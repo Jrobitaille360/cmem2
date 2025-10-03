@@ -1,0 +1,2181 @@
+{
+    "base_infos": {
+        "name": "Collective Memories API",
+        "version": "1.1.0",
+        "description": "API REST pour l'application de mémoires collectives. Gestion utilisateurs, groupes, mémoires, fichiers, tags. Authentification JWT avec vérification email obligatoire. SMTP intégré.",
+        "documentation": "https://votre site/api/docs",
+        "base_url": "https://votre site/cmem1_API/",
+        "format": "JSON",
+        "encoding": "UTF-8",
+        "auth": {
+            "type": "JWT Bearer Token",
+            "header": "Authorization: Bearer <token>",
+            "email_verification_required": true,
+            "login_security": "Email must be verified before authentication"
+        },
+        "email": {
+            "smtp": true,
+            "server": "votre serveur:587",
+            "security": "TLS",
+            "templates": "HTML responsive",
+            "dev_mode": "emails loggés uniquement",
+            "verification": {
+                "required_for_login": true,
+                "token_expiry": "24 hours",
+                "resend_available": true,
+                "endpoint_resend": "/public/users/resend-verification"
+            }
+        },
+        "frontend_requirements": {
+            "auth": "JWT Bearer tokens dans l'en-tête Authorization",
+            "content_type": "application/json pour les données POST/PUT",
+            "cors": "CORS ouvert (Access-Control-Allow-Origin: *)",
+            "file_uploads": "multipart/form-data pour les uploads (images, docs, audio, vidéo)"
+        },
+        "limits": {
+            "pagination": "100 éléments max/page",
+            "uploads": {
+                "images": "5 MB",
+                "documents": "10 MB",
+                "audio": "20 MB",
+                "video": "50 MB",
+                "avatars": "2 MB"
+            },
+            "rate_limit": "100 requêtes/heure/IP"
+        },
+        "security_workflows": {
+            "user_registration": {
+                "steps": [
+                    "1. POST /users/register - Créer un compte",
+                    "2. Email de vérification envoyé automatiquement", 
+                    "3. POST /users/verify-email - Vérifier l'email avec le token",
+                    "4. POST /users/login - Se connecter (email vérifié requis)"
+                ]
+            },
+            "login_with_unverified_email": {
+                "error_code": 403,
+                "error_type": "EMAIL_NOT_VERIFIED",
+                "recovery_options": [
+                    "POST /users/resend-verification - Renvoyer l'email",
+                    "POST /users/verify-email - Vérifier avec le token"
+                ]
+            },
+            "password_reset": {
+                "steps": [
+                    "1. POST /users/request-password-reset",
+                    "2. Email avec token de reset envoyé",
+                    "3. POST /users/reset-password - Changer le mot de passe"
+                ]
+            }
+        },
+        "standard_error_codes": {
+            "400": "Données de validation invalides",
+            "401": "Authentification requise ou token invalide", 
+            "403": "Accès refusé (permissions insuffisantes ou email non vérifié)",
+            "404": "Ressource non trouvée",
+            "409": "Conflit (ressource existe déjà)",
+            "500": "Erreur interne du serveur"
+        },
+        "status": "Opérationnelle",
+        "server_time": "Exemple: 2025-08-04 17:56:34 (dynamique)",
+        "database": {
+            "status": "Connectée",
+            "charset": "utf8mb4"
+        }
+    },
+    "entry_points": [
+        {   "section": "Public",
+            "endpoints": [
+                {   "method": "GET", "path": "/",
+                    "description": "Obtenir des informations sur l'API",
+                    "auth": "Non",
+                    "validation": {
+                        "note": "Aucune donnée d'entrée requise"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "API_info",
+                        "data": {
+                            "name": "Collective Memories API",
+                            "version": "1.1.0",
+                            "status": "Opérationnelle"
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 500,
+                            "message": "Erreur serveur critique"
+                        }
+                    ]
+                },
+                {   "method": "GET", "path": "/help",
+                    "description": "Fourni de l'aide sur les endpoints de l'API",
+                    "auth": "Non",
+                    "validation": {
+                        "note": "Aucune donnée d'entrée requise"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "help",
+                        "data": {
+                            "endpoints": {
+                                "public": {},
+                                "users": {},
+                                "memories": {},
+                                "elements": {},
+                                "groups": {},
+                                "tag": {},
+                                "file": {},
+                                "data": {},
+                                "stats": {}
+                            }
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 500,
+                            "message": "Erreur serveur lors de la génération de l'aide"
+                        }
+                    ]
+                },
+                {   "method": "GET", "path": "/health",
+                    "description": "Vérifier le statut de l'API",
+                    "auth": "Non",
+                    "validation": {
+                        "note": "Aucune donnée d'entrée requise"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "health_status",
+                        "data": {
+                            "status": "OK",
+                            "message": "API Collective Memories opérationnelle",
+                            "timestamp": "2025-07-27 14:30:00",
+                            "version": "1.1.0"
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 500,
+                            "message": "Erreur serveur lors de la vérification du statut"
+                        },
+                        {
+                            "code": 503,
+                            "message": "Service temporairement indisponible"
+                        }
+                    ]
+                },
+                {   "method": "POST", "path": "/users/register",
+                    "description": "Créer un nouveau compte utilisateur",
+                    "auth": "Non",
+                    "request": {
+                        "name": "Jean Dupont",
+                        "email": "user@example.com",
+                        "password": "motdepasse123",
+                        "bio": "Historien passionné",
+                        "phone": "0600000002",
+                        "date_of_birth": "1990-02-15",
+                        "location": "Lyon"
+                    },
+                    "validation": {
+                        "name": "requis, 2-255 caractères",
+                        "email": "requis, email valide, unique",
+                        "password": "requis, 6 caractères minimum",
+                        "bio": "optionnel, texte libre",
+                        "phone": "optionnel, numéro de téléphone",
+                        "date_of_birth": "optionnel, format YYYY-MM-DD",
+                        "location": "optionnel, lieu de résidence"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Nouvel utilisateur créé. Un email de vérification a été envoyé.",
+                        "data": {
+                            "user": {
+                                "id": 23,
+                                "name": "Jean Dupont",
+                                "email": "user@example.com",
+                                "role": "UTILISATEUR",
+                                "profile_image": "default.jpg",
+                                "bio": "Historien passionné",
+                                "phone": "0600000002",
+                                "date_of_birth": "1990-02-15",
+                                "location": "Lyon",
+                                "email_verified": 0,
+                                "last_login": null,
+                                "created_at": "2025-07-27 14:30:00",
+                                "updated_at": "2025-07-27 14:30:00",
+                                "deleted_at": null
+                            },
+                            "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 400,
+                            "message": "Données invalides"
+                        },
+                        {
+                            "code": 409,
+                            "message": "Cet email est déjà utilisé, peut-être désactivé. Vous devez vous connecter ou le réactiver"
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors de la création de l'utilisateur"
+                        },
+                        {
+                            "code": 500,
+                            "message": "Échec de l'envoi de l'email de vérification"
+                        }
+                    ]
+                },
+                {   "method": "POST", "path": "/users/login",
+                    "description": "Se connecter. L'email doit être vérifié pour pouvoir se connecter",
+                    "auth": "Non",
+                    "request": {
+                        "email": "user@example.com",
+                        "password": "motdepasse123"
+                    },
+                    "validation": {
+                        "email": "requis, email valide",
+                        "password": "requis, 6 caractères minimum"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Connexion réussie",
+                        "data": {
+                            "user": {
+                                "id": 1,
+                                "name": "Jean Dupont",
+                                "email": "user@example.com",
+                                "role": "UTILISATEUR",
+                                "email_verified": 1,
+                                "last_login": "2025-09-10 14:30:00"
+                            },
+                            "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 400,
+                            "message": "Données de validation invalides"
+                        },
+                        {
+                            "code": 401,
+                            "message": "Identifiants invalides"
+                        },
+                        {
+                            "code": 403,
+                            "message": "Email non vérifié",
+                            "example_response": {
+                                "success": false,
+                                "error": "Email non vérifié",
+                                "data": {
+                                    "code": "EMAIL_NOT_VERIFIED",
+                                    "message": "Votre adresse email n'a pas encore été vérifiée. Veuillez vérifier votre boîte de réception.",
+                                    "actions": {
+                                        "resend_verification": {
+                                            "endpoint": "/public/users/resend-verification",
+                                            "method": "POST",
+                                            "params": ["email"]
+                                        },
+                                        "verify_email": {
+                                            "endpoint": "/public/users/verify-email",
+                                            "method": "POST",
+                                            "params": ["token"]
+                                        }
+                                    },
+                                    "user_email": "user@example.com"
+                                }
+                            }
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur interne du serveur"
+                        }
+                    ]
+                },
+                {   "method": "POST", "path": "/users/request-password-reset",
+                    "description": "Demander une réinitialisation de mot de passe (par email)",
+                    "auth": "Non",
+                    "request": {
+                        "email": "user@example.com"
+                    },
+                    "validation": {
+                        "email": "requis, email valide"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Si cet email existe, un lien de réinitialisation a été envoyé"
+                    },
+                    "error_responses": [
+                        {
+                            "code": 400,
+                            "message": "Données de validation invalides"
+                        },
+                        {
+                            "code": 404,
+                            "message": "Utilisateur non trouvé"
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors de la génération du token ou de l'envoi de l'email"
+                        }
+                    ]
+                },
+                {   "method": "POST", "path": "/users/reset-password",
+                    "description": "Changer le mot de passe avec un token",
+                    "auth": "Non",
+                    "request": {
+                        "token": "dsfélg ...",
+                        "new_password": "nouveauMotDePasse123"
+                    },
+                    "validation": {
+                        "token": "requis, token valide non expiré",
+                        "new_password": "requis, 6 caractères minimum"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Mot de passe changé avec succès"
+                    },
+                    "error_responses": [
+                        {
+                            "code": 400,
+                            "message": "Données de validation invalides"
+                        },
+                        {
+                            "code": 404,
+                            "message": "Token non trouvé, invalide ou expiré"
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors du changement de mot de passe"
+                        }
+                    ]
+                },
+                {   "method": "POST", "path": "/users/resend-verification",
+                    "description": "Renvoyer l'email de vérification pour un compte non vérifié",
+                    "auth": "Non",
+                    "request": {
+                        "email": "user@example.com"
+                    },
+                    "validation": {
+                        "email": "requis, email valide"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Un nouvel email de vérification a été envoyé à votre adresse",
+                        "data": {
+                            "email": "user@example.com",
+                            "expires_in": "24 heures"
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 400,
+                            "message": "Données de validation invalides ou email déjà vérifié"
+                        },
+                        {
+                            "code": 404,
+                            "message": "Aucun compte associé à cette adresse email"
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors de l'envoi de l'email"
+                        }
+                    ]
+                },
+                {   "method": "POST", "path": "/users/verify-email",
+                    "description": "Vérifier l'adresse email avec un token",
+                    "auth": "Non",
+                    "request": {
+                        "token": "ajsdfhkasdf"
+                    },
+                    "validation": {
+                        "token": "requis, token valide"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Email vérifié avec succès"
+                    },
+                    "error_responses": [
+                        {
+                            "code": 404,
+                            "message": "Utilisateur non trouvé ou token invalide"
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors de la vérification"
+                        }
+                    ]
+                },
+                {   "method": "GET", "path": "/groups",
+                    "description": "Lister les groupes publics",
+                    "auth": "Non",
+                    "request": {
+                        "q": "terme recherché",
+                        "page": 1,
+                        "page_size": 20
+                    },
+                    "validation": {
+                        "q": "optionnel, terme de recherche, 2-255 caractères",
+                        "page": "optionnel, numéro de page, entier >= 1",
+                        "page_size": "optionnel, taille de page, entier 1-100"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "data": {
+                            "groups": [],
+                            "pagination": {}
+                        }
+                    }
+                },
+                {   "method": "POST", "path": "/groups/join",
+                    "description": "Rejoindre un groupe avec code",
+                    "auth": "Non",
+                    "request": {
+                        "code": "code du groupe"
+                    },
+                    "validation": {
+                        "code": "requis, code de groupe valide"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Vous avez rejoint le groupe avec succès"
+                    },
+                    "error_responses": [
+                        {
+                            "code": 404,
+                            "message": "Groupe non trouvé"
+                        },
+                        {
+                            "code": 400,
+                            "message": "Code de groupe invalide"
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors de la tentative de rejoindre le groupe"
+                        }
+                    ]
+                },
+                {   "method": "GET", "path": "/memories",
+                    "description": "Lister les mémoires publiques",
+                    "auth": "Non",
+                    "request": {
+                        "q": "terme recherché",
+                        "page": 1,
+                        "page_size": 20,
+                        "order_by": "created_at",
+                        "order_dir": "DESC"
+                    },
+                    "validation": {
+                        "q": "optionnel, terme de recherche, 2-255 caractères",
+                            "page": "optionnel, numéro de page, entier >= 1",
+                            "page_size": "optionnel, taille de page, entier 1-100"
+                        },
+                    "success_response": {
+                        "success": true,
+                        "data": {
+                                "memories": [],
+                                "pagination": {}
+                        }
+                    }
+                }
+            ]
+        },
+        {   "section": "Users",
+            "basePath": "/users",
+            "endpoints": [
+                {   "method": "POST", "path": "/users/avatar",
+                    "description": "Mettre à jour son propre avatar",
+                    "auth": "Utilisateur",
+                    "request": {
+                        "avatar": "(fichier, multipart/form-data)"
+                    },
+                    "validation": {
+                        "avatar": "requis, fichier image (JPEG, PNG, GIF), taille max 2MB"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Avatar mis à jour avec succès",
+                        "data": {
+                            "avatar_url": "/uploads/avatars/1_avatar.jpg"
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 401,
+                            "message": "Authentification requise"
+                        },
+                        {
+                            "code": 400,
+                            "message": "Aucun fichier avatar uploadé"
+                        },
+                        {
+                            "code": 400,
+                            "message": "Fichier avatar invalide"
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors de l'enregistrement du fichier avatar"
+                        }
+                    ]
+                },
+                {   "method": "POST", "path": "/users/{id}/avatar",
+                    "description": "Mettre à jour l'avatar d'un autre utilisateur",
+                    "auth": "Admin",
+                    "request": {
+                        "avatar": "(fichier, multipart/form-data)"
+                    },
+                    "validation": {
+                        "avatar": "requis, fichier image (JPEG, PNG, GIF), taille max 2MB",
+                        "id": "requis, ID utilisateur valide"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Avatar mis à jour avec succès",
+                        "data": {
+                            "avatar_url": "/uploads/avatars/1_avatar.jpg"
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 401,
+                            "message": "Authentification requise"
+                        },
+                        {
+                            "code": 403,
+                            "message": "Accès non autorisé"
+                        },
+                        {
+                            "code": 400,
+                            "message": "Aucun fichier avatar uploadé"
+                        },
+                        {
+                            "code": 400,
+                            "message": "Fichier avatar invalide"
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors de l'enregistrement du fichier avatar"
+                        }
+                    ]
+                },
+                {   "method": "PUT", "path": "/users/password",
+                    "description": "Changer son propre mot de passe",
+                    "auth": "Utilisateur",
+                    "request": {
+                        "current_password": "motDePasseActuel",
+                        "new_password": "nouveauMotDePasse123"
+                    },
+                    "validation": {
+                        "current_password": "requis, mot de passe actuel",
+                        "new_password": "requis, 6 caractères minimum"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Mot de passe changé avec succès"
+                    },
+                    "error_responses": [
+                        {
+                            "code": 400,
+                            "message": "Données de validation invalides"
+                        },
+                        {
+                            "code": 401,
+                            "message": "Mot de passe actuel incorrect"
+                        },
+                        {
+                            "code": 404,
+                            "message": "Utilisateur non trouvé"
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors du changement de mot de passe"
+                        }
+                    ]
+                },
+                {   "method": "PUT", "path": "/users/{id}/password",
+                    "description": "Changer le mot de passe d'un utilisateur par un administrateur",
+                    "auth": "Admin",
+                    "request": {
+                        "new_password": "nouveauMotDePasse123"
+                    },
+                    "validation": {
+                        "new_password": "requis, 6 caractères minimum",
+                        "id": "requis, ID utilisateur valide"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Mot de passe changé avec succès"
+                    },
+                    "error_responses": [
+                        {
+                            "code": 400,
+                            "message": "Données de validation invalides"
+                        },
+                        {
+                            "code": 401,
+                            "message": "Authentification requise"
+                        },
+                        {
+                            "code": 403,
+                            "message": "Accès non autorisé"
+                        },
+                        {
+                            "code": 404,
+                            "message": "Utilisateur non trouvé"
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors du changement de mot de passe"
+                        }
+                    ]
+                },
+                {
+                    "method": "POST",
+                    "path": "/users/logout",
+                    "description": "Se déconnecter",
+                    "auth": "Utilisateur",
+                    "validation": {
+                        "note": "Aucune donnée d'entrée requise"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Déconnexion réussie"
+                    },
+                    "error_responses": [
+                        {
+                            "code": 401,
+                            "message": "Utilisateur non authentifié"
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur serveur lors de la déconnexion"
+                        }
+                    ]
+                },
+                {
+                    "method": "GET",
+                    "path": "/users",
+                    "description": "Obtenir la liste de tous les utilisateurs",
+                    "auth": "Admin",
+                    "request": {
+                        "page": 2,
+                        "limite": 30
+                    },
+                    "validation": {
+                        "page": "optionnel, numéro de page, entier >= 1",
+                        "limite": "optionnel, nombre d'éléments par page, entier 1-100"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Liste des utilisateurs",
+                        "data": {
+                            "users": [],
+                            "total_users": 202,
+                            "page": 2,
+                            "limit": 30,
+                            "total_pages": 7
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 401,
+                            "message": "Utilisateur non authentifié"
+                        },
+                        {
+                            "code": 403,
+                            "message": "Accès non autorisé"
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur serveur lors de la récupération des utilisateurs"
+                        }
+                    ]
+                },
+                {
+                    "method": "GET",
+                    "path": "/users/me",
+                    "description": "Récupérer son propre profil.",
+                    "auth": "Utilisateur",
+                    "validation": {
+                        "note": "Aucune donnée d'entrée requise"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Profil récupéré",
+                        "data": {
+                            "id": 1,
+                            "name": "Jean Dupont",
+                            "email": "user@cmem1.com",
+                            "role": "UTILISATEUR",
+                            "profile_image": "/uploads/avatars/2.jpg",
+                            "bio": "Historien passionné",
+                            "phone": "0600000002",
+                            "date_of_birth": "1990-02-15",
+                            "location": "Lyon",
+                            "email_verified": 1,
+                            "last_login": "2025-08-02 10:00:00",
+                            "created_at": "2025-01-01 10:00:00",
+                            "updated_at": "2025-08-02 10:00:00",
+                            "deleted_at": null
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 401,
+                            "message": "Utilisateur non authentifié"
+                        },
+                        {
+                            "code": 404,
+                            "message": "Utilisateur non trouvé"
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur serveur lors de la récupération de l'utilisateur"
+                        }
+                    ]
+                },
+                {
+                    "method": "GET",
+                    "path": "/users/{id}",
+                    "description": "Récupérer le profil d'un utilisateur.",
+                    "auth": "Admin",
+                    "validation": {
+                        "id": "requis, ID utilisateur valide"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Profil récupéré",
+                        "data": {
+                            "id": 1,
+                            "name": "Jean Dupont",
+                            "email": "user@cmem1.com",
+                            "role": "UTILISATEUR",
+                            "profile_image": "/uploads/avatars/2.jpg",
+                            "bio": "Historien passionné",
+                            "phone": "0600000002",
+                            "date_of_birth": "1990-02-15",
+                            "location": "Lyon",
+                            "email_verified": 1,
+                            "last_login": "2025-08-02 10:00:00",
+                            "created_at": "2025-01-01 10:00:00",
+                            "updated_at": "2025-08-02 10:00:00",
+                            "deleted_at": null
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 401,
+                            "message": "Utilisateur non authentifié"
+                        },
+                        {
+                            "code": 403,
+                            "message": "Accès non autorisé"
+                        },
+                        {
+                            "code": 404,
+                            "message": "Utilisateur non trouvé"
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur serveur lors de la récupération de l'utilisateur"
+                        }
+                    ]
+                },
+                {
+                    "method": "PUT",
+                    "path": "/users/me",
+                    "description": "Modifier son propre profil",
+                    "auth": "Utilisateur",
+                    "request": {
+                        "name": "Jean Martin NOUVEAU",
+                        "email": "nouveau@email.com",
+                        "bio": "Nouvelle biographie...",
+                        "phone": "0611223344",
+                        "date_of_birth": "1990-01-15",
+                        "location": "Paris"
+                    },
+                    "validation": {
+                        "name": "optionnel, 2-255 caractères",
+                        "email": "optionnel, email valide, unique",
+                        "bio": "optionnel, texte libre",
+                        "phone": "optionnel, numéro de téléphone",
+                        "date_of_birth": "optionnel, format YYYY-MM-DD",
+                        "location": "optionnel, lieu de résidence"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Profil mis à jour avec succès",
+                        "data": {
+                            "id": 1,
+                            "name": "Jean Martin",
+                            "email": "nouveau@email.com",
+                            "role": "UTILISATEUR",
+                            "profile_image": "avatars/123_avatar.jpg",
+                            "bio": "Nouvelle biographie...",
+                            "phone": "0611223344",
+                            "date_of_birth": "1990-01-15",
+                            "location": "Paris",
+                            "email_verified": 1,
+                            "last_login": "2025-08-01 10:00:00",
+                            "created_at": "2025-01-01 10:00:00",
+                            "updated_at": "2025-08-01 10:00:00",
+                            "deleted_at": null
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 400,
+                            "message": "Données de validation invalides"
+                        },
+                        {
+                            "code": 404,
+                            "message": "Utilisateur non trouvé"
+                        },
+                        {
+                            "code": 409,
+                            "message": "Cet email est déjà utilisé"
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors de la mise à jour"
+                        }
+                    ]
+                },
+                {
+                    "method": "PUT",
+                    "path": "/users/{id}",
+                    "description": "Modifier le profil d'un utilisateur par l'administrateur",
+                    "auth": "Admin",
+                    "request": {
+                        "name": "Jean Martin NOUVEAU",
+                        "email": "nouveau@email.com",
+                        "bio": "Nouvelle biographie...",
+                        "phone": "0611223344",
+                        "date_of_birth": "1990-01-15",
+                        "location": "Paris"
+                    },
+                    "validation": {
+                        "name": "optionnel, 2-255 caractères",
+                        "email": "optionnel, email valide, unique",
+                        "bio": "optionnel, texte libre",
+                        "phone": "optionnel, numéro de téléphone",
+                        "date_of_birth": "optionnel, format YYYY-MM-DD",
+                        "location": "optionnel, lieu de résidence",
+                        "id": "requis, ID utilisateur valide"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Profil mis à jour avec succès",
+                        "data": {
+                            "id": 1,
+                            "name": "Jean Martin",
+                            "email": "nouveau@email.com",
+                            "role": "UTILISATEUR",
+                            "profile_image": "avatars/123_avatar.jpg",
+                            "bio": "Nouvelle biographie...",
+                            "phone": "0611223344",
+                            "date_of_birth": "1990-01-15",
+                            "location": "Paris",
+                            "email_verified": 1,
+                            "last_login": "2025-08-01 10:00:00",
+                            "created_at": "2025-01-01 10:00:00",
+                            "updated_at": "2025-08-01 10:00:00",
+                            "deleted_at": null
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 400,
+                            "message": "Données de validation invalides"
+                        },
+                        {
+                            "code": 404,
+                            "message": "Utilisateur non trouvé"
+                        },
+                        {
+                            "code": 409,
+                            "message": "Cet email est déjà utilisé"
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors de la mise à jour"
+                        }
+                    ]
+                },
+                {
+                    "method": "DELETE",
+                    "path": "/users/me",
+                    "description": "Supprimer son propre compte (soft delete)",
+                    "auth": "Utilisateur",
+                    "request": {
+                        "password": "motDePasseActuel"
+                    },
+                    "validation": {
+                        "password": "requis, mot de passe actuel"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Compte supprimé avec succès"
+                    },
+                    "error_responses": [
+                        {
+                            "code": 400,
+                            "message": "Mot de passe requis"
+                        },
+                        {
+                            "code": 401,
+                            "message": "Mot de passe incorrect ou non authentifié"
+                        },
+                        {
+                            "code": 404,
+                            "message": "Utilisateur non trouvé"
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors de la suppression"
+                        }
+                    ]
+                },
+                {
+                    "method": "DELETE",
+                    "path": "/users/{id}",
+                    "description": "Supprimer un compte (soft delete par défaut, ou hard delete)",
+                    "auth": "Admin",
+                    "request": {
+                        "force_delete": true
+                    },
+                    "validation": {
+                        "force_delete": "optionnel, booléen pour suppression définitive",
+                        "id": "requis, ID utilisateur valide"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Compte supprimé avec succès"
+                    },
+                    "error_responses": [
+                        {
+                            "code": 401,
+                            "message": "Authentification requise"
+                        },
+                        {
+                            "code": 403,
+                            "message": "Accès non autorisé"
+                        },
+                        {
+                            "code": 404,
+                            "message": "Utilisateur non trouvé"
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors de la suppression"
+                        }
+                    ]
+                },
+                {
+                    "method": "POST",
+                    "path": "/users/{id}/restore",
+                    "description": "Restaurer un compte supprimé (soft)",
+                    "auth": "Admin",
+                    "request": {},
+                    "validation": {
+                        "id": "requis, ID utilisateur valide"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Compte restauré avec succès"
+                    },
+                    "error_responses": [
+                        {
+                            "code": 401,
+                            "message": "Authentification requise"
+                        },
+                        {
+                            "code": 403,
+                            "message": "Accès non autorisé"
+                        },
+                        {
+                            "code": 404,
+                            "message": "Utilisateur non trouvé ou non supprimé"
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors de la restauration"
+                        }
+                    ]
+                }
+            ]
+        },
+        {   "section": "Memories",
+            "basePath": "/memories",
+            "endpoints": [
+                {   "method": "GET", "path": "/memories",
+                    "description": "Lister les mémoires (publiques si non authentifié, toutes si authentifié)",
+                    "auth": "Optionnelle",
+                    "request": {
+                        "page": 1,
+                        "page_size": 20,
+                        "q": ""
+                    },
+                    "validation": {
+                        "page": "optionnel, numéro de page, entier >= 1",
+                        "page_size": "optionnel, taille de page, entier 1-100",
+                        "q": "optionnel, terme de recherche, 2-255 caractères"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "data": {
+                            "memories": [],
+                            "pagination": {}
+                        }
+                    }
+                },
+                {   "method": "POST", "path": "/memories",
+                    "description": "Créer une nouvelle mémoire",
+                    "auth": "Utilisateur",
+                    "request": {
+                        "title": "Titre de la mémoire",
+                        "content": "Contenu détaillé de la mémoire...",
+                        "visibility": "private",
+                        "location": "Paris, France",
+                        "latitude": 48.8566,
+                        "longitude": 2.3522,
+                        "date": "2025-07-27"
+                    },
+                    "validation": {
+                        "title": "requis, 3-255 caractères",
+                        "content": "optionnel, texte libre",
+                        "visibility": "optionnel, par défaut 'privé'",
+                        "location": "optionnel, lieu de résidence",
+                        "latitude": "optionnel, format décimal",
+                        "longitude": "optionnel, format décimal",
+                        "date": "optionnel, format YYYY-MM-DD"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Mémoire créée avec succès",
+                        "data": {
+                            "id": 2,
+                            "title": "Titre de la mémoire",
+                            "content": "Contenu détaillé...",
+                            "visibility": "public",
+                            "user_id": 1,
+                            "created_at": "2025-07-27 14:30:00"
+                        }
+                    }
+                },
+                {   "method": "GET", "path": "/memories/{id}",
+                    "description": "Récupérer une mémoire spécifique",
+                    "auth": "Utilisateur",
+                    "success_response": {
+                        "success": true,
+                        "data": {
+                            "id": 1,
+                            "title": "Ma première mémoire",
+                            "content": "Contenu complet...",
+                            "visibility": "public",
+                            "location": "Paris, France",
+                            "latitude": 48.8566,
+                            "longitude": 2.3522,
+                            "time_start": "2025-07-20",
+                            "time_end": "2025-07-20",
+                            "user_id": 1,
+                            "creator_name": "Jean Dupont",
+                            "elements": [],
+                            "tags": [],
+                            "created_at": "2025-07-27 14:00:00",
+                            "updated_at": "2025-07-27 14:00:00"
+                        }
+                    }
+                },
+                {   "method": "PUT", "path": "/memories/{id}",
+                    "description": "Modifier une mémoire",
+                    "auth": "Propriétaire ou Admin",
+                    "request": {
+                        "title": "Nouveau titre",
+                        "content": "Nouveau contenu...",
+                        "is_private": true,
+                        "location": "Lyon, France",
+                        "latitude": 45.764,
+                        "longitude": 4.8357
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Mémoire mise à jour avec succès",
+                        "data": {
+                            "id": 1,
+                            "title": "Nouveau titre",
+                            "content": "Nouveau contenu...",
+                            "updated_at": "2025-07-27 14:35:00"
+                        }
+                    }
+                },
+                {   "method": "DELETE", "path": "/memories/{id}",
+                    "description": "Supprimer une mémoire",
+                    "auth": "Propriétaire ou Admin",
+                    "success_response": {
+                        "success": true,
+                        "message": "Mémoire supprimée avec succès"
+                    }
+                },
+                {   "method": "GET", "path": "/memories/my",
+                    "description": "Récupérer mes mémoires",
+                    "auth": "Utilisateur",
+                    "success_response": {
+                        "success": true,
+                        "data": {}
+                    }
+                },
+                {   "method": "POST", "path": "/memories/{memoryId}/{elementId}/attach",
+                    "description": "Attacher un élément à une mémoire",
+                    "auth": "Utilisateur",
+                    "success_response": {
+                        "success": true,
+                        "data": {}
+                    }
+                },
+                {   "method": "POST", "path": "/memories/{memoryId}/{elementId}/detach",
+                    "description": "Détacher un élément d'une mémoire",
+                    "auth": "Utilisateur",
+                    "success_response": {
+                        "success": true,
+                        "data": {}
+                    }
+                }
+            ]
+        },
+        {   "section": "Elements",
+            "basePath": "/elements",
+            "endpoints": [
+                {   "method": "POST", "path": "/elements",
+                    "description": "Créer un élément (texte, image, audio, vidéo, document, GPX, iCal)",
+                    "auth": "JWT Bearer Token",
+                    "request": {
+                        "title": "Titre de l'élément",
+                        "content": "Contenu de l'élément",
+                        "media_type": "text",
+                        "visibility": "private",
+                        "filename": "nom_fichier.ext"
+                    },
+                    "validation": {
+                        "title": "requis, string, min 2, max 255 caractères",
+                        "content": "optionnel, string, max 10000 caractères",
+                        "media_type": "optionnel, enum: text,image,audio,video,document,gpx,ical (défaut: text)",
+                        "visibility": "optionnel, enum: private,shared,public (défaut: private)",
+                        "filename": "requis sauf pour texte, string, max 255 caractères"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Élément créé avec succès",
+                        "data": {
+                            "id": 47,
+                            "title": "Titre de l'élément",
+                            "content": "Contenu de l'élément",
+                            "media_type": "text",
+                            "visibility": "private",
+                            "filename": "nom_fichier.ext",
+                            "owner_id": 13,
+                            "created_at": "2025-09-11 09:00:45",
+                            "updated_at": "2025-09-11 09:00:45"
+                        }
+                    }
+                },
+                {   "method": "GET", "path": "/elements",
+                    "description": "Lister les éléments avec filtrage et pagination",
+                    "auth": "JWT Bearer Token, sinon seulement éléments publics",
+                    "request": {
+                        "media_type": "filtrer par type (text,image,audio,video,document,gpx,ical)",
+                        "q": "terme de recherche dans titre/contenu",
+                        "page": "numéro de page (défaut: 1)",
+                        "limit": "nombre d'éléments par page (défaut: 20, max: 100)"
+                    },
+                    "validation": {
+                        "media_type": "optionnel, enum: text,image,audio,video,document,gpx,ical",
+                        "q": "optionnel, string, max 255 caractères",
+                        "page": "optionnel, integer, min 1",
+                        "limit": "optionnel, integer, min 1, max 100"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Liste des éléments récupérée",
+                        "data": {
+                            "elements": [],
+                            "pagination": {
+                                "page": 1,
+                                "limit": 20,
+                                "total": 1,
+                                "total_pages": 1
+                            }
+                        }
+                    }
+                },
+                {   "method": "GET", "path": "/elements/{id}",
+                    "description": "Récupérer un élément spécifique",
+                    "auth": "JWT Bearer Token",
+                    "permissions": "Propriétaire: accès complet, Autres: seulement éléments publics, Admin: accès complet",
+                    "success_response": {
+                        "success": true,
+                        "message": "Élément récupéré",
+                        "data": {
+                            "id": 47,
+                            "title": "Titre de l'élément",
+                            "content": "Contenu complet",
+                            "media_type": "text",
+                            "visibility": "public",
+                            "filename": null,
+                            "owner_id": 13,
+                            "created_at": "2025-09-11 09:00:45",
+                            "updated_at": "2025-09-11 09:00:45"
+                        }
+                    }
+                },
+                {   "method": "PUT", "path": "/elements/{id}",
+                    "description": "Modifier un élément existant",
+                    "auth": "JWT Bearer Token (propriétaire ou admin)",
+                    "request": {
+                        "title": "Nouveau titre",
+                        "content": "Nouveau contenu",
+                        "media_type": "image",
+                        "visibility": "public",
+                        "filename": "nouveau_fichier.jpg"
+                    },
+                    "validation": {
+                        "title": "optionnel, string, max 255 caractères",
+                        "content": "optionnel, string, max 10000 caractères",
+                        "media_type": "optionnel, enum: text,image,audio,video,document,gpx,ical",
+                        "visibility": "optionnel, enum: private,shared,public",
+                        "filename": "optionnel, string, max 255 caractères"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Élément mis à jour avec succès",
+                        "data": {
+                            "id": 47,
+                            "title": "Nouveau titre",
+                            "content": "Nouveau contenu",
+                            "media_type": "image",
+                            "visibility": "public",
+                            "filename": "nouveau_fichier.jpg",
+                            "owner_id": 13,
+                            "updated_at": "2025-09-11 09:15:32"
+                        }
+                    }
+                },
+                {   "method": "DELETE", "path": "/elements/{id}",
+                    "description": "Supprimer un élément (soft delete)",
+                    "auth": "JWT Bearer Token (propriétaire ou admin)",
+                    "success_response": {
+                        "success": true,
+                        "message": "Élément supprimé avec succès"
+                    }
+                }
+            ]
+        },
+        {   "section": "Tags",
+            "basePath": "/tags",
+            "endpoints": [
+                {   "method": "POST", "path": "/tags", 
+                    "description": "Créer un tag",
+                    "auth": "Utilisateur",
+                    "request": {
+                        "name": "Histoire",
+                        "table_associate": "memories",
+                        "color": "#3498db"
+                    },
+                    "validation": {
+                        "name": "requis, 1-100 caractères",
+                        "table_associate": "optionnel, in('groups','memories','elements','files','all')",
+                        "color": "optionnel, format #RRGGBB"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Tag créé avec succès",
+                        "data": {
+                            "id": 1,
+                            "name": "Histoire",
+                            "table_associate": "memories",
+                            "color": "#3498db",
+                            "tag_owner": 1,
+                            "created_at": "2025-08-26 10:00:00",
+                            "updated_at": "2025-08-26 10:00:00",
+                            "deleted_at": null
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 400,
+                            "message": "Données invalides"
+                        },
+                        {
+                            "code": 401,
+                            "message": "Utilisateur non authentifié"
+                        }
+                    ]
+                },
+                {   "method": "GET", "path": "/tags",
+                    "description": "Lister/rechercher les tags",
+                    "auth": "Utilisateur",
+                    "request": {
+                        "q": "Recherche par nom",
+                        "table_associate": "memories",
+                        "page": 1,
+                        "limit": 20
+                    },
+                    "validation": {
+                        "q": "optionnel, terme de recherche",
+                        "table_associate": "optionnel, in('groups','memories','elements','files','all')",
+                        "page": "optionnel, numéro de page >= 1",
+                        "limit": "optionnel, nombre d'éléments 1-50"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Résultats de recherche",
+                        "data": {
+                            "tags": [],
+                            "search_term": "Histoire",
+                            "table_associate": "memories",
+                            "page": 1,
+                            "limit": 20
+                        }
+                    }
+                },
+                {   "method": "GET", "path": "/tags/{id}",
+                    "description": "Détail d'un tag",
+                    "auth": "Utilisateur",
+                    "validation": {
+                        "id": "requis, ID du tag numérique"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Détails du tag récupérés",
+                        "data": {
+                            "id": 1,
+                            "name": "Histoire",
+                            "table_associate": "memories",
+                            "color": "#3498db",
+                            "tag_owner": 1,
+                            "created_at": "2025-08-26 10:00:00",
+                            "updated_at": "2025-08-26 10:00:00",
+                            "deleted_at": null
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 403,
+                            "message": "Accès non autorisé"
+                        },
+                        {
+                            "code": 404,
+                            "message": "Tag non trouvé"
+                        }
+                    ]
+                },
+                {   "method": "PUT", "path": "/tags/{id}",
+                    "description": "Modifier un tag",
+                    "auth": "Propriétaire ou Admin",
+                    "request": {
+                        "name": "Nouveau nom",
+                        "table_associate": "memories",
+                        "color": "#3498db"
+                    },
+                    "validation": {
+                        "id": "requis, ID du tag numérique",
+                        "name": "optionnel, 1-100 caractères",
+                        "table_associate": "optionnel, in('groups','memories','elements','files','all')",
+                        "color": "optionnel, format #RRGGBB"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Tag modifié avec succès",
+                        "data": {
+                            "id": 1,
+                            "name": "Nouveau nom",
+                            "table_associate": "memories",
+                            "color": "#3498db",
+                            "tag_owner": 1,
+                            "created_at": "2025-08-26 10:00:00",
+                            "updated_at": "2025-08-26 10:30:00",
+                            "deleted_at": null
+                        }
+                    }
+                },
+                {   "method": "DELETE", "path": "/tags/{id}",
+                    "description": "Supprimer un tag (soft delete)",
+                    "auth": "Propriétaire ou Admin",
+                    "request": {
+                        "force_delete": true
+                    },
+                    "validation": {
+                        "force_delete": "optionnel, booléen pour suppression définitive",
+                        "id": "requis, ID du fichier numérique"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Tag supprimé avec succès"
+                    },
+                    "error_responses": [
+                        {
+                            "code": 409,
+                            "message": "Impossible de supprimer ce tag car il est encore utilisé",
+                            "data": {
+                                "usage_count": 3
+                            }
+                        }
+                    ]
+                },
+                {   "method": "POST", "path": "/tags/{id}/restore",
+                    "description": "Restaurer un tag supprimé",
+                    "auth": "Propriétaire ou Admin",
+                    "validation": {
+                        "id": "requis, ID du tag numérique"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Tag restauré avec succès"
+                    },
+                    "error_responses": [
+                        {
+                            "code": 400,
+                            "message": "Ce tag n'est pas supprimé"
+                        },
+                        {
+                            "code": 404,
+                            "message": "Tag non trouvé"
+                        }
+                    ]
+                },
+                {   "method": "GET", "path": "/tags/my-tags",
+                    "description": "Mes tags",
+                    "auth": "Utilisateur",
+                    "request": {
+                        "page": 1,
+                        "limit": 50
+                    },
+                    "validation": {
+                        "page": "optionnel, numéro de page >= 1",
+                        "limit": "optionnel, nombre d'éléments 1-50"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Liste des tags récupérée",
+                        "data": {
+                            "tags": [],
+                            "page": 1,
+                            "limit": 50,
+                            "user_id": 1
+                        }
+                    }
+                },
+                {   "method": "GET", "path": "/tags/by-table/{table_associate}",
+                    "description": "Tags par table associée",
+                    "auth": "Utilisateur",
+                    "validation": {
+                        "table_associate": "requis, in('groups','memories','elements','files','all')"
+                    },
+                    "request": {
+                        "page": 1,
+                        "limit": 50
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Tags récupérés pour memories",
+                        "data": {
+                            "tags": [],
+                            "table_associate": "memories",
+                            "page": 1,
+                            "limit": 50
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 400,
+                            "message": "Table associée invalide"
+                        }
+                    ]
+                },
+                {   "method": "GET", "path": "/tags/most-used",
+                    "description": "Tags les plus utilisés",
+                    "auth": "Utilisateur",
+                    "request": {
+                        "table_associate": "memories",
+                        "limit": 10
+                    },
+                    "validation": {
+                        "table_associate": "optionnel, in('groups','memories','elements','files','all'), défaut 'memories'",
+                        "limit": "optionnel, nombre d'éléments 1-50, défaut 10"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Tags les plus utilisés",
+                        "data": {
+                            "tags": [
+                                {
+                                    "id": 1,
+                                    "name": "Histoire",
+                                    "table_associate": "memories",
+                                    "color": "#3498db",
+                                    "tag_owner": 1,
+                                    "usage_count": 15,
+                                    "created_at": "2025-08-26 10:00:00"
+                                }
+                            ],
+                            "table_associate": "memories",
+                            "limit": 10
+                        }
+                    }
+                },
+                {   "method": "POST", "path": "/tags/get-or-create",
+                    "description": "Obtenir ou créer un tag",
+                    "auth": "Utilisateur",
+                    "request": {
+                        "name": "Nouveau tag",
+                        "table_associate": "memories",
+                        "color": "#3498db"
+                    },
+                    "validation": {
+                        "name": "requis, 1-100 caractères",
+                        "table_associate": "optionnel, in('groups','memories','elements','files','all'), défaut 'memories'",
+                        "color": "optionnel, format #RRGGBB, défaut '#3498db'"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Tag récupéré ou créé",
+                        "data": {
+                            "id": 1,
+                            "name": "Nouveau tag",
+                            "table_associate": "memories",
+                            "color": "#3498db",
+                            "tag_owner": 1,
+                            "created_at": "2025-08-26 10:00:00",
+                            "updated_at": "2025-08-26 10:00:00",
+                            "deleted_at": null
+                        }
+                    }
+                },
+                {   "method": "GET", "path": "/tags/user/{user_id}",
+                    "description": "Tags d'un utilisateur spécifique (admin seulement)",
+                    "auth": "Admin",
+                    "validation": {
+                        "user_id": "requis, ID utilisateur numérique"
+                    },
+                    "request": {
+                        "page": 1,
+                        "limit": 50
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Liste des tags récupérée",
+                        "data": {
+                            "tags": [],
+                            "page": 1,
+                            "limit": 50,
+                            "user_id": 2
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 400,
+                            "message": "ID utilisateur doit être numérique"
+                        },
+                        {
+                            "code": 403,
+                            "message": "Accès non autorisé"
+                        }
+                    ]
+                },
+                {   "method": "PUT", "path": "/tags/{tagId}/{item_id}",
+                    "description": "Associer ou dissocier un tag à un élément (mémoire, élément, fichier, groupe), la table doit être spécifiée pour le tag 'all'",
+                    "auth": "Utilisateur",
+                    "request": {
+                        "table_associate": "memories"
+                    },
+                    "validation": {
+                        "table_associate": "requis, in('groups','memories','elements','files')",
+                        "tagId": "requis, ID de tag numérique, accessible par l'utilisateur",
+                        "item_id": "requis, ID d'élément numérique, accessible par l'utilisateur"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Tag associé ou dissocié avec succès",
+                        "data": {
+                            "tag_id": 1,
+                            "item_id": 10,
+                            "action": "associé ou dissocié"
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 400,
+                            "message": "ID utilisateur doit être numérique"
+                        },
+                        {
+                            "code": 403,
+                            "message": "Accès non autorisé"
+                        }
+                    ]
+                }
+            ]
+        },
+        {   "section": "Files",
+            "basePath": "/files",
+            "endpoints": [
+                {   "method": "POST", "path": "/files",
+                    "description": "Upload d'un fichier générique",
+                    "auth": "Utilisateur",
+                    "request": {
+                        "file": "(multipart/form-data)",
+                        "description": "Description du fichier"
+                    },
+                    "validation": {
+                        "file": "requis, fichier valide selon les types autorisés",
+                        "description": "optionnel, texte libre",
+                        "size_limits": "Images: 5MB, Documents: 10MB, Audio: 20MB, Vidéo: 50MB",
+                        "allowed_types": "JPEG, PNG, GIF, WebP, PDF, TXT, DOC, DOCX, MP3, WAV, OGG, MP4, AVI, MOV"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Fichier uploadé avec succès",
+                        "data": {
+                            "file_id": 1001,
+                            "original_name": "document.pdf",
+                            "description": "Un document PDF important",
+                            "file_name": "64f3b2a8_1703123456_document.pdf",
+                            "mime_type": "application/pdf",
+                            "file_size": 1024000,
+                            "media_type": "document",
+                            "upload_date": "2025-12-21 10:30:00",
+                            "url": "/uploads/files/64f3b2a8_1703123456_document.pdf",
+                            "owner_id": 1
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 400,
+                            "message": "Aucun fichier valide uploadé"
+                        },
+                        {
+                            "code": 400,
+                            "message": "Fichier trop volumineux"
+                        },
+                        {
+                            "code": 400,
+                            "message": "Type de fichier non autorisé"
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors de l'enregistrement du fichier"
+                        }
+                    ]
+                },
+                {   "method": "GET", "path": "/files/{id}",
+                    "description": "Télécharger un fichier",
+                    "auth": "Utilisateur",
+                    "validation": {
+                        "id": "requis, ID du fichier numérique"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Informations du fichier (simulation)",
+                        "data": {
+                            "file_id": 1,
+                            "original_name": "document_1.pdf",
+                            "file_type": "application/pdf",
+                            "file_size": 1024000,
+                            "file_path": "/uploads/files/file_1.pdf"
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 403,
+                            "message": "Accès non autorisé"
+                        },
+                        {
+                            "code": 404,
+                            "message": "Fichier non trouvé"
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors du téléchargement"
+                        }
+                    ]
+                },
+                {   "method": "GET", "path": "/files/{id}/info",
+                    "description": "Obtenir des informations sur un fichier",
+                    "auth": "Utilisateur",
+                    "validation": {
+                        "id": "requis, ID du fichier numérique"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Informations du fichier (simulation)",
+                        "data": {
+                            "id": 1,
+                            "original_name": "document_1.pdf",
+                            "description": "Un document PDF important",
+                            "upload_ip": "192.168.1.1",
+                            "file_path": "/uploads/files/file_1.pdf",
+                            "file_name": "file_1.pdf",
+                            "file_size": 1024000,
+                            "mime_type": "application/pdf",
+                            "media_type": "document",
+                            "uploaded_by": 1,
+                            "uploaded_at": "2025-12-20 15:30:00",
+                            "download_count": 0,
+                            "created_at": "2025-12-20 15:30:00",
+                            "updated_at": "2025-12-20 15:30:00"
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 403,
+                            "message": "Accès non autorisé"
+                        },
+                        {
+                            "code": 404,
+                            "message": "Fichier non trouvé"
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors du téléchargement"
+                        }
+                    ]
+                },
+                {   "method": "DELETE", "path": "/files/{id}",
+                    "description": "Supprimer un fichier. Force_delete pour suppression définitive du fichier également.",
+                    "auth": "Propriétaire ou Admin",
+                    "request": {
+                        "force_delete": true
+                    },
+                    "validation": {
+                        "force_delete": "optionnel, booléen pour suppression définitive",
+                        "id": "requis, ID du fichier numérique"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Fichier supprimé avec succès",
+                        "data": {
+                            "file_id": 1,
+                            "deleted_at": "2025-12-21 10:45:00"
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 403,
+                            "message": "Accès non autorisé pour supprimer ce fichier"
+                        },
+                        {
+                            "code": 404,
+                            "message": "Fichier non trouvé"
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors de la suppression"
+                        }
+                    ]
+                },
+                {   "method": "POST", "path": "/files/{id}/restore",
+                    "description": "Restaurer un fichier supprimé (softdelete)",
+                    "auth": "Propriétaire ou Admin",
+                    "validation": {
+                        "id": "requis, ID du fichier numérique"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Fichier restauré avec succès",
+                        "data": {
+                            "file_id": 1
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 400,
+                            "message": "Ce fichier n'est pas supprimé"
+                        },
+                        {
+                            "code": 403,
+                            "message": "Accès non autorisé pour restaurer ce fichier"
+                        },
+                        {
+                            "code": 404,
+                            "message": "Fichier non trouvé"
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors de la restauration"
+                        }
+                    ]
+                },
+                {   "method": "GET", "path": "/files/user/{user_id}",
+                    "description": "Lister les fichiers d'un utilisateur",
+                    "auth": "Propriétaire ou Admin",
+                    "request": {
+                        "page": 1,
+                        "limit": 20
+                    },
+                    "validation": {
+                        "user_id": "requis, ID utilisateur numérique",
+                        "page": "optionnel, numéro de page >= 1, défaut 1",
+                        "limit": "optionnel, nombre d'éléments 1-100, défaut 20"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Fichiers récupérés avec succès",
+                        "data": {
+                            "files": [
+                                {
+                                    "file_id": 1,
+                                    "original_name": "photo_vacances.jpg",
+                                    "description": "Mes vacances d'été",
+                                    "mime_type": "image/jpeg",
+                                    "media_type": "image",
+                                    "file_size": 2048000,
+                                    "download_count": 5,
+                                    "upload_date": "2025-08-20 10:30:00",
+                                    "updated_at": "2025-08-20 10:30:00",
+                                    "url": "/uploads/files/file_1.jpg"
+                                }
+                            ],
+                            "pagination": {
+                                "current_page": 1,
+                                "limit": 20,
+                                "total_files": 15,
+                                "total_pages": 1,
+                                "has_next_page": false,
+                                "has_previous_page": false
+                            },
+                            "statistics": {
+                                "total_files": 15,
+                                "total_size": 30720000,
+                                "categories": {
+                                    "image": 8,
+                                    "document": 5,
+                                    "video": 2
+                                }
+                            },
+                            "user_id": 3
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 403,
+                            "message": "Accès non autorisé"
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors de la récupération"
+                        }
+                    ]
+                }
+            ]
+        },
+        {   "section": "Groups",
+            "basePath": "/groups",
+            "endpoints": [
+                {   "method": "POST", "path": "/groups",
+                    "description": "Créer un groupe",
+                    "auth": "Utilisateur",
+                    "request": {
+                        "name": "Mon nouveau groupe",
+                        "description": "Description du groupe...",
+                        "visibility": "public",
+                        "max_members": 50
+                    },
+                    "validation": {
+                        "name": "requis, 3-255 caractères",
+                        "description": "optionnel, >2, <=1000 caractères",
+                        "visibility": "requis, private, shared ou public",
+                        "max_members": "optionnel, >0 <=1000"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Groupe créé avec succès",
+                        "data": {}
+                    }
+                },
+                {   "method": "GET", "path": "/groups/{id}",
+                    "description": "Détails d'un groupe",
+                    "auth": "Membre, Admin, ou Non (si public)",
+                    "validation": {
+                        "group_id": "requis, ID de groupe valide"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Détails du groupe récupérés",
+                        "data": {}
+                    }
+                },
+                {   "method": "PUT", "path": "/groups/{id}",
+                    "description": "Modifier un groupe",
+                    "auth": "Admin du groupe ou Admin",
+                    "request": {
+                        "name": "Nouveau nom",
+                        "description": "Nouvelle description...",
+                        "max_members": 75,
+                        "visibility": "public"
+                    },
+                    "validation": {
+                        "name": "optionnel, 3-255 caractères",
+                        "description": "optionnel, >2, <=1000 caractères",
+                        "max_members": "optionnel, >0 <=1000",
+                        "visibility": "optionnel, private, shared ou public",
+                        "group_id": "requis, ID de groupe valide"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Groupe mis à jour avec succès",
+                        "data": {}
+                    }
+                },
+                {   "method": "DELETE", "path": "/groups/{id}",
+                    "description": "Supprimer un groupe",
+                    "auth": "Admin du groupe ou Admin",
+                    "request": {
+                        "force_delete": true
+                    },
+                    "validation": {
+                        "force_delete": "optionnel, booléen pour suppression définitive",
+                        "group_id": "requis, ID de groupe valide"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Groupe supprimé avec succès"
+                    }
+                },
+                {   "method": "POST", "path": "/groups/{id}/restore",
+                    "description": "Restaurer un groupe supprimé",
+                    "auth": "Admin",
+                    "validation": {
+                        "group_id": "requis, ID de groupe valide"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Groupe restauré avec succès"
+                    }
+                },
+                {   "method": "GET", "path": "/groups/user/{user_id}",
+                    "description": "Groupes d'un utilisateur",
+                    "auth": "Utilisateur (soi-même) ou Admin",
+                    "request": {
+                        "page": 1,
+                        "page_size": 20
+                    },
+                    "validation": {
+                        "page": "optionnel, numéro de page, entier >= 1",
+                        "page_size": "optionnel, taille de page, entier 1-100",
+                        "user_id": "requis, ID utilisateur valide"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "data": {}
+                    }
+                },
+                {   "method": "GET", "path": "/groups/my-groups",
+                    "description": "Mes groupes",
+                    "auth": "Utilisateur",
+                    "request": {
+                        "page": 1,
+                        "page_size": 20
+                    },
+                    "validation": {
+                        "page": "optionnel, numéro de page, entier >= 1",
+                        "page_size": "optionnel, taille de page, entier 1-100"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "data": {}
+                    }
+                },
+                {   "method": "GET", "path": "/groups/search",
+                    "description": "Rechercher des groupes",
+                    "auth": "Utilisateur",
+                    "request": {
+                        "q": "terme recherché",
+                        "page": 1,
+                        "page_size": 20
+                    },
+                    "validation": {
+                        "q": "required|string|max:255",
+                        "page": "integer|min:1",
+                        "page_size": "integer|min:1|max:100"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "data": {}
+                    }
+                },
+                {   "method": "POST", "path": "/groups/{id}/invite",
+                    "description": "Inviter un utilisateur",
+                    "auth": "Admin du groupe ou Admin",
+                    "request": {
+                        "user_email": "user@example.com",
+                        "role": "member"
+                    },
+                    "validation": {
+                        "user_email": "required|email",
+                        "role": "optional|in:member,moderator,admin",
+                        "group_id": "requis, ID de groupe valide"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Invitation envoyée avec succès par email",
+                        "data": {}
+                    }
+                },
+                {   "method": "POST", "path": "/groups/join",
+                    "description": "Rejoindre un groupe avec un code d'invitation",
+                    "auth": "Utilisateur",
+                    "request": {
+                        "code": "ABC123XYZ"
+                    },
+                    "validation": {
+                        "code": "requis, chaîne de caractères"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Vous avez rejoint le groupe avec succès",
+                        "data": {}
+                    }
+                },
+                {   "method": "PUT", "path": "/groups/{group_id}/members/{user_id}",
+                    "description": "Mettre à jour le rôle d'un utilisateur dans un groupe",
+                    "auth": "Admin du groupe ou Admin",
+                    "request": {
+                        "role": "moderator"
+                    },
+                    "validation": {
+                        "group_id": "requis, ID de groupe",
+                        "user_id": "requis, ID utilisateur",
+                        "role": "requis, in:member,moderator,admin"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Rôle de l'utilisateur mis à jour avec succès",
+                        "data": {}
+                    }
+                },
+                {   "method": "GET", "path": "/groups/my-invitations",
+                    "description": "Mes invitations en attente",
+                    "auth": "Utilisateur",
+                    "validation": {
+                        "note": "Aucune donnée d'entrée requise"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "data": {}
+                    }
+                },
+                {   "method": "POST", "path": "/groups/{id}/leave",
+                    "description": "Quitter un groupe. Le propriétaire ne peut pas quitter le groupe.",
+                    "auth": "Utilisateur",
+                    "validation": {
+                        "id": "requis, ID de groupe valide"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": " l'utilisateur a quitté le groupe "
+                    }
+                },
+                {   "method": "GET", "path": "/groups/{id}/members",
+                    "description": "Récupérer les membres d'un groupe",
+                    "auth": "Membre ou Admin",
+                    "validation": {
+                        "id": "requis, ID de groupe valide"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Liste des membres du groupe",
+                        "data": {}
+                    }
+                }
+            ]
+        },
+        {   "section": "Stats",
+            "basePath": "/stats",
+            "endpoints": [
+                {
+                    "method": "POST",
+                    "path": "/stats/build",
+                    "description": "Générer toutes les statistiques de la plateforme",
+                    "auth": "Admin",
+                    "success_response": {
+                        "success": true,
+                        "message": {
+                            "note": "Les doublons sont automatiquement évités par la procédure stockée"
+                        },
+                        "timestamp": "2025-08-06 14:30:00"
+                    }
+                },
+                {
+                    "method": "GET",
+                    "path": "/stats/platform",
+                    "description": "Récupérer les statistiques globales de la plateforme",
+                    "auth": "Admin",
+                    "success_response": {
+                        "success": true,
+                        "data": {}
+                    }
+                },
+                {
+                    "method": "GET",
+                    "path": "/stats/groups",
+                    "description": "Récupérer les statistiques par groupe",
+                    "auth": "Admin",
+                    "request": {
+                        "limit": 50,
+                        "offset": 0
+                    },
+                    "success_response": {
+                        "success": true,
+                        "data": {}
+                    }
+                },
+                {
+                    "method": "GET",
+                    "path": "/stats/users",
+                    "description": "Récupérer les statistiques par utilisateur",
+                    "auth": "Admin",
+                    "request": {
+                        "limit": 50,
+                        "offset": 0
+                    },
+                    "success_response": {
+                        "success": true,
+                        "data": {}
+                    }
+                },
+                {
+                    "method": "GET",
+                    "path": "/stats/users/{id}",
+                    "description": "Récupère les statitiques d'un utilisateur",
+                    "auth": "Utilisateur (soi-même) ou Admin",
+                    "success_response": {
+                        "success": true,
+                        "message": "Statistiques utilisateur récupérées",
+                        "data": {}
+                    },
+                    "error_responses": [
+                        {
+                            "code": 404,
+                            "message": "Utilisateur non trouvé"
+                        },
+                        {
+                            "code": 403,
+                            "message": "Accès non autorisé"
+                        }
+                    ]
+                },
+                {
+                    "method": "GET",
+                    "path": "/stats/my-stats",
+                    "description": "Statistiques de l'utilisateur connecté",
+                    "auth": "Utilisateur",
+                    "success_response": {
+                        "success": true,
+                        "data": {}
+                    }
+                }
+            ]
+        }
+    ]
+}

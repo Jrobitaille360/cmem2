@@ -1,0 +1,47 @@
+# Fichiers de configuration sensibles
+config/auth_groups/shared/.env
+config/memories_elements/.env
+.env
+.env.auth_groups
+.env.memories_elements
+
+# Garder les fichiers d'exemple
+!.env*.example
+
+# Dossiers de logs
+logs/
+*.log
+
+# Dossiers d'upload
+uploads/
+storage/
+
+# Dossiers vendor de Composer
+vendor/
+
+# Fichiers temporaires PHP
+*.tmp
+*.temp
+
+# Fichiers de sauvegarde
+*.bak
+*.backup
+
+# Fichiers IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Fichiers de test temporaires
+test_*.php
+debug_*.php
+
+# Cache
+cache/
+tmp/

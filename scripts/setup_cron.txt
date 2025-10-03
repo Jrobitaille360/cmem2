@@ -1,0 +1,78 @@
+# Configuration Cron Jobs pour CMem1 API
+# Copier ces lignes dans votre crontab (crontab -e)
+
+# ========== GÉNÉRATION DES STATISTIQUES ==========
+# Génération quotidienne à 2h du matin
+0 2 * * * /usr/bin/php /path/to/cmem1_API/scripts/cron_stats_generation.php >> /path/to/cmem1_API/logs/cron-stats.log 2>&1
+
+# ========== NETTOYAGE DES TOKENS EXPIRÉS ==========
+# Nettoyage des tokens JWT expirés toutes les heures
+0 * * * * /usr/bin/php /path/to/cmem1_API/scripts/cleanup_tokens.php >> /path/to/cmem1_API/logs/cron-cleanup.log 2>&1
+
+# Alternative: appel direct des procédures MySQL
+# 0 * * * * mysql -u user -p'password' cmem1_db -e "CALL CleanupExpiredTokens();" >> /path/to/cmem1_API/logs/cron-cleanup.log 2>&1
+
+# ========== NETTOYAGE DES ANCIENNES DONNÉES ==========
+# Nettoyage des anciennes statistiques (hebdomadaire, dimanche 3h)
+0 3 * * 0 /usr/bin/php /path/to/cmem1_API/scripts/cleanup_old_stats.php >> /path/to/cmem1_API/logs/cron-cleanup.log 2>&1
+
+# Nettoyage des tokens de reset et vérification email expirés (quotidien, 1h)
+0 1 * * * mysql -u user -p'password' cmem1_db -e "DELETE FROM password_resets WHERE expires_at < NOW(); DELETE FROM email_verifications WHERE expires_at < NOW();" >> /path/to/cmem1_API/logs/cron-cleanup.log 2>&1
+
+# ========== SAUVEGARDE QUOTIDIENNE ==========
+# /path/to/cmem1_API/backups/
+# ├── cmem1_db_20250924.sql.gz
+# ├── cmem1_db_20250925.sql.gz
+# ├── cmem1_db_20250926.sql.gz
+# └── ...
+
+# Dump quotidien de la base de données (4h du matin)
+0 4 * * * /usr/bin/mysqldump -u user -p'password' --single-transaction --routines --triggers cmem1_db > /path/to/cmem1_API/backups/cmem1_db_$(date +\%Y\%m\%d).sql && gzip /path/to/cmem1_API/backups/cmem1_db_$(date +\%Y\%m\%d).sql >> /path/to/cmem1_API/logs/cron-backup.log 2>&1
+
+# Nettoyage des sauvegardes anciennes (garde 7 jours)
+0 5 * * * find /path/to/cmem1_API/backups/ -name "cmem1_db_*.sql.gz" -mtime +7 -delete >> /path/to/cmem1_API/logs/cron-backup.log 2>&1
+
+# Alternative Windows PowerShell:
+# & "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqldump.exe" -u user -p'password' --single-transaction cmem1_db > "C:\path\to\backups\cmem1_db_$(Get-Date -Format 'yyyyMMdd').sql"
+# Get-ChildItem "C:\path\to\backups\cmem1_db_*.sql" | Where-Object {$_.LastWriteTime -lt (Get-Date).AddDays(-7)} | Remove-Item
+
+# ========== EXEMPLES POUR WINDOWS ==========
+# Créer des tâches planifiées qui exécutent:
+# - Statistiques: php.exe "C:\path\to\cmem1_API\scripts\cron_stats_generation.php"
+# - Tokens: php.exe "C:\path\to\cmem1_API\scripts\cleanup_tokens.php"
+
+# ========== OPTIONS ALTERNATIVES DE FRÉQUENCE ==========
+# Statistiques:
+# - Toutes les 6 heures: 0 */6 * * *
+# - Deux fois par jour (6h et 18h): 0 6,18 * * *
+# - Chaque dimanche à 3h: 0 3 * * 0
+
+# Tokens:
+# - Toutes les 30 minutes: */30 * * * *
+# - Toutes les 2 heures: 0 */2 * * *
+
+# ========== MONITORING ET DEBUGGING ==========
+# Créer le répertoire de sauvegarde (à exécuter une fois):
+# mkdir -p /path/to/cmem1_API/backups && chmod 750 /path/to/cmem1_API/backups
+
+# Vérification des logs:
+# tail -f /path/to/cmem1_API/logs/cron-stats.log
+# tail -f /path/to/cmem1_API/logs/cron-cleanup.log
+# tail -f /path/to/cmem1_API/logs/cron-backup.log
+
+# Vérifier l'espace disque des sauvegardes:
+# du -sh /path/to/cmem1_API/backups/
+# ls -lah /path/to/cmem1_API/backups/
+
+# Test de restauration (exemple):
+# gunzip < /path/to/cmem1_API/backups/cmem1_db_20250924.sql.gz | mysql -u user -p'password' cmem1_db_test
+
+# Test manuel des scripts:
+# php /path/to/cmem1_API/scripts/cron_stats_generation.php
+# php /path/to/cmem1_API/scripts/cleanup_tokens.php
+
+# Vérifier les tokens valides en cours:
+# mysql -u user -p'password' cmem1_db -e "SELECT COUNT(*) as active_tokens FROM valid_tokens WHERE expires_at > NOW();"
+
+# Statistiques des utilisateurs en ligne:
+# mysql -u user -p'password' cmem1_db -e "SELECT * FROM v_online_users_stats;"
