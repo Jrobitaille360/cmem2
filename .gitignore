@@ -4,6 +4,8 @@ config/memories_elements/.env
 .env
 .env.auth_groups
 .env.memories_elements
+.env.cmem1
+.env.local
 
 # Garder les fichiers d'exemple
 !.env*.example
