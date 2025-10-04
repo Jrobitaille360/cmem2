@@ -20,6 +20,8 @@ storage/
 
 # Dossiers vendor de Composer
 vendor/
+# Dossiers test
+test*/
 
 # Fichiers temporaires PHP
 *.tmp
@@ -41,7 +43,7 @@ Thumbs.db
 desktop.ini
 
 # Fichiers de test temporaires
-test_*.php
+test_*.*
 debug_*.php
 
 # Cache

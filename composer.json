@@ -14,7 +14,6 @@
         "psr-4": {
             "Memories\\": [
                 "src/auth_groups/",
-                "src/auth_groups/shared/", 
                 "src/memories_elements/"
             ]
         }

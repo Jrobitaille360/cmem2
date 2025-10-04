@@ -25,7 +25,7 @@ abstract class BaseModel {
     public function __construct() {
         // Connexion automatique via le singleton
         if (self::$db === null) {
-            require_once __DIR__ . '/../../../../config/auth_groups/shared/database.php';
+            require_once __DIR__ . '/../../../config/auth_groups/database.php';
             self::$db = \Database::getInstance()->getConnection();
         }
     }

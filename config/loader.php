@@ -10,9 +10,9 @@
  */
 
 // Charger d'abord les configurations communes obligatoires (ordre important)
-require_once __DIR__ . '/auth_groups/shared/environment.php';
-require_once __DIR__ . '/auth_groups/shared/logs.php';
-require_once __DIR__ . '/auth_groups/shared/database.php';
+require_once __DIR__ . '/auth_groups/environment.php';
+require_once __DIR__ . '/auth_groups/logs.php';
+require_once __DIR__ . '/auth_groups/database.php';
 
 // Charger les configurations du module auth_groups
 require_once __DIR__ . '/auth_groups/auth.php';
@@ -20,9 +20,9 @@ require_once __DIR__ . '/auth_groups/uploads.php';
 require_once __DIR__ . '/auth_groups/tags.php';
 
 // Charger les configurations du module memories_elements
-require_once __DIR__ . '/memories_elements/memories.php';
-require_once __DIR__ . '/memories_elements/uploads.php';
-require_once __DIR__ . '/memories_elements/pagination.php';
+//require_once __DIR__ . '/memories_elements/memories.php';
+//require_once __DIR__ . '/memories_elements/uploads.php';
+//require_once __DIR__ . '/memories_elements/pagination.php';
 
 /**
  * Validation de la configuration
@@ -119,12 +119,12 @@ if (!empty($config_errors)) {
 
 // Constantes de compatibilité pour l'ancienne structure
 // À supprimer progressivement lors de la migration
-define('DEFAULT_PAGE_SIZE', MEMORIES_DEFAULT_PAGE_SIZE);
-define('MAX_PAGE_SIZE', MEMORIES_MAX_PAGE_SIZE);
+//define('DEFAULT_PAGE_SIZE', MEMORIES_DEFAULT_PAGE_SIZE);
+//define('MAX_PAGE_SIZE', MEMORIES_MAX_PAGE_SIZE);
 
 // Définir les types de fichiers globaux pour compatibilité
-define('ALLOWED_IMAGE_TYPES', ALLOWED_MEMORY_IMAGE_TYPES);
-define('ALLOWED_VIDEO_TYPES', ALLOWED_MEMORY_VIDEO_TYPES);
-define('ALLOWED_DOCUMENT_TYPES', ALLOWED_MEMORY_DOCUMENT_TYPES);
-define('ALLOWED_AUDIO_TYPES', ALLOWED_MEMORY_AUDIO_TYPES);
-define('ALLOWED_FILE_TYPES', ALLOWED_MEMORY_FILE_TYPES);
+//define('ALLOWED_IMAGE_TYPES', ALLOWED_MEMORY_IMAGE_TYPES);
+//define('ALLOWED_VIDEO_TYPES', ALLOWED_MEMORY_VIDEO_TYPES);
+//define('ALLOWED_DOCUMENT_TYPES', ALLOWED_MEMORY_DOCUMENT_TYPES);
+//define('ALLOWED_AUDIO_TYPES', ALLOWED_MEMORY_AUDIO_TYPES);
+//define('ALLOWED_FILE_TYPES', ALLOWED_MEMORY_FILE_TYPES);
