@@ -82,6 +82,10 @@ CREATE TABLE users (
 	KEY idx_users_last_login (last_login)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+INSERT INTO users (id, name, email, password_hash, role,  email_verified) VALUES
+    (1, 'TEMPORARY ADMINISTRATOR', 'TMP_admin@cmem1.com', '$2y$10$GxWCcbHdnPY3PmBrmLwPCeQ/nKokme.bKhmhcpKSfvIJhrzj0pQ/.', 'ADMINISTRATEUR', 1);
+
+
 -- Ajout de la contrainte de clé étrangère pour tag_owner maintenant que la table users existe
 ALTER TABLE tags ADD FOREIGN KEY (tag_owner) REFERENCES users(id) ON DELETE CASCADE;
 
