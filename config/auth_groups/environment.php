@@ -80,6 +80,25 @@ define('ENABLE_REQUEST_LOGGING', filter_var($_ENV['ENABLE_REQUEST_LOGGING'] ?? '
 define('MAINTENANCE_MODE', filter_var($_ENV['MAINTENANCE_MODE'] ?? 'false', FILTER_VALIDATE_BOOLEAN));
 define('MAINTENANCE_MESSAGE', $_ENV['MAINTENANCE_MESSAGE'] ?? 'Application en maintenance. Veuillez réessayer plus tard.');
 
+// Configuration des uploads spécifiques
+define('MAX_IMAGE_SIZE', (int)($_ENV['MAX_IMAGE_SIZE'] ?? 5242880)); // 5MB par défaut
+define('MAX_VIDEO_SIZE', (int)($_ENV['MAX_VIDEO_SIZE'] ?? 52428800)); // 50MB par défaut
+define('MAX_AUDIO_SIZE', (int)($_ENV['MAX_AUDIO_SIZE'] ?? 10485760)); // 10MB par défaut
+define('MAX_DOCUMENT_SIZE', (int)($_ENV['MAX_DOCUMENT_SIZE'] ?? 10485760)); // 10MB par défaut
+
+// Types de fichiers autorisés
+define('ALLOWED_IMAGE_TYPES', explode(',', $_ENV['ALLOWED_IMAGE_TYPES'] ?? 'image/jpeg,image/png,image/gif'));
+define('ALLOWED_VIDEO_TYPES', explode(',', $_ENV['ALLOWED_VIDEO_TYPES'] ?? 'video/mp4,video/webm'));
+define('ALLOWED_DOCUMENT_TYPES', explode(',', $_ENV['ALLOWED_DOCUMENT_TYPES'] ?? 'application/pdf'));
+define('ALLOWED_AUDIO_TYPES', explode(',', $_ENV['ALLOWED_AUDIO_TYPES'] ?? 'audio/mpeg,audio/wav'));
+
+define('ALLOWED_FILE_TYPES', array_merge(
+    ALLOWED_IMAGE_TYPES,
+    ALLOWED_VIDEO_TYPES,
+    ALLOWED_DOCUMENT_TYPES,
+    ALLOWED_AUDIO_TYPES
+));
+
 // Configuration des erreurs
 if (APP_DEBUG) {
     error_reporting(E_ALL);

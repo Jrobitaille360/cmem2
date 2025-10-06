@@ -76,7 +76,6 @@ class UserManagerController {
                 $verificationToken = bin2hex(random_bytes(32));
                 $expiresAt = date('Y-m-d H:i:s', time() + (24 * 60 * 60)); // Expire dans 24h                
                 // Insérer le token de vérification dans la base de données
-                $config = require_once __DIR__ . '/../../../config/auth_groups/shared/database.php';
                 $pdo = \Database::getInstance()->getConnection();
                 $stmt = $pdo->prepare("
                     INSERT INTO email_verifications (user_id, token, expires_at) 

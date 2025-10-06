@@ -101,7 +101,7 @@ class FileValidator {
     public static function getMaxSizeForType($type) {
         switch (strtolower($type)) {
             case 'image':
-                return MAX_IMAGE_SIZE;
+                return MAX_AVATAR_SIZE;
             default:
                 return MAX_FILE_SIZE;
         }
