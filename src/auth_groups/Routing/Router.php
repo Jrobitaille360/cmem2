@@ -6,8 +6,8 @@ use Memories\Routing\RouteHandlers\{
     PublicRouteHandler,
     UserRouteHandler,
     GroupRouteHandler,
-    MemoryRouteHandler,
-    ElementRouteHandler,
+   // MemoryRouteHandler,
+   // ElementRouteHandler,
     TagRouteHandler,
     FileRouteHandler,
     StatsRouteHandler,
@@ -36,8 +36,8 @@ class Router
         $this->routeHandlers = [
             'users' => new UserRouteHandler($this->authService),
             'groups' => new GroupRouteHandler($this->authService),
-            'memories' => new MemoryRouteHandler($this->authService),
-            'elements' => new ElementRouteHandler($this->authService),
+           // 'memories' => new MemoryRouteHandler($this->authService),
+           // 'elements' => new ElementRouteHandler($this->authService),
             'tags' => new TagRouteHandler($this->authService),
             'files' => new FileRouteHandler($this->authService),
             'stats' => new StatsRouteHandler($this->authService),
@@ -90,7 +90,7 @@ class Router
         
         // Nettoyer l'URI - s'assurer que $uri n'est pas null
         $uri = $uri ?? '';
-        $uri = str_replace('/cmem1_API', '', $uri);
+        $uri = str_replace('/cmem2_API', '', $uri);
         $uri = str_replace('/index.php', '', $uri);
         $uri = trim($uri, '/');
         
@@ -117,8 +117,8 @@ class Router
             'modules' => [
                 'users' => 'Gestion des utilisateurs et authentification',
                 'groups' => 'Gestion des groupes et invitations',
-                'memories' => 'Gestion des mémoires collectives',
-                'elements' => 'Gestion des éléments multimédias',
+               // 'memories' => 'Gestion des mémoires collectives',
+                //'elements' => 'Gestion des éléments multimédias',
                 'tags' => 'Système de tags et catégorisation',
                 'files' => 'Upload et gestion de fichiers',
                 'stats' => 'Statistiques et analytics',

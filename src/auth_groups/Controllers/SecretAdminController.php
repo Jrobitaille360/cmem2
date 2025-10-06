@@ -100,13 +100,12 @@ class SecretAdminController
             
             // Liste des procédures autorisées
             $allowedProcedures = [
-                'ResetData',
-                'ResetDatabase',
-                'GenerateAllStats',
-                'GenerateUserStats', 
+                'CleanupOldStats',
                 'GenerateGroupStats',
                 'GeneratePlatformStats',
-                'CleanupOldStats'
+                'GenerateUserStats', 
+                'ResetAuthGroupsData',
+                'ResetAuthenticationGroups'
             ];
             
             if (!in_array($procedure, $allowedProcedures)) {

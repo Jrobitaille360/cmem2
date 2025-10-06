@@ -37,15 +37,15 @@ function validateConfiguration(): array {
     if (!defined('LOG_DIR')) $errors[] = 'LOG_DIR non défini';
     
     // Validation du module auth_groups
-    if (!defined('JWT_SECRET') || JWT_SECRET === 'your-secret-key-change-this-in-production') {
+    if (!defined('JWT_SECRET') || (JWT_SECRET !== 'Zjz1vB^D4xkEWss7TV9zXC3^r$uPfFaQz5A!xxG$^CKnX*3S!bEh4b3*3UcK2*s1')) {
         $errors[] = 'JWT_SECRET doit être défini avec une clé sécurisée';
     }
     if (!defined('JWT_EXPIRATION')) $errors[] = 'JWT_EXPIRATION non défini';
     
     // Validation du module memories_elements
-    if (!defined('MAX_MEMORY_IMAGE_SIZE')) $errors[] = 'MAX_MEMORY_IMAGE_SIZE non défini';
-    if (!defined('MEMORY_UPLOAD_DIR')) $errors[] = 'MEMORY_UPLOAD_DIR non défini';
-    if (!defined('MEMORIES_DEFAULT_PAGE_SIZE')) $errors[] = 'MEMORIES_DEFAULT_PAGE_SIZE non défini';
+    //if (!defined('MAX_MEMORY_IMAGE_SIZE')) $errors[] = 'MAX_MEMORY_IMAGE_SIZE non défini';
+    //if (!defined('MEMORY_UPLOAD_DIR')) $errors[] = 'MEMORY_UPLOAD_DIR non défini';
+    //if (!defined('MEMORIES_DEFAULT_PAGE_SIZE')) $errors[] = 'MEMORIES_DEFAULT_PAGE_SIZE non défini';
     
     // Validation des répertoires critiques
     if (!is_dir(UPLOAD_DIR)) $errors[] = 'Répertoire UPLOAD_DIR inaccessible: ' . UPLOAD_DIR;
@@ -68,8 +68,8 @@ function initializeDirectories(): void {
     if (!file_exists(GROUP_FILES_UPLOAD_DIR)) mkdir(GROUP_FILES_UPLOAD_DIR, 0755, true);
     
     // Répertoires du module memories_elements
-    if (!file_exists(MEMORY_UPLOAD_DIR)) mkdir(MEMORY_UPLOAD_DIR, 0755, true);
-    if (!file_exists(MEMORY_TEMP_DIR)) mkdir(MEMORY_TEMP_DIR, 0755, true);
+    //if (!file_exists(MEMORY_UPLOAD_DIR)) mkdir(MEMORY_UPLOAD_DIR, 0755, true);
+    //if (!file_exists(MEMORY_TEMP_DIR)) mkdir(MEMORY_TEMP_DIR, 0755, true);
 }
 
 /**

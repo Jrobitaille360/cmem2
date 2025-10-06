@@ -6,8 +6,9 @@ use Memories\Routing\BaseRouteHandler;
 use Memories\Controllers\{
     UserController, 
     GroupController, 
+    MemoryController, 
+    ElementController
 };
-
 use Memories\Utils\Response;
 
 class PublicRouteHandler extends BaseRouteHandler 
@@ -26,7 +27,7 @@ class PublicRouteHandler extends BaseRouteHandler
     }
     
     protected function getSupportedControllers(): array {
-        return ['help', 'health', 'users', 'groups','secret-admin'];
+        return ['help', 'health', 'users', 'groups'];
         //return ['help', 'health', 'users', 'groups', 'memories', 'elements'];
     }
     
@@ -36,14 +37,22 @@ class PublicRouteHandler extends BaseRouteHandler
         $method = $request['method'];
         $id = $request['id'];
         
-        $res= match(true) {
+    $res= match(true) {
             // Routes d'information
             ($controller === 'help' && $action === '' && $method === 'GET') => 
                 $this->showHelpInfo(),
                 
             ($controller === 'health' && $action === '' && $method === 'GET') => 
-                $this->showHealthInfo(),                
-                   
+                $this->showHealthInfo(),
+            
+            /* // Routes publiques des mémoires - seulement si non authentifié
+            ($controller === 'memories' && $action === '' && $method === 'GET' && !$this->hasAuthToken()) => 
+                $this->controllers['memories']->getPublicMemories(),
+             */    
+            // Routes publiques des éléments
+            /* ($controller === 'elements' && $action === '' && $method === 'GET' && !$this->hasAuthToken()) => 
+                $this->controllers['elements']->getPublicElements(),
+            */     
             // Routes publiques des groupes
             ($controller === 'groups' && $action === '' && $method === 'GET') => 
                 $this->controllers['groups']->getPublicGroups(),
@@ -89,10 +98,14 @@ class PublicRouteHandler extends BaseRouteHandler
                     'POST /health - Statut de santé de l\'API',
                     'POST /users/register - Inscription utilisateur',
                     'POST /users/login - Connexion utilisateur',
+                  //  'POST /memories/public - Mémoires publiques',
+                  //  'POST /elements/public - Éléments publics',
                     'POST /groups/public - Groupes publics'
                 ],
                 'authenticated' => [
                     'users' => 'Gestion des utilisateurs',
+                   // 'memories' => 'Gestion des mémoires',
+                    // 'elements' => 'Gestion des éléments',
                     'groups' => 'Gestion des groupes',
                     'tags' => 'Gestion des tags'
                 ]

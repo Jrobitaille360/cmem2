@@ -6,8 +6,8 @@
 
 // Charger les fichiers .env modulaires s'ils existent
 $envFiles = [
-    __DIR__ . '/../../../.env.auth_groups',        // Infrastructure obligatoire
-    __DIR__ . '/../../../.env.memories_elements'   // Module optionnel
+    __DIR__ . '/../../.env.auth_groups',        // Infrastructure obligatoire
+    //__DIR__ . '/../../.env.memories_elements'   // Module optionnel
 ];
 
 foreach ($envFiles as $envFile) {
