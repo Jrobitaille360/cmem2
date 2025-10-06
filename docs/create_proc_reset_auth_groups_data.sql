@@ -41,7 +41,7 @@ BEGIN
     INSERT INTO group_members (group_id, user_id, invited_by, role, joined_at, created_at) VALUES
     (1, 2, 1, 'admin', NOW(), NOW()),
     (1, 3, 1, 'member', NOW(), NOW()),
-    (2, 5, 2, 'member', NOW(), NOW()),
+    (2, 5, 2, 'admin', NOW(), NOW()),
     (2, 6, 2, 'member', NOW(), NOW());
 
     UPDATE group_members SET role = 'admin' WHERE group_id = 2 AND user_id = 2;

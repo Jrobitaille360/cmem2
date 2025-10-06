@@ -226,7 +226,7 @@ class Tag extends BaseModel {
     /**
      * Obtenir ou créer un tag par nom pour un propriétaire spécifique
      */
-    public function getOrCreate($name, $tagOwner, $tableAssociate = 'memories', $color = '#3498db') {
+    public function getOrCreate($name, $tagOwner, $tableAssociate = 'groups', $color = '#3498db') {
         // Essayer de trouver le tag existant pour ce propriétaire
         if ($this->findByName($name, $tagOwner)) {
             return $this->toArray();
@@ -253,8 +253,6 @@ class Tag extends BaseModel {
         if ($tableAssociate === 'all') {
             $query = "SELECT t.*, 
                      COALESCE(
-                         (SELECT COUNT(*) FROM memory_tag_relations mr WHERE mr.tag_id = t.id AND mr.deleted_at IS NULL) +
-                         (SELECT COUNT(*) FROM element_tag_relations er WHERE er.tag_id = t.id AND er.deleted_at IS NULL) +
                          (SELECT COUNT(*) FROM file_tag_relations fr WHERE fr.tag_id = t.id AND fr.deleted_at IS NULL) +
                          (SELECT COUNT(*) FROM group_tag_relations gr WHERE gr.tag_id = t.id AND gr.deleted_at IS NULL),
                          0
@@ -263,6 +261,9 @@ class Tag extends BaseModel {
                      WHERE t.table_associate = 'all' AND t.deleted_at IS NULL";
         } else {
             $relationTable = $this->getRelationTable($tableAssociate);
+            if ($relationTable === null) {
+                return [0];
+            }
             $query = "SELECT t.*, COUNT(r.tag_id) as usage_count 
                      FROM {$this->table} t 
                      LEFT JOIN {$relationTable} r ON t.id = r.tag_id AND r.deleted_at IS NULL
@@ -298,11 +299,14 @@ class Tag extends BaseModel {
      */
     public function getUsageCount() {
         if($this->table_associate === 'all') {
-            // Count tag usage in all related tables (groups, memories, elements, files)
+            // Count tag usage in all related tables (groups, files)
             $count = 0;
-            $tables = ['groups', 'memories', 'elements', 'files'];
+            $tables = ['groups', 'files'];
             foreach ($tables as $table) {
                 $relationTable = $this->getRelationTable($table);
+                if ($relationTable === null) {
+                    return 0;
+                }
                 $query = "SELECT COUNT(*) as count FROM {$relationTable} 
                          WHERE tag_id = :tag_id AND deleted_at IS NULL";
                 $stmt = $this->getDb()->prepare($query);
@@ -315,6 +319,9 @@ class Tag extends BaseModel {
             return $count;
         } else {
             $relationTable = $this->getRelationTable($this->table_associate);
+            if ($relationTable === null) {
+                return 0;
+            }
             $query = "SELECT COUNT(*) as count FROM {$relationTable} 
                      WHERE tag_id = :tag_id AND deleted_at IS NULL";
             $stmt = $this->getDb()->prepare($query);
@@ -347,19 +354,13 @@ class Tag extends BaseModel {
      */
     private function getRelationTable($tableAssociate) {
         switch ($tableAssociate) {
-            case 'memories':
-                return 'memory_tag_relations';
-            case 'elements':
-                return 'element_tag_relations';
             case 'files':
                 return 'file_tag_relations';
             case 'groups':
                 return 'group_tag_relations';
             case 'all':
-                // Pour 'all', on ne peut pas utiliser une seule table de relation
-                throw new \InvalidArgumentException("Pour table_associate = 'all', utilisez une logique spécifique dans chaque méthode");
             default:
-                throw new \InvalidArgumentException("Table associée non valide: {$tableAssociate}");
+                return null;
         }
     }
     
@@ -412,6 +413,9 @@ class Tag extends BaseModel {
      */
     public function associateToItem($itemId, $tableAssociate) {
         $relationTable = $this->getRelationTable($tableAssociate);
+        if ($relationTable === null) {
+            return 0;
+        }
         $itemColumn = $this->getItemColumnName($tableAssociate);
         
         // Vérifier si l'association existe déjà (même si supprimée)
@@ -451,6 +455,9 @@ class Tag extends BaseModel {
      */
     public function dissociateFromItem($itemId, $tableAssociate) {
         $relationTable = $this->getRelationTable($tableAssociate);
+        if ($relationTable === null) {
+            return 0;
+        }
         $itemColumn = $this->getItemColumnName($tableAssociate);
         
         $query = "UPDATE {$relationTable} 
@@ -469,6 +476,9 @@ class Tag extends BaseModel {
      */
     public function isAssociatedToItem($itemId, $tableAssociate) {
         $relationTable = $this->getRelationTable($tableAssociate);
+        if ($relationTable === null) {
+            return 0;
+        }
         $itemColumn = $this->getItemColumnName($tableAssociate);
         
         $query = "SELECT COUNT(*) as count FROM {$relationTable} 
