@@ -1,14 +1,14 @@
 <?php
 
-namespace Memories\Routing\RouteHandlers;
+namespace AuthGroups\Routing\RouteHandlers;
 
-use Memories\Routing\BaseRouteHandler;
-use Memories\Controllers\{
+use AuthGroups\Routing\BaseRouteHandler;
+use AuthGroups\Controllers\{
     UserController, 
     GroupController, 
 };
 
-use Memories\Utils\Response;
+use AuthGroups\Utils\Response;
 
 class PublicRouteHandler extends BaseRouteHandler 
 {
@@ -20,14 +20,11 @@ class PublicRouteHandler extends BaseRouteHandler
         $this->controllers = [
             'users' => new UserController(),
             'groups' => new GroupController(),
-           // 'memories' => new MemoryController(),
-           // 'elements' => new ElementController()
         ];
     }
     
     protected function getSupportedControllers(): array {
         return ['help', 'health', 'users', 'groups','secret-admin'];
-        //return ['help', 'health', 'users', 'groups', 'memories', 'elements'];
     }
     
     protected function handleRoute(array $request) {
@@ -104,18 +101,13 @@ class PublicRouteHandler extends BaseRouteHandler
     private function showHealthInfo(): void {
         $info = [
             "status" => "OK",
-            "message" => "API Collective Memories opérationnelle",
+            "message" => "API AuthGroups opérationnelle",
             "timestamp" => date('Y-m-d H:i:s'),
             "version" => "1.2.0"
         ];
         Response::success('health_status', $info);
     }
 
-    /**
-     * Gère la route GET /memories - vérifie l'authentification
-     * Si authentifié, retourne false pour passer au MemoryRouteHandler
-     * Si non authentifié, retourne les mémoires publiques
-     */
     private function hasAuthToken(): bool {
         $authHeader = null;
 

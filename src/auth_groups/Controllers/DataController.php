@@ -1,10 +1,10 @@
 <?php
 
-namespace Memories\Controllers;
+namespace AuthGroups\Controllers;
 
-use Memories\Utils\Response;
-use Memories\Services\LogService;
-use Memories\Middleware\LoggingMiddleware;
+use AuthGroups\Utils\Response;
+use AuthGroups\Services\LogService;
+use AuthGroups\Middleware\LoggingMiddleware;
 use Exception;
 
 class DataController 

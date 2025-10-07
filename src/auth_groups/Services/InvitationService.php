@@ -1,6 +1,6 @@
 <?php
 
-namespace Memories\Services;
+namespace AuthGroups\Services;
 
 use PDO;
 use Exception;
@@ -215,8 +215,8 @@ class InvitationService {
         $headers = [
             'MIME-Version: 1.0',
             'Content-type: text/html; charset=UTF-8',
-            'From: ' . ($_ENV['MAIL_FROM'] ?? 'noreply@memories.app'),
-            'Reply-To: ' . ($_ENV['MAIL_REPLY_TO'] ?? 'support@memories.app'),
+            'From: ' . ($_ENV['MAIL_FROM'] ?? 'noreply@authgroups.local'),
+            'Reply-To: ' . ($_ENV['MAIL_REPLY_TO'] ?? 'support@authgroups.local'),
         ];
         
         // Pour l'instant, log l'email (en développement)

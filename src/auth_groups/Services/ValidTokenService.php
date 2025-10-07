@@ -1,8 +1,8 @@
 <?php
 
-namespace Memories\Services;
+namespace AuthGroups\Services;
 
-use Memories\Services\LogService;
+use AuthGroups\Services\LogService;
 use Exception;
 
 /**

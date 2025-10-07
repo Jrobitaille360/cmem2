@@ -1,11 +1,11 @@
 <?php
 
-namespace Memories\Controllers;
+namespace AuthGroups\Controllers;
 
-use Memories\Services\ValidTokenService;
-use Memories\Utils\Response;
-use Memories\Services\LogService;
-use Memories\Middleware\LoggingMiddleware;
+use AuthGroups\Services\ValidTokenService;
+use AuthGroups\Utils\Response;
+use AuthGroups\Services\LogService;
+use AuthGroups\Middleware\LoggingMiddleware;
 use Exception;
 
 /**

@@ -6,23 +6,15 @@
  * Architecture:
  * - auth_groups/shared/ : Configurations communes obligatoires (environnement, base de données, logs)
  * - auth_groups/       : Configurations d'authentification, utilisateurs, groupes, tags
- * - memories_elements/ : Configurations de mémoires, éléments, uploads multimédia
  */
 
 // Charger d'abord les configurations communes obligatoires (ordre important)
-require_once __DIR__ . '/auth_groups/environment.php';
-require_once __DIR__ . '/auth_groups/logs.php';
-require_once __DIR__ . '/auth_groups/database.php';
+require_once __DIR__ . 'environment.php';
+require_once __DIR__ . 'database.php';
 
 // Charger les configurations du module auth_groups
-require_once __DIR__ . '/auth_groups/auth.php';
 require_once __DIR__ . '/auth_groups/uploads.php';
-require_once __DIR__ . '/auth_groups/tags.php';
 
-// Charger les configurations du module memories_elements
-//require_once __DIR__ . '/memories_elements/memories.php';
-//require_once __DIR__ . '/memories_elements/uploads.php';
-//require_once __DIR__ . '/memories_elements/pagination.php';
 
 /**
  * Validation de la configuration
@@ -42,10 +34,6 @@ function validateConfiguration(): array {
     }
     if (!defined('JWT_EXPIRATION')) $errors[] = 'JWT_EXPIRATION non défini';
     
-    // Validation du module memories_elements
-    //if (!defined('MAX_MEMORY_IMAGE_SIZE')) $errors[] = 'MAX_MEMORY_IMAGE_SIZE non défini';
-    //if (!defined('MEMORY_UPLOAD_DIR')) $errors[] = 'MEMORY_UPLOAD_DIR non défini';
-    //if (!defined('MEMORIES_DEFAULT_PAGE_SIZE')) $errors[] = 'MEMORIES_DEFAULT_PAGE_SIZE non défini';
     
     // Validation des répertoires critiques
     if (!is_dir(UPLOAD_DIR)) $errors[] = 'Répertoire UPLOAD_DIR inaccessible: ' . UPLOAD_DIR;
@@ -67,10 +55,7 @@ function initializeDirectories(): void {
     if (!file_exists(AVATAR_UPLOAD_DIR)) mkdir(AVATAR_UPLOAD_DIR, 0755, true);
     if (!file_exists(GROUP_FILES_UPLOAD_DIR)) mkdir(GROUP_FILES_UPLOAD_DIR, 0755, true);
     
-    // Répertoires du module memories_elements
-    //if (!file_exists(MEMORY_UPLOAD_DIR)) mkdir(MEMORY_UPLOAD_DIR, 0755, true);
-    //if (!file_exists(MEMORY_TEMP_DIR)) mkdir(MEMORY_TEMP_DIR, 0755, true);
-}
+    }
 
 /**
  * Affichage des informations de configuration (debug uniquement)
@@ -83,7 +68,6 @@ function displayConfigurationInfo(): void {
     echo "- Environnement: " . APP_ENV . "\n";
     echo "- Base URL: " . BASE_URL . "\n";
     echo "- Version API: " . API_VERSION . "\n";
-    echo "- Modules: auth_groups, memories_elements, shared\n";
     echo "-->\n"; */
 }
 
@@ -117,14 +101,3 @@ if (!empty($config_errors)) {
     displayConfigurationInfo();
 }
 
-// Constantes de compatibilité pour l'ancienne structure
-// À supprimer progressivement lors de la migration
-//define('DEFAULT_PAGE_SIZE', MEMORIES_DEFAULT_PAGE_SIZE);
-//define('MAX_PAGE_SIZE', MEMORIES_MAX_PAGE_SIZE);
-
-// Définir les types de fichiers globaux pour compatibilité
-//define('ALLOWED_IMAGE_TYPES', ALLOWED_MEMORY_IMAGE_TYPES);
-//define('ALLOWED_VIDEO_TYPES', ALLOWED_MEMORY_VIDEO_TYPES);
-//define('ALLOWED_DOCUMENT_TYPES', ALLOWED_MEMORY_DOCUMENT_TYPES);
-//define('ALLOWED_AUDIO_TYPES', ALLOWED_MEMORY_AUDIO_TYPES);
-//define('ALLOWED_FILE_TYPES', ALLOWED_MEMORY_FILE_TYPES);

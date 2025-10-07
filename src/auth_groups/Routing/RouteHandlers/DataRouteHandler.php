@@ -1,10 +1,10 @@
 <?php
 
-namespace Memories\Routing\RouteHandlers;
+namespace AuthGroups\Routing\RouteHandlers;
 
-use Memories\Routing\BaseRouteHandler;
-use Memories\Controllers\DataController;
-use Memories\Utils\Response;
+use AuthGroups\Routing\BaseRouteHandler;
+use AuthGroups\Controllers\DataController;
+use AuthGroups\Utils\Response;
 
 class DataRouteHandler extends BaseRouteHandler 
 {

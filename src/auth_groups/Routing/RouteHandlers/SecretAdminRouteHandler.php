@@ -1,10 +1,10 @@
 <?php
 
-namespace Memories\Routing\RouteHandlers;
+namespace AuthGroups\Routing\RouteHandlers;
 
-use Memories\Routing\BaseRouteHandler;
-use Memories\Controllers\SecretAdminController;
-use Memories\Utils\Response;
+use AuthGroups\Routing\BaseRouteHandler;
+use AuthGroups\Controllers\SecretAdminController;
+use AuthGroups\Utils\Response;
 
 /**
  * Gestionnaire de routes pour l'endpoint admin secret
@@ -21,7 +21,7 @@ class SecretAdminRouteHandler extends BaseRouteHandler
     
     public function __construct() {
         // Passer l'AuthService pour l'authentification JWT
-        parent::__construct(new \Memories\Services\AuthService());
+        parent::__construct(new \AuthGroups\Services\AuthService());
         $this->controller = new SecretAdminController();
     }
     
@@ -37,7 +37,7 @@ class SecretAdminRouteHandler extends BaseRouteHandler
         
         // Vérification supplémentaire : l'utilisateur doit être ADMINISTRATEUR
         if (!$user || $user['role'] !== 'ADMINISTRATEUR') {
-            \Memories\Services\LogService::warning('Tentative d\'accès admin secret sans privilèges admin', [
+            \AuthGroups\Services\LogService::warning('Tentative d\'accès admin secret sans privilèges admin', [
                 'user_id' => $user['user_id'] ?? null,
                 'role' => $user['role'] ?? 'inconnu',
                 'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',

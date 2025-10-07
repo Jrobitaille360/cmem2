@@ -707,7 +707,7 @@
                         "data": {
                             "id": 1,
                             "name": "Jean Dupont",
-                            "email": "user@cmem1.com",
+                            "email": "user@cmem2.com",
                             "role": "UTILISATEUR",
                             "profile_image": "/uploads/avatars/2.jpg",
                             "bio": "Historien passionné",
@@ -750,7 +750,7 @@
                         "data": {
                             "id": 1,
                             "name": "Jean Dupont",
-                            "email": "user@cmem1.com",
+                            "email": "user@cmem2.com",
                             "role": "UTILISATEUR",
                             "profile_image": "/uploads/avatars/2.jpg",
                             "bio": "Historien passionné",

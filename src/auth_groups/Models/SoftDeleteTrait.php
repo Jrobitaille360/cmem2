@@ -1,6 +1,6 @@
 <?php
 
-namespace Memories\Models;
+namespace AuthGroups\Models;
 
 /**
  * Trait pour gérer les soft deletes

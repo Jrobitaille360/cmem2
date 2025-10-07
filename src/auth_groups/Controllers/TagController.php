@@ -1,12 +1,12 @@
 <?php
 
-namespace Memories\Controllers;
+namespace AuthGroups\Controllers;
 
-use Memories\Models\Tag;
-use Memories\Utils\Response;
-use Memories\Utils\Validator;
-use Memories\Services\LogService;
-use Memories\Middleware\LoggingMiddleware;
+use AuthGroups\Models\Tag;
+use AuthGroups\Utils\Response;
+use AuthGroups\Utils\Validator;
+use AuthGroups\Services\LogService;
+use AuthGroups\Middleware\LoggingMiddleware;
 use Exception;
 
 /**
@@ -216,7 +216,7 @@ class TagController {
             $validator = new Validator();
             $validation = $validator->validate($input, [
                 'name' => 'required|string|min:1|max:100',
-                'table_associate' => 'required|in:groups,memories,elements,files,all',
+                'table_associate' => 'required|in:groups,files,all',
                 'color' => 'string|regex:/^#[0-9A-Fa-f]{6}$/'
             ]);
             
@@ -230,7 +230,7 @@ class TagController {
             
             $tag = new Tag();
             $tag->name = trim($input['name']);
-            $tag->table_associate = $input['table_associate'] ?? 'memories';
+            $tag->table_associate = $input['table_associate'] ?? 'groups';
             $tag->color = $input['color'] ?? '#3498db';
             $tag->tag_owner = $currentUserId;
 
@@ -317,7 +317,7 @@ class TagController {
             $validator = new Validator();
             $validation = $validator->validate($input, [
                 'name' => 'string|min:1|max:100',
-                'table_associate' => 'in:groups,memories,elements,files,all',
+                'table_associate' => 'in:groups,files,all',
                 'color' => 'string|regex:/^#[0-9A-Fa-f]{6}$/'
             ]);
             
@@ -453,11 +453,11 @@ class TagController {
             LoggingMiddleware::logEntry();
             
             $params = Response::getRequestParams();
-            $tableAssociate = $params['table_associate'] ?? 'memories';
+            $tableAssociate = $params['table_associate'] ?? 'groups';
             $limit = min((int)($params['limit'] ?? 10), 50); // Maximum 50
             
             // Valider la table associée
-            $validTables = ['memories', 'elements', 'files', 'groups', 'all'];
+            $validTables = ['files', 'groups', 'all'];
             if (!in_array($tableAssociate, $validTables)) {
                 LogService::warning("Table associée invalide pour getMostUsed", [
                     'table_associate' => $tableAssociate,
@@ -510,7 +510,7 @@ class TagController {
             $validator = new Validator();
             $validation = $validator->validate($input, [
                 'name' => 'required|string|min:1|max:100',
-                'table_associate' => 'in:groups,memories,elements,files,all',
+                'table_associate' => 'in:groups,files,all',
                 'color' => 'string|regex:/^#[0-9A-Fa-f]{6}$/'
             ]);
             
@@ -526,7 +526,7 @@ class TagController {
             $result = $tag->getOrCreate(
                 trim($input['name']),
                 $currentUserId,
-                $input['table_associate'] ?? 'memories',
+                $input['table_associate'] ?? 'groups',
                 $input['color'] ?? '#3498db'
             );
             
@@ -633,7 +633,7 @@ class TagController {
             // Validation
             $validator = new Validator();
             $validation = $validator->validate($input, [
-                'table_associate' => 'required|in:groups,memories,elements,files'
+                'table_associate' => 'required|in:groups,files'
             ]);
             
             if (!$validation['valid']) {

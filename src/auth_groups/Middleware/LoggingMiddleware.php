@@ -1,8 +1,8 @@
 <?php
 
-namespace Memories\Middleware;
+namespace AuthGroups\Middleware;
 
-use Memories\Services\LogService;
+use AuthGroups\Services\LogService;
 
 /**
  * Middleware pour le logging automatique des requêtes API

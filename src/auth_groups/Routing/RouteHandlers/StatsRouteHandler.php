@@ -1,10 +1,10 @@
 <?php
 
-namespace Memories\Routing\RouteHandlers;
+namespace AuthGroups\Routing\RouteHandlers;
 
-use Memories\Routing\BaseRouteHandler;
-use Memories\Controllers\StatsController;
-use Memories\Utils\Response;
+use AuthGroups\Routing\BaseRouteHandler;
+use AuthGroups\Controllers\StatsController;
+use AuthGroups\Utils\Response;
 
 class StatsRouteHandler extends BaseRouteHandler 
 {

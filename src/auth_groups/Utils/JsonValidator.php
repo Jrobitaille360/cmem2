@@ -1,6 +1,6 @@
 <?php
 
-namespace Memories\Utils;
+namespace AuthGroups\Utils;
 
 class JsonValidator 
 {

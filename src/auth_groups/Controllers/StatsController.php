@@ -1,10 +1,10 @@
 <?php
 
-namespace Memories\Controllers;
+namespace AuthGroups\Controllers;
 
-use Memories\Utils\Response;
-use Memories\Services\LogService;
-use Memories\Services\ValidTokenService;
+use AuthGroups\Utils\Response;
+use AuthGroups\Services\LogService;
+use AuthGroups\Services\ValidTokenService;
 use PDO;
 use Exception;
 
@@ -244,8 +244,6 @@ class StatsController
                 // Générer des statistiques temporaires si aucune n'existe
                 $userStats = [
                     'user_id' => $targetUserId,
-                    'total_memories' => 0,
-                    'total_elements' => 0,
                     'total_groups' => 0,
                     'storage_used_mb' => 0,
                     'generated_at' => date('Y-m-d H:i:s'),

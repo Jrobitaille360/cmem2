@@ -1,8 +1,8 @@
 <?php
 
-namespace Memories\Routing;
+namespace AuthGroups\Routing;
 
-use Memories\Routing\RouteHandlers\{
+use AuthGroups\Routing\RouteHandlers\{
     PublicRouteHandler,
     UserRouteHandler,
     GroupRouteHandler,
@@ -14,9 +14,9 @@ use Memories\Routing\RouteHandlers\{
     DataRouteHandler,
     SecretAdminRouteHandler
 };
-use Memories\Services\{AuthService, LogService};
-use Memories\Utils\Response;
-use Memories\Middleware\LoggingMiddleware;
+use AuthGroups\Services\{AuthService, LogService};
+use AuthGroups\Utils\Response;
+use AuthGroups\Middleware\LoggingMiddleware;
 use Exception;
 
 class Router 
@@ -36,8 +36,6 @@ class Router
         $this->routeHandlers = [
             'users' => new UserRouteHandler($this->authService),
             'groups' => new GroupRouteHandler($this->authService),
-           // 'memories' => new MemoryRouteHandler($this->authService),
-           // 'elements' => new ElementRouteHandler($this->authService),
             'tags' => new TagRouteHandler($this->authService),
             'files' => new FileRouteHandler($this->authService),
             'stats' => new StatsRouteHandler($this->authService),
@@ -109,16 +107,14 @@ class Router
     
     private function showAPIInfo(): void {
         $info = [
-            'name' => 'Collective Memories API',
+            'name' => 'AuthGroups API',
             'version' => '1.1.0',
-            'description' => 'API REST pour l\'application de mémoires collectives',
+            'description' => 'API REST pour la gestion d\'authentification et de groupes',
             'architecture' => 'Architecture modulaire avec gestionnaires de routes séparés',
             'performance' => 'Optimisée avec chargement sélectif des composants',
             'modules' => [
                 'users' => 'Gestion des utilisateurs et authentification',
                 'groups' => 'Gestion des groupes et invitations',
-               // 'memories' => 'Gestion des mémoires collectives',
-                //'elements' => 'Gestion des éléments multimédias',
                 'tags' => 'Système de tags et catégorisation',
                 'files' => 'Upload et gestion de fichiers',
                 'stats' => 'Statistiques et analytics',

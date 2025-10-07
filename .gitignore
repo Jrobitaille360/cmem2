@@ -1,9 +1,7 @@
 # Fichiers de configuration sensibles
 config/auth_groups/shared/.env
-config/memories_elements/.env
 .env
 .env.auth_groups
-.env.memories_elements
 .env.cmem1
 .env.local
 

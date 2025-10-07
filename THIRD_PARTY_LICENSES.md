@@ -1,6 +1,6 @@
 # Licences des Dépendances Tierces
 
-Ce fichier liste toutes les dépendances externes et leurs licences respectives utilisées dans l'API Collective Memories.
+Ce fichier liste toutes les dépendances externes et leurs licences respectives utilisées dans l'API AuthGroups.
 
 ## Dépendances de Production
 

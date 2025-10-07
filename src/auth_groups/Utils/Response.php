@@ -1,8 +1,8 @@
 <?php
 
-namespace Memories\Utils;
+namespace AuthGroups\Utils;
 
-use Memories\Services\LogService;
+use AuthGroups\Services\LogService;
 
 class Response {
     

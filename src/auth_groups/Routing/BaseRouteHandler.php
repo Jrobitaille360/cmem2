@@ -1,10 +1,10 @@
 <?php
 
-namespace Memories\Routing;
+namespace AuthGroups\Routing;
 
-use Memories\Services\AuthService;
-use Memories\Utils\Response;
-use Memories\Middleware\LoggingMiddleware;
+use AuthGroups\Services\AuthService;
+use AuthGroups\Utils\Response;
+use AuthGroups\Middleware\LoggingMiddleware;
 
 abstract class BaseRouteHandler implements RouteHandlerInterface 
 {

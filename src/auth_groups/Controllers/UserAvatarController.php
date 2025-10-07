@@ -1,16 +1,16 @@
 <?php
 
-namespace Memories\Controllers;
+namespace AuthGroups\Controllers;
 
-use Memories\Models\User;
-use Memories\Services\EmailService;
-use Memories\Utils\Response;
-use Memories\Utils\Validator;
-use Memories\Utils\FileValidator;
-use Memories\Utils\Database;
+use AuthGroups\Models\User;
+use AuthGroups\Services\EmailService;
+use AuthGroups\Utils\Response;
+use AuthGroups\Utils\Validator;
+use AuthGroups\Utils\FileValidator;
+use AuthGroups\Utils\Database;
 use Firebase\JWT\JWT;
-use Memories\Services\LogService;
-use Memories\Middleware\LoggingMiddleware;
+use AuthGroups\Services\LogService;
+use AuthGroups\Middleware\LoggingMiddleware;
 use Exception;
 
 /**

@@ -1,12 +1,12 @@
 <?php
 
-namespace Memories\Services;
+namespace AuthGroups\Services;
 
 use Exception;
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\SMTP;
 use PHPMailer\PHPMailer\Exception as PHPMailerException;
-use Memories\Services\LogService;
+use AuthGroups\Services\LogService;
 
 /**
  * Service pour gérer l'envoi d'emails avec SMTP
@@ -31,8 +31,8 @@ class EmailService {
         $this->smtpUsername = $_ENV['SMTP_USERNAME'] ?? $_ENV['MAIL_USERNAME'] ?? '';
         $this->smtpPassword = $_ENV['SMTP_PASSWORD'] ?? $_ENV['MAIL_PASSWORD'] ?? '';
         $this->smtpSecure = $_ENV['SMTP_SECURE'] ?? 'tls'; // tls, ssl, ou false
-        $this->fromEmail = $_ENV['MAIL_FROM_ADDRESS'] ?? 'noreply@memories.app';
-        $this->fromName = $_ENV['MAIL_FROM_NAME'] ?? 'Collective Memories';
+        $this->fromEmail = $_ENV['MAIL_FROM_ADDRESS'] ?? 'noreply@authgroups.local';
+        $this->fromName = $_ENV['MAIL_FROM_NAME'] ?? 'AuthGroups API';
         $this->isDevMode = ($_ENV['APP_ENV'] ?? 'production') === 'development';
         $this->useSMTP = $_ENV['USE_SMTP'] ?? 'true'; // true par défaut pour utiliser SMTP
         
@@ -291,7 +291,7 @@ class EmailService {
             'username' => $username
         ]);
         
-        $subject = "Bienvenue sur Collective Memories !";
+        $subject = "Bienvenue sur AuthGroups API !";
         
         $body = $this->buildWelcomeTemplate([
             'username' => $username,
@@ -390,7 +390,7 @@ class EmailService {
      * Envoyer un email de vérification d'adresse email
      */
     public function sendEmailVerification($email, $username, $verificationToken) {
-        $subject = "Vérifiez votre adresse email - Collective Memories";
+        $subject = "Vérifiez votre adresse email - AuthGroups API";
         
         $verificationUrl = APP_URL . "/verify-email?token=" . $verificationToken;
         
@@ -440,7 +440,7 @@ class EmailService {
      * Envoyer un rapport d'activité périodique
      */
     public function sendActivityDigest($email, $username, $digestData) {
-        $subject = "Votre résumé d'activité - Collective Memories";
+        $subject = "Votre résumé d'activité - AuthGroups API";
         
         $body = $this->buildActivityDigestTemplate([
             'username' => $username,
@@ -463,7 +463,7 @@ class EmailService {
             'source_ip' => $alertData['ip'] ?? 'unknown'
         ]);
         
-        $subject = "Alerte de sécurité - Collective Memories";
+        $subject = "Alerte de sécurité - AuthGroups API";
         
         $body = $this->buildSecurityAlertTemplate([
             'username' => $username,
@@ -555,7 +555,7 @@ class EmailService {
         <body>
             <div class='container'>
                 <div class='header'>
-                    <h1>Bienvenue sur Collective Memories !</h1>
+                    <h1>Bienvenue sur AuthGroups API !</h1>
                 </div>
                 <div class='content'>
                     <h2>Bonjour {$data['username']} !</h2>
@@ -675,7 +675,7 @@ class EmailService {
                 </div>
                 <div class='content'>
                     <h2>Bonjour {$data['username']} !</h2>
-                    <p>Merci de confirmer votre adresse email pour activer votre compte Collective Memories.</p>
+                    <p>Merci de confirmer votre adresse email pour activer votre compte AuthGroups API.</p>
                     <p style='text-align: center;'>
                         <a href='{$data['verificationUrl']}' class='button'>Vérifier mon email</a>
                     </p>
@@ -797,10 +797,9 @@ class EmailService {
                 </div>
                 <div class='content'>
                     <h2>Bonjour {$data['username']} !</h2>
-                    <p>Voici un résumé de votre activité sur Collective Memories :</p>
+                    <p>Voici un résumé de votre activité sur AuthGroups API :</p>
                     <div class='stats'>
-                        <div class='stat-item'>📸 <strong>" . (isset($data['digestData']['memories_created']) ? $data['digestData']['memories_created'] : 0) . "</strong> mémoires créées</div>
-                        <div class='stat-item'>👥 <strong>" . (isset($data['digestData']['groups_joined']) ? $data['digestData']['groups_joined'] : 0) . "</strong> nouveaux groupes rejoint</div>
+                        <div class='stat-item'> <strong>" . (isset($data['digestData']['groups_joined']) ? $data['digestData']['groups_joined'] : 0) . "</strong> nouveaux groupes rejoints</div>
                         <div class='stat-item'>💬 <strong>" . (isset($data['digestData']['interactions']) ? $data['digestData']['interactions'] : 0) . "</strong> interactions</div>
                     </div>
                     <p style='text-align: center;'>
@@ -1027,7 +1026,7 @@ class EmailService {
     public function sendTestEmail($to = null) {
         $testEmail = $to ?? $this->fromEmail;
         
-        $subject = 'Test SMTP - Collective Memories';
+        $subject = 'Test SMTP - AuthGroups API';
         $body = $this->buildTestEmailTemplate([
             'timestamp' => date('Y-m-d H:i:s'),
             'config' => [
@@ -1045,7 +1044,7 @@ class EmailService {
      * Envoyer une notification de maintenance programmée
      */
     public function sendMaintenanceNotification($emails, $maintenanceData) {
-        $subject = "Maintenance programmée - Collective Memories";
+        $subject = "Maintenance programmée - AuthGroups API";
         
         $body = $this->buildMaintenanceTemplate([
             'startTime' => $maintenanceData['start_time'],
@@ -1065,7 +1064,7 @@ class EmailService {
      * Envoyer un email de confirmation d'action critique
      */
     public function sendActionConfirmation($email, $username, $action, $confirmationUrl) {
-        $subject = "Confirmation d'action requise - Collective Memories";
+        $subject = "Confirmation d'action requise - AuthGroups API";
         
         $body = $this->buildActionConfirmationTemplate([
             'username' => $username,
@@ -1134,7 +1133,7 @@ class EmailService {
                 </div>
                 <div class='content'>
                     <h2>Information importante</h2>
-                    <p>Nous effectuerons une maintenance de Collective Memories selon les détails suivants :</p>
+                    <p>Nous effectuerons une maintenance de AuthGroups API selon les détails suivants :</p>
                     <div class='maintenance-info'>
                         <p><strong>📅 Début :</strong> {$data['startTime']}</p>
                         <p><strong>⏱️ Durée estimée :</strong> {$data['duration']}</p>

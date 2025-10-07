@@ -1,0 +1,11 @@
+{
+  ✓ enlever toutes traces de memories et elements (COMPLETÉ - Renommé en AuthGroups)
+  ✓ refaire la documentation et le README.md (COMPLETÉ)
+  API key setup
+  admin to add php new features
+    admin to create tables, php entrypoints
+    example
+        calendar
+        todo list
+
+}

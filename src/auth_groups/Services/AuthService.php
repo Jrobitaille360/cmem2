@@ -1,10 +1,10 @@
 <?php
 
-namespace Memories\Services;
+namespace AuthGroups\Services;
 
-use Memories\Models\User;
-use Memories\Services\LogService;
-use Memories\Services\ValidTokenService;
+use AuthGroups\Models\User;
+use AuthGroups\Services\LogService;
+use AuthGroups\Services\ValidTokenService;
 use Exception;
 
 class AuthService 

@@ -1,248 +1,409 @@
-# 🌟 Collective Memories API
+# AuthGroups API
 
-> API REST pour la gestion de mémoires collectives - Version 1.1.0
+API REST moderne pour la gestion d'authentification, de groupes et de fichiers avec support de tags et statistiques.
 
-Une plateforme collaborative permettant aux utilisateurs de créer, partager et organiser leurs souvenirs et documents au sein de groupes communautaires.
+## 📋 Table des matières
 
----
+- [Vue d'ensemble](#vue-densemble)
+- [Fonctionnalités](#fonctionnalités)
+- [Technologies](#technologies)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Architecture](#architecture)
+- [Endpoints API](#endpoints-api)
+- [Authentification](#authentification)
+- [Documentation](#documentation)
+- [Tests](#tests)
+- [Licence](#licence)
 
-## 🚀 Fonctionnalités principales
+## 🎯 Vue d'ensemble
 
-### 👥 **Gestion des utilisateurs**
-- Inscription et authentification JWT
-- Profils utilisateurs personnalisables
-- Système de rôles (Utilisateur, Admin)
-- Vérification par email et réinitialisation de mot de passe
+AuthGroups API est une solution complète pour gérer :
+- **Authentification** : Système JWT avec gestion des sessions
+- **Utilisateurs** : Inscription, connexion, profils, avatars
+- **Groupes** : Création, gestion des membres, invitations
+- **Fichiers** : Upload, stockage, gestion avec validation
+- **Tags** : Système de catégorisation flexible
+- **Statistiques** : Analytics et rapports d'utilisation
+- **Synchronisation** : Support hors-ligne
 
-### 💾 **Mémoires collectives**
-- Création et modification de mémoires
-- Support multimédia (texte, images, documents)
-- Système de visibilité (public/privé)
-- Géolocalisation et dates
-- Recherche avancée
+## ✨ Fonctionnalités
 
-### 👥 **Groupes collaboratifs**
-- Création de groupes publics/privés
-- Système d'invitations
-- Gestion des rôles (membre, modérateur, admin)
-- Limitation du nombre de membres
+### Gestion des utilisateurs
+- 🔐 Inscription et authentification JWT
+- 👤 Profils utilisateurs personnalisables
+- 🖼️ Upload d'avatars
+- 🔑 Réinitialisation de mot de passe
+- 📧 Notifications par email
+- 🔒 Gestion des rôles (UTILISATEUR, MODERATEUR, ADMINISTRATEUR)
 
-### 📁 **Gestion des fichiers**
-- Upload multiformat (images, documents, audio, vidéo)
-- Validation et limites de taille
-- Organisation par utilisateur
-- Système de restauration
+### Gestion des groupes
+- 👥 Création et administration de groupes
+- 📨 Système d'invitations par email
+- 🏷️ Images de groupe
+- 🔐 Gestion des permissions
+- 🔍 Recherche avancée
 
-### 🏷️ **Tags et organisation**
-- Système d'étiquetage flexible
-- Association multi-tables (mémoires, fichiers, groupes)
-- Tags populaires et recherche
-- Couleurs personnalisables
+### Système de fichiers
+- 📁 Upload de fichiers multiples
+- 🖼️ Support images, vidéos, documents, audio
+- ✅ Validation et sécurité
+- 🗑️ Soft delete avec restauration
+- 📊 Gestion du stockage
 
-### 📊 **Statistiques et analytics**
-- Tableaux de bord administrateur
-- Statistiques utilisateurs
-- Métriques par groupe
-- Rapports d'activité
+### Tags et catégorisation
+- 🏷️ Tags personnalisables avec couleurs
+- 🔗 Association à groupes et fichiers
+- 📊 Tags les plus utilisés
+- 🔍 Recherche par tags
 
----
+### Statistiques
+- 📈 Statistiques utilisateurs
+- 📊 Analytics groupes
+- 💾 Utilisation du stockage
+- 👥 Utilisateurs en ligne
 
-## 🛠️ Technologies utilisées
+## 🛠️ Technologies
 
-- **Backend** : PHP 8.x
-- **Base de données** : MySQL/PostgreSQL
-- **Architecture** : API REST
-- **Authentification** : JWT Bearer Token
-- **Email** : SMTP avec TLS
-- **Upload** : Multipart form-data
-- **Validation** : Validation personnalisée PHP
-- **Logging** : Système de logs intégré
+- **PHP 8.x** - Langage principal
+- **MySQL/MariaDB** - Base de données
+- **JWT** - Authentification (firebase/php-jwt)
+- **PHPMailer** - Envoi d'emails
+- **Composer** - Gestion des dépendances
+- **PHPUnit** - Tests unitaires
 
----
+## 📦 Installation
 
-## 📋 Prérequis
+### Prérequis
 
-- **PHP** 8.0+
-- **MySQL** 5.7+ ou **PostgreSQL** 12+
-- **Composer** (gestionnaire de dépendances PHP)
-- **Serveur web** (Apache/Nginx)
-- **Extensions PHP** : PDO, JSON, mbstring, fileinfo
+- PHP >= 8.0
+- MySQL >= 5.7 ou MariaDB >= 10.3
+- Composer
+- Extension PHP : PDO, mbstring, openssl, fileinfo
 
----
+### Installation
 
-## ⚡ Installation rapide
-
-### 1. Cloner le projet
+1. **Cloner le projet**
 ```bash
-git clone https://github.com/Jrobitaille360/cmem1.git
-cd cmem1_API
+git clone https://github.com/Jrobitaille360/cmem2.git
+cd cmem2_API
 ```
 
-### 2. Installer les dépendances
+2. **Installer les dépendances**
 ```bash
 composer install
 ```
 
-### 3. Configuration
+3. **Créer la base de données**
 ```bash
-# Copier le fichier de configuration
-cp config/config.example.php config/config.php
-cp config/database.example.php config/database.php
-
-# Modifier les paramètres de base de données et SMTP
+mysql -u root -p < docs/create_database.sql
 ```
 
-### 4. Base de données
+4. **Configurer l'environnement**
 ```bash
-# Créer la base de données avec le schéma fourni
-mysql -u username -p < docs/schema_CMem1_mysql.sql
-
-# Optionnel : Insérer des données de test
-mysql -u username -p < docs/test_donnees.sql
+cp config/environment.example.php config/environment.php
 ```
 
-### 5. Permissions
-```bash
-# Donner les permissions d'écriture
-chmod -R 755 uploads/
-chmod -R 755 logs/
+Éditer `config/environment.php` avec vos paramètres :
+```php
+// Base de données
+define('DB_HOST', 'localhost');
+define('DB_NAME', 'cmem2_db');
+define('DB_USER', 'your_user');
+define('DB_PASS', 'your_password');
+
+// JWT
+define('JWT_SECRET_KEY', 'your-secret-key-here');
+
+// Emails
+$_ENV['MAIL_HOST'] = 'smtp.example.com';
+$_ENV['MAIL_PORT'] = 587;
+$_ENV['MAIL_USERNAME'] = 'your-email@example.com';
+$_ENV['MAIL_PASSWORD'] = 'your-password';
 ```
 
----
+5. **Configurer les permissions**
+```bash
+chmod -R 755 config/uploads/
+```
+
+## ⚙️ Configuration
+
+### Structure des fichiers de configuration
+
+```
+config/
+├── database.php          # Configuration base de données
+├── environment.php       # Variables d'environnement
+├── loader.php           # Autoloader
+└── uploads/             # Dossier uploads
+    ├── avatars/         # Avatars utilisateurs
+    ├── groups/          # Images de groupes
+    └── temp/            # Fichiers temporaires
+```
+
+### Variables d'environnement
+
+| Variable | Description | Défaut |
+|----------|-------------|--------|
+| `DB_HOST` | Hôte de la base de données | localhost |
+| `DB_NAME` | Nom de la base de données | cmem2_db |
+| `DB_USER` | Utilisateur de la base | - |
+| `DB_PASS` | Mot de passe de la base | - |
+| `JWT_SECRET_KEY` | Clé secrète JWT | - |
+| `JWT_EXPIRATION` | Durée de validité JWT (secondes) | 86400 |
+| `MAIL_HOST` | Serveur SMTP | - |
+| `MAIL_PORT` | Port SMTP | 587 |
+| `MAIL_USERNAME` | Email SMTP | - |
+| `MAIL_PASSWORD` | Mot de passe SMTP | - |
+
+## 🏗️ Architecture
+
+### Structure du projet
+
+```
+cmem2_API/
+├── config/              # Configuration
+├── docs/                # Documentation
+├── src/
+│   └── auth_groups/     # Code source principal
+│       ├── Controllers/ # Contrôleurs
+│       ├── Models/      # Modèles de données
+│       ├── Services/    # Services métier
+│       ├── Routing/     # Routeur et handlers
+│       ├── Middleware/  # Middlewares
+│       └── Utils/       # Utilitaires
+├── tests/               # Tests
+├── vendor/              # Dépendances Composer
+├── index.php            # Point d'entrée
+└── composer.json        # Configuration Composer
+```
+
+### Architecture modulaire
+
+L'API utilise une architecture modulaire avec séparation des responsabilités :
+
+- **Controllers** : Gestion des requêtes HTTP
+- **Models** : Logique métier et accès données
+- **Services** : Services partagés (Auth, Email, Logs)
+- **Routing** : Routage et handlers spécialisés
+- **Middleware** : Logging et interception
+- **Utils** : Validation, réponses, helpers
+
+## 🔌 Endpoints API
+
+### Public
+
+| Méthode | Endpoint | Description |
+|---------|----------|-------------|
+| GET | `/` | Informations API |
+| GET | `/help` | Liste des endpoints |
+| GET | `/health` | Statut de l'API |
+
+### Utilisateurs
+
+| Méthode | Endpoint | Description | Auth |
+|---------|----------|-------------|------|
+| POST | `/users/register` | Inscription | Non |
+| POST | `/users/login` | Connexion | Non |
+| GET | `/users/me` | Profil actuel | Oui |
+| PUT | `/users/me` | Modifier profil | Oui |
+| DELETE | `/users/me` | Supprimer compte | Oui |
+| POST | `/users/avatar` | Upload avatar | Oui |
+| GET | `/users/{id}` | Détails utilisateur | Oui |
+
+### Groupes
+
+| Méthode | Endpoint | Description | Auth |
+|---------|----------|-------------|------|
+| GET | `/groups` | Liste des groupes | Oui |
+| POST | `/groups` | Créer un groupe | Oui |
+| GET | `/groups/{id}` | Détails d'un groupe | Oui |
+| PUT | `/groups/{id}` | Modifier un groupe | Oui |
+| DELETE | `/groups/{id}` | Supprimer un groupe | Oui |
+| POST | `/groups/{id}/invite` | Inviter un membre | Oui |
+| GET | `/groups/search` | Rechercher des groupes | Oui |
+
+### Fichiers
+
+| Méthode | Endpoint | Description | Auth |
+|---------|----------|-------------|------|
+| POST | `/files/upload` | Upload fichier(s) | Oui |
+| GET | `/files` | Liste des fichiers | Oui |
+| GET | `/files/{id}` | Détails d'un fichier | Oui |
+| DELETE | `/files/{id}` | Supprimer un fichier | Oui |
+| PUT | `/files/{id}/restore` | Restaurer un fichier | Oui |
+
+### Tags
+
+| Méthode | Endpoint | Description | Auth |
+|---------|----------|-------------|------|
+| GET | `/tags` | Liste des tags | Oui |
+| POST | `/tags` | Créer un tag | Oui |
+| GET | `/tags/{id}` | Détails d'un tag | Oui |
+| PUT | `/tags/{id}` | Modifier un tag | Oui |
+| DELETE | `/tags/{id}` | Supprimer un tag | Oui |
+| GET | `/tags/by-table/{table}` | Tags par table | Oui |
+| GET | `/tags/most-used` | Tags populaires | Oui |
+
+### Statistiques
+
+| Méthode | Endpoint | Description | Auth |
+|---------|----------|-------------|------|
+| GET | `/stats/user/{id}` | Stats utilisateur | Oui |
+| GET | `/stats/online` | Utilisateurs en ligne | Oui |
+
+Voir la [documentation complète des endpoints](docs/) pour plus de détails.
+
+## 🔐 Authentification
+
+L'API utilise JWT (JSON Web Tokens) pour l'authentification.
+
+### Obtenir un token
+
+```http
+POST /users/login
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "password123"
+}
+```
+
+Réponse :
+```json
+{
+  "success": true,
+  "data": {
+    "token": "eyJ0eXAiOiJKV1QiLCJhbGc...",
+    "user": {
+      "user_id": 1,
+      "name": "John Doe",
+      "email": "user@example.com",
+      "role": "UTILISATEUR"
+    }
+  }
+}
+```
+
+### Utiliser le token
+
+Incluez le token dans l'en-tête `Authorization` :
+
+```http
+GET /users/me
+Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGc...
+```
+
+### Durée de validité
+
+- Token valide pendant 24h par défaut
+- Configurable via `JWT_EXPIRATION`
+- Stockage des sessions actives en base de données
 
 ## 📚 Documentation
 
-### 📖 **Guide complet**
-- **[Documentation API](docs/README.md)** - Guide principal et navigation
-- **[Configuration](docs/CONFIGURATION.md)** - Guide de configuration de l'environnement
-- **[Spécifications techniques](docs/SPECIFICATIONS.md)** - Configuration système et limites
+### Documentation des endpoints
 
-### 🔗 **Endpoints par catégorie**
-- **[📡 Public](docs/ENDPOINTS_PUBLIC.md)** - Accès libre (8 endpoints)
-- **[👥 Users](docs/ENDPOINTS_USERS.md)** - Gestion utilisateurs (15 endpoints)
-- **[💾 Memories](docs/ENDPOINTS_MEMORIES.md)** - Mémoires (10 endpoints)
-- **[🧩 Elements](docs/ENDPOINTS_ELEMENTS.md)** - Éléments multimédia (6 endpoints)
-- **[🏷️ Tags](docs/ENDPOINTS_TAGS.md)** - Étiquetage (13 endpoints)
-- **[📁 Files](docs/ENDPOINTS_FILES.md)** - Fichiers (6 endpoints)
-- **[👥 Groups](docs/ENDPOINTS_GROUPS.md)** - Groupes (14 endpoints)
-- **[📊 Stats](docs/ENDPOINTS_STATS.md)** - Statistiques (6 endpoints)
+- [Endpoints utilisateurs](docs/ENDPOINTS_USERS.md)
+- [Endpoints groupes](docs/ENDPOINTS_GROUPS.md)
+- [Endpoints fichiers](docs/ENDPOINTS_FILES.md)
+- [Endpoints tags](docs/ENDPOINTS_TAGS.md)
+- [Endpoints statistiques](docs/ENDPOINTS_STATS.md)
+- [Endpoints publics](docs/ENDPOINTS_PUBLIC.md)
 
-### 🧪 **Tests et développement**
-- **[Tests unitaires](tests/)** - Suite de tests complète
-- **[Schéma base de données](docs/schema_CMem1_mysql.sql)** - Structure MySQL
-- **[Données de test](docs/test_donnees.sql)** - Jeu de données d'exemple
+### Documentation technique
 
----
+- [Endpoints admin secret](docs/ADMIN_SECRET_ENDPOINT.md)
+- [Structure base de données](docs/create_database.sql)
+- [Triggers et procédures](docs/create_triggers_auth_groups.sql)
 
-## 🚦 Status du projet
+## 🧪 Tests
 
-- ✅ **API fonctionnelle** - Version 1.1.0 stable
-- ✅ **Documentation complète** - 78 endpoints documentés  
-- ✅ **Tests intégrés** - Suite de tests unitaires
-- ✅ **Authentification sécurisée** - JWT + validation email
-- ✅ **Multi-format** - Support images, documents, audio, vidéo
-- ✅ **Système de logs** - Traçabilité complète
-- ✅ **Rate limiting** - 100 req/hour/IP
-- ✅ **CORS activé** - Compatible applications frontend
+### Exécuter les tests
 
----
+```bash
+# Tous les tests
+composer test
 
-## 🔒 Sécurité
-
-- **Authentification JWT** avec expiration
-- **Hashage bcrypt** des mots de passe
-- **Validation stricte** des entrées utilisateur
-- **Protection CSRF** intégrée
-- **Limitation du taux de requêtes**
-- **Validation des types de fichiers**
-- **Soft delete** pour la récupération de données
-
----
-
-## 📊 Limites système
-
-| Type | Limite | Description |
-|------|--------|-------------|
-| **Images** | 5MB | JPEG, PNG, GIF, WebP |
-| **Documents** | 10MB | PDF, TXT, DOC, DOCX |
-| **Audio** | 20MB | MP3, WAV, OGG |
-| **Vidéo** | 50MB | MP4, AVI, MOV |
-| **Avatars** | 2MB | Images utilisateurs |
-| **Rate limiting** | 100/h | Requêtes par IP |
-
----
-
-## 🌐 Endpoints principaux
-
-```http
-# Information API
-GET /
-
-# Authentification
-POST /users/register
-POST /users/login
-POST /users/logout
-
-# Mémoires
-GET /memories
-POST /memories
-GET /memories/{id}
-
-# Groupes
-GET /groups/public
-POST /groups
-GET /groups/{id}
-
-# Upload
-POST /files
-POST /memories/{id}/upload
+# Tests spécifiques
+php tests/test_users_entrypoints.php
+php tests/test_group_entrypoints.php
+php tests/test_files_entrypoints.php
+php tests/test_tags_entrypoints.php
 ```
 
----
+### Structure des tests
 
-## 🤝 Contribution
+```
+tests/
+├── users/              # Tests utilisateurs
+├── groups/             # Tests groupes
+├── files/              # Tests fichiers
+├── tags/               # Tests tags
+└── public/             # Tests endpoints publics
+```
 
-### Comment contribuer
-1. **Fork** le projet
-2. **Créer** une branche feature (`git checkout -b feature/nouvelle-fonctionnalite`)
-3. **Commiter** les changements (`git commit -m 'Ajout nouvelle fonctionnalité'`)
-4. **Push** vers la branche (`git push origin feature/nouvelle-fonctionnalite`)
-5. **Ouvrir** une Pull Request
+## 🔧 Développement
 
-### Standards de code
-- **PSR-4** pour l'autoloading
-- **PSR-12** pour le style de code
-- **Documentation** des nouvelles fonctionnalités
-- **Tests unitaires** pour les nouvelles features
+### Logs
 
----
+Les logs sont enregistrés dans `logs/` :
+- `app.log` - Logs applicatifs
+- `error.log` - Erreurs
+- Rotation automatique quotidienne
 
-## 📞 Support et contact
+### Base de données
 
-### 🐛 **Signaler un bug**
-Ouvrez une [issue GitHub](https://github.com/Jrobitaille360/cmem1/issues) avec :
-- Description du problème
-- Étapes pour reproduire
-- Environnement (PHP, serveur, etc.)
+Réinitialiser les données de test :
+```sql
+CALL reset_auth_groups_data();
+```
 
-### 💡 **Demander une fonctionnalité**
-Utilisez les [discussions GitHub](https://github.com/Jrobitaille360/cmem1/discussions) pour proposer de nouvelles idées.
+### Conventions
 
-### 📧 **Contact direct**
-Pour les questions techniques ou partenariats.
-
----
+- **Namespaces** : `AuthGroups\{Module}`
+- **Classes** : PascalCase
+- **Méthodes** : camelCase
+- **Variables** : snake_case (DB) / camelCase (PHP)
+- **Constantes** : UPPER_CASE
 
 ## 📄 Licence
 
-Ce projet est sous licence **MIT** - voir le fichier [LICENSE](LICENSE) pour plus de détails.
+Ce projet utilise plusieurs dépendances open-source. Voir [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) pour les détails.
+
+## 🤝 Contribution
+
+Les contributions sont les bienvenues ! 
+
+1. Fork le projet
+2. Créer une branche (`git checkout -b feature/AmazingFeature`)
+3. Commit les changements (`git commit -m 'Add some AmazingFeature'`)
+4. Push vers la branche (`git push origin feature/AmazingFeature`)
+5. Ouvrir une Pull Request
+
+## 📞 Support
+
+Pour toute question ou problème :
+- Email : support@authgroups.local
+- Issues : [GitHub Issues](https://github.com/Jrobitaille360/cmem2/issues)
+
+## 🗺️ Roadmap
+
+- [ ] API key setup
+- [ ] Admin dynamic feature creation
+  - [ ] Create tables via admin panel
+  - [ ] Generate PHP endpoints
+  - [ ] Examples: Calendar, Todo list
+- [ ] Rate limiting
+- [ ] Cache layer (Redis)
+- [ ] WebSockets pour notifications temps réel
+- [ ] Export de données
+- [ ] Audit logs détaillés
 
 ---
 
-## 🙏 Remerciements
-
-Merci à tous les contributeurs qui ont participé au développement de cette API collaborative !
-
----
-
-**Collective Memories API v1.1.0** - *Préservons nos souvenirs ensemble* 🌟
+**Version** : 1.2.0  
+**Dernière mise à jour** : Octobre 2025  
+**Auteur** : [Jrobitaille360](https://github.com/Jrobitaille360)

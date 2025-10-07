@@ -1,6 +1,6 @@
 <?php
 
-namespace Memories\Models;
+namespace AuthGroups\Models;
 
 /**
  * Modèle spécifique pour les opérations admin secretes

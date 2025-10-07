@@ -1,11 +1,11 @@
 <?php
 
-namespace Memories\Controllers;
+namespace AuthGroups\Controllers;
 
-use Memories\Utils\Response;
-use Memories\Services\LogService;
-use Memories\Middleware\LoggingMiddleware;
-use Memories\Models\File;
+use AuthGroups\Utils\Response;
+use AuthGroups\Services\LogService;
+use AuthGroups\Middleware\LoggingMiddleware;
+use AuthGroups\Models\File;
 use Exception;
 
 class FileController

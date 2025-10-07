@@ -1,8 +1,8 @@
 <?php
 
-namespace Memories\Models;
+namespace AuthGroups\Models;
 
-use Memories\Services\EmailService;
+use AuthGroups\Services\EmailService;
 use PDO;
 use Exception;
 use InvalidArgumentException;
@@ -485,7 +485,7 @@ class Group extends BaseModel
             try
             {
                 $groupData = $this->findById($groupId);
-                $inviterData = (new \Memories\Models\User())->findById($inviterId);
+                $inviterData = (new \AuthGroups\Models\User())->findById($inviterId);
 
                 $emailService = new EmailService();
                 $emailService->sendGroupInvitation(

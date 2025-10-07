@@ -1,12 +1,12 @@
 <?php
 
-namespace Memories\Controllers;
+namespace AuthGroups\Controllers;
 
-use Memories\Models\Group;
-use Memories\Utils\Response;
-use Memories\Utils\Validator;
-use Memories\Services\LogService;
-use Memories\Middleware\LoggingMiddleware;
+use AuthGroups\Models\Group;
+use AuthGroups\Utils\Response;
+use AuthGroups\Utils\Validator;
+use AuthGroups\Services\LogService;
+use AuthGroups\Middleware\LoggingMiddleware;
 use Exception;
 
 class GroupMemberController

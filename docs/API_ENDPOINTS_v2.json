@@ -1,0 +1,428 @@
+{
+    "api_info": {
+        "name": "AuthGroups API",
+        "version": "1.2.0",
+        "description": "API REST pour la gestion d'authentification, groupes, fichiers et tags. Authentification JWT avec système de rôles.",
+        "base_url": "https://your-domain.com/api/",
+        "format": "JSON",
+        "encoding": "UTF-8",
+        "updated": "2025-10-07"
+    },
+    "authentication": {
+        "type": "JWT Bearer Token",
+        "header": "Authorization: Bearer <token>",
+        "token_expiration": "24 hours",
+        "roles": ["UTILISATEUR", "MODERATEUR", "ADMINISTRATEUR"]
+    },
+    "endpoints": {
+        "public": {
+            "root": {
+                "method": "GET",
+                "path": "/",
+                "description": "Informations sur l'API",
+                "auth_required": false
+            },
+            "help": {
+                "method": "GET",
+                "path": "/help",
+                "description": "Liste des endpoints disponibles",
+                "auth_required": false
+            },
+            "health": {
+                "method": "GET",
+                "path": "/health",
+                "description": "Vérification du statut de l'API",
+                "auth_required": false
+            }
+        },
+        "users": {
+            "register": {
+                "method": "POST",
+                "path": "/users/register",
+                "description": "Inscription d'un nouvel utilisateur",
+                "auth_required": false,
+                "body": {
+                    "name": "string (required, 2-100 chars)",
+                    "email": "string (required, valid email)",
+                    "password": "string (required, min 8 chars)"
+                }
+            },
+            "login": {
+                "method": "POST",
+                "path": "/users/login",
+                "description": "Connexion utilisateur",
+                "auth_required": false,
+                "body": {
+                    "email": "string (required)",
+                    "password": "string (required)"
+                }
+            },
+            "me": {
+                "method": "GET",
+                "path": "/users/me",
+                "description": "Récupérer le profil de l'utilisateur connecté",
+                "auth_required": true
+            },
+            "update_me": {
+                "method": "PUT",
+                "path": "/users/me",
+                "description": "Modifier le profil de l'utilisateur connecté",
+                "auth_required": true,
+                "body": {
+                    "name": "string (optional)",
+                    "email": "string (optional)",
+                    "password": "string (optional)"
+                }
+            },
+            "delete_me": {
+                "method": "DELETE",
+                "path": "/users/me",
+                "description": "Supprimer le compte de l'utilisateur connecté",
+                "auth_required": true
+            },
+            "upload_avatar": {
+                "method": "POST",
+                "path": "/users/avatar",
+                "description": "Upload d'un avatar utilisateur",
+                "auth_required": true,
+                "content_type": "multipart/form-data",
+                "body": {
+                    "avatar": "file (image, max 2MB)"
+                }
+            },
+            "get_user": {
+                "method": "GET",
+                "path": "/users/{id}",
+                "description": "Récupérer les détails d'un utilisateur",
+                "auth_required": true,
+                "params": {
+                    "id": "integer (user ID)"
+                }
+            },
+            "list_users": {
+                "method": "GET",
+                "path": "/users",
+                "description": "Liste des utilisateurs",
+                "auth_required": true,
+                "query_params": {
+                    "page": "integer (default: 1)",
+                    "limit": "integer (default: 10, max: 100)"
+                }
+            }
+        },
+        "groups": {
+            "list": {
+                "method": "GET",
+                "path": "/groups",
+                "description": "Liste des groupes de l'utilisateur",
+                "auth_required": true
+            },
+            "create": {
+                "method": "POST",
+                "path": "/groups",
+                "description": "Créer un nouveau groupe",
+                "auth_required": true,
+                "body": {
+                    "name": "string (required, 2-100 chars)",
+                    "description": "string (optional, max 500 chars)",
+                    "visibility": "string (optional: PUBLIC, PRIVE, AMIS)"
+                }
+            },
+            "get": {
+                "method": "GET",
+                "path": "/groups/{id}",
+                "description": "Détails d'un groupe",
+                "auth_required": true,
+                "params": {
+                    "id": "integer (group ID)"
+                }
+            },
+            "update": {
+                "method": "PUT",
+                "path": "/groups/{id}",
+                "description": "Modifier un groupe",
+                "auth_required": true,
+                "params": {
+                    "id": "integer (group ID)"
+                },
+                "body": {
+                    "name": "string (optional)",
+                    "description": "string (optional)",
+                    "visibility": "string (optional)"
+                }
+            },
+            "delete": {
+                "method": "DELETE",
+                "path": "/groups/{id}",
+                "description": "Supprimer un groupe",
+                "auth_required": true,
+                "params": {
+                    "id": "integer (group ID)"
+                }
+            },
+            "invite": {
+                "method": "POST",
+                "path": "/groups/{id}/invite",
+                "description": "Inviter un membre au groupe",
+                "auth_required": true,
+                "params": {
+                    "id": "integer (group ID)"
+                },
+                "body": {
+                    "email": "string (required)",
+                    "role": "string (optional: MEMBRE, MODERATEUR, ADMIN)"
+                }
+            },
+            "members": {
+                "method": "GET",
+                "path": "/groups/{id}/members",
+                "description": "Liste des membres d'un groupe",
+                "auth_required": true,
+                "params": {
+                    "id": "integer (group ID)"
+                }
+            },
+            "search": {
+                "method": "GET",
+                "path": "/groups/search",
+                "description": "Rechercher des groupes",
+                "auth_required": true,
+                "query_params": {
+                    "q": "string (search query)",
+                    "visibility": "string (optional)",
+                    "page": "integer (default: 1)",
+                    "limit": "integer (default: 10)"
+                }
+            }
+        },
+        "files": {
+            "upload": {
+                "method": "POST",
+                "path": "/files/upload",
+                "description": "Upload de fichier(s)",
+                "auth_required": true,
+                "content_type": "multipart/form-data",
+                "body": {
+                    "files[]": "file(s) (max sizes: images 5MB, docs 10MB, audio 10MB, video 50MB)",
+                    "description": "string (optional)"
+                }
+            },
+            "list": {
+                "method": "GET",
+                "path": "/files",
+                "description": "Liste des fichiers de l'utilisateur",
+                "auth_required": true,
+                "query_params": {
+                    "page": "integer (default: 1)",
+                    "limit": "integer (default: 10)",
+                    "type": "string (optional: image, video, document, audio)"
+                }
+            },
+            "get": {
+                "method": "GET",
+                "path": "/files/{id}",
+                "description": "Détails d'un fichier",
+                "auth_required": true,
+                "params": {
+                    "id": "integer (file ID)"
+                }
+            },
+            "delete": {
+                "method": "DELETE",
+                "path": "/files/{id}",
+                "description": "Supprimer un fichier (soft delete)",
+                "auth_required": true,
+                "params": {
+                    "id": "integer (file ID)"
+                }
+            },
+            "restore": {
+                "method": "PUT",
+                "path": "/files/{id}/restore",
+                "description": "Restaurer un fichier supprimé",
+                "auth_required": true,
+                "params": {
+                    "id": "integer (file ID)"
+                }
+            }
+        },
+        "tags": {
+            "list": {
+                "method": "GET",
+                "path": "/tags",
+                "description": "Liste des tags de l'utilisateur",
+                "auth_required": true,
+                "query_params": {
+                    "table_associate": "string (optional: groups, files, all)"
+                }
+            },
+            "create": {
+                "method": "POST",
+                "path": "/tags",
+                "description": "Créer un nouveau tag",
+                "auth_required": true,
+                "body": {
+                    "name": "string (required, 1-100 chars)",
+                    "table_associate": "string (required: groups, files, all)",
+                    "color": "string (optional, hex format #RRGGBB)"
+                }
+            },
+            "get": {
+                "method": "GET",
+                "path": "/tags/{id}",
+                "description": "Détails d'un tag",
+                "auth_required": true,
+                "params": {
+                    "id": "integer (tag ID)"
+                }
+            },
+            "update": {
+                "method": "PUT",
+                "path": "/tags/{id}",
+                "description": "Modifier un tag",
+                "auth_required": true,
+                "params": {
+                    "id": "integer (tag ID)"
+                },
+                "body": {
+                    "name": "string (optional)",
+                    "color": "string (optional)",
+                    "table_associate": "string (optional)"
+                }
+            },
+            "delete": {
+                "method": "DELETE",
+                "path": "/tags/{id}",
+                "description": "Supprimer un tag",
+                "auth_required": true,
+                "params": {
+                    "id": "integer (tag ID)"
+                }
+            },
+            "by_table": {
+                "method": "GET",
+                "path": "/tags/by-table/{table}",
+                "description": "Tags par table associée",
+                "auth_required": true,
+                "params": {
+                    "table": "string (groups, files, all)"
+                }
+            },
+            "most_used": {
+                "method": "GET",
+                "path": "/tags/most-used",
+                "description": "Tags les plus utilisés",
+                "auth_required": true,
+                "query_params": {
+                    "table_associate": "string (optional: groups, files, all)",
+                    "limit": "integer (default: 10, max: 50)"
+                }
+            },
+            "associate": {
+                "method": "POST",
+                "path": "/tags/{tag_id}/associate/{item_id}",
+                "description": "Associer un tag à un élément",
+                "auth_required": true,
+                "params": {
+                    "tag_id": "integer (tag ID)",
+                    "item_id": "integer (item ID)"
+                },
+                "body": {
+                    "table_associate": "string (required: groups, files)"
+                }
+            }
+        },
+        "stats": {
+            "user": {
+                "method": "GET",
+                "path": "/stats/user/{id}",
+                "description": "Statistiques d'un utilisateur",
+                "auth_required": true,
+                "params": {
+                    "id": "integer (user ID)"
+                }
+            },
+            "online": {
+                "method": "GET",
+                "path": "/stats/online",
+                "description": "Utilisateurs actuellement en ligne",
+                "auth_required": true
+            }
+        },
+        "data": {
+            "sync": {
+                "method": "POST",
+                "path": "/data/sync",
+                "description": "Synchronisation des données (offline support)",
+                "auth_required": true,
+                "body": {
+                    "last_sync": "timestamp (optional)",
+                    "data": "object (sync data)"
+                }
+            }
+        }
+    },
+    "response_format": {
+        "success": {
+            "example": {
+                "success": true,
+                "data": {
+                    "resource_key": "..."
+                },
+                "message": "Operation successful"
+            }
+        },
+        "error": {
+            "example": {
+                "success": false,
+                "error": {
+                    "code": "ERROR_CODE",
+                    "message": "Error description",
+                    "details": {}
+                }
+            }
+        }
+    },
+    "http_status_codes": {
+        "200": "OK - Success",
+        "201": "Created - Resource created",
+        "400": "Bad Request - Invalid data",
+        "401": "Unauthorized - Authentication required",
+        "403": "Forbidden - Access denied",
+        "404": "Not Found - Resource not found",
+        "409": "Conflict - Resource already exists",
+        "500": "Internal Server Error - Server error"
+    },
+    "file_types": {
+        "images": {
+            "formats": ["jpg", "jpeg", "png", "gif", "webp"],
+            "max_size": "5 MB",
+            "max_dimensions": "4096x4096"
+        },
+        "videos": {
+            "formats": ["mp4", "webm", "ogg", "avi", "mov"],
+            "max_size": "50 MB"
+        },
+        "documents": {
+            "formats": ["pdf", "doc", "docx", "txt", "xls", "xlsx"],
+            "max_size": "10 MB"
+        },
+        "audio": {
+            "formats": ["mp3", "wav", "ogg"],
+            "max_size": "10 MB"
+        }
+    },
+    "documentation_files": {
+        "readme": "README.md",
+        "overview": "docs/API_OVERVIEW.md",
+        "endpoints": {
+            "users": "docs/ENDPOINTS_USERS.md",
+            "groups": "docs/ENDPOINTS_GROUPS.md",
+            "files": "docs/ENDPOINTS_FILES.md",
+            "tags": "docs/ENDPOINTS_TAGS.md",
+            "stats": "docs/ENDPOINTS_STATS.md",
+            "public": "docs/ENDPOINTS_PUBLIC.md"
+        },
+        "admin": "docs/ADMIN_SECRET_ENDPOINT.md"
+    }
+}

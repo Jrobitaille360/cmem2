@@ -1,6 +1,6 @@
 <?php
 
-namespace Memories\Models;
+namespace AuthGroups\Models;
 
 use PDO;
 
@@ -29,7 +29,7 @@ class Tag extends BaseModel {
         
         // Nettoyage des données
         $this->name = htmlspecialchars(strip_tags($this->name));
-        $this->table_associate = $this->table_associate ?? 'memories';
+        $this->table_associate = $this->table_associate ?? 'groups';
         $this->color = $this->color ?? '#3498db';
         
         // Validation que tag_owner est défini
@@ -382,7 +382,7 @@ class Tag extends BaseModel {
             $errors[] = "Le propriétaire du tag est requis";
         }
         
-        $validTables = ['groups', 'memories', 'elements', 'files', 'all'];
+        $validTables = ['groups', 'files', 'all'];
         if (!empty($this->table_associate) && !in_array($this->table_associate, $validTables)) {
             $errors[] = "Table associée non valide";
         }
@@ -498,10 +498,6 @@ class Tag extends BaseModel {
      */
     private function getItemColumnName($tableAssociate) {
         switch ($tableAssociate) {
-            case 'memories':
-                return 'memory_id';
-            case 'elements':
-                return 'element_id';
             case 'files':
                 return 'file_id';
             case 'groups':

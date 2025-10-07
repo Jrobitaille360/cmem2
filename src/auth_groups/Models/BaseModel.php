@@ -1,6 +1,6 @@
 <?php
 
-namespace Memories\Models;
+namespace AuthGroups\Models;
 
 use PDO;
 

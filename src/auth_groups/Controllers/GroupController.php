@@ -1,15 +1,15 @@
 <?php
 
-namespace Memories\Controllers;
+namespace AuthGroups\Controllers;
 
-use Memories\Models\Group;
-use Memories\Models\User;
-use Memories\Utils\Response;
-use Memories\Utils\Validator;
-use Memories\Services\LogService;
-use Memories\Services\AuthService;
-use Memories\Services\UserService;
-use Memories\Middleware\LoggingMiddleware;
+use AuthGroups\Models\Group;
+use AuthGroups\Models\User;
+use AuthGroups\Utils\Response;
+use AuthGroups\Utils\Validator;
+use AuthGroups\Services\LogService;
+use AuthGroups\Services\AuthService;
+use AuthGroups\Services\UserService;
+use AuthGroups\Middleware\LoggingMiddleware;
 use Exception;
 
 /**

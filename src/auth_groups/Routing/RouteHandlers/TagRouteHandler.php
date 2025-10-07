@@ -1,10 +1,10 @@
 <?php
 
-namespace Memories\Routing\RouteHandlers;
+namespace AuthGroups\Routing\RouteHandlers;
 
-use Memories\Routing\BaseRouteHandler;
-use Memories\Controllers\TagController;
-use Memories\Utils\Response;
+use AuthGroups\Routing\BaseRouteHandler;
+use AuthGroups\Controllers\TagController;
+use AuthGroups\Utils\Response;
 
 class TagRouteHandler extends BaseRouteHandler 
 {
@@ -92,7 +92,7 @@ class TagRouteHandler extends BaseRouteHandler
     }
     
     private function handleByTableRoute($tableAssociate, array $user): void {
-        if (!in_array($tableAssociate, ['groups', 'memories', 'elements', 'files', 'all'])) {
+        if (!in_array($tableAssociate, ['groups', 'files', 'all'])) {
             Response::error('Table associée invalide', null, 400);
             return;
         }

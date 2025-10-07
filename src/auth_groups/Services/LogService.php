@@ -1,6 +1,6 @@
 <?php
 
-namespace Memories\Services;
+namespace AuthGroups\Services;
 
 /**
  * Service de logging avancé avec rotation automatique et archivage

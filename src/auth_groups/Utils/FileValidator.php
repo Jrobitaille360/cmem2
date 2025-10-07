@@ -1,8 +1,8 @@
 <?php
 
-namespace Memories\Utils;
+namespace AuthGroups\Utils;
 
-use Memories\Services\LogService;
+use AuthGroups\Services\LogService;
 
 class FileValidator {
     
@@ -158,11 +158,6 @@ class FileValidator {
         $directories = [
             UPLOAD_DIR,
             UPLOAD_DIR . 'avatars/',
-            UPLOAD_DIR . 'memories/',
-            UPLOAD_DIR . 'memories/images/',
-            UPLOAD_DIR . 'memories/videos/',
-            UPLOAD_DIR . 'memories/documents/',
-            UPLOAD_DIR . 'memories/audio/',
             UPLOAD_DIR . 'temp/'
         ];
         
