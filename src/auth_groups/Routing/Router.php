@@ -15,6 +15,7 @@ use AuthGroups\Routing\RouteHandlers\{
     SecretAdminRouteHandler,
     ApiKeyRouteHandler
 };
+use AuthGroups\Routing\WebhookRouteHandler;
 use AuthGroups\Services\{AuthService, LogService};
 use AuthGroups\Utils\Response;
 use AuthGroups\Middleware\LoggingMiddleware;
@@ -31,9 +32,11 @@ class Router
     }
     
     private PublicRouteHandler $publicHandler;
+    private WebhookRouteHandler $webhookHandler;
 
     private function initializeRouteHandlers(): void {
         $this->publicHandler = new PublicRouteHandler();
+        $this->webhookHandler = new WebhookRouteHandler();
         $this->routeHandlers = [
             'users' => new UserRouteHandler($this->authService),
             'groups' => new GroupRouteHandler($this->authService),
@@ -59,6 +62,13 @@ class Router
             // On tente d'abord le handler public
             $publicResult = $this->publicHandler->handle($request);
             if ($publicResult === true) {
+                return;
+            }
+
+            // Vérifier si c'est un webhook
+            if ($request['controller'] === 'webhook') {
+                $path = implode('/', array_slice($request['segments'], 0, 2));
+                $this->webhookHandler->handleRequest($path, $request['method']);
                 return;
             }
 
