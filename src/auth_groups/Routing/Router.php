@@ -12,7 +12,8 @@ use AuthGroups\Routing\RouteHandlers\{
     FileRouteHandler,
     StatsRouteHandler,
     DataRouteHandler,
-    SecretAdminRouteHandler
+    SecretAdminRouteHandler,
+    ApiKeyRouteHandler
 };
 use AuthGroups\Services\{AuthService, LogService};
 use AuthGroups\Utils\Response;
@@ -40,7 +41,8 @@ class Router
             'files' => new FileRouteHandler($this->authService),
             'stats' => new StatsRouteHandler($this->authService),
             'data' => new DataRouteHandler($this->authService),
-            'secret-admin' => new SecretAdminRouteHandler()
+            'secret-admin' => new SecretAdminRouteHandler(),
+            'api-keys' => new ApiKeyRouteHandler($this->authService)
         ];
     }
     

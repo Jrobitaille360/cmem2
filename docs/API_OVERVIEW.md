@@ -31,6 +31,7 @@ Handlers spécialisés par module :
 - `DataRouteHandler` - Synchronisation
 - `PublicRouteHandler` - Endpoints publics
 - `SecretAdminRouteHandler` - Administration
+- `ApiKeyRouteHandler` - 🆕 Gestion des clés API
 
 #### 3. Controllers
 Contrôleurs par fonctionnalité :
@@ -38,6 +39,7 @@ Contrôleurs par fonctionnalité :
 - `GroupController` - Opérations groupes
 - `FileController` - Opérations fichiers
 - `TagController` - Opérations tags
+- `ApiKeyController` - 🆕 Opérations clés API
 - etc.
 
 #### 4. Models
@@ -46,6 +48,7 @@ Modèles de données :
 - `Group` - Groupe
 - `File` - Fichier
 - `Tag` - Tag
+- `ApiKey` - 🆕 Clé API
 - `BaseModel` - Classe de base avec CRUD
 
 #### 5. Services
@@ -55,7 +58,12 @@ Services partagés :
 - `LogService` - Logging avancé
 - `ValidTokenService` - Gestion des sessions
 
-#### 6. Utils
+#### 6. Middleware
+Middleware d'authentification :
+- `JWTAuthMiddleware` - Authentification par JWT tokens
+- `ApiKeyAuthMiddleware` - 🆕 Authentification par API keys
+
+#### 7. Utils
 Utilitaires :
 - `Response` - Formatage des réponses
 - `Validator` - Validation des données
@@ -104,13 +112,53 @@ Utilitaires :
 
 ## Authentification et autorisation
 
+### Méthodes d'authentification
+
+L'API supporte deux méthodes d'authentification :
+
+#### 1. JWT Tokens (pour utilisateurs)
+- **Usage** : Applications web, mobiles, authentification utilisateur
+- **Durée** : 24 heures par défaut
+- **Header** : `Authorization: Bearer {token}`
+- **Obtention** : Via `/users/login`
+
+```php
+// Exemple de vérification JWT
+$authMiddleware = new JWTAuthMiddleware();
+$user = $authMiddleware->authenticate($request);
+```
+
+#### 2. API Keys (pour machines/intégrations)
+- **Usage** : Intégrations machine-to-machine, automatisations, services externes
+- **Durée** : Configurable (jours ou jamais)
+- **Header** : `X-API-Key: {key}` ou `Authorization: Bearer {key}`
+- **Obtention** : Via `/api-keys` (nécessite JWT)
+- **Scopes** : `read`, `write`, `delete`, `admin`, `*`
+- **Rate Limiting** : Configurable par minute et par heure
+- **Environnements** : `production` (`ag_live_*`) et `test` (`ag_test_*`)
+
+```php
+// Exemple de vérification API Key
+$apiKeyAuth = new ApiKeyAuthMiddleware();
+$user = $apiKeyAuth->authenticate($request);
+```
+
+#### 3. Authentification flexible (JWT ou API Key)
+```php
+// Accepte JWT ou API Key
+$apiKeyAuth = new ApiKeyAuthMiddleware();
+$user = $apiKeyAuth->authenticateFlexible($request);
+```
+
+Voir [ENDPOINTS_API_KEYS.md](./ENDPOINTS_API_KEYS.md) pour la documentation complète des API keys.
+
 ### Niveaux d'accès
 
 1. **Public** - Pas d'authentification requise
    - `/help`, `/health`
    - Certains endpoints `/users` (login, register)
 
-2. **Authentifié** - Token JWT requis
+2. **Authentifié** - Token JWT ou API Key requis
    - Tous les autres endpoints
 
 3. **Rôles utilisateurs**
@@ -124,6 +172,12 @@ Utilitaires :
 // Dans un contrôleur
 if ($user['role'] !== 'ADMINISTRATEUR') {
     return Response::error('Accès refusé', null, 403);
+}
+
+// Vérification de scope API Key
+$apiKeyAuth = new ApiKeyAuthMiddleware();
+if (!$apiKeyAuth->hasScope('write')) {
+    return Response::error('Scope insuffisant', null, 403);
 }
 ```
 

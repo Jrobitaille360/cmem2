@@ -12,9 +12,7 @@
     },
     "autoload": {
         "psr-4": {
-            "Memories\\": [
-                "src/auth_groups/"
-            ]
+            "AuthGroups\\": "src/auth_groups/"
         }
     },
     "scripts": {

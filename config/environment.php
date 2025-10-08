@@ -6,7 +6,7 @@
 
 // Charger les fichiers .env modulaires s'ils existent
 $envFiles = [
-    __DIR__ . '/../../.env.auth_groups',        // Infrastructure obligatoire
+    __DIR__ . '/../.env.auth_groups',        // Infrastructure obligatoire
     ];
 
 foreach ($envFiles as $envFile) {
@@ -184,7 +184,7 @@ if (LOG_ENABLED && !file_exists(LOG_DIR)) {
  */
 
 // Configuration JWT
-define('JWT_SECRET', $_ENV['JWT_SECRET'] ?? 'your-secret-key-change-this-in-production');
+define('JWT_SECRET', $_ENV['JWT_SECRET'] ?? 'Zjz1vB^D4xkEWss7TV9zXC3^r$uPfFaQz5A!xxG$^CKnX*3S!bEh4b3*3UcK2*s1');
 define('JWT_ALGORITHM', $_ENV['JWT_ALGORITHM'] ?? 'HS256');
 define('JWT_EXPIRATION', (int)($_ENV['JWT_EXPIRATION'] ?? 86400)); // 24 heures par défaut
 

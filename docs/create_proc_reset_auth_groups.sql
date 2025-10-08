@@ -9,6 +9,10 @@ BEGIN
 -- === SUPPRESSION DES VUES ET TABLES (ordre correct des dépendances) ===
 
 -- 1. SUPPRESSION DES VUES EN PREMIER
+DROP VIEW IF EXISTS api_keys_stats_by_user;
+DROP VIEW IF EXISTS active_api_keys;
+DROP TABLE IF EXISTS api_keys;
+
 DROP VIEW IF EXISTS v_online_users_stats;
 DROP VIEW IF EXISTS v_active_sessions;
 DROP VIEW IF EXISTS v_admin_dashboard;
@@ -431,6 +435,107 @@ SELECT
     (SELECT ROUND(COALESCE(SUM(file_size), 0) / 1024 / 1024, 2) FROM files) as total_storage_mb,
         (SELECT COUNT(*) FROM group_invitations WHERE status = 'pending' AND (expires_at IS NULL OR expires_at > NOW())) as pending_invitations;
 
+CREATE TABLE IF NOT EXISTS api_keys (
+    id INT(11) AUTO_INCREMENT PRIMARY KEY,
+    user_id INT(11) NOT NULL,
+    
+    -- Informations de la clé
+    name VARCHAR(255) NOT NULL COMMENT 'Nom descriptif de la clé API',
+    key_prefix VARCHAR(10) NOT NULL DEFAULT 'ag_live' COMMENT 'Préfixe de la clé (ag_live, ag_test)',
+    key_hash VARCHAR(255) NOT NULL COMMENT 'Hash SHA-256 de la clé complète',
+    last_4 VARCHAR(4) NOT NULL COMMENT '4 derniers caractères visibles de la clé',
+    
+    -- Permissions et configuration
+    scopes JSON DEFAULT NULL COMMENT 'Permissions/scopes de la clé (JSON array)',
+    environment ENUM('production', 'test') NOT NULL DEFAULT 'production' COMMENT 'Environnement (production/test)',
+    
+    -- Rate limiting
+    rate_limit_per_minute INT(11) DEFAULT 60 COMMENT 'Nombre max de requêtes par minute',
+    rate_limit_per_hour INT(11) DEFAULT 3600 COMMENT 'Nombre max de requêtes par heure',
+    
+    -- Statistiques d'utilisation
+    total_requests INT(11) DEFAULT 0 COMMENT 'Nombre total de requêtes effectuées',
+    last_used_at DATETIME DEFAULT NULL COMMENT 'Dernière utilisation de la clé',
+    last_used_ip VARCHAR(45) DEFAULT NULL COMMENT 'Dernière IP ayant utilisé la clé',
+    
+    -- Expiration et révocation
+    expires_at DATETIME DEFAULT NULL COMMENT 'Date expiration de la clé (NULL = jamais)',
+    revoked_at DATETIME DEFAULT NULL COMMENT 'Date de révocation (NULL = active)',
+    revoked_reason VARCHAR(255) DEFAULT NULL COMMENT 'Raison de la révocation',
+    
+    -- Métadonnées
+    metadata JSON DEFAULT NULL COMMENT 'Métadonnées additionnelles (JSON object)',
+    notes TEXT DEFAULT NULL COMMENT 'Notes internes sur la clé',
+    
+    -- Timestamps
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at DATETIME NULL,
+    -- Index et contraintes
+    UNIQUE KEY unique_key_hash (key_hash),
+    INDEX idx_user_id (user_id),
+    INDEX idx_key_prefix (key_prefix),
+    INDEX idx_environment (environment),
+    INDEX idx_expires_at (expires_at),
+    INDEX idx_revoked_at (revoked_at),
+    INDEX idx_created_at (created_at),
+    INDEX idx_last_used_at (last_used_at),
+    
+    -- Clé étrangère
+    CONSTRAINT fk_api_keys_user_id 
+        FOREIGN KEY (user_id) 
+        REFERENCES users(id) 
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
+        
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT='Stockage des clés API pour authentification';
+
+
+-- Vue pour voir uniquement les clés actives
+
+CREATE OR REPLACE VIEW active_api_keys AS
+SELECT 
+    id,
+    user_id,
+    name,
+    key_prefix,
+    last_4,
+    scopes,
+    environment,
+    rate_limit_per_minute,
+    rate_limit_per_hour,
+    total_requests,
+    last_used_at,
+    last_used_ip,
+    expires_at,
+    metadata,
+    created_at,
+    updated_at,
+    CASE 
+        WHEN expires_at IS NOT NULL AND expires_at < NOW() THEN TRUE
+        ELSE FALSE 
+    END AS is_expired
+FROM api_keys
+WHERE revoked_at IS NULL
+  AND (expires_at IS NULL OR expires_at > NOW());
+
+-- Vue pour statistiques par utilisateur
+CREATE OR REPLACE VIEW api_keys_stats_by_user AS
+SELECT 
+    user_id,
+    COUNT(*) AS total_keys,
+    SUM(CASE WHEN revoked_at IS NULL AND (expires_at IS NULL OR expires_at > NOW()) THEN 1 ELSE 0 END) AS active_keys,
+    SUM(CASE WHEN revoked_at IS NOT NULL THEN 1 ELSE 0 END) AS revoked_keys,
+    SUM(CASE WHEN expires_at IS NOT NULL AND expires_at < NOW() AND revoked_at IS NULL THEN 1 ELSE 0 END) AS expired_keys,
+    SUM(total_requests) AS total_requests_all_keys,
+    MAX(last_used_at) AS most_recent_usage,
+    MAX(created_at) AS most_recent_key_created
+FROM api_keys
+GROUP BY user_id;
+
+
+
 END //
 
 DELIMITER ;
@@ -440,6 +545,7 @@ DROP PROCEDURE IF EXISTS GeneratePlatformStats;
 DROP PROCEDURE IF EXISTS GenerateGroupStats;
 DROP PROCEDURE IF EXISTS GenerateUserStats;
 DROP PROCEDURE IF EXISTS CleanupOldStats;
+DROP PROCEDURE IF EXISTS cleanup_expired_api_keys;
 
 DELIMITER $$
 
@@ -577,6 +683,19 @@ BEGIN
     DELETE FROM user_stats_snapshot WHERE generated_at < DATE_SUB(NOW(), INTERVAL 30 DAY);
     
     SELECT 'Nettoyage des anciennes statistiques terminé' as message, NOW() as cleaned_at;
+END$$
+
+CREATE PROCEDURE IF NOT EXISTS cleanup_expired_api_keys()
+BEGIN
+    -- Marquer comme révoquées les clés expirées non encore révoquées
+    UPDATE api_keys 
+    SET revoked_at = NOW(),
+        revoked_reason = 'Expired automatically'
+    WHERE expires_at IS NOT NULL 
+      AND expires_at < NOW() 
+      AND revoked_at IS NULL;
+    
+    SELECT ROW_COUNT() AS keys_auto_revoked;
 END$$
 
 DELIMITER ;

@@ -9,11 +9,12 @@
  */
 
 // Charger d'abord les configurations communes obligatoires (ordre important)
-require_once __DIR__ . 'environment.php';
-require_once __DIR__ . 'database.php';
+require_once __DIR__ . '/environment.php';
+require_once __DIR__ . '/database.php';
 
 // Charger les configurations du module auth_groups
-require_once __DIR__ . '/auth_groups/uploads.php';
+// Note: pas de fichier de config spécifique pour l'instant
+// require_once __DIR__ . '/auth_groups/uploads.php';
 
 
 /**
@@ -29,8 +30,10 @@ function validateConfiguration(): array {
     if (!defined('LOG_DIR')) $errors[] = 'LOG_DIR non défini';
     
     // Validation du module auth_groups
-    if (!defined('JWT_SECRET') || (JWT_SECRET !== 'Zjz1vB^D4xkEWss7TV9zXC3^r$uPfFaQz5A!xxG$^CKnX*3S!bEh4b3*3UcK2*s1')) {
-        $errors[] = 'JWT_SECRET doit être défini avec une clé sécurisée';
+    if (!defined('JWT_SECRET')) {
+        $errors[] = 'JWT_SECRET non défini';
+    } elseif (strlen(JWT_SECRET) < 32 || JWT_SECRET === 'your-secret-key-change-this-in-production') {
+        $errors[] = 'JWT_SECRET doit être une clé sécurisée d\'au moins 32 caractères (changez la valeur par défaut)';
     }
     if (!defined('JWT_EXPIRATION')) $errors[] = 'JWT_EXPIRATION non défini';
     

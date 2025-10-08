@@ -1,6 +1,14 @@
 # AuthGroups API
 
+![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)
+![PHP](https://img.shields.io/badge/PHP-8.0+-purple.svg)
+![Status](https://img.shields.io/badge/status-production%20ready-green.svg)
+![Tests](https://img.shields.io/badge/tests-23%2F23%20passing-brightgreen.svg)
+![License](https://img.shields.io/badge/license-MIT-orange.svg)
+
 API REST moderne pour la gestion d'authentification, de groupes et de fichiers avec support de tags et statistiques.
+
+**🆕 Nouveauté v1.3.0**: Système complet d'API Keys pour authentification machine-to-machine !
 
 ## 📋 Table des matières
 
@@ -36,6 +44,7 @@ AuthGroups API est une solution complète pour gérer :
 - 🔑 Réinitialisation de mot de passe
 - 📧 Notifications par email
 - 🔒 Gestion des rôles (UTILISATEUR, MODERATEUR, ADMINISTRATEUR)
+- 🔑 **API Keys pour authentification machine-to-machine**
 
 ### Gestion des groupes
 - 👥 Création et administration de groupes
@@ -246,6 +255,16 @@ L'API utilise une architecture modulaire avec séparation des responsabilités :
 | GET | `/tags/by-table/{table}` | Tags par table | Oui |
 | GET | `/tags/most-used` | Tags populaires | Oui |
 
+### API Keys
+
+| Méthode | Endpoint | Description | Auth |
+|---------|----------|-------------|------|
+| POST | `/api-keys` | Créer une clé API | JWT |
+| GET | `/api-keys` | Liste des clés | JWT |
+| GET | `/api-keys/{id}` | Détails d'une clé | JWT |
+| DELETE | `/api-keys/{id}` | Révoquer une clé | JWT |
+| POST | `/api-keys/{id}/regenerate` | Régénérer une clé | JWT |
+
 ### Statistiques
 
 | Méthode | Endpoint | Description | Auth |
@@ -257,9 +276,13 @@ Voir la [documentation complète des endpoints](docs/) pour plus de détails.
 
 ## 🔐 Authentification
 
-L'API utilise JWT (JSON Web Tokens) pour l'authentification.
+L'API supporte deux méthodes d'authentification :
 
-### Obtenir un token
+### 1. JWT (JSON Web Tokens)
+
+Pour les applications web et mobiles avec utilisateurs.
+
+**Obtenir un token**
 
 ```http
 POST /users/login
@@ -287,7 +310,7 @@ Réponse :
 }
 ```
 
-### Utiliser le token
+**Utiliser le token**
 
 Incluez le token dans l'en-tête `Authorization` :
 
@@ -296,11 +319,45 @@ GET /users/me
 Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGc...
 ```
 
-### Durée de validité
-
+**Durée de validité**
 - Token valide pendant 24h par défaut
 - Configurable via `JWT_EXPIRATION`
 - Stockage des sessions actives en base de données
+
+### 2. API Keys
+
+Pour les intégrations serveur-à-serveur et scripts automatisés.
+
+**Créer une clé API**
+
+```http
+POST /api-keys
+Authorization: Bearer <jwt_token>
+Content-Type: application/json
+
+{
+  "name": "Production Key",
+  "scopes": ["read", "write"],
+  "expires_in_days": 365
+}
+```
+
+**Utiliser une clé API**
+
+```http
+GET /groups
+X-API-Key: ag_live_a1b2c3d4e5f6...
+```
+
+**Avantages des API keys**
+- ✅ Pas besoin de login/logout
+- ✅ Idéal pour scripts et cron jobs
+- ✅ Scopes granulaires (read, write, delete, admin)
+- ✅ Rate limiting configurable
+- ✅ Révocation instantanée
+- ✅ Environnements séparés (production/test)
+
+Voir [ENDPOINTS_API_KEYS.md](docs/ENDPOINTS_API_KEYS.md) pour plus de détails.
 
 ## 📚 Documentation
 
@@ -310,6 +367,7 @@ Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGc...
 - [Endpoints groupes](docs/ENDPOINTS_GROUPS.md)
 - [Endpoints fichiers](docs/ENDPOINTS_FILES.md)
 - [Endpoints tags](docs/ENDPOINTS_TAGS.md)
+- [Endpoints API Keys](docs/ENDPOINTS_API_KEYS.md) 🆕
 - [Endpoints statistiques](docs/ENDPOINTS_STATS.md)
 - [Endpoints publics](docs/ENDPOINTS_PUBLIC.md)
 
@@ -356,6 +414,11 @@ Les logs sont enregistrés dans `logs/` :
 
 ### Base de données
 
+Créer la table des API keys:
+```sql
+SOURCE docs/create_table_api_keys.sql
+```
+
 Réinitialiser les données de test :
 ```sql
 CALL reset_auth_groups_data();
@@ -391,7 +454,7 @@ Pour toute question ou problème :
 
 ## 🗺️ Roadmap
 
-- [ ] API key setup
+- [x] API key setup ✅
 - [ ] Admin dynamic feature creation
   - [ ] Create tables via admin panel
   - [ ] Generate PHP endpoints

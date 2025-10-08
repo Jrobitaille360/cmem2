@@ -251,6 +251,7 @@ curl http://localhost/cmem2_API/health
 - **Endpoints groupes**: [docs/ENDPOINTS_GROUPS.md](./ENDPOINTS_GROUPS.md)
 - **Endpoints fichiers**: [docs/ENDPOINTS_FILES.md](./ENDPOINTS_FILES.md)
 - **Endpoints tags**: [docs/ENDPOINTS_TAGS.md](./ENDPOINTS_TAGS.md)
+- **🆕 Endpoints API Keys**: [docs/ENDPOINTS_API_KEYS.md](./ENDPOINTS_API_KEYS.md)
 
 ## 🧪 Tests
 

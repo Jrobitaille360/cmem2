@@ -5,6 +5,65 @@ All notable changes to AuthGroups API will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2025-10-07
+
+### 🎉 Major Features
+- **API Keys System**: Complete implementation for machine-to-machine authentication
+
+### ✨ Added
+- `ApiKey` model for key generation, validation, and management
+- `ApiKeyController` for CRUD operations on API keys
+- `ApiKeyAuthMiddleware` for API key authentication
+- `ApiKeyRouteHandler` for API keys endpoints routing
+- Database table `api_keys` with comprehensive tracking
+- `ENDPOINTS_API_KEYS.md` - Complete API keys documentation
+- Support for two key environments: `ag_live_*` (production) and `ag_test_*` (test)
+- Scopes system: `read`, `write`, `delete`, `admin`, `*` (all)
+- Rate limiting per key (per minute and per hour)
+- Key expiration and automatic revocation
+- Usage statistics per key (total requests, last used, last IP)
+- Key regeneration endpoint
+- Metadata and notes support for keys
+
+### 🔐 Security
+- SHA-256 hashing for API keys storage
+- Only last 4 characters visible after creation
+- API key shown only once upon creation
+- Support for key revocation with reason tracking
+- Automatic cleanup of expired keys
+
+### 📡 API Endpoints
+- `POST /api-keys` - Create new API key
+- `GET /api-keys` - List user's API keys
+- `GET /api-keys/{id}` - Get key details and statistics
+- `DELETE /api-keys/{id}` - Revoke an API key
+- `POST /api-keys/{id}/regenerate` - Regenerate an API key
+
+### 🔄 Changed
+- Updated `Router.php` to include `ApiKeyRouteHandler`
+- Enhanced authentication to support both JWT and API keys
+- Updated `LoggingMiddleware` to properly redact API keys
+
+### 📝 Documentation
+- Added API keys section to `README.md`
+- Updated `API_REFERENCE.md` with API keys examples
+- Updated `API_OVERVIEW.md` with ApiKeyRouteHandler and middleware
+- Updated `API_ENDPOINTS.json` with API keys module (v1.3.0)
+- Complete `ENDPOINTS_API_KEYS.md` with examples in JS, Python, PHP, Bash
+- Added `API_KEYS_QUICK_REFERENCE.md` - Quick reference guide (531 lines)
+- Added `API_KEYS_IMPLEMENTATION.md` - Implementation guide (405 lines)
+- Added `API_KEYS_ARCHITECTURE.md` - Architecture documentation (583 lines)
+- Added `MIGRATION_v1.3.0.md` - Migration guide from v1.2.x (478 lines)
+- Added `QUICKSTART.md` - Quick start guide (267 lines)
+- Added `API_KEYS_COMPLETION_SUMMARY.md` - Complete implementation summary
+- Updated roadmap to mark API key setup as completed
+
+### 🧪 Testing
+- Added `tests/api_keys/test_api_keys_basic.php` - Complete test suite (23 tests)
+- Added `tests/api_keys/check_table_exists.php` - Database verification
+- Added `tests/api_keys/add_deleted_at_remote.php` - Migration helper
+- All tests passing (23/23) ✅
+
 ## [1.2.0] - 2025-10-07
 
 ### 🎉 Major Changes

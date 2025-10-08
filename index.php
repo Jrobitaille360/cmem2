@@ -10,12 +10,13 @@ require_once __DIR__ . '/vendor/autoload.php';
 // Configuration modulaire (remplace config.php et database.php)
 require_once __DIR__ . '/config/loader.php';
 
-use Memories\Routing\Router;
-use Memories\Services\LogService;
-use Memories\Middleware\LoggingMiddleware;
-use Memories\Utils\Response;
+use AuthGroups\Routing\Router;
+use AuthGroups\Services\LogService;
+use AuthGroups\Middleware\LoggingMiddleware;
+use AuthGroups\Utils\Response;
 
 // Démarrer le logging
+
 LoggingMiddleware::logEntry();
 
 // Configuration CORS (maintenant gérée par la configuration modulaire)

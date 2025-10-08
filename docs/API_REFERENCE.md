@@ -11,13 +11,16 @@ Production:  https://your-domain.com/api/
 
 ## 🔑 Authentification
 
-### Headers requis pour endpoints protégés
+L'API supporte deux méthodes d'authentification :
+
+### 1. JWT Token (pour utilisateurs)
+#### Headers requis
 ```http
-Authorization: Bearer {token}
+Authorization: Bearer {jwt_token}
 Content-Type: application/json
 ```
 
-### Obtenir un token
+#### Obtenir un token
 ```bash
 POST /users/login
 {
@@ -25,6 +28,26 @@ POST /users/login
   "password": "password"
 }
 ```
+
+### 2. API Keys (pour machines/intégrations)
+#### Headers requis
+```http
+X-API-Key: {api_key}
+Content-Type: application/json
+```
+
+#### Créer une API key
+```bash
+POST /api-keys
+Authorization: Bearer {jwt_token}
+{
+  "name": "My Integration",
+  "scopes": ["read", "write"],
+  "environment": "production"
+}
+```
+
+Voir [ENDPOINTS_API_KEYS.md](./ENDPOINTS_API_KEYS.md) pour plus de détails.
 
 ## 📋 Endpoints Essentiels
 
@@ -74,6 +97,16 @@ POST /users/login
 | Tags par table | GET | `/tags/by-table/{table}` | ✅ |
 | Plus utilisés | GET | `/tags/most-used` | ✅ |
 | Associer | POST | `/tags/{tag_id}/associate/{item_id}` | ✅ |
+
+### 🆕 API Keys
+
+| Action | Méthode | Endpoint | Auth |
+|--------|---------|----------|:----:|
+| Créer clé | POST | `/api-keys` | ✅ JWT |
+| Liste clés | GET | `/api-keys` | ✅ JWT |
+| Détails clé | GET | `/api-keys/{id}` | ✅ JWT |
+| Révoquer | DELETE | `/api-keys/{id}` | ✅ JWT |
+| Régénérer | POST | `/api-keys/{id}/regenerate` | ✅ JWT |
 
 ### Stats
 
@@ -134,13 +167,20 @@ POST /users/login
 // Configuration de base
 const API_URL = 'http://localhost/cmem2_API';
 let token = localStorage.getItem('token');
+let apiKey = localStorage.getItem('apiKey'); // For machine integrations
 
 const api = {
   async call(endpoint, options = {}) {
     const headers = {
-      'Content-Type': 'application/json',
-      ...(token && { 'Authorization': `Bearer ${token}` })
+      'Content-Type': 'application/json'
     };
+    
+    // Auth: JWT token or API key
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    } else if (apiKey) {
+      headers['X-API-Key'] = apiKey;
+    }
     
     const response = await fetch(`${API_URL}${endpoint}`, {
       ...options,
@@ -174,6 +214,14 @@ const api = {
     method: 'PUT',
     body: JSON.stringify(data)
   }),
+  
+  // API Keys
+  createApiKey: (data) => api.call('/api-keys', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
+  
+  listApiKeys: () => api.call('/api-keys'),
   
   // Groupes
   getGroups: () => api.call('/groups'),

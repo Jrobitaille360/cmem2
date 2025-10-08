@@ -1,7 +1,7 @@
 <?php
 
-use Memories\Utils\Response;
-use Memories\Services\LogService;
+use AuthGroups\Utils\Response;
+use AuthGroups\Services\LogService;
 
 /**
  * Configuration de la base de données partagée
@@ -21,7 +21,7 @@ class Database {
     
     private function __construct() {
         // Configuration depuis les variables d'environnement
-        $this->host = $_ENV['DB_HOST'] ?? 'localhost';
+        $this->host = $_ENV['DB_HOST'] ?? 'journauxdebord.com';
         $this->db_name = $_ENV['DB_NAME'] ?? 'cmem1_db';
         $this->username = $_ENV['DB_USER'] ?? 'root';
         $this->password = $_ENV['DB_PASS'] ?? '';
