@@ -5,15 +5,46 @@ namespace AuthGroups\Services;
 use AuthGroups\Models\User;
 use AuthGroups\Services\LogService;
 use AuthGroups\Services\ValidTokenService;
+use AuthGroups\Middleware\ApiKeyAuthMiddleware;
 use Exception;
 
 class AuthService 
 {
     /**
-     * Authentifier l'utilisateur à partir du header Authorization (JWT)
+     * Authentifier l'utilisateur à partir du header Authorization (JWT ou API Key)
      * @return array|null Données utilisateur ou null si non authentifié
      */
     public function authenticate(): ?array {
+        // D'abord, vérifier s'il y a une API Key
+        if (ApiKeyAuthMiddleware::hasApiKey()) {
+            // Utiliser l'authentification flexible qui gère les API Keys
+            $authData = ApiKeyAuthMiddleware::authenticateFlexible();
+            
+            // Si l'authentification API Key a échoué, authenticateFlexible() 
+            // a déjà envoyé une réponse d'erreur, donc on retourne null
+            if (!$authData) {
+                return null;
+            }
+            
+            // Récupérer les données utilisateur complètes depuis la base de données
+            $user = new User();
+            $userData = $user->findById($authData['user_id']);
+            
+            if (!$userData) {
+                return null;
+            }
+            
+            // Retourner les données utilisateur avec le rôle
+            return [
+                'user_id' => $userData['id'],
+                'email' => $userData['email'],
+                'role' => $userData['role'] ?? 'UTILISATEUR',
+                'username' => $userData['username'] ?? $userData['email'],
+                'auth_type' => 'api_key'
+            ];
+        }
+        
+        // Sinon, utiliser l'authentification JWT classique
         $token = self::extractTokenFromHeader();
         if (!$token) {
             return null;

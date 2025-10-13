@@ -53,10 +53,33 @@ class ApiKeyController
             return;
         }
         
-        $userId = $userData['user_id'];
+        $currentUserId = $userData['user_id'];
+        $currentUserRole = $userData['role'] ?? null;
         
         // Récupérer les données de la requête
         $data = json_decode(file_get_contents('php://input'), true);
+        
+        // Déterminer l'utilisateur cible (admin peut spécifier un autre user_id)
+        $targetUserId = $data['user_id'] ?? $currentUserId;
+        
+        // Vérifier les permissions si un autre utilisateur est ciblé
+        if ($targetUserId !== $currentUserId) {
+            // Seuls les administrateurs peuvent créer des clés pour d'autres utilisateurs
+            if ($currentUserRole !== 'ADMINISTRATEUR') {
+                Response::error('Privilèges administrateur requis pour créer une clé API pour un autre utilisateur', null, 403);
+                return;
+            }
+            
+            // Vérifier que l'utilisateur cible existe
+            require_once __DIR__ . '/../Models/User.php';
+            $userModel = new \AuthGroups\Models\User();
+            $targetUser = $userModel->findById($targetUserId);
+            
+            if (!$targetUser) {
+                Response::error('Utilisateur cible non trouvé', null, 404);
+                return;
+            }
+        }
         
         // Validation
         $errors = [];
@@ -124,8 +147,8 @@ class ApiKeyController
         }
         
         try {
-            // Générer la clé
-            $result = ApiKey::generate($userId, $data['name'], $options);
+            // Générer la clé pour l'utilisateur cible (peut être différent si admin)
+            $result = ApiKey::generate($targetUserId, $data['name'], $options);
             
             // IMPORTANT: La clé complète n'est montrée qu'UNE SEULE FOIS
             Response::success('Clé API créée avec succès', [
@@ -171,13 +194,36 @@ class ApiKeyController
             return;
         }
         
-        $userId = $userData['user_id'];
+        $currentUserId = $userData['user_id'];
+        $currentUserRole = $userData['role'] ?? null;
+        
+        // Déterminer l'utilisateur cible (admin peut spécifier un autre user_id)
+        $targetUserId = $_GET['user_id'] ?? $currentUserId;
+        
+        // Vérifier les permissions si un autre utilisateur est ciblé
+        if ($targetUserId !== $currentUserId) {
+            // Seuls les administrateurs peuvent lister les clés d'autres utilisateurs
+            if ($currentUserRole !== 'ADMINISTRATEUR') {
+                Response::error('Privilèges administrateur requis pour lister les clés API d\'un autre utilisateur', null, 403);
+                return;
+            }
+            
+            // Vérifier que l'utilisateur cible existe
+            require_once __DIR__ . '/../Models/User.php';
+            $userModel = new \AuthGroups\Models\User();
+            $targetUser = $userModel->findById($targetUserId);
+            
+            if (!$targetUser) {
+                Response::error('Utilisateur cible non trouvé', null, 404);
+                return;
+            }
+        }
         
         // Filtres optionnels
         $activeOnly = isset($_GET['active_only']) && $_GET['active_only'] === 'true';
         
         try {
-            $keys = ApiKey::getByUserId($userId, $activeOnly);
+            $keys = ApiKey::getByUserId($targetUserId, $activeOnly);
             
             // Formater la réponse (ne jamais inclure key_hash)
             $formattedKeys = array_map(function($key) {
@@ -237,7 +283,8 @@ class ApiKeyController
             return;
         }
         
-        $userId = $userData['user_id'];
+        $currentUserId = $userData['user_id'];
+        $currentUserRole = $userData['role'] ?? null;
         
         try {
             $model = new ApiKey();
@@ -248,10 +295,12 @@ class ApiKeyController
                 return;
             }
             
-            // Vérifier que la clé appartient à l'utilisateur
-            if ($keyData['user_id'] != $userId) {
-                Response::error('Accès refusé', null, 403);
-                return;
+            // Vérifier que la clé appartient à l'utilisateur ou que l'utilisateur est admin
+            if ($keyData['user_id'] != $currentUserId) {
+                if ($currentUserRole !== 'ADMINISTRATEUR') {
+                    Response::error('Accès refusé - Privilèges administrateur requis', null, 403);
+                    return;
+                }
             }
             
             // Obtenir les statistiques
@@ -315,7 +364,8 @@ class ApiKeyController
             return;
         }
         
-        $userId = $userData['user_id'];
+        $currentUserId = $userData['user_id'];
+        $currentUserRole = $userData['role'] ?? null;
         
         try {
             // Vérifier que la clé existe et appartient à l'utilisateur
@@ -327,9 +377,12 @@ class ApiKeyController
                 return;
             }
             
-            if ($keyData['user_id'] != $userId) {
-                Response::error('Accès refusé', null, 403);
-                return;
+            // Vérifier que la clé appartient à l'utilisateur ou que l'utilisateur est admin
+            if ($keyData['user_id'] != $currentUserId) {
+                if ($currentUserRole !== 'ADMINISTRATEUR') {
+                    Response::error('Accès refusé - Privilèges administrateur requis', null, 403);
+                    return;
+                }
             }
             
             if ($keyData['revoked_at']) {
@@ -383,7 +436,8 @@ class ApiKeyController
             return;
         }
         
-        $userId = $userData['user_id'];
+        $currentUserId = $userData['user_id'];
+        $currentUserRole = $userData['role'] ?? null;
         
         try {
             // Récupérer la clé existante
@@ -395,9 +449,12 @@ class ApiKeyController
                 return;
             }
             
-            if ($oldKeyData['user_id'] != $userId) {
-                Response::error('Accès refusé', null, 403);
-                return;
+            // Vérifier que la clé appartient à l'utilisateur ou que l'utilisateur est admin
+            if ($oldKeyData['user_id'] != $currentUserId) {
+                if ($currentUserRole !== 'ADMINISTRATEUR') {
+                    Response::error('Accès refusé - Privilèges administrateur requis', null, 403);
+                    return;
+                }
             }
             
             // Révoquer l'ancienne clé
@@ -422,7 +479,7 @@ class ApiKeyController
                 }
             }
             
-            $result = ApiKey::generate($userId, $oldKeyData['name'], $options);
+            $result = ApiKey::generate($oldKeyData['user_id'], $oldKeyData['name'], $options);
             
             Response::success('Clé API régénérée avec succès', [
                 'old_key_id' => $keyId,

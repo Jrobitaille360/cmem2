@@ -22,6 +22,24 @@ Production: ag_live_<64 caractères hexadécimaux>
 Test:       ag_test_<64 caractères hexadécimaux>
 ```
 
+## 👑 Fonctionnalités Administrateur
+
+Les utilisateurs avec le rôle `ADMINISTRATEUR` peuvent effectuer des opérations sur les clés API d'autres utilisateurs :
+
+### Permissions spéciales
+
+- **Créer des clés pour d'autres utilisateurs** : En spécifiant `user_id` dans le body
+- **Lister les clés d'un utilisateur** : En ajoutant `?user_id=X` en query parameter  
+- **Consulter les détails** : D'une clé appartenant à n'importe quel utilisateur
+- **Révoquer des clés** : D'autres utilisateurs
+- **Régénérer des clés** : D'autres utilisateurs
+
+### Sécurité
+
+- Seuls les administrateurs authentifiés via JWT peuvent utiliser ces fonctionnalités
+- Toutes les actions admin sont loggées avec l'ID de l'administrateur
+- Les utilisateurs réguliers ne peuvent agir que sur leurs propres clés
+
 ## 📍 Endpoints
 
 ### 1. Créer une clé API
@@ -38,6 +56,7 @@ Content-Type: application/json
 ```json
 {
   "name": "Production API Key",
+  "user_id": 42,
   "environment": "production",
   "scopes": ["read", "write"],
   "expires_in_days": 365,
@@ -56,6 +75,7 @@ Content-Type: application/json
 | Champ | Type | Requis | Description |
 |-------|------|--------|-------------|
 | `name` | string | ✅ | Nom descriptif (max 255 caractères) |
+| `user_id` | int | ❌ | **Admin uniquement** : ID utilisateur cible (défaut: utilisateur authentifié) |
 | `environment` | string | ❌ | `production` ou `test` (défaut: `production`) |
 | `scopes` | array | ❌ | Permissions (défaut: `["read", "write"]`) |
 | `expires_in_days` | int | ❌ | Jours avant expiration (null = jamais) |
@@ -108,10 +128,10 @@ Content-Type: application/json
 
 ### 2. Lister les clés API
 
-Récupère toutes les clés de l'utilisateur authentifié.
+Récupère toutes les clés de l'utilisateur authentifié ou d'un autre utilisateur (admin uniquement).
 
 ```http
-GET /api-keys?active_only=true
+GET /api-keys?active_only=true&user_id=42
 Authorization: Bearer <jwt_token>
 ```
 
@@ -120,6 +140,7 @@ Authorization: Bearer <jwt_token>
 | Paramètre | Type | Description |
 |-----------|------|-------------|
 | `active_only` | boolean | Filtrer uniquement les clés actives (défaut: false) |
+| `user_id` | int | **Admin uniquement** : ID utilisateur dont lister les clés |
 
 **Réponse succès (200):**
 ```json
@@ -532,6 +553,84 @@ response = requests.post(
 key_data = response.json()
 api_key = key_data['data']['api_key']
 print(f'Nouvelle clé: {api_key}')
+```
+
+### 👑 Exemples Administrateur
+
+```bash
+# Admin: Créer une clé pour l'utilisateur ID 42
+curl -X POST http://localhost/cmem2_API/api-keys \
+  -H "Authorization: Bearer $ADMIN_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": 42,
+    "name": "Clé pour utilisateur 42",
+    "scopes": ["read", "write"],
+    "environment": "production"
+  }'
+
+# Admin: Lister les clés de l'utilisateur ID 42
+curl -X GET "http://localhost/cmem2_API/api-keys?user_id=42" \
+  -H "Authorization: Bearer $ADMIN_JWT_TOKEN"
+
+# Admin: Voir les détails d'une clé d'un autre utilisateur
+curl -X GET http://localhost/cmem2_API/api-keys/123 \
+  -H "Authorization: Bearer $ADMIN_JWT_TOKEN"
+
+# Admin: Révoquer une clé d'un autre utilisateur
+curl -X DELETE http://localhost/cmem2_API/api-keys/123 \
+  -H "Authorization: Bearer $ADMIN_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"reason": "Révoquée par admin pour sécurité"}'
+```
+
+```javascript
+// Exemples JavaScript pour administrateurs
+const adminToken = 'eyJhbGciOiJIUzI1NiIs...'; // Token admin
+
+// Créer une clé pour un autre utilisateur
+const createKeyForUser = async (userId, keyData) => {
+  const response = await fetch('/api-keys', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${adminToken}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      user_id: userId,
+      ...keyData
+    })
+  });
+  return response.json();
+};
+
+// Lister les clés d'un utilisateur
+const listUserKeys = async (userId) => {
+  const response = await fetch(`/api-keys?user_id=${userId}`, {
+    headers: {
+      'Authorization': `Bearer ${adminToken}`
+    }
+  });
+  return response.json();
+};
+```
+
+## 🔍 Codes d'erreur spécifiques
+
+| Code | Message | Solution |
+|------|---------|----------|
+| `MISSING_API_KEY` | Clé API manquante | Ajouter header X-API-Key |
+| `INVALID_API_KEY` | Clé invalide/expirée/révoquée | Vérifier la clé ou en générer une nouvelle |
+| `INSUFFICIENT_PERMISSIONS` | Scope requis manquant | Utiliser une clé avec les bons scopes |
+| `RATE_LIMIT_EXCEEDED` | Limite dépassée | Attendre le reset ou augmenter la limite |
+
+## 📝 Notes importantes
+
+1. **La clé complète n'est montrée qu'une seule fois** lors de la création ou régénération
+2. **Les clés révoquées ne peuvent pas être réactivées** - créer une nouvelle clé
+3. **Les clés expirées sont automatiquement révoquées** par le système
+4. **Seuls les propriétaires et administrateurs peuvent gérer les clés** - administrateurs ont accès cross-user
+5. **Les métadonnées sont flexibles** - utilisez-les pour identifier vos intégrations
 # IMPORTANT: Sauvegarder immédiatement!
 ```
 

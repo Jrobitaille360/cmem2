@@ -20,13 +20,14 @@ use AuthGroups\Utils\Response;
 LoggingMiddleware::logEntry();
 
 // Configuration CORS (maintenant gérée par la configuration modulaire)
-$allowedOrigins = ALLOWED_ORIGINS;
-$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+//$allowedOrigins = ALLOWED_ORIGINS;
+//$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 
-if (in_array($origin, $allowedOrigins) || in_array('*', $allowedOrigins)) {
+/* if (in_array($origin, $allowedOrigins) || in_array('*', $allowedOrigins)) {
     header('Access-Control-Allow-Origin: ' . ($origin ?: '*'));
-}
+} */
 
+header('Access-Control-Allow-Origin: *');
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Methods: ' . implode(', ', ALLOWED_METHODS));
 header('Access-Control-Allow-Headers: ' . implode(', ', ALLOWED_HEADERS));
@@ -37,6 +38,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     LoggingMiddleware::logExit(200);
     http_response_code(200);
     exit();
+}
+
+header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, X-API-Key, Authorization');
+
+// Gérer les requêtes OPTIONS (preflight)
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit;
 }
 
 // Vérifier le mode maintenance
