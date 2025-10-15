@@ -166,16 +166,18 @@ class SecretAdminController
     }
 
     /**
-     * Lister les procédures disponibles
+     * Liste les procédures stockées disponibles
      * 
      * SÉCURITÉ RENFORCÉE : Double authentification requise
      * 1. Token JWT valide avec rôle ADMINISTRATEUR (vérifié dans RouteHandler)
-     * 2. Clé secrète admin dans query param ou header
+     * 2. Clé secrète admin dans query param
      * 
-     * Deux modes d'authentification supportés :
-     * Mode 1 (nouveau, compatible navigateurs) - Paramètre GET:
+     * Format d'appel :
      * GET /secret-admin/procedures?admin_secret=clé_secrète
+     * Headers: Authorization: Bearer {JWT_TOKEN}
      * 
+     * @param array $authenticatedUser Utilisateur authentifié via JWT (doit être ADMINISTRATEUR)
+     * @return void
      */
     public function listProcedures(array $authenticatedUser): void
     {
@@ -202,40 +204,70 @@ class SecretAdminController
             }
 
             $procedures = [
-                'ResetData' => [
-                    'description' => 'Remet à zéro toutes les données en gardant la structure',
+                'ResetAuthGroupsData' => [
+                    'name' => 'ResetAuthGroupsData',
+                    'description' => 'Remet à zéro toutes les données du module authentification/groupes en gardant la structure',
                     'parameters' => [],
-                    'danger_level' => 'HIGH'
+                    'danger_level' => 'HIGH',
+                    'warning' => 'ATTENTION : Cette procédure supprime toutes les données utilisateurs, groupes, fichiers et tags'
                 ],
-                'ResetDatabase' => [
-                    'description' => 'Recrée complètement la base de données',
+                'ResetAuthenticationGroups' => [
+                    'name' => 'ResetAuthenticationGroups',
+                    'description' => 'Recrée complètement la base de données (DROP et CREATE de toutes les tables)',
                     'parameters' => [],
-                    'danger_level' => 'EXTREME'
+                    'danger_level' => 'EXTREME',
+                    'warning' => 'DANGER EXTRÊME : Toute la base de données sera recréée, toutes les données seront perdues'
                 ],
-                'GenerateAllStats' => [
-                    'description' => 'Génère toutes les statistiques',
+                'GeneratePlatformStats' => [
+                    'name' => 'GeneratePlatformStats',
+                    'description' => 'Génère les statistiques globales de la plateforme (utilisateurs, groupes, tags, fichiers, stockage)',
                     'parameters' => [],
                     'danger_level' => 'LOW'
                 ],
                 'GenerateUserStats' => [
-                    'description' => 'Génère les statistiques des utilisateurs',
+                    'name' => 'GenerateUserStats',
+                    'description' => 'Génère les statistiques individuelles pour chaque utilisateur',
                     'parameters' => [],
                     'danger_level' => 'LOW'
                 ],
                 'GenerateGroupStats' => [
-                    'description' => 'Génère les statistiques des groupes',
-                    'parameters' => [],
-                    'danger_level' => 'LOW'
-                ],
-                'GeneratePlatformStats' => [
-                    'description' => 'Génère les statistiques de la plateforme',
+                    'name' => 'GenerateGroupStats',
+                    'description' => 'Génère les statistiques pour chaque groupe',
                     'parameters' => [],
                     'danger_level' => 'LOW'
                 ],
                 'CleanupOldStats' => [
-                    'description' => 'Nettoie les anciennes statistiques',
+                    'name' => 'CleanupOldStats',
+                    'description' => 'Nettoie les anciennes statistiques (garde les 100 derniers snapshots et supprime ceux de +30 jours)',
                     'parameters' => [],
                     'danger_level' => 'MEDIUM'
+                ],
+                'cleanup_expired_api_keys' => [
+                    'name' => 'cleanup_expired_api_keys',
+                    'description' => 'Révoque automatiquement les clés API expirées',
+                    'parameters' => [],
+                    'danger_level' => 'LOW'
+                ],
+                'cleanup_expired_licenses' => [
+                    'name' => 'cleanup_expired_licenses',
+                    'description' => 'Nettoie les licences expirées et met à jour le statut des utilisateurs',
+                    'parameters' => [],
+                    'danger_level' => 'MEDIUM',
+                    'note' => 'Système de licence - Modifie le payment_status des utilisateurs'
+                ],
+                'get_license_status' => [
+                    'name' => 'get_license_status',
+                    'description' => 'Récupère le statut de licence d\'un utilisateur spécifique',
+                    'parameters' => [
+                        [
+                            'name' => 'p_user_id',
+                            'type' => 'INT',
+                            'required' => true,
+                            'description' => 'ID de l\'utilisateur'
+                        ]
+                    ],
+                    'danger_level' => 'LOW',
+                    'note' => 'Nécessite un paramètre user_id'
                 ]
             ];
 
@@ -246,25 +278,32 @@ class SecretAdminController
                 'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown'
             ]);
 
-            Response::success('Procédures disponibles', [
-                'procedures' => $procedures,
+            Response::success('Procédures disponibles récupérées avec succès', [
+                'count' => count($procedures),
+                'procedures' => array_values($procedures),
                 'authenticated_admin' => [
                     'user_id' => $authenticatedUser['user_id'],
                     'email' => $authenticatedUser['email'],
                     'role' => $authenticatedUser['role']
                 ],
+                'authentication_info' => [
+                    'type' => 'Double authentification',
+                    'requirements' => [
+                        '1. Token JWT valide avec rôle ADMINISTRATEUR',
+                        '2. Clé secrète admin (ADMIN_SECRET_KEY)'
+                    ]
+                ],
                 'usage' => [
                     'endpoint' => '/secret-admin/execute-procedure',
                     'method' => 'POST',
-                    'authentication' => 'Double authentification requise : JWT + clé secrète',
-                    'modes' => [
-                        'description' => 'Compatible navigateurs',
-                        'headers' => ['Authorization: Bearer YOUR_JWT_TOKEN'],
-                        'body' => [
-                            'admin_secret' => 'clé_secrète',
-                            'procedure' => 'nom_de_la_procedure',
-                            'parameters' => []
-                        ]
+                    'headers' => [
+                        'Authorization' => 'Bearer {JWT_TOKEN}',
+                        'Content-Type' => 'application/json'
+                    ],
+                    'body' => [
+                        'admin_secret' => '{ADMIN_SECRET_KEY}',
+                        'procedure' => 'nom_de_la_procedure',
+                        'parameters' => []
                     ]
                 ]
             ]);
