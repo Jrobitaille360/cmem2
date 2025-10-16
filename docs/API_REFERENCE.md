@@ -4,7 +4,7 @@ Guide de référence rapide pour les développeurs.
 
 ## 🔗 URLs de Base
 
-```
+```text
 Development: http://localhost/cmem2_API/
 Production:  https://your-domain.com/api/
 ```
@@ -14,13 +14,16 @@ Production:  https://your-domain.com/api/
 L'API supporte deux méthodes d'authentification :
 
 ### 1. JWT Token (pour utilisateurs)
+
 #### Headers requis
+
 ```http
 Authorization: Bearer {jwt_token}
 Content-Type: application/json
 ```
 
 #### Obtenir un token
+
 ```bash
 POST /users/login
 {
@@ -30,13 +33,14 @@ POST /users/login
 ```
 
 ### 2. API Keys (pour machines/intégrations)
-#### Headers requis
+
 ```http
 X-API-Key: {api_key}
 Content-Type: application/json
 ```
 
 #### Créer une API key
+
 ```bash
 POST /api-keys
 Authorization: Bearer {jwt_token}
@@ -139,6 +143,7 @@ Voir [ENDPOINTS_API_KEYS.md](./ENDPOINTS_API_KEYS.md) pour plus de détails.
 ## 📦 Format des Réponses
 
 ### Succès
+
 ```json
 {
   "success": true,
@@ -148,6 +153,7 @@ Voir [ENDPOINTS_API_KEYS.md](./ENDPOINTS_API_KEYS.md) pour plus de détails.
 ```
 
 ### Erreur
+
 ```json
 {
   "success": false,

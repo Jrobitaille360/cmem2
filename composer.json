@@ -3,7 +3,7 @@
     "description": "Backend API pour l'application Memories v2",
     "type": "project",
     "require": {
-        "php": ">=7.4",
+        "php": ">=8.0",
         "firebase/php-jwt": "^6.0",
         "phpmailer/phpmailer": "^6.10"
     },
