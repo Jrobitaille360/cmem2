@@ -3,6 +3,10 @@
 # Activer la réécriture d'URL
 RewriteEngine On
 
+# Transmettre le header Authorization à PHP (nécessaire pour JWT)
+RewriteCond %{HTTP:Authorization} .
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
 # Rediriger toutes les requêtes vers index.php
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d

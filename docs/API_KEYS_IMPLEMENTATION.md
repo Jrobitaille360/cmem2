@@ -18,6 +18,7 @@ Implémentation complète du système d'API Keys pour l'authentification machine
 ## 📁 Fichiers créés
 
 ### 1. Base de données
+
 - **`docs/create_table_api_keys.sql`** (122 lignes)
   - Table `api_keys` (16 colonnes)
   - Indexes optimisés (8 index)
@@ -26,6 +27,7 @@ Implémentation complète du système d'API Keys pour l'authentification machine
   - Vue `api_keys_stats_by_user`
 
 ### 2. Modèle
+
 - **`src/auth_groups/Models/ApiKey.php`** (530 lignes)
   - `generate()` : Génération sécurisée de clés
   - `validate()` : Validation et vérification
@@ -36,6 +38,7 @@ Implémentation complète du système d'API Keys pour l'authentification machine
   - `cleanupExpired()` : Nettoyage automatique
 
 ### 3. Middleware
+
 - **`src/auth_groups/Middleware/ApiKeyAuthMiddleware.php`** (320 lignes)
   - `authenticate()` : Auth stricte par API key
   - `authenticateFlexible()` : Auth JWT OU API key
@@ -45,6 +48,7 @@ Implémentation complète du système d'API Keys pour l'authentification machine
   - Rate limiting avec headers de réponse
 
 ### 4. Contrôleur
+
 - **`src/auth_groups/Controllers/ApiKeyController.php`** (450 lignes)
   - `POST /api-keys` : Création de clé
   - `GET /api-keys` : Liste des clés
@@ -54,6 +58,7 @@ Implémentation complète du système d'API Keys pour l'authentification machine
   - Validation complète des entrées
 
 ### 5. Routing
+
 - **`src/auth_groups/Routing/RouteHandlers/ApiKeyRouteHandler.php`** (95 lignes)
   - Handler dédié aux endpoints `/api-keys`
   - Intégration dans l'architecture Router
@@ -62,6 +67,7 @@ Implémentation complète du système d'API Keys pour l'authentification machine
   - Ajout de `ApiKeyRouteHandler` dans les handlers
 
 ### 6. Documentation
+
 - **`docs/ENDPOINTS_API_KEYS.md`** (520 lignes)
   - Spécification complète des 5 endpoints
   - Méthodes d'authentification
@@ -104,7 +110,8 @@ Implémentation complète du système d'API Keys pour l'authentification machine
 ## 🔐 Schéma de sécurité
 
 ### Génération de clé
-```
+
+```text
 1. Génération : random_bytes(32) → 64 caractères hexadécimaux
 2. Format : {prefix}_{random_key}
    - Production : ag_live_a1b2c3d4e5f6...
@@ -117,7 +124,8 @@ Implémentation complète du système d'API Keys pour l'authentification machine
 ```
 
 ### Validation de clé
-```
+
+```text
 1. Extraction depuis header (X-API-Key ou Authorization)
 2. Lookup en DB par hash SHA-256
 3. Vérifications :
@@ -141,6 +149,7 @@ Implémentation complète du système d'API Keys pour l'authentification machine
 | `admin` | Administration | Tous + endpoints admin |
 
 **Validation :**
+
 - Stockage : Array JSON en DB : `["read", "write"]`
 - Vérification : `in_array($required_scope, $key_scopes) || in_array('*', $key_scopes)`
 - Flexibilité : Middleware permet de vérifier scopes multiples
@@ -148,22 +157,27 @@ Implémentation complète du système d'API Keys pour l'authentification machine
 ## 📊 Rate Limiting
 
 ### Configuration par clé
+
 ```sql
 rate_limit_per_minute: 60    -- 60 req/min par défaut
 rate_limit_per_hour: 3600    -- 3600 req/h par défaut
 ```
 
 ### Mécanisme
+
 1. **Tracking** : Compteur en mémoire (Redis recommandé en prod)
 2. **Fenêtre** : Sliding window de 1 minute / 1 heure
 3. **Headers de réponse** :
-   ```
+
+   ```text
    X-RateLimit-Remaining: 45
    X-RateLimit-Reset: 2025-10-07 15:32:00
    ```
+
 4. **Dépassement** : HTTP 429 Too Many Requests
 
 ### Exemple d'implémentation
+
 ```php
 $apiKey->checkRateLimit($keyData['id'], 'minute', $keyData['rate_limit_per_minute']);
 $apiKey->checkRateLimit($keyData['id'], 'hour', $keyData['rate_limit_per_hour']);
@@ -187,6 +201,7 @@ stateDiagram-v2
 ```
 
 ### États
+
 - **Created** : Clé créée, jamais utilisée
 - **Active** : Clé en utilisation normale
 - **RateLimited** : Limite temporaire atteinte
@@ -197,6 +212,7 @@ stateDiagram-v2
 ## 🚀 Usage typique
 
 ### 1. Création (nécessite JWT)
+
 ```bash
 curl -X POST http://localhost/cmem2_API/api-keys \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..." \
@@ -212,6 +228,7 @@ curl -X POST http://localhost/cmem2_API/api-keys \
 ```
 
 **Réponse (UNIQUE AFFICHAGE) :**
+
 ```json
 {
   "success": true,
@@ -232,6 +249,7 @@ curl -X POST http://localhost/cmem2_API/api-keys \
 ```
 
 ### 2. Utilisation
+
 ```bash
 # Méthode 1 : Header X-API-Key (recommandé)
 curl -X GET http://localhost/cmem2_API/groups \
@@ -243,12 +261,14 @@ curl -X GET http://localhost/cmem2_API/groups \
 ```
 
 ### 3. Liste des clés (masquées)
+
 ```bash
 curl -X GET http://localhost/cmem2_API/api-keys \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..."
 ```
 
 **Réponse :**
+
 ```json
 {
   "success": true,
@@ -271,6 +291,7 @@ curl -X GET http://localhost/cmem2_API/api-keys \
 ```
 
 ### 4. Révocation
+
 ```bash
 curl -X DELETE http://localhost/cmem2_API/api-keys/1 \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..." \
@@ -283,11 +304,13 @@ curl -X DELETE http://localhost/cmem2_API/api-keys/1 \
 ## 📈 Statistiques et monitoring
 
 ### Vue `api_keys_stats_by_user`
+
 ```sql
 SELECT * FROM api_keys_stats_by_user;
 ```
 
 Retourne :
+
 - `user_id`, `user_email`
 - `total_keys` : Nombre de clés
 - `active_keys` : Clés non révoquées
@@ -295,11 +318,13 @@ Retourne :
 - `most_recent_activity` : Dernière utilisation
 
 ### Endpoint stats
+
 ```bash
 GET /api-keys/{id}
 ```
 
 Retourne statistiques détaillées :
+
 - Total requests
 - Requests aujourd'hui
 - Moyenne requêtes/jour
@@ -309,6 +334,7 @@ Retourne statistiques détaillées :
 ## 🛡️ Meilleures pratiques
 
 ### ✅ À FAIRE
+
 1. **Rotation régulière** : Régénérer les clés tous les 90 jours
 2. **Scopes minimaux** : Ne donner que les permissions nécessaires
 3. **Environnements séparés** : Utiliser `test` pour dev/staging
@@ -318,6 +344,7 @@ Retourne statistiques détaillées :
 7. **Logging** : Tracer toutes les créations/révocations
 
 ### ❌ À ÉVITER
+
 1. ❌ Partager une clé entre plusieurs services
 2. ❌ Commiter les clés dans git
 3. ❌ Utiliser `*` (all scopes) sans raison valide
@@ -331,6 +358,7 @@ Retourne statistiques détaillées :
 ### Tests manuels recommandés
 
 1. **Création et utilisation**
+
    ```bash
    # 1. Login pour obtenir JWT
    # 2. Créer API key
@@ -339,6 +367,7 @@ Retourne statistiques détaillées :
    ```
 
 2. **Scopes**
+
    ```bash
    # 1. Créer clé avec scope "read" uniquement
    # 2. Tenter GET (doit réussir)
@@ -346,6 +375,7 @@ Retourne statistiques détaillées :
    ```
 
 3. **Rate limiting**
+
    ```bash
    # 1. Créer clé avec rate_limit_per_minute: 2
    # 2. Faire 3 requêtes en 10 secondes
@@ -353,6 +383,7 @@ Retourne statistiques détaillées :
    ```
 
 4. **Expiration**
+
    ```bash
    # 1. Créer clé avec expires_in_days: 0
    # 2. Attendre 24h ou modifier en DB
@@ -360,6 +391,7 @@ Retourne statistiques détaillées :
    ```
 
 5. **Révocation**
+
    ```bash
    # 1. Créer et utiliser clé
    # 2. Révoquer via DELETE
@@ -367,6 +399,7 @@ Retourne statistiques détaillées :
    ```
 
 ### Script de test complet
+
 ```bash
 # À créer : tests/api_keys/test_api_keys_full.php
 php tests/api_keys/test_api_keys_full.php
@@ -375,12 +408,15 @@ php tests/api_keys/test_api_keys_full.php
 ## 🔧 Installation
 
 ### 1. Exécuter le script SQL
+
 ```bash
 mysql -u root -p cmem2_db < docs/create_table_api_keys.sql
 ```
 
 ### 2. Vérifier les fichiers
+
 Tous les fichiers PHP sont déjà en place dans :
+
 - `src/auth_groups/Models/ApiKey.php`
 - `src/auth_groups/Middleware/ApiKeyAuthMiddleware.php`
 - `src/auth_groups/Controllers/ApiKeyController.php`
@@ -388,6 +424,7 @@ Tous les fichiers PHP sont déjà en place dans :
 - `src/auth_groups/Routing/Router.php` (déjà modifié)
 
 ### 3. Test de l'installation
+
 ```bash
 curl http://localhost/cmem2_API/health
 ```
@@ -414,6 +451,7 @@ Le système d'API Keys est **100% opérationnel** et prêt pour la production. I
 - ✅ **Architecture propre** (MVC, middleware, routing)
 
 **Prochaines étapes suggérées :**
+
 1. Tester le système avec des cas réels
 2. Créer des tests automatisés unitaires
 3. Implémenter Redis pour rate limiting en production

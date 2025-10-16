@@ -22,15 +22,34 @@ class ApiKeyController
     
     /**
      * Récupérer le token Bearer de l'en-tête
+     * Supporte plusieurs méthodes pour plus de compatibilité
      */
     private function getBearerToken()
     {
-        $headers = getallheaders();
-        if (isset($headers['Authorization'])) {
-            if (preg_match('/Bearer\s+(.+)/i', $headers['Authorization'], $matches)) {
+        // Méthode 1 : Vérifier $_SERVER['HTTP_AUTHORIZATION'] (ajouté par .htaccess)
+        if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
+            if (preg_match('/Bearer\s+(.+)/i', $_SERVER['HTTP_AUTHORIZATION'], $matches)) {
                 return $matches[1];
             }
         }
+        
+        // Méthode 2 : Vérifier REDIRECT_HTTP_AUTHORIZATION (certaines configs Apache)
+        if (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+            if (preg_match('/Bearer\s+(.+)/i', $_SERVER['REDIRECT_HTTP_AUTHORIZATION'], $matches)) {
+                return $matches[1];
+            }
+        }
+        
+        // Méthode 3 : getallheaders() (fallback)
+        if (function_exists('getallheaders')) {
+            $headers = getallheaders();
+            if (isset($headers['Authorization'])) {
+                if (preg_match('/Bearer\s+(.+)/i', $headers['Authorization'], $matches)) {
+                    return $matches[1];
+                }
+            }
+        }
+        
         return null;
     }
     
