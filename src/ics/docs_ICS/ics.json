@@ -1,0 +1,477 @@
+{
+    "base_infos": {
+        "name": "ICS Calendar API Module",
+        "version": "1.0.0",
+        "description": "Module de gestion des calendriers ICS. Création, partage et exportation de calendriers au format ICS standard. Support des événements avec récurrence, participants et intégration avec tous les clients calendriers (Google Calendar, Outlook, Apple Calendar, etc.)",
+        "documentation": "https://votre-site/api/docs/ics",
+        "base_url": "https://votre-site/cmem2_API/",
+        "format": "JSON + ICS",
+        "encoding": "UTF-8",
+        "auth": {
+            "type": "JWT Bearer Token + API Keys",
+            "methods": {
+                "jwt": {
+                    "header": "Authorization: Bearer <token>",
+                    "use_case": "Applications web et mobiles avec utilisateurs",
+                    "required_for": "Création, modification, partage de calendriers"
+                },
+                "public_ics": {
+                    "header": "Aucun",
+                    "use_case": "Téléchargement public de fichiers ICS via token de partage",
+                    "required_for": "Accès aux calendriers publics partagés"
+                }
+            }
+        },
+        "ics_features": {
+            "format": "RFC 5545 compliant",
+            "timezone_support": true,
+            "recurrence_support": true,
+            "attendees_support": true,
+            "all_day_events": true,
+            "compatible_with": [
+                "Google Calendar",
+                "Microsoft Outlook", 
+                "Apple Calendar",
+                "Mozilla Thunderbird",
+                "CalDAV clients"
+            ]
+        },
+        "sharing_features": {
+            "public_sharing": "URL publique avec token unique",
+            "user_sharing": "Partage avec utilisateurs spécifiques",
+            "permissions": ["read", "write"],
+            "auto_sync": "Les clients calendriers se synchronisent automatiquement"
+        },
+        "limits": {
+            "calendars_per_user": 100,
+            "events_per_calendar": 10000,
+            "max_attendees_per_event": 100,
+            "share_token_length": 64,
+            "max_calendar_title": 255,
+            "max_event_title": 255,
+            "max_description": 1000
+        },
+        "status": "Développement - Module séparé",
+        "integration_status": "Non intégré au routeur principal"
+    },
+    "entry_points": [
+        {
+            "section": "Calendars Management",
+            "description": "Gestion des calendriers - Création, consultation, partage",
+            "endpoints": [
+                {
+                    "method": "POST",
+                    "path": "/calendars",
+                    "description": "Créer un nouveau calendrier",
+                    "auth": "JWT Bearer Token requis",
+                    "controller": "ICS\\Controllers\\CalendarController::createCalendar",
+                    "request": {
+                        "title": "Mon Calendrier Personnel",
+                        "description": "Calendrier pour mes événements personnels",
+                        "visibility": "private",
+                        "max_members": 50,
+                        "color": "#FF5722",
+                        "timezone": "America/Montreal"
+                    },
+                    "validation": {
+                        "title": "requis, string, max 100 caractères",
+                        "description": "optionnel, string, max 1000 caractères",
+                        "visibility": "optionnel, string, valeurs: public|private, défaut: private",
+                        "max_members": "optionnel, integer, min: 1, max: 1000, défaut: 1000",
+                        "color": "optionnel, string, max 7 caractères (hex color), défaut: #3174ad",
+                        "timezone": "optionnel, string, max 100 caractères, défaut: America/Montreal"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Calendrier créé avec succès",
+                        "data": {
+                            "calendar": {
+                                "id": 1,
+                                "title": "Mon Calendrier Personnel",
+                                "description": "Calendrier pour mes événements personnels",
+                                "share_token": "abc123def456...",
+                                "ics_url": "https://votre-site/calendar/abc123def456.ics",
+                                "visibility": "private",
+                                "color": "#FF5722",
+                                "created_at": "2025-10-17 10:00:00"
+                            }
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 400,
+                            "message": "Données invalides",
+                            "details": "Erreurs de validation des champs"
+                        },
+                        {
+                            "code": 401,
+                            "message": "Authentification requise"
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors de la création du calendrier"
+                        }
+                    ]
+                },
+                {
+                    "method": "GET",
+                    "path": "/calendars",
+                    "description": "Récupérer tous les calendriers de l'utilisateur",
+                    "auth": "JWT Bearer Token requis",
+                    "controller": "ICS\\Controllers\\CalendarController::getUserCalendars",
+                    "request": "Aucun paramètre requis",
+                    "success_response": {
+                        "success": true,
+                        "message": "Calendriers de l'utilisateur récupérés avec succès",
+                        "data": {
+                            "calendars": [
+                                {
+                                    "id": 1,
+                                    "title": "Calendrier Personnel",
+                                    "description": "Mes événements personnels",
+                                    "event_count": 12,
+                                    "ics_url": "https://votre-site/calendar/abc123.ics",
+                                    "visibility": "private",
+                                    "color": "#3174ad",
+                                    "created_at": "2025-10-17 10:00:00"
+                                }
+                            ],
+                            "count": 1
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 401,
+                            "message": "Authentification requise"
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors de la récupération des calendriers"
+                        }
+                    ]
+                },
+                {
+                    "method": "POST",
+                    "path": "/calendars/{id}/share",
+                    "description": "Partager un calendrier avec un autre utilisateur",
+                    "auth": "JWT Bearer Token requis",
+                    "controller": "ICS\\Controllers\\CalendarController::shareCalendar",
+                    "request": {
+                        "user_id": 5
+                    },
+                    "validation": {
+                        "user_id": "requis, integer, ID de l'utilisateur avec qui partager"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Calendrier partagé avec succès",
+                        "data": {
+                            "share": {
+                                "calendar_id": 1,
+                                "shared_with_user_id": 5,
+                                "permission": "read",
+                                "shared_at": "2025-10-17 15:30:00"
+                            }
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 400,
+                            "message": "Données invalides"
+                        },
+                        {
+                            "code": 401,
+                            "message": "Authentification requise"
+                        },
+                        {
+                            "code": 404,
+                            "message": "Calendrier non trouvé"
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors du partage du calendrier"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "section": "Events Management", 
+            "description": "Gestion des événements dans les calendriers",
+            "endpoints": [
+                {
+                    "method": "POST",
+                    "path": "/calendars/{id}/events",
+                    "description": "Créer un nouvel événement dans un calendrier",
+                    "auth": "JWT Bearer Token requis",
+                    "controller": "ICS\\Controllers\\CalendarController::createEvent",
+                    "request": {
+                        "title": "Réunion équipe",
+                        "description": "Réunion hebdomadaire de l'équipe de développement",
+                        "start_datetime": "2025-10-20 14:00:00",
+                        "end_datetime": "2025-10-20 15:30:00",
+                        "all_day": false,
+                        "location": "Salle de conférence A",
+                        "organizer_email": "admin@example.com",
+                        "attendees": [
+                            {
+                                "email": "user1@example.com",
+                                "name": "Jean Dupont"
+                            },
+                            {
+                                "email": "user2@example.com", 
+                                "name": "Marie Martin"
+                            }
+                        ],
+                        "recurrence_rule": "FREQ=WEEKLY;BYDAY=MO",
+                        "status": "confirmed"
+                    },
+                    "validation": {
+                        "title": "requis, string",
+                        "start_datetime": "requis, datetime format YYYY-MM-DD HH:MM:SS",
+                        "end_datetime": "requis, datetime format YYYY-MM-DD HH:MM:SS, doit être après start_datetime",
+                        "description": "optionnel, string",
+                        "all_day": "optionnel, boolean, défaut: false",
+                        "location": "optionnel, string",
+                        "organizer_email": "optionnel, email valide",
+                        "attendees": "optionnel, array d'objets {email, name}",
+                        "recurrence_rule": "optionnel, string RRULE RFC 5545",
+                        "status": "optionnel, enum: confirmed|tentative|cancelled, défaut: confirmed"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Événement créé avec succès",
+                        "data": {
+                            "event": {
+                                "id": 15,
+                                "calendar_id": 1,
+                                "title": "Réunion équipe",
+                                "start_datetime": "2025-10-20 14:00:00",
+                                "end_datetime": "2025-10-20 15:30:00",
+                                "all_day": false,
+                                "status": "confirmed",
+                                "created_at": "2025-10-17 16:00:00"
+                            }
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 400,
+                            "message": "Données invalides"
+                        },
+                        {
+                            "code": 401,
+                            "message": "Authentification requise"
+                        },
+                        {
+                            "code": 404,
+                            "message": "Calendrier non trouvé"
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors de la création de l'événement"
+                        }
+                    ]
+                },
+                {
+                    "method": "GET",
+                    "path": "/calendars/{id}/events",
+                    "description": "Récupérer tous les événements d'un calendrier",
+                    "auth": "JWT Bearer Token requis",
+                    "controller": "ICS\\Controllers\\CalendarController::getCalendarEvents",
+                    "query_parameters": {
+                        "start_date": "optionnel, YYYY-MM-DD, filtre par date de début",
+                        "end_date": "optionnel, YYYY-MM-DD, filtre par date de fin"
+                    },
+                    "success_response": {
+                        "success": true,
+                        "message": "Événements du calendrier récupérés avec succès",
+                        "data": {
+                            "events": [
+                                {
+                                    "id": 15,
+                                    "title": "Réunion équipe",
+                                    "description": "Réunion hebdomadaire",
+                                    "start_datetime": "2025-10-20 14:00:00",
+                                    "end_datetime": "2025-10-20 15:30:00",
+                                    "all_day": false,
+                                    "location": "Salle A",
+                                    "status": "confirmed",
+                                    "duration_formatted": "1 h 30 min"
+                                }
+                            ],
+                            "count": 1
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 401,
+                            "message": "Authentification requise"
+                        },
+                        {
+                            "code": 404,
+                            "message": "Calendrier non trouvé"
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors de la récupération des événements"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "section": "ICS Export",
+            "description": "Génération et téléchargement de fichiers ICS",
+            "endpoints": [
+                {
+                    "method": "GET",
+                    "path": "/calendar/{token}.ics",
+                    "description": "Télécharger le fichier ICS d'un calendrier public (sans authentification)",
+                    "auth": "Aucun - Accès public via token de partage",
+                    "controller": "ICS\\Controllers\\CalendarController::getPublicCalendarIcs",
+                    "parameters": {
+                        "token": "Token de partage unique du calendrier (64 caractères)"
+                    },
+                    "response_type": "text/calendar",
+                    "success_response": {
+                        "content_type": "text/calendar; charset=utf-8",
+                        "content_disposition": "attachment; filename=\"Nom_Calendrier.ics\"",
+                        "body": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\n..."
+                    },
+                    "ics_example": {
+                        "BEGIN": "VCALENDAR",
+                        "VERSION": "2.0",
+                        "PRODID": "-//CMEM Calendar//FR",
+                        "CALSCALE": "GREGORIAN",
+                        "X-WR-CALNAME": "Mon Calendrier",
+                        "X-WR-TIMEZONE": "America/Montreal",
+                        "events": "Événements au format VEVENT RFC 5545",
+                        "END": "VCALENDAR"
+                    },
+                    "error_responses": [
+                        {
+                            "code": 404,
+                            "message": "Calendrier non trouvé",
+                            "format": "JSON (pas ICS)"
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors de la génération du fichier ICS",
+                            "format": "JSON (pas ICS)"
+                        }
+                    ],
+                    "usage_examples": {
+                        "google_calendar": "Ajouter par URL dans Google Calendar",
+                        "outlook": "S'abonner au calendrier dans Outlook",
+                        "apple_calendar": "Ajouter un abonnement dans Calendrier Apple",
+                        "curl_download": "curl 'https://votre-site/calendar/abc123.ics' -o mon-calendrier.ics"
+                    }
+                },
+                {
+                    "method": "GET", 
+                    "path": "/calendars/{id}/ics",
+                    "description": "Télécharger le fichier ICS d'un calendrier (authentification requise)",
+                    "auth": "JWT Bearer Token requis",
+                    "controller": "ICS\\Controllers\\CalendarController::getCalendarIcsUserId",
+                    "parameters": {
+                        "id": "ID du calendrier"
+                    },
+                    "response_type": "text/calendar",
+                    "success_response": {
+                        "content_type": "text/calendar; charset=utf-8",
+                        "content_disposition": "attachment; filename=\"Calendrier.ics\"",
+                        "body": "Contenu ICS complet avec tous les événements"
+                    },
+                    "error_responses": [
+                        {
+                            "code": 401,
+                            "message": "Authentification requise"
+                        },
+                        {
+                            "code": 404,
+                            "message": "Calendrier non trouvé"
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors de la génération du fichier ICS"
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "database_schema": {
+        "tables": [
+            {
+                "name": "calendars",
+                "description": "Stockage des calendriers utilisateurs",
+                "fields": {
+                    "id": "INT AUTO_INCREMENT PRIMARY KEY",
+                    "user_id": "INT NOT NULL, FOREIGN KEY vers users(id)",
+                    "title": "VARCHAR(255) NOT NULL",
+                    "description": "TEXT",
+                    "timezone": "VARCHAR(50) DEFAULT 'America/Montreal'",
+                    "color": "VARCHAR(7) DEFAULT '#3174ad'",
+                    "is_public": "BOOLEAN DEFAULT FALSE", 
+                    "max_members": "INT DEFAULT 1000",
+                    "share_token": "VARCHAR(64) UNIQUE",
+                    "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+                    "updated_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+                    "deleted_at": "TIMESTAMP NULL"
+                }
+            },
+            {
+                "name": "calendar_events",
+                "description": "Stockage des événements de calendrier",
+                "fields": {
+                    "id": "INT AUTO_INCREMENT PRIMARY KEY",
+                    "calendar_id": "INT NOT NULL, FOREIGN KEY vers calendars(id)",
+                    "title": "VARCHAR(255) NOT NULL",
+                    "description": "TEXT",
+                    "start_datetime": "DATETIME NOT NULL",
+                    "end_datetime": "DATETIME NOT NULL", 
+                    "all_day": "BOOLEAN DEFAULT FALSE",
+                    "location": "VARCHAR(255)",
+                    "organizer_email": "VARCHAR(255)",
+                    "attendees": "JSON",
+                    "recurrence_rule": "VARCHAR(255)",
+                    "status": "ENUM('confirmed', 'tentative', 'cancelled') DEFAULT 'confirmed'",
+                    "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+                    "updated_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+                    "deleted_at": "TIMESTAMP NULL"
+                }
+            },
+            {
+                "name": "calendar_shares",
+                "description": "Partages de calendriers entre utilisateurs",
+                "fields": {
+                    "id": "INT AUTO_INCREMENT PRIMARY KEY",
+                    "calendar_id": "INT NOT NULL, FOREIGN KEY vers calendars(id)",
+                    "shared_with_user_id": "INT, FOREIGN KEY vers users(id)",
+                    "shared_with_email": "VARCHAR(255)",
+                    "permission": "ENUM('read', 'write') DEFAULT 'read'",
+                    "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+                }
+            }
+        ]
+    },
+    "integration_notes": {
+        "status": "Module développé séparément",
+        "namespace": "ICS\\",
+        "location": "src/ics/",
+        "routing": "Non intégré au routeur principal pour le moment",
+        "dependencies": [
+            "AuthGroups\\Utils\\Response",
+            "AuthGroups\\Utils\\Validator", 
+            "AuthGroups\\Middleware\\LoggingMiddleware",
+            "AuthGroups\\Services\\LogService",
+            "AuthGroups\\Models\\BaseModel"
+        ],
+        "future_integration": {
+            "router_handler": "ICS\\Routing\\RouteHandlers\\CalendarRouteHandler",
+            "endpoint_prefix": "/calendars",
+            "public_endpoints": "/calendar/{token}.ics"
+        }
+    }
+}

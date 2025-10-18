@@ -1,0 +1,365 @@
+<?php
+
+namespace ICS\Models;
+
+use AuthGroups\Models\BaseModel;
+use AuthGroups\Services\LogService;
+use PDO;
+
+class CalendarEvent extends BaseModel
+{
+    protected $table = 'calendar_events';
+    
+    public $id;
+    public $calendarId;
+    public $title;
+    public $description;
+    public $startDatetime;
+    public $endDatetime;
+    public $allDay;
+    public $location;
+    public $organizerEmail;
+    public $attendees;
+    public $recurrenceRule;
+    public $status;
+    public $createdAt;
+    public $updatedAt;
+
+    public function __construct() {
+        parent::__construct();
+    }
+
+    /**
+     * Crée un nouvel événement dans un calendrier
+     */
+    public function create(): array
+    {
+        
+        try {
+            $query = "
+                INSERT INTO calendar_events (
+                    calendar_id, title, description, start_datetime, end_datetime,
+                    all_day, location, organizer_email, attendees, recurrence_rule, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ";
+
+            $stmt = $this->db->prepare($query);
+
+            // Préparer les données
+
+            $stmt->execute([
+                $this->id,
+                $this->title,
+                $this->description ?? null,
+                $this->startDatetime,
+                $this->endDatetime,
+                $this->allDay,
+                $this->location ?? null,
+                $this->organizerEmail ?? null,
+                $this->attendees,
+                $this->recurrenceRule ?? null,
+                $this->status
+            ]);
+
+            $eventId = $this->db->lastInsertId();
+
+            LogService::info("Événement créé", [
+                'event_id' => $eventId,
+                'calendar_id' => $this->id,
+                'title' => $this->title
+            ]); 
+            
+            return [
+                'id' => $eventId,
+                'calendar_id' => $this->id,
+                'title' => $this->title,
+                'start_datetime' => $this->startDatetime,
+                'end_datetime' => $this->endDatetime,
+                'all_day' => $this->allDay,
+                'status' => $this->status
+            ];
+            
+        } catch (\Exception $e) {
+            LogService::error("Erreur lors de la création de l'événement", [
+                'calendar_id' => $this->id,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Récupère un événement par son ID
+     */
+    public function getById($eventId): ?array
+    {      
+        $query = "SELECT * FROM calendar_events WHERE id = ? AND deleted_at IS NULL";
+        $stmt = $this->db->prepare($query);
+        $stmt->execute([$eventId]);
+        
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result ?: null;
+    }
+
+    /**
+     * Récupère tous les événements d'un calendrier
+     */
+    public function getByCalendarId($calendarId, $startDate = null, $endDate = null): array
+    {
+        $query = "SELECT * FROM calendar_events WHERE calendar_id = ? AND deleted_at IS NULL";
+        $params = [$calendarId];
+        
+        if ($startDate && $endDate) {
+            $query .= " AND (start_datetime <= ? AND end_datetime >= ?)";
+            $params[] = $endDate;
+            $params[] = $startDate;
+        }
+        
+        $query .= " ORDER BY start_datetime ASC";
+
+        $stmt = $this->db->prepare($query);
+        $stmt->execute($params);
+        
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Met à jour un événement
+     */
+    public function update(): bool
+    {
+        try {
+            $fields = [];
+            $values = [];
+            
+            if(isset($this->title)) {
+                $fields[] = "title = ?";
+                $values[] = $this->title;
+            }
+
+            if(isset($this->description)) {
+                $fields[] = "description = ?";
+                $values[] = $this->description;
+            }
+
+            if(isset($this->startDatetime)) {
+                $fields[] = "start_datetime = ?";
+                $values[] = $this->startDatetime;
+            }
+
+            if(isset($this->endDatetime)) {
+                $fields[] = "end_datetime = ?";
+                $values[] = $this->endDatetime;
+            }
+
+            if(isset($this->allDay)) {
+                $fields[] = "all_day = ?";
+                $values[] = (bool)$this->allDay;
+            }
+
+            if(isset($this->location)) {
+                $fields[] = "location = ?";
+                $values[] = $this->location;
+            }
+
+            if(isset($this->organizerEmail)) {
+                $fields[] = "organizer_email = ?";
+                $values[] = $this->organizerEmail;
+            }
+
+            if(isset($this->attendees)) {
+                $fields[] = "attendees = ?";
+                $values[] = json_encode($this->attendees);
+            }
+            if(isset($this->recurrenceRule)) {
+                $fields[] = "recurrence_rule = ?";
+                $values[] = $this->recurrenceRule;
+            }
+            if(isset($this->status)) {
+                $fields[] = "status = ?";
+                $values[] = $this->status;
+            }          
+            if (empty($fields)) {
+                return false;
+            }
+            
+            $fields[] = "updated_at = CURRENT_TIMESTAMP";
+            $values[] = $this->id;
+            
+            $query = "UPDATE calendar_events SET " . implode(', ', $fields) . " WHERE id = ?";
+            $stmt = $this->getDb()->prepare($query);
+            
+            $result = $stmt->execute($values);
+            
+            LogService::info("Événement mis à jour", [
+                'event_id' => $this->id
+            ]);
+            
+            return $result;
+            
+        } catch (\Exception $e) {
+            LogService::error("Erreur lors de la mise à jour de l'événement", [
+                'event_id' => $this->id,
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    
+    /**
+     * Récupère les événements à venir pour un utilisateur
+     */
+    public function getUpcomingEvents($userId, $limit = 10): array
+    {
+        $query = "
+            SELECT ce.*, c.title as calendar_title, c.color as calendar_color
+            FROM calendar_events ce
+            JOIN calendars c ON ce.calendar_id = c.id
+            WHERE c.user_id = ? 
+                AND ce.start_datetime >= NOW()
+                AND ce.deleted_at IS NULL
+                AND c.deleted_at IS NULL
+            ORDER BY ce.start_datetime ASC
+            LIMIT ?
+        ";
+
+        $stmt = $this->getDb()->prepare($query);
+        $stmt->execute([$userId, $limit]);
+        
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Recherche des événements par titre ou description
+     */
+    public function search($userId, $query, $limit = 50): array
+    {
+        $searchQuery = "
+            SELECT ce.*, c.title as calendar_title, c.color as calendar_color
+            FROM calendar_events ce
+            JOIN calendars c ON ce.calendar_id = c.id
+            WHERE c.user_id = ? 
+                AND (ce.title LIKE ? OR ce.description LIKE ?)
+                AND ce.deleted_at IS NULL
+                AND c.deleted_at IS NULL
+            ORDER BY ce.start_datetime DESC
+            LIMIT ?
+        ";
+        
+        $searchTerm = "%{$query}%";
+        $stmt = $this->getDb()->prepare($searchQuery);
+        $stmt->execute([$userId, $searchTerm, $searchTerm, $limit]);
+        
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Vérifie si un utilisateur a accès à un événement
+     */
+    public function userHasAccess($eventId, $userId): bool
+    {
+        $query = "
+            SELECT COUNT(*) as count
+            FROM calendar_events ce
+            JOIN calendars c ON ce.calendar_id = c.id
+            LEFT JOIN calendar_shares cs ON c.id = cs.calendar_id
+            WHERE ce.id = ?
+                AND (c.user_id = ? OR cs.shared_with_user_id = ? OR c.is_public = 1)
+                AND ce.deleted_at IS NULL
+                AND c.deleted_at IS NULL
+        ";
+
+        $stmt = $this->getDb()->prepare($query);
+        $stmt->execute([$eventId, $userId, $userId]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        return $result['count'] > 0;
+    }
+
+
+
+    /**
+     * Formate un événement pour l'affichage
+     */
+    public function formatEvent($event): array
+    {
+        $formatted = $event;
+        
+        // Décoder les participants si présents
+        if (isset($event['attendees']) && $event['attendees']) {
+            $formatted['attendees'] = json_decode($event['attendees'], true);
+        }
+        
+        // Formater les dates
+        if (isset($event['start_datetime'])) {
+            $formatted['start_date'] = date('Y-m-d', strtotime($event['start_datetime']));
+            $formatted['start_time'] = date('H:i', strtotime($event['start_datetime']));
+        }
+        
+        if (isset($event['end_datetime'])) {
+            $formatted['end_date'] = date('Y-m-d', strtotime($event['end_datetime']));
+            $formatted['end_time'] = date('H:i', strtotime($event['end_datetime']));
+        }
+        
+        // Calculer la durée
+        if (isset($event['start_datetime']) && isset($event['end_datetime'])) {
+            $start = new \DateTime($event['start_datetime']);
+            $end = new \DateTime($event['end_datetime']);
+            $duration = $start->diff($end);
+            
+            $formatted['duration_minutes'] = ($duration->h * 60) + $duration->i;
+            $formatted['duration_formatted'] = $duration->format('%h h %i min');
+        }
+        
+        return $formatted;
+    }
+
+    /**
+     * Valide les données d'un événement
+     */
+    public function validateEventData(): array
+    {
+        $errors = [];
+        
+        // Titre obligatoire
+        if (empty($this->title)) {
+            $errors['title'] = 'Le titre est obligatoire';
+        }
+        
+        // Dates obligatoires
+        if (empty($this->startDatetime)) {
+            $errors['startDatetime'] = 'La date de début est obligatoire';
+        }
+
+        if (empty($this->endDatetime)) {
+            $errors['endDatetime'] = 'La date de fin est obligatoire';
+        }
+        
+        // Vérifier que la date de fin est après la date de début
+        if (!empty($this->startDatetime) && !empty($this->endDatetime)) {
+            $start = new \DateTime($this->startDatetime);
+            $end = new \DateTime($this->endDatetime);
+
+            if ($end <= $start) {
+                $errors['endDatetime'] = 'La date de fin doit être postérieure à la date de début';
+            }
+        }
+        
+        // Valider l'email de l'organisateur
+        if (!empty($this->organizerEmail) && !filter_var($this->organizerEmail, FILTER_VALIDATE_EMAIL)) {
+            $errors['organizerEmail'] = 'L\'email de l\'organisateur n\'est pas valide';
+        }
+        
+        // Valider le statut
+        $validStatuses = ['confirmed', 'tentative', 'cancelled'];
+        if (isset($this->status) && !in_array($this->status, $validStatuses)) {
+            $errors['status'] = 'Le statut doit être : ' . implode(', ', $validStatuses);
+        }
+        
+        return [
+            'valid' => empty($errors),
+            'errors' => $errors
+        ];
+    }
+}
