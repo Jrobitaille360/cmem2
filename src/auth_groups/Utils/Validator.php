@@ -101,7 +101,11 @@ class Validator {
                     $this->addError($field, "Le champ {$field} doit être une date/heure valide (YYYY-MM-DD HH:MM:SS)");
                 }
                 break;
-                
+            case 'date_or_datetime':
+                if ($value !== null && !$this->isValidDate($value) && !$this->isValidDateTime($value)) {
+                    $this->addError($field, "Le champ {$field} doit être une date ou une date/heure valide");
+                }
+                break;    
             case 'url':
                 if ($value !== null && !filter_var($value, FILTER_VALIDATE_URL)) {
                     $this->addError($field, "Le champ {$field} doit être une URL valide");

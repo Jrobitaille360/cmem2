@@ -5,39 +5,73 @@ namespace ICS;
 use Core\PluginInterface;
 use Core\PluginManager;
 use ICS\Routing\RouteHandlers\CalendarRouteHandler;
-use AuthGroups\Services\LogService;
 
 class CalendarPlugin implements PluginInterface
 {
     private array $config;
-    private CalendarRouteHandler $routeHandler;
+    private ?CalendarRouteHandler $routeHandler = null;
+
+    /**
+     * Logging sûr qui vérifie si LogService est disponible
+     */
+    private function safeLog(string $level, string $message, array $context = []): void
+    {
+        // Vérifier si LogService est disponible et chargé
+        if (class_exists('\AuthGroups\Services\LogService')) {
+            try {
+                switch ($level) {
+                    case 'info':
+                        \AuthGroups\Services\LogService::info($message, $context);
+                        break;
+                    case 'warning':
+                        \AuthGroups\Services\LogService::warning($message, $context);
+                        break;
+                    case 'error':
+                        \AuthGroups\Services\LogService::error($message, $context);
+                        break;
+                }
+            } catch (\Exception $e) {
+                // Si LogService échoue, ne rien faire pour éviter les boucles
+            }
+        }
+    }
 
     public function initialize(): void
     {
         // Charger la configuration
         $this->loadConfig();
         
-        // Initialiser les route handlers
-        $authService = new \AuthGroups\Services\AuthService();
-        $this->routeHandler = new CalendarRouteHandler($authService);
-        
-        // Enregistrer les routes dans le PluginManager
+        // Enregistrer les route handlers dans le PluginManager (sans les instancier immédiatement)
         PluginManager::getInstance()->registerPluginRoutes('ics', [
-            'calendars' => $this->routeHandler
+            'calendars' => function($authService) {
+                if ($this->routeHandler === null) {
+                    $this->routeHandler = new CalendarRouteHandler($authService);
+                }
+                return $this->routeHandler;
+            }
         ]);
         
         // Exécuter les migrations si nécessaire
         $this->runMigrations();
         
-        LogService::info("Plugin ICS Calendar initialisé", [
-            'version' => $this->getInfo()['version']
-        ]);
+        // Log seulement si les constantes de log sont définies
+        if (defined('LOG_ENABLED') && LOG_ENABLED) {
+            $this->safeLog('info', "Plugin ICS Calendar initialisé", [
+                'version' => $this->getInfo()['version']
+            ]);
+        }
     }
 
     public function getRouteHandlers(): array
     {
+        // Retourner une factory function pour créer le handler à la demande
         return [
-            'calendars' => $this->routeHandler
+            'calendars' => function($authService) {
+                if ($this->routeHandler === null) {
+                    $this->routeHandler = new CalendarRouteHandler($authService);
+                }
+                return $this->routeHandler;
+            }
         ];
     }
 
@@ -53,7 +87,9 @@ class CalendarPlugin implements PluginInterface
 
     public function deactivate(): void
     {
-        LogService::info("Plugin ICS Calendar désactivé");
+        if (defined('LOG_ENABLED') && LOG_ENABLED) {
+            $this->safeLog('info', "Plugin ICS Calendar désactivé");
+        }
     }
 
     public function getDependencies(): array
@@ -76,7 +112,9 @@ class CalendarPlugin implements PluginInterface
         $migrationsPath = __DIR__ . '/docs_ICS/migrations/';
         if (is_dir($migrationsPath)) {
             // Logique de migration
-            LogService::info("Migrations ICS exécutées");
+            if (defined('LOG_ENABLED') && LOG_ENABLED) {
+                error_log("Migrations ICS exécutées");
+            }
         }
     }
 }

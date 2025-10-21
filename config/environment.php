@@ -56,6 +56,24 @@ define('APP_VERSION', $_ENV['APP_VERSION'] ?? '2.0.0');
 define('API_VERSION', 'v1');
 define('BASE_URL', $_ENV['BASE_URL'] ?? (APP_ENV === 'production' ? 'https://cmem1.journauxdebord.com' : 'http://localhost'));
 
+// Charger les configurations de plugins en attente maintenant que BASE_URL est définie
+if (isset($GLOBALS['pending_config_loads'])) {
+    foreach ($GLOBALS['pending_config_loads'] as $pluginName => $configFiles) {
+        foreach ($configFiles as $configFile) {
+            if (file_exists($configFile)) {
+                require_once $configFile;
+                
+                if (defined('APP_DEBUG') && APP_DEBUG) {
+                    error_log("Configuration plugin chargée: {$pluginName} - " . basename($configFile));
+                }
+            }
+        }
+    }
+    
+    // Nettoyer les configurations en attente
+    unset($GLOBALS['pending_config_loads']);
+}
+
 // Configuration CORS - Variables d'environnement
 $allowedOrigins = $_ENV['ALLOWED_ORIGINS'] ?? 'https://cmem1.journauxdebord.com,http://localhost:3000,http://localhost:8080,http://127.0.0.1:3000';
 define('ALLOWED_ORIGINS', explode(',', $allowedOrigins));

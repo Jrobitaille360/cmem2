@@ -55,13 +55,10 @@
         "integration_status": "Non intégré au routeur principal"
     },
     "entry_points": [
-        {
-            "section": "Calendars Management",
+        {   "section": "Calendars Management",
             "description": "Gestion des calendriers - Création, consultation, partage",
             "endpoints": [
-                {
-                    "method": "POST",
-                    "path": "/calendars",
+                {   "method": "POST", "path": "/calendars",
                     "description": "Créer un nouveau calendrier",
                     "auth": "JWT Bearer Token requis",
                     "controller": "ICS\\Controllers\\CalendarController::createCalendar",
@@ -113,9 +110,7 @@
                         }
                     ]
                 },
-                {
-                    "method": "GET",
-                    "path": "/calendars",
+                {   "method": "GET", "path": "/calendars",
                     "description": "Récupérer tous les calendriers de l'utilisateur",
                     "auth": "JWT Bearer Token requis",
                     "controller": "ICS\\Controllers\\CalendarController::getUserCalendars",
@@ -150,9 +145,7 @@
                         }
                     ]
                 },
-                {
-                    "method": "POST",
-                    "path": "/calendars/{id}/share",
+                {   "method": "POST", "path": "/calendars/{id}/share",
                     "description": "Partager un calendrier avec un autre utilisateur",
                     "auth": "JWT Bearer Token requis",
                     "controller": "ICS\\Controllers\\CalendarController::shareCalendar",
@@ -195,8 +188,7 @@
                 }
             ]
         },
-        {
-            "section": "Events Management", 
+        {   "section": "Events Management", 
             "description": "Gestion des événements dans les calendriers",
             "endpoints": [
                 {
@@ -320,8 +312,7 @@
                 }
             ]
         },
-        {
-            "section": "ICS Export",
+        {   "section": "ICS Export",
             "description": "Génération et téléchargement de fichiers ICS",
             "endpoints": [
                 {

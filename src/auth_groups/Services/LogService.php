@@ -51,13 +51,13 @@ class LogService
      */
     private function __construct()
     {
-        $this->enabled = LOG_ENABLED ?? true;
-        $this->logLevel = LOG_LEVEL ?? 'debug';
-        $this->logDir = LOG_DIR ?? __DIR__ . '/../../logs/';
-        $this->maxFileSize = LOG_MAX_FILE_SIZE ?? 10485760; // 10MB
-        $this->archiveAfterDays = LOG_ARCHIVE_AFTER_DAYS ?? 7;
-        $this->deleteAfterWeeks = LOG_DELETE_AFTER_WEEKS ?? 12;
-        $this->timezone = LOG_TIMEZONE ?? 'America/Toronto';
+        $this->enabled = defined('LOG_ENABLED') ? LOG_ENABLED : true;
+        $this->logLevel = defined('LOG_LEVEL') ? LOG_LEVEL : 'debug';
+        $this->logDir = defined('LOG_DIR') ? LOG_DIR : __DIR__ . '/../../logs/';
+        $this->maxFileSize = defined('LOG_MAX_FILE_SIZE') ? LOG_MAX_FILE_SIZE : 10485760; // 10MB
+        $this->archiveAfterDays = defined('LOG_ARCHIVE_AFTER_DAYS') ? LOG_ARCHIVE_AFTER_DAYS : 7;
+        $this->deleteAfterWeeks = defined('LOG_DELETE_AFTER_WEEKS') ? LOG_DELETE_AFTER_WEEKS : 12;
+        $this->timezone = defined('LOG_TIMEZONE') ? LOG_TIMEZONE : 'America/Toronto';
         
         try {
             $this->timezoneObj = new \DateTimeZone($this->timezone);

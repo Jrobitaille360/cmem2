@@ -78,7 +78,7 @@ define('ICS_ENABLE_CALDAV', $_ENV['ICS_ENABLE_CALDAV'] ?? false);
 // ============================================================================
 
 // URL de base pour les fichiers ICS publics
-define('ICS_BASE_URL', $_ENV['ICS_BASE_URL'] ?? BASE_URL);
+define('ICS_BASE_URL', $_ENV['ICS_BASE_URL'] ?? (defined('BASE_URL') ? BASE_URL : 'http://localhost'));
 define('ICS_PUBLIC_PATH', '/calendar/');
 define('ICS_PRIVATE_PATH', '/calendars/');
 
@@ -120,7 +120,7 @@ define('ICS_RATE_LIMIT_ICS_DOWNLOAD', $_ENV['ICS_RATE_LIMIT_ICS_DOWNLOAD'] ?? 10
 // Cache des fichiers ICS générés
 define('ICS_ENABLE_CACHE', $_ENV['ICS_ENABLE_CACHE'] ?? true);
 define('ICS_CACHE_TTL', $_ENV['ICS_CACHE_TTL'] ?? 3600); // 1 heure
-define('ICS_CACHE_DIR', UPLOAD_DIR . '/cache/ics/');
+define('ICS_CACHE_DIR', (defined('UPLOAD_DIR') ? UPLOAD_DIR : __DIR__ . '/../../uploads/') . 'cache/ics/');
 
 // Pagination
 define('ICS_DEFAULT_EVENTS_PER_PAGE', 50);
@@ -146,12 +146,12 @@ define('ICS_NOTIFY_ON_UPDATE', true);
 // ============================================================================
 
 // Logging spécifique ICS
-define('ICS_LOG_ENABLED', $_ENV['ICS_LOG_ENABLED'] ?? LOG_ENABLED);
+define('ICS_LOG_ENABLED', $_ENV['ICS_LOG_ENABLED'] ?? (defined('LOG_ENABLED') ? LOG_ENABLED : true));
 define('ICS_LOG_LEVEL', $_ENV['ICS_LOG_LEVEL'] ?? 'INFO'); // DEBUG, INFO, WARNING, ERROR
-define('ICS_LOG_FILE', LOG_DIR . 'ics.log');
+define('ICS_LOG_FILE', (defined('LOG_DIR') ? LOG_DIR : __DIR__ . '/../../../logs/') . 'ics.log');
 
 // Debug
-define('ICS_DEBUG_MODE', $_ENV['ICS_DEBUG_MODE'] ?? APP_DEBUG);
+define('ICS_DEBUG_MODE', $_ENV['ICS_DEBUG_MODE'] ?? (defined('APP_DEBUG') ? APP_DEBUG : false));
 define('ICS_DEBUG_GENERATE_ICS', false); // Log le contenu ICS généré
 
 // ============================================================================

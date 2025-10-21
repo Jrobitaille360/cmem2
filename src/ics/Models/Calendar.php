@@ -32,8 +32,8 @@ class Calendar extends BaseModel
         $shareToken = bin2hex(random_bytes(32));
 
         $query ="
-            INSERT INTO calendars (user_id, title, description, timezone, color, is_public, share_token)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO calendars (user_id, title, description, timezone, color, visibility, max_members, share_token)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ";
 
         $stmt = $this->getDb()->prepare($query);
@@ -96,7 +96,7 @@ class Calendar extends BaseModel
 
         $params[] = $this->id;
 
-        $sql = "UPDATE {$this->table} SET " . implode(', ', $fields) . ", updated_at = NOW() WHERE id = ?";
+        $sql = "UPDATE {$this->table} SET " . implode(', ', $fields) . ", updated_at = NOW() WHERE id = ? AND deleted_at IS NULL";
 
         $stmt = $this->getDb()->prepare($sql);
 
@@ -108,15 +108,20 @@ class Calendar extends BaseModel
         $stmt = $this->getDb()->prepare("
             SELECT c.*, 
                    COUNT(ce.id) as event_count,
-                   CONCAT(?, '/calendar/', c.share_token, '.ics') as ics_url
+                   CONCAT(?, '/calendar/', c.share_token, '.ics') as ics_url,
+                   CASE 
+                       WHEN c.user_id = ? THEN 'owner'
+                       ELSE 'public'
+                   END as access_type
             FROM calendars c
-            LEFT JOIN calendar_events ce ON c.id = ce.calendar_id
-            WHERE c.user_id = ?
+            LEFT JOIN calendar_events ce ON c.id = ce.calendar_id AND ce.deleted_at IS NULL
+            WHERE (c.user_id = ? OR c.visibility = 'public') 
+                AND c.deleted_at IS NULL
             GROUP BY c.id
-            ORDER BY c.created_at DESC
+            ORDER BY c.user_id = ? DESC, c.created_at DESC
         ");
         
-        $stmt->execute([BASE_URL, $userId]);
+        $stmt->execute([BASE_URL, $userId, $userId, $userId]);
         
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -125,7 +130,7 @@ class Calendar extends BaseModel
     {
         $stmt = $this->getDb()->prepare("
             SELECT * FROM calendars 
-            WHERE share_token = ? AND visibility = 'public' 
+            WHERE share_token = ? AND visibility = 'public' AND deleted_at IS NULL
         ");
        
         $stmt->execute([$shareToken]);     
@@ -136,7 +141,7 @@ class Calendar extends BaseModel
     {
         $stmt = $this->getDb()->prepare("
             SELECT * FROM calendars 
-            WHERE id = ?
+            WHERE id = ? AND deleted_at IS NULL
         ");
         $stmt->execute([$calendarId]);
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
@@ -147,7 +152,7 @@ class Calendar extends BaseModel
         // Vérifier si le partage existe déjà
         $stmt = $this->getDb()->prepare("
             SELECT * FROM calendar_shares 
-            WHERE calendar_id = ? AND user_id = ?
+            WHERE calendar_id = ? AND user_id = ? and deleted_at IS NULL
         ");
         $stmt->execute([$calendarId, $userId]);
         $existingShare = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -177,7 +182,7 @@ class Calendar extends BaseModel
     {
         $stmt = $this->getDb()->prepare("
             SELECT * FROM calendars 
-            WHERE share_token = ? AND user_id = ? 
+            WHERE share_token = ? AND user_id = ? AND deleted_at IS NULL
         ");
 
         $stmt->execute([$shareToken, $userId]);
@@ -188,7 +193,7 @@ class Calendar extends BaseModel
     {
         $db = \Database::getInstance();
         
-        $sql = "SELECT * FROM calendar_events WHERE calendar_id = ?";
+        $sql = "SELECT * FROM calendar_events WHERE calendar_id = ? and deleted_at IS NULL";
         $params = [$calendarId];
         
         if ($startDate && $endDate) {

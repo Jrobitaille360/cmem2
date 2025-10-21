@@ -212,6 +212,16 @@ class Response {
         readfile($filePath);
         exit;
     }
+
+    public static function sendIcs($icsContent, $fileName = 'calendar.ics') {
+        header('Content-Type: text/calendar; charset=utf-8');
+        header('Content-Disposition: inline; filename="' . $fileName . '"');
+        header('Content-Length: ' . strlen($icsContent));
+        header('Cache-Control: public, max-age=3600');
+        
+        echo $icsContent;
+        exit;
+    }   
     
     /**
      * Redirection

@@ -23,7 +23,7 @@ class CalendarController
         // Validation
         $validator = new Validator();
         $validation = $validator->validate($input, [
-                'titre' => 'required|string|max:100',
+                'title' => 'required|string|max:100',
                 'description' => 'optionnal|string|max:1000',
                 'visibility' => 'optionnal|string|in:public,private',
                 'max_members' => 'optionnal|integer|min:1|max:1000',
@@ -52,10 +52,7 @@ class CalendarController
 
             $result = $cal->create();
             LoggingMiddleware::logExit(201);
-            Response::success([
-                'calendar' => $result,
-                'message' => 'Calendrier créé avec succès'
-            ], 201);
+            Response::success('Calendrier créé avec succès', $result, 201);
         } catch (\Exception $e) {
             LogService::error("Erreur lors de la création du calendrier", [
                 'exception' => $e->getMessage()
@@ -219,8 +216,8 @@ class CalendarController
         $validator = new Validator();
         $validation = $validator->validate($input, [
             'title' => 'required|string',
-            'start_datetime' => 'required|date',
-            'end_datetime' => 'required|date'
+            'start_datetime' => 'required|date_or_datetime',
+            'end_datetime' => 'required|date_or_datetime'
         ]);
         if(!$validation['valid']) {
             LogService::warning("Données d'événement invalides", [
@@ -230,7 +227,25 @@ class CalendarController
             Response::error('Données invalides', $validation['errors'], 400);
             return;
         }
-
+        // Vérifier que les dates sont valides
+        if (strtotime($input['end_datetime']) < strtotime($input['start_datetime'])) {
+            LogService::warning("Dates d'événement invalides", [
+                'start_datetime' => $input['start_datetime'],
+                'end_datetime' => $input['end_datetime']
+            ]);
+            LoggingMiddleware::logExit(401);
+            Response::error('La date de fin doit être après la date de début', 401);
+            return;
+        }
+        // Vérifier validité de la récurence s'il y en a une
+        if (isset($input['recurrence_rule']) && !CalendarEvent::isValidRecurrenceRule($input['recurrence_rule'])) {
+            LogService::warning("Règle de récurrence invalide", [
+                'recurrence_rule' => $input['recurrence_rule']
+            ]);
+            LoggingMiddleware::logExit(400);
+            Response::error('Règle de récurrence invalide', 400);
+            return;
+        }
         $cal = new Calendar();
         // Vérifier l'accès au calendrier
         $calendar = $cal->getById($calendarId);
@@ -241,7 +256,7 @@ class CalendarController
             
         try {
             $event = new CalendarEvent();
-            $event->id = $calendarId;
+            $event->calendarId = $calendarId;
             $event->title = $input['title'];
             $event->startDatetime = $input['start_datetime'];
             $event->endDatetime = $input['end_datetime'];
@@ -260,10 +275,7 @@ class CalendarController
                 'user_id' => $userId
             ]);
             LoggingMiddleware::logExit(200);
-            Response::success([
-                'event' => $event,
-                'message' => 'Événement créé avec succès'
-            ], 201);
+            Response::success('Événement créé avec succès', $event, 201);
         } catch (\Exception $e) {
             LogService::error("Erreur lors de la création de l'événement", [
                 'exception' => $e->getMessage()
@@ -290,7 +302,29 @@ class CalendarController
         }
         
         try {
+            $input = Response::getRequestParams();
+            $validator = new Validator();
+            $validation = $validator->validate($input, [
+                'start_datetime' => 'optionnal|date_or_datetime',
+                'end_datetime' => 'optionnal|date_or_datetime',
+                'page' => 'optionnal|integer|min:1',
+                'limit' => 'optionnal|integer|min:1|max:100'
+            ]);
             $events = Calendar::getEventsForCalendar($calendarId);
+            if (isset($input['start_datetime'])) {
+                $events = array_filter($events, function($event) use ($input) {
+                    return strtotime($event['start_datetime']) >= strtotime($input['start_datetime']);
+                });
+            }
+            if (isset($input['end_datetime'])) {
+                $events = array_filter($events, function($event) use ($input) {
+                    return strtotime($event['end_datetime']) <= strtotime($input['end_datetime']);
+                });
+            }
+            if (isset($input['page']) && isset($input['limit'])) {
+                $offset = ($input['page'] - 1) * $input['limit'];
+                $events = array_slice($events, $offset, $input['limit']);
+            }
             logService::info("Événements du calendrier récupérés", [
                 'calendar_id' => $calendarId,
                 'user_id' => $userId,
@@ -307,8 +341,7 @@ class CalendarController
             ]);
             LoggingMiddleware::logExit(500);
             Response::error('Erreur lors de la récupération des événements', 500);
-        }
-        
+        }       
     }
 
     public function getCalendarIcs($shareToken): void

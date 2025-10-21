@@ -104,3 +104,75 @@ if (!empty($config_errors)) {
     displayConfigurationInfo();
 }
 
+// ============================================================================
+// CHARGEMENT DES PLUGINS (après toute la configuration de base)
+// ============================================================================
+
+function loadPlugins(): void {
+    try {
+        // Charger les classes Core nécessaires
+        require_once __DIR__ . '/../src/Core/PluginInterface.php';
+        require_once __DIR__ . '/../src/Core/PluginManager.php';
+
+        $pluginManager = \Core\PluginManager::getInstance();
+        
+        // Charger tous les plugins disponibles
+        $pluginManager->loadPlugins();
+        
+        // Récupérer la liste des plugins chargés
+        $loadedPlugins = $pluginManager->getLoadedPlugins();
+        
+        // Extraire les noms des plugins
+        $loadedPluginNames = array_column($loadedPlugins, 'name');
+        
+        // Vérifier quels plugins sont activés
+        $pluginCalendarEnabled = in_array('ICS Calendar', $loadedPluginNames) || in_array('calendar', $loadedPluginNames);
+        $pluginNotificationsEnabled = in_array('Notifications', $loadedPluginNames) || in_array('notifications', $loadedPluginNames);
+        $pluginAnalyticsEnabled = in_array('Analytics', $loadedPluginNames) || in_array('analytics', $loadedPluginNames);
+        
+        // Stocker l'instance du PluginManager dans les globals pour un accès ultérieur
+        $GLOBALS['plugin_manager'] = $pluginManager;
+        
+        // Définir les constantes pour les plugins
+        if (!defined('LOADED_PLUGINS')) {
+            define('LOADED_PLUGINS', $loadedPluginNames);
+        }
+
+        if (!defined('PLUGIN_CALENDAR_ENABLED')) {
+            define('PLUGIN_CALENDAR_ENABLED', $pluginCalendarEnabled);
+        }
+
+        if (!defined('PLUGIN_NOTIFICATIONS_ENABLED')) {
+            define('PLUGIN_NOTIFICATIONS_ENABLED', $pluginNotificationsEnabled);
+        }
+
+        if (!defined('PLUGIN_ANALYTICS_ENABLED')) {
+            define('PLUGIN_ANALYTICS_ENABLED', $pluginAnalyticsEnabled);
+        }
+        
+        if (APP_DEBUG && !empty($loadedPluginNames)) {
+            error_log("Plugins chargés: " . implode(', ', $loadedPluginNames));
+        }
+        
+    } catch (\Exception $e) {
+        error_log("Erreur lors du chargement des plugins: " . $e->getMessage());
+        
+        // Définir des constantes par défaut en cas d'échec
+        if (!defined('LOADED_PLUGINS')) {
+            define('LOADED_PLUGINS', []);
+        }
+        if (!defined('PLUGIN_CALENDAR_ENABLED')) {
+            define('PLUGIN_CALENDAR_ENABLED', false);
+        }
+        if (!defined('PLUGIN_NOTIFICATIONS_ENABLED')) {
+            define('PLUGIN_NOTIFICATIONS_ENABLED', false);
+        }
+        if (!defined('PLUGIN_ANALYTICS_ENABLED')) {
+            define('PLUGIN_ANALYTICS_ENABLED', false);
+        }
+    }
+}
+
+// Charger les plugins après toutes les configurations
+loadPlugins();
+

@@ -36,52 +36,51 @@ class CalendarEvent extends BaseModel
     {
         
         try {
-            $query = "
-                INSERT INTO calendar_events (
+            $query = "INSERT INTO calendar_events (
                     calendar_id, title, description, start_datetime, end_datetime,
                     all_day, location, organizer_email, attendees, recurrence_rule, status
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ";
 
-            $stmt = $this->db->prepare($query);
+            $stmt = $this->getDb()->prepare($query);
 
             // Préparer les données
 
             $stmt->execute([
-                $this->id,
+                $this->calendarId,
                 $this->title,
                 $this->description ?? null,
                 $this->startDatetime,
                 $this->endDatetime,
-                $this->allDay,
+                $this->allDay ? 1 : 0,
                 $this->location ?? null,
                 $this->organizerEmail ?? null,
-                $this->attendees,
+                $this->attendees ? json_encode($this->attendees) : null,
                 $this->recurrenceRule ?? null,
-                $this->status
+                $this->status ?? 'confirmed'
             ]);
 
-            $eventId = $this->db->lastInsertId();
+            $eventId = $this->getDb()->lastInsertId();
 
             LogService::info("Événement créé", [
                 'event_id' => $eventId,
-                'calendar_id' => $this->id,
+                'calendar_id' => $this->calendarId,
                 'title' => $this->title
             ]); 
             
             return [
                 'id' => $eventId,
-                'calendar_id' => $this->id,
+                'calendar_id' => $this->calendarId,
                 'title' => $this->title,
                 'start_datetime' => $this->startDatetime,
                 'end_datetime' => $this->endDatetime,
-                'all_day' => $this->allDay,
-                'status' => $this->status
+                'all_day' => $this->allDay ? 1 : 0,
+                'status' => $this->status ?? 'confirmed'
             ];
             
         } catch (\Exception $e) {
             LogService::error("Erreur lors de la création de l'événement", [
-                'calendar_id' => $this->id,
+                'calendar_id' => $this->calendarId,
                 'error' => $e->getMessage()
             ]);
             throw $e;
@@ -94,7 +93,7 @@ class CalendarEvent extends BaseModel
     public function getById($eventId): ?array
     {      
         $query = "SELECT * FROM calendar_events WHERE id = ? AND deleted_at IS NULL";
-        $stmt = $this->db->prepare($query);
+        $stmt = $this->getDb()->prepare($query);
         $stmt->execute([$eventId]);
         
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -117,7 +116,7 @@ class CalendarEvent extends BaseModel
         
         $query .= " ORDER BY start_datetime ASC";
 
-        $stmt = $this->db->prepare($query);
+        $stmt = $this->getDb()->prepare($query);
         $stmt->execute($params);
         
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -357,9 +356,186 @@ class CalendarEvent extends BaseModel
             $errors['status'] = 'Le statut doit être : ' . implode(', ', $validStatuses);
         }
         
+        // Valider la règle de récurrence
+        if (!empty($this->recurrenceRule) && !self::isValidRecurrenceRule($this->recurrenceRule)) {
+            $errors['recurrenceRule'] = 'La règle de récurrence n\'est pas conforme au format iCalendar RFC-5545';
+        }
+        
         return [
             'valid' => empty($errors),
             'errors' => $errors
         ];
     }
+
+    public static function isValidRecurrenceRule($rule): bool  
+    {
+        // ref : https://icalendar.org/iCalendar-RFC-5545/3-3-10-recurrence-rule.html
+
+        if (empty($rule)) {
+            return true; // Pas de règle = valide
+        }
+        
+        // Séparer les composants de la règle
+        $components = explode(';', $rule);
+        $parsedRule = [];
+        
+        foreach ($components as $component) {
+            if (strpos($component, '=') === false) {
+                return false; // Format invalide
+            }
+            
+            list($key, $value) = explode('=', $component, 2);
+            $parsedRule[strtoupper($key)] = $value;
+        }
+        
+        // FREQ est obligatoire selon RFC-5545
+        if (!isset($parsedRule['FREQ'])) {
+            return false;
+        }
+        
+        // Valider FREQ
+        $validFreqs = ['SECONDLY', 'MINUTELY', 'HOURLY', 'DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'];
+        if (!in_array(strtoupper($parsedRule['FREQ']), $validFreqs)) {
+            return false;
+        }
+        
+        // Valider les autres composants optionnels
+        foreach ($parsedRule as $key => $value) {
+            switch ($key) {
+                case 'FREQ':
+                    // Déjà validé
+                    break;
+                    
+                case 'UNTIL':
+                    // Format date: YYYYMMDD ou YYYYMMDDTHHMMSS ou YYYYMMDDTHHMMSSZ
+                    if (!preg_match('/^\d{8}(T\d{6}Z?)?$/', $value)) {
+                        return false;
+                    }
+                    break;
+                    
+                case 'COUNT':
+                    if (!is_numeric($value) || intval($value) <= 0) {
+                        return false;
+                    }
+                    break;
+                    
+                case 'INTERVAL':
+                    if (!is_numeric($value) || intval($value) <= 0) {
+                        return false;
+                    }
+                    break;
+                    
+                case 'BYSECOND':
+                case 'BYMINUTE':
+                    // 0-59
+                    $values = explode(',', $value);
+                    foreach ($values as $v) {
+                        if (!is_numeric($v) || intval($v) < 0 || intval($v) > 59) {
+                            return false;
+                        }
+                    }
+                    break;
+                    
+                case 'BYHOUR':
+                    // 0-23
+                    $values = explode(',', $value);
+                    foreach ($values as $v) {
+                        if (!is_numeric($v) || intval($v) < 0 || intval($v) > 23) {
+                            return false;
+                        }
+                    }
+                    break;
+                    
+                case 'BYDAY':
+                    // Format: MO,TU,WE... ou +1MO,-2FR...
+                    $validDays = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+                    $values = explode(',', $value);
+                    foreach ($values as $v) {
+                        if (!preg_match('/^([+-]?\d+)?(SU|MO|TU|WE|TH|FR|SA)$/', $v, $matches)) {
+                            return false;
+                        }
+                        if (isset($matches[1]) && $matches[1] !== '') {
+                            $num = intval($matches[1]);
+                            if ($num < -53 || $num > 53 || $num === 0) {
+                                return false;
+                            }
+                        }
+                    }
+                    break;
+                    
+                case 'BYMONTHDAY':
+                    // 1-31 ou -31 à -1
+                    $values = explode(',', $value);
+                    foreach ($values as $v) {
+                        if (!is_numeric($v)) {
+                            return false;
+                        }
+                        $num = intval($v);
+                        if ($num === 0 || $num < -31 || $num > 31) {
+                            return false;
+                        }
+                    }
+                    break;
+                    
+                case 'BYYEARDAY':
+                    // 1-366 ou -366 à -1
+                    $values = explode(',', $value);
+                    foreach ($values as $v) {
+                        if (!is_numeric($v)) {
+                            return false;
+                        }
+                        $num = intval($v);
+                        if ($num === 0 || $num < -366 || $num > 366) {
+                            return false;
+                        }
+                    }
+                    break;
+                    
+                case 'BYWEEKNO':
+                    // 1-53 ou -53 à -1
+                    $values = explode(',', $value);
+                    foreach ($values as $v) {
+                        if (!is_numeric($v)) {
+                            return false;
+                        }
+                        $num = intval($v);
+                        if ($num === 0 || $num < -53 || $num > 53) {
+                            return false;
+                        }
+                    }
+                    break;
+                    
+                case 'BYMONTH':
+                    // 1-12
+                    $values = explode(',', $value);
+                    foreach ($values as $v) {
+                        if (!is_numeric($v) || intval($v) < 1 || intval($v) > 12) {
+                            return false;
+                        }
+                    }
+                    break;
+                    
+                case 'WKST':
+                    // Jour de début de semaine
+                    $validDays = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+                    if (!in_array(strtoupper($value), $validDays)) {
+                        return false;
+                    }
+                    break;
+                    
+                default:
+                    // Propriété non reconnue - selon RFC peut être ignorée
+                    // mais pour la validation stricte, on peut retourner false
+                    break;
+            }
+        }
+        
+        // Vérification de compatibilité COUNT et UNTIL (mutuellement exclusifs)
+        if (isset($parsedRule['COUNT']) && isset($parsedRule['UNTIL'])) {
+            return false;
+        }
+        
+        return true;
+    }
+
 }

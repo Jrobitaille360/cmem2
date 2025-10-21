@@ -2,7 +2,6 @@
 
 namespace Core;
 
-use AuthGroups\Services\LogService;
 use AuthGroups\Utils\Response;
 
 class PluginManager
@@ -23,6 +22,32 @@ class PluginManager
             self::$instance = new PluginManager();
         }
         return self::$instance;
+    }
+
+    /**
+     * Logging sûr qui vérifie si LogService est disponible
+     */
+    private function safeLog(string $level, string $message, array $context = []): void
+    {
+        // Vérifier si LogService est disponible et chargé
+        if (class_exists('\AuthGroups\Services\LogService')) {
+            try {
+                switch ($level) {
+                    case 'info':
+                        \AuthGroups\Services\LogService::info($message, $context);
+                        break;
+                    case 'warning':
+                        \AuthGroups\Services\LogService::warning($message, $context);
+                        break;
+                    case 'error':
+                        \AuthGroups\Services\LogService::error($message, $context);
+                        break;
+                }
+            } catch (\Exception $e) {
+                // Si LogService échoue, ne rien faire pour éviter les boucles
+            }
+        }
+        // Sinon, les logs sont ignorés silencieusement pendant le chargement initial
     }
 
     /**
@@ -47,7 +72,7 @@ class PluginManager
             $configFile = $pluginPath . '/plugin.json';
             
             if (!file_exists($configFile)) {
-                LogService::warning("Configuration plugin manquante", [
+                $this->safeLog('warning', "Configuration plugin manquante", [
                     'plugin' => $pluginName,
                     'config_file' => $configFile
                 ]);
@@ -57,7 +82,7 @@ class PluginManager
             $config = json_decode(file_get_contents($configFile), true);
             
             if (!$this->validatePluginConfig($config)) {
-                LogService::error("Configuration plugin invalide", [
+                $this->safeLog('error', "Configuration plugin invalide", [
                     'plugin' => $pluginName
                 ]);
                 return false;
@@ -65,7 +90,7 @@ class PluginManager
             
             // Vérifier les dépendances
             if (!$this->checkDependencies($config)) {
-                LogService::error("Dépendances plugin non satisfaites", [
+                $this->safeLog('error', "Dépendances plugin non satisfaites", [
                     'plugin' => $pluginName,
                     'dependencies' => $config['dependencies'] ?? []
                 ]);
@@ -90,7 +115,7 @@ class PluginManager
                     'status' => 'loaded'
                 ];
                 
-                LogService::info("Plugin chargé avec succès", [
+                $this->safeLog('info', "Plugin chargé avec succès", [
                     'plugin' => $pluginName,
                     'version' => $config['version']
                 ]);
@@ -99,7 +124,7 @@ class PluginManager
             }
             
         } catch (\Exception $e) {
-            LogService::error("Erreur lors du chargement du plugin", [
+            $this->safeLog('error', "Erreur lors du chargement du plugin", [
                 'plugin' => $pluginName,
                 'error' => $e->getMessage()
             ]);
@@ -200,7 +225,7 @@ class PluginManager
      */
     private function loadPluginAutoloader(string $pluginPath): void
     {
-        $autoloadFile = $pluginPath . '/autoload.php';
+        $autoloadFile = $pluginPath . '/autoloader.php';
         if (file_exists($autoloadFile)) {
             require_once $autoloadFile;
         }

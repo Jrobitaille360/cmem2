@@ -47,6 +47,79 @@ class Router
             'secret-admin' => new SecretAdminRouteHandler(),
             'api-keys' => new ApiKeyRouteHandler($this->authService)
         ];
+        
+        // Intégrer les route handlers des plugins
+        $this->loadPluginRouteHandlers();
+    }
+    
+    /**
+     * Charge les route handlers des plugins via le PluginManager
+     */
+    private function loadPluginRouteHandlers(): void {
+        try {
+            // Essayer de charger via le PluginManager
+            if (isset($GLOBALS['plugin_manager'])) {
+                $pluginManager = $GLOBALS['plugin_manager'];
+                $pluginRoutes = $pluginManager->getPluginRouteHandlers();
+                
+                foreach ($pluginRoutes as $route => $handlerFactory) {
+                    if (is_callable($handlerFactory)) {
+                        $this->routeHandlers[$route] = $handlerFactory($this->authService);
+                    }
+                }
+                
+                if (!empty($pluginRoutes) && defined('APP_DEBUG') && APP_DEBUG) {
+                    LogService::info("Routes de plugins chargées", [
+                        'routes' => array_keys($pluginRoutes)
+                    ]);
+                }
+            }
+            
+            // Charger les routes en attente depuis les globals
+            if (isset($GLOBALS['pending_route_handlers'])) {
+                foreach ($GLOBALS['pending_route_handlers'] as $pluginName => $routes) {
+                    foreach ($routes as $route => $handlerClass) {
+                        if (class_exists($handlerClass)) {
+                            $this->routeHandlers[$route] = new $handlerClass($this->authService);
+                            
+                            if (defined('APP_DEBUG') && APP_DEBUG) {
+                                LogService::info("Route de plugin chargée", [
+                                    'plugin' => $pluginName,
+                                    'route' => $route,
+                                    'handler' => $handlerClass
+                                ]);
+                            }
+                        }
+                    }
+                }
+                
+                // Nettoyer les routes en attente après chargement
+                unset($GLOBALS['pending_route_handlers']);
+            }
+            
+        } catch (Exception $e) {
+            LogService::warning("Erreur lors du chargement des routes de plugins", [
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+    
+    /**
+     * Méthode publique pour ajouter un route handler (pour l'intégration directe)
+     */
+    public function addRouteHandler(string $route, $handler): void {
+        if (is_string($handler) && class_exists($handler)) {
+            $this->routeHandlers[$route] = new $handler($this->authService);
+        } elseif (is_object($handler)) {
+            $this->routeHandlers[$route] = $handler;
+        }
+        
+        if (defined('APP_DEBUG') && APP_DEBUG) {
+            LogService::info("Route handler ajouté", [
+                'route' => $route,
+                'handler' => is_string($handler) ? $handler : get_class($handler)
+            ]);
+        }
     }
     
     public function handleRequest(): void {

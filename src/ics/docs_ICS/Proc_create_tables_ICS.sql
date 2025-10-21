@@ -17,6 +17,7 @@ CREATE TABLE calendars (
     timezone VARCHAR(50) DEFAULT 'America/Montreal',
     color VARCHAR(7) DEFAULT '#3174ad',
     visibility ENUM('public', 'private') DEFAULT 'private',
+    max_members INT DEFAULT 100,
     share_token VARCHAR(64) UNIQUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -42,6 +43,7 @@ CREATE TABLE calendar_events (
     status ENUM('confirmed', 'tentative', 'cancelled') DEFAULT 'confirmed',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP NULL,
     FOREIGN KEY (calendar_id) REFERENCES calendars(id) ON DELETE CASCADE,
     INDEX idx_calendar_events (calendar_id),
     INDEX idx_event_dates (start_datetime, end_datetime)
