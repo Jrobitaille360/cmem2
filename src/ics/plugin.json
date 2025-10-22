@@ -20,6 +20,10 @@
             "/calendars/{id}/share"
         ]
     },
+    "route_handlers": {
+        "public": "ICS\\Routing\\RouteHandlers\\CalendarPublicRoute",
+        "authenticated": "ICS\\Routing\\RouteHandlers\\CalendarRouteHandler"
+    },
     "database": {
         "tables": ["calendars", "calendar_events", "calendar_shares"],
         "migrations_path": "docs_ICS/migrations/"

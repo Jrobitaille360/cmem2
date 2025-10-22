@@ -115,6 +115,9 @@ class PluginManager
                     'status' => 'loaded'
                 ];
                 
+                // Charger les gestionnaires de routes du plugin (différé)
+                $this->storePluginRouteHandlersConfig($pluginName, $config);
+                
                 $this->safeLog('info', "Plugin chargé avec succès", [
                     'plugin' => $pluginName,
                     'version' => $config['version']
@@ -157,6 +160,134 @@ class PluginManager
         }
         
         return $handlers;
+    }
+
+    /**
+     * Obtient les gestionnaires de routes spécifiques des plugins
+     */
+    public function getPluginRouteHandlerClasses(): array
+    {
+        $handlers = [];
+        
+        foreach ($this->loadedPlugins as $pluginName => $plugin) {
+            if (isset($plugin['route_handlers'])) {
+                $handlers[$pluginName] = $plugin['route_handlers'];
+            }
+        }
+        
+        return $handlers;
+    }
+
+    /**
+     * Obtient les gestionnaires de routes publiques des plugins
+     */
+    public function getPublicRouteHandlers(): array
+    {
+        $handlers = [];
+        
+        foreach ($this->loadedPlugins as $pluginName => $plugin) {
+            // Chercher d'abord dans route_handlers (chargé)
+            if (isset($plugin['route_handlers']['public'])) {
+                $handlers[$pluginName] = $plugin['route_handlers']['public'];
+            }
+            // Sinon chercher dans route_handlers_config (config stockée)
+            elseif (isset($plugin['route_handlers_config']['public'])) {
+                $handlers[$pluginName] = $plugin['route_handlers_config']['public'];
+            }
+            // Sinon chercher dans config (directement depuis plugin.json)
+            elseif (isset($plugin['config']['route_handlers']['public'])) {
+                $handlers[$pluginName] = $plugin['config']['route_handlers']['public'];
+            }
+        }
+        
+        return $handlers;
+    }
+
+    /**
+     * Obtient les gestionnaires de routes authentifiées des plugins
+     */
+    public function getAuthenticatedRouteHandlers(): array
+    {
+        $handlers = [];
+        
+        foreach ($this->loadedPlugins as $pluginName => $plugin) {
+            // Chercher d'abord dans route_handlers (chargé)
+            if (isset($plugin['route_handlers']['authenticated'])) {
+                $handlers[$pluginName] = $plugin['route_handlers']['authenticated'];
+            }
+            // Sinon chercher dans route_handlers_config (config stockée)
+            elseif (isset($plugin['route_handlers_config']['authenticated'])) {
+                $handlers[$pluginName] = $plugin['route_handlers_config']['authenticated'];
+            }
+            // Sinon chercher dans config (directement depuis plugin.json)
+            elseif (isset($plugin['config']['route_handlers']['authenticated'])) {
+                $handlers[$pluginName] = $plugin['config']['route_handlers']['authenticated'];
+            }
+        }
+        
+        return $handlers;
+    }
+
+    /**
+     * Stocke la configuration des gestionnaires de routes (sans les instancier)
+     */
+    private function storePluginRouteHandlersConfig(string $pluginName, array $config): void
+    {
+        if (isset($config['route_handlers'])) {
+            $this->loadedPlugins[$pluginName]['route_handlers_config'] = $config['route_handlers'];
+        }
+    }
+
+    /**
+     * Charge tous les gestionnaires de routes des plugins (à appeler après le chargement complet)
+     */
+    public function loadAllPluginRouteHandlers(): void
+    {
+        foreach ($this->loadedPlugins as $pluginName => $plugin) {
+            if (isset($plugin['route_handlers_config']) && !isset($plugin['route_handlers'])) {
+                $this->loadPluginRouteHandlers($pluginName, ['route_handlers' => $plugin['route_handlers_config']]);
+            }
+        }
+    }
+
+    /**
+     * Charge les gestionnaires de routes d'un plugin
+     */
+    private function loadPluginRouteHandlers(string $pluginName, array $config): void
+    {
+        if (isset($config['route_handlers'])) {
+            $routeHandlers = [];
+            
+            foreach ($config['route_handlers'] as $type => $handlerClass) {
+                try {
+                    if (class_exists($handlerClass)) {
+                        $routeHandlers[$type] = $handlerClass;
+                        $this->safeLog('info', "Gestionnaire de routes chargé", [
+                            'plugin' => $pluginName,
+                            'type' => $type,
+                            'handler' => $handlerClass
+                        ]);
+                    } else {
+                        $this->safeLog('warning', "Classe de gestionnaire de routes introuvable", [
+                            'plugin' => $pluginName,
+                            'type' => $type,
+                            'handler' => $handlerClass
+                        ]);
+                    }
+                } catch (\Exception $e) {
+                    $this->safeLog('error', "Erreur lors du chargement du gestionnaire de routes", [
+                        'plugin' => $pluginName,
+                        'type' => $type,
+                        'handler' => $handlerClass,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
+            
+            if (!empty($routeHandlers)) {
+                $this->loadedPlugins[$pluginName]['route_handlers'] = $routeHandlers;
+            }
+        }
     }
 
     /**

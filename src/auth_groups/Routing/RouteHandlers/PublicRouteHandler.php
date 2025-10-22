@@ -14,6 +14,7 @@ class PublicRouteHandler extends BaseRouteHandler
 {
     protected bool $requiresAuth = false;
     private array $controllers;
+    private array $pluginPublicHandlers = [];
     
     public function __construct() {
         parent::__construct(null);
@@ -21,10 +22,42 @@ class PublicRouteHandler extends BaseRouteHandler
             'users' => new UserController(),
             'groups' => new GroupController(),
         ];
+        $this->loadPluginPublicHandlers();
+    }
+    
+    /**
+     * Charge les route handlers publics des plugins
+     */
+    private function loadPluginPublicHandlers(): void {
+        try {
+            if (isset($GLOBALS['plugin_manager'])) {
+                $pluginManager = $GLOBALS['plugin_manager'];
+                $publicHandlers = $pluginManager->getPublicRouteHandlers();
+                
+                foreach ($publicHandlers as $pluginName => $handlerClass) {
+                    if (class_exists($handlerClass)) {
+                        $this->pluginPublicHandlers[$pluginName] = new $handlerClass();
+                        
+                        if (defined('APP_DEBUG') && APP_DEBUG && class_exists('\AuthGroups\Services\LogService')) {
+                            \AuthGroups\Services\LogService::info("Route handler public de plugin chargé", [
+                                'plugin' => $pluginName,
+                                'handler' => $handlerClass
+                            ]);
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            if (defined('APP_DEBUG') && APP_DEBUG && class_exists('\AuthGroups\Services\LogService')) {
+                \AuthGroups\Services\LogService::warning("Erreur lors du chargement des routes publiques de plugins", [
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
     }
     
     protected function getSupportedControllers(): array {
-        return ['help', 'health', 'users', 'groups','secret-admin'];
+        return ['help', 'health', 'users', 'groups', 'secret-admin'];
     }
     
     protected function handleRoute(array $request) {
@@ -33,6 +66,17 @@ class PublicRouteHandler extends BaseRouteHandler
         $method = $request['method'];
         $id = $request['id'];
         
+        // D'abord, essayer les route handlers publics des plugins
+        foreach ($this->pluginPublicHandlers as $pluginName => $handler) {
+            if (method_exists($handler, 'handleRoute')) {
+                $result = $handler->handleRoute($request);
+                if ($result === true || is_array($result)) {
+                    return true; // Route traitée par le plugin
+                }
+            }
+        }
+        
+        // Ensuite, traiter les routes publiques intégrées
         $res= match(true) {
             // Routes d'information
             ($controller === 'help' && $action === '' && $method === 'GET') => 

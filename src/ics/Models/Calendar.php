@@ -111,17 +111,22 @@ class Calendar extends BaseModel
                    CONCAT(?, '/calendar/', c.share_token, '.ics') as ics_url,
                    CASE 
                        WHEN c.user_id = ? THEN 'owner'
-                       ELSE 'public'
-                   END as access_type
+                       WHEN c.visibility = 'public' THEN 'public'
+                       WHEN cs.permission IS NOT NULL THEN CONCAT('shared_', cs.permission)
+                       ELSE NULL
+                   END as access_type,
+                   cs.permission as share_permission
             FROM calendars c
             LEFT JOIN calendar_events ce ON c.id = ce.calendar_id AND ce.deleted_at IS NULL
-            WHERE (c.user_id = ? OR c.visibility = 'public') 
+            LEFT JOIN calendar_shares cs ON c.id = cs.calendar_id 
+                AND cs.shared_with_user_id = ? AND cs.deleted_at IS NULL
+            WHERE (c.user_id = ? OR c.visibility = 'public' OR cs.shared_with_user_id = ?) 
                 AND c.deleted_at IS NULL
             GROUP BY c.id
             ORDER BY c.user_id = ? DESC, c.created_at DESC
         ");
         
-        $stmt->execute([BASE_URL, $userId, $userId, $userId]);
+        $stmt->execute([BASE_URL, $userId, $userId, $userId, $userId, $userId]);
         
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -130,7 +135,7 @@ class Calendar extends BaseModel
     {
         $stmt = $this->getDb()->prepare("
             SELECT * FROM calendars 
-            WHERE share_token = ? AND visibility = 'public' AND deleted_at IS NULL
+            WHERE share_token = ? AND deleted_at IS NULL
         ");
        
         $stmt->execute([$shareToken]);     
@@ -147,33 +152,85 @@ class Calendar extends BaseModel
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
-    public function shareWith($calendarId, $userId): array
+    public function shareWith($calendarId, $targetUserId, $permission = 'read'): array
     {
         // Vérifier si le partage existe déjà
         $stmt = $this->getDb()->prepare("
             SELECT * FROM calendar_shares 
-            WHERE calendar_id = ? AND user_id = ? and deleted_at IS NULL
+            WHERE calendar_id = ? AND shared_with_user_id = ? and deleted_at IS NULL
         ");
-        $stmt->execute([$calendarId, $userId]);
+        $stmt->execute([$calendarId, $targetUserId]);
         $existingShare = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($existingShare) {
-            return $existingShare; // Retourner le partage existant
+            // Mettre à jour les permissions si elles ont changé
+            if ($existingShare['permission'] !== $permission) {
+                $updateStmt = $this->getDb()->prepare("
+                    UPDATE calendar_shares 
+                    SET permission = ?, updated_at = NOW() 
+                    WHERE id = ?
+                ");
+                $updateStmt->execute([$permission, $existingShare['id']]);
+                $existingShare['permission'] = $permission;
+            }
+            return $existingShare;
         }
 
         // Créer un nouveau partage
         $stmt = $this->getDb()->prepare("
-            INSERT INTO calendar_shares (calendar_id, user_id, created_at)
-            VALUES (?, ?, NOW())
+            INSERT INTO calendar_shares (calendar_id, shared_with_user_id, permission, created_at)
+            VALUES (?, ?, ?, NOW())
         ");
 
-        $stmt->execute([$calendarId, $userId]);
+        $stmt->execute([$calendarId, $targetUserId, $permission]);
         $shareId = $this->getDb()->lastInsertId();
 
         return [
             'id' => $shareId,
             'calendar_id' => $calendarId,
-            'user_id' => $userId
+            'shared_with_user_id' => $targetUserId,
+            'permission' => $permission
+        ];
+    }
+
+    public function shareWithEmail($calendarId, $email, $permission = 'read'): array
+    {
+        // Vérifier si le partage existe déjà
+        $stmt = $this->getDb()->prepare("
+            SELECT * FROM calendar_shares 
+            WHERE calendar_id = ? AND shared_with_email = ? and deleted_at IS NULL
+        ");
+        $stmt->execute([$calendarId, $email]);
+        $existingShare = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($existingShare) {
+            // Mettre à jour les permissions si elles ont changé
+            if ($existingShare['permission'] !== $permission) {
+                $updateStmt = $this->getDb()->prepare("
+                    UPDATE calendar_shares 
+                    SET permission = ?, updated_at = NOW() 
+                    WHERE id = ?
+                ");
+                $updateStmt->execute([$permission, $existingShare['id']]);
+                $existingShare['permission'] = $permission;
+            }
+            return $existingShare;
+        }
+
+        // Créer un nouveau partage par email
+        $stmt = $this->getDb()->prepare("
+            INSERT INTO calendar_shares (calendar_id, shared_with_email, permission, created_at)
+            VALUES (?, ?, ?, NOW())
+        ");
+
+        $stmt->execute([$calendarId, $email, $permission]);
+        $shareId = $this->getDb()->lastInsertId();
+
+        return [
+            'id' => $shareId,
+            'calendar_id' => $calendarId,
+            'shared_with_email' => $email,
+            'permission' => $permission
         ];
     }
 
@@ -189,9 +246,9 @@ class Calendar extends BaseModel
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
-    public static function getEventsForCalendar($calendarId, $startDate = null, $endDate = null): array
+    public function getEventsForCalendar($calendarId, $startDate = null, $endDate = null): array
     {
-        $db = \Database::getInstance();
+       
         
         $sql = "SELECT * FROM calendar_events WHERE calendar_id = ? and deleted_at IS NULL";
         $params = [$calendarId];
@@ -204,7 +261,7 @@ class Calendar extends BaseModel
         
         $sql .= " ORDER BY start_datetime ASC";
         
-        $stmt = $db->prepare($sql);
+        $stmt = $this->getDb()->prepare($sql);
         $stmt->execute($params);
         
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -294,6 +351,137 @@ class Calendar extends BaseModel
     private static function generateIcsUrl($shareToken): string
     {
         return BASE_URL . '/calendar/' . $shareToken . '.ics';
+    }
+
+    /**
+     * Vérifie si un utilisateur a accès à un calendrier et retourne le niveau de permission
+     */
+    public function getUserPermissionForCalendar($calendarId, $userId): ?array
+    {
+        $stmt = $this->getDb()->prepare("
+            SELECT c.*, 
+                   CASE 
+                       WHEN c.user_id = ? THEN 'owner'
+                       WHEN c.visibility = 'public' THEN 'public'
+                       WHEN cs.permission IS NOT NULL THEN cs.permission
+                       ELSE NULL
+                   END as access_level,
+                   cs.permission as share_permission
+            FROM calendars c
+            LEFT JOIN calendar_shares cs ON c.id = cs.calendar_id 
+                AND cs.shared_with_user_id = ? AND cs.deleted_at IS NULL
+            WHERE c.id = ? AND c.deleted_at IS NULL
+                AND (c.user_id = ? OR c.visibility = 'public' OR cs.shared_with_user_id = ?)
+        ");
+        
+        $stmt->execute([$userId, $userId, $calendarId, $userId, $userId]);
+        
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    /**
+     * Vérifie si un utilisateur peut écrire dans un calendrier
+     */
+    public function canUserWrite($calendarId, $userId): bool
+    {
+        $permission = $this->getUserPermissionForCalendar($calendarId, $userId);
+        
+        if (!$permission) {
+            return false;
+        }
+        
+        // Le propriétaire a toujours les droits en écriture
+        if ($permission['access_level'] === 'owner') {
+            return true;
+        }
+        
+        // Pour les calendriers partagés, vérifier la permission
+        return $permission['access_level'] === 'write';
+    }
+
+    /**
+     * Trouve un partage de calendrier par user_id ou email
+     */
+    public function findCalendarShare($calendarId, $userId = null, $email = null): ?array
+    {
+        if (!$userId && !$email) {
+            return null;
+        }
+
+        $sql = "SELECT * FROM calendar_shares WHERE calendar_id = ? AND deleted_at IS NULL";
+        $params = [$calendarId];
+
+        if ($userId) {
+            $sql .= " AND shared_with_user_id = ?";
+            $params[] = $userId;
+        } else {
+            $sql .= " AND shared_with_email = ?";
+            $params[] = $email;
+        }
+
+        $stmt = $this->getDb()->prepare($sql);
+        $stmt->execute($params);
+        
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    /**
+     * Supprime un partage de calendrier (soft delete)
+     */
+    public function removeShare($calendarId, $targetUserId = null, $targetEmail = null): bool
+    {
+        if (!$targetUserId && !$targetEmail) {
+            return false;
+        }
+
+        $sql = "UPDATE calendar_shares SET deleted_at = NOW(), updated_at = NOW() 
+                WHERE calendar_id = ? AND deleted_at IS NULL";
+        $params = [$calendarId];
+
+        if ($targetUserId) {
+            $sql .= " AND shared_with_user_id = ?";
+            $params[] = $targetUserId;
+        } else {
+            $sql .= " AND shared_with_email = ?";
+            $params[] = $targetEmail;
+        }
+
+        $stmt = $this->getDb()->prepare($sql);
+        return $stmt->execute($params);
+    }
+
+    /**
+     * Vérifie si un utilisateur peut supprimer un partage
+     * - Le propriétaire du calendrier peut supprimer n'importe quel partage
+     * - Un utilisateur peut supprimer le partage qui le concerne
+     */
+    public function canUserRemoveShare($calendarId, $currentUserId, $targetUserId = null, $targetEmail = null): bool
+    {
+        // Récupérer le calendrier
+        $calendar = $this->getById($calendarId);
+        if (!$calendar) {
+            return false;
+        }
+
+        // Si l'utilisateur est propriétaire du calendrier, il peut supprimer n'importe quel partage
+        if ($calendar['user_id'] == $currentUserId) {
+            return true;
+        }
+
+        // Si l'utilisateur veut supprimer son propre partage
+        if ($targetUserId && $targetUserId == $currentUserId) {
+            return true;
+        }
+
+        // Pour les partages par email, vérifier si l'utilisateur actuel correspond à l'email
+        if ($targetEmail) {
+            // Note: Vous pourriez vouloir ajouter une vérification pour s'assurer que 
+            // l'email correspond à l'utilisateur actuel dans votre système
+            // Pour l'instant, on permet seulement au propriétaire de supprimer les partages par email
+            return false;
+        }
+
+        return false;
     }
 
 }

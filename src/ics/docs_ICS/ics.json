@@ -61,6 +61,7 @@
                 {   "method": "POST", "path": "/calendars",
                     "description": "Créer un nouveau calendrier",
                     "auth": "JWT Bearer Token requis",
+                    "route_handler": "ICS\\Routing\\RouteHandlers\\CalendarRouteHandler::handleRoute",
                     "controller": "ICS\\Controllers\\CalendarController::createCalendar",
                     "request": {
                         "title": "Mon Calendrier Personnel",
@@ -79,18 +80,25 @@
                         "timezone": "optionnel, string, max 100 caractères, défaut: America/Montreal"
                     },
                     "success_response": {
+                        "status_code": 201,
                         "success": true,
                         "message": "Calendrier créé avec succès",
-                        "data": {
-                            "calendar": {
+                        "data": "Objet calendrier retourné par Calendar::create() incluant id, user_id, title, description, visibility, max_members, color, timezone, share_token, created_at, updated_at",
+                        "example": {
+                            "success": true,
+                            "message": "Calendrier créé avec succès",
+                            "data": {
                                 "id": 1,
+                                "user_id": 5,
                                 "title": "Mon Calendrier Personnel",
                                 "description": "Calendrier pour mes événements personnels",
                                 "share_token": "abc123def456...",
-                                "ics_url": "https://votre-site/calendar/abc123def456.ics",
                                 "visibility": "private",
+                                "max_members": 50,
                                 "color": "#FF5722",
-                                "created_at": "2025-10-17 10:00:00"
+                                "timezone": "America/Montreal",
+                                "created_at": "2025-10-21 10:00:00",
+                                "updated_at": "2025-10-21 10:00:00"
                             }
                         }
                     },
@@ -98,91 +106,458 @@
                         {
                             "code": 400,
                             "message": "Données invalides",
-                            "details": "Erreurs de validation des champs"
-                        },
-                        {
-                            "code": 401,
-                            "message": "Authentification requise"
-                        },
-                        {
-                            "code": 500,
-                            "message": "Erreur lors de la création du calendrier"
-                        }
-                    ]
-                },
-                {   "method": "GET", "path": "/calendars",
-                    "description": "Récupérer tous les calendriers de l'utilisateur",
-                    "auth": "JWT Bearer Token requis",
-                    "controller": "ICS\\Controllers\\CalendarController::getUserCalendars",
-                    "request": "Aucun paramètre requis",
-                    "success_response": {
-                        "success": true,
-                        "message": "Calendriers de l'utilisateur récupérés avec succès",
-                        "data": {
-                            "calendars": [
-                                {
-                                    "id": 1,
-                                    "title": "Calendrier Personnel",
-                                    "description": "Mes événements personnels",
-                                    "event_count": 12,
-                                    "ics_url": "https://votre-site/calendar/abc123.ics",
-                                    "visibility": "private",
-                                    "color": "#3174ad",
-                                    "created_at": "2025-10-17 10:00:00"
+                            "trigger": "Échec de validation des champs (Validator)",
+                            "logged": "LogService::warning avec détails des erreurs",
+                            "example": {
+                                "success": false,
+                                "message": "Données invalides",
+                                "errors": {
+                                    "title": ["Le champ title est requis"],
+                                    "visibility": ["La valeur doit être public ou private"]
                                 }
-                            ],
-                            "count": 1
-                        }
-                    },
-                    "error_responses": [
-                        {
-                            "code": 401,
-                            "message": "Authentification requise"
+                            }
                         },
                         {
                             "code": 500,
-                            "message": "Erreur lors de la récupération des calendriers"
+                            "message": "Erreur lors de la création du calendrier",
+                            "trigger": "Exception levée lors de Calendar::create()",
+                            "logged": "LogService::error avec exception message",
+                            "example": {
+                                "success": false,
+                                "message": "Erreur lors de la création du calendrier"
+                            }
                         }
                     ]
                 },
-                {   "method": "POST", "path": "/calendars/{id}/share",
-                    "description": "Partager un calendrier avec un autre utilisateur",
+                {   "method": "PUT", "path": "/calendars/{id}",
+                    "description": "Mettre à jour un calendrier existant",
                     "auth": "JWT Bearer Token requis",
-                    "controller": "ICS\\Controllers\\CalendarController::shareCalendar",
+                    "route_handler": "ICS\\Routing\\RouteHandlers\\CalendarRouteHandler::handleRoute",
+                    "controller": "ICS\\Controllers\\CalendarController::updateCalendar",
                     "request": {
-                        "user_id": 5
+                        "title": "Nouveau titre",
+                        "description": "Nouvelle description",
+                        "visibility": "public",
+                        "max_members": 100,
+                        "color": "#FF5722",
+                        "timezone": "America/New_York"
                     },
                     "validation": {
-                        "user_id": "requis, integer, ID de l'utilisateur avec qui partager"
+                        "title": "optionnel, string, max 100 caractères",
+                        "description": "optionnel, string, max 1000 caractères",
+                        "visibility": "optionnel, string, valeurs: public|private",
+                        "max_members": "optionnel, integer, min: 1, max: 1000",
+                        "color": "optionnel, string, max 7 caractères (hex color)",
+                        "timezone": "optionnel, string, max 100 caractères"
+                    },
+                    "business_rules": {
+                        "calendar_ownership": "L'utilisateur doit être propriétaire du calendrier (erreur 404)",
+                        "partial_update": "Seuls les champs fournis sont mis à jour"
                     },
                     "success_response": {
+                        "status_code": 200,
                         "success": true,
-                        "message": "Calendrier partagé avec succès",
-                        "data": {
-                            "share": {
-                                "calendar_id": 1,
-                                "shared_with_user_id": 5,
-                                "permission": "read",
-                                "shared_at": "2025-10-17 15:30:00"
+                        "message": "Calendrier mis à jour avec succès",
+                        "data": "Objet calendrier mis à jour retourné par Calendar::update()",
+                        "logged": "LogService::info avec calendar_id, user_id, updated_fields",
+                        "example": {
+                            "success": true,
+                            "message": "Calendrier mis à jour avec succès",
+                            "data": {
+                                "id": 1,
+                                "user_id": 5,
+                                "title": "Nouveau titre",
+                                "description": "Nouvelle description",
+                                "visibility": "public",
+                                "max_members": 100,
+                                "color": "#FF5722",
+                                "timezone": "America/New_York",
+                                "updated_at": "2025-10-21 16:30:00"
                             }
                         }
                     },
                     "error_responses": [
                         {
                             "code": 400,
-                            "message": "Données invalides"
-                        },
-                        {
-                            "code": 401,
-                            "message": "Authentification requise"
+                            "message": "Données invalides",
+                            "trigger": "Échec de validation des champs",
+                            "logged": "LogService::warning avec erreurs de validation",
+                            "example": {
+                                "success": false,
+                                "message": "Données invalides",
+                                "errors": {
+                                    "visibility": ["La valeur doit être public ou private"]
+                                }
+                            }
                         },
                         {
                             "code": 404,
-                            "message": "Calendrier non trouvé"
+                            "message": "Calendrier non trouvé",
+                            "trigger": "Calendrier inexistant OU utilisateur non propriétaire",
+                            "logged": "LogService::warning - Tentative de modification d'un calendrier non possédé",
+                            "example": {
+                                "success": false,
+                                "message": "Calendrier non trouvé"
+                            }
                         },
                         {
                             "code": 500,
-                            "message": "Erreur lors du partage du calendrier"
+                            "message": "Erreur lors de la mise à jour du calendrier",
+                            "trigger": "Exception levée lors de Calendar::update()",
+                            "logged": "LogService::error avec exception message",
+                            "example": {
+                                "success": false,
+                                "message": "Erreur lors de la mise à jour du calendrier"
+                            }
+                        }
+                    ]
+                },
+                {   "method": "DELETE", "path": "/calendars/{id}",
+                    "description": "Supprimer un calendrier (soft delete - marque comme supprimé)",
+                    "auth": "JWT Bearer Token requis",
+                    "route_handler": "ICS\\Routing\\RouteHandlers\\CalendarRouteHandler::handleRoute",
+                    "controller": "ICS\\Controllers\\CalendarController::deleteCalendar",
+                    "parameters": {
+                        "id": "ID du calendrier (integer)"
+                    },
+                    "business_rules": {
+                        "calendar_ownership": "L'utilisateur doit être propriétaire du calendrier (erreur 404)",
+                        "soft_delete": "Le calendrier est marqué comme supprimé (deleted_at) mais reste en base",
+                        "recoverable": "Peut être restauré ultérieurement"
+                    },
+                    "success_response": {
+                        "status_code": 200,
+                        "success": true,
+                        "message": "Calendrier supprimé avec succès",
+                        "data": {
+                            "calendar_id": "ID du calendrier supprimé",
+                            "deleted_at": "Timestamp de la suppression"
+                        },
+                        "logged": "LogService::info - Calendrier supprimé (soft delete)",
+                        "example": {
+                            "success": true,
+                            "message": "Calendrier supprimé avec succès",
+                            "data": {
+                                "calendar_id": 1,
+                                "deleted_at": "2025-10-21 16:45:00"
+                            }
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 404,
+                            "message": "Calendrier non trouvé",
+                            "trigger": "Calendrier inexistant OU utilisateur non propriétaire",
+                            "logged": "LogService::warning - Tentative de suppression d'un calendrier non possédé",
+                            "example": {
+                                "success": false,
+                                "message": "Calendrier non trouvé"
+                            }
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors de la suppression du calendrier",
+                            "trigger": "Exception levée lors de Calendar::softDelete()",
+                            "logged": "LogService::error avec exception message",
+                            "example": {
+                                "success": false,
+                                "message": "Erreur lors de la suppression du calendrier"
+                            }
+                        }
+                    ]
+                },
+                {   "method": "DELETE", "path": "/calendars/{id}/hard",
+                    "description": "Supprimer définitivement un calendrier (hard delete - suppression physique)",
+                    "auth": "JWT Bearer Token requis",
+                    "route_handler": "ICS\\Routing\\RouteHandlers\\CalendarRouteHandler::handleRoute",
+                    "controller": "ICS\\Controllers\\CalendarController::hardDeleteCalendar",
+                    "parameters": {
+                        "id": "ID du calendrier (integer)"
+                    },
+                    "business_rules": {
+                        "calendar_ownership": "L'utilisateur doit être propriétaire du calendrier (erreur 404)",
+                        "hard_delete": "Le calendrier est DÉFINITIVEMENT supprimé de la base de données",
+                        "irreversible": "⚠️ ATTENTION: Cette action est IRRÉVERSIBLE",
+                        "cascade": "Supprime également tous les événements associés"
+                    },
+                    "success_response": {
+                        "status_code": 200,
+                        "success": true,
+                        "message": "Calendrier supprimé définitivement avec succès",
+                        "data": {
+                            "calendar_id": "ID du calendrier supprimé"
+                        },
+                        "logged": "LogService::info - Calendrier supprimé définitivement (hard delete)",
+                        "example": {
+                            "success": true,
+                            "message": "Calendrier supprimé définitivement avec succès",
+                            "data": {
+                                "calendar_id": 1
+                            }
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 404,
+                            "message": "Calendrier non trouvé",
+                            "trigger": "Calendrier inexistant OU utilisateur non propriétaire",
+                            "logged": "LogService::warning - Tentative de suppression définitive d'un calendrier non possédé",
+                            "example": {
+                                "success": false,
+                                "message": "Calendrier non trouvé"
+                            }
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors de la suppression définitive du calendrier",
+                            "trigger": "Exception levée lors de Calendar::hardDelete()",
+                            "logged": "LogService::error avec exception message",
+                            "example": {
+                                "success": false,
+                                "message": "Erreur lors de la suppression définitive du calendrier"
+                            }
+                        }
+                    ]
+                },
+                {   "method": "GET", "path": "/calendars",
+                    "description": "Récupérer tous les calendriers de l'utilisateur",
+                    "auth": "JWT Bearer Token requis",
+                    "route_handler": "ICS\\Routing\\RouteHandlers\\CalendarRouteHandler::handleRoute",
+                    "controller": "ICS\\Controllers\\CalendarController::getUserCalendars",
+                    "request": "Aucun paramètre requis",
+                    "success_response": {
+                        "status_code": 200,
+                        "success": true,
+                        "message": "calendriers de l'utilisateur récupérés avec succès",
+                        "data": {
+                            "calendars": "Array d'objets calendrier retournés par Calendar::getUserCalendars()",
+                            "count": "Nombre de calendriers"
+                        },
+                        "example": {
+                            "success": true,
+                            "message": "calendriers de l'utilisateur récupérés avec succès",
+                            "data": {
+                                "calendars": [
+                                    {
+                                        "id": 1,
+                                        "user_id": 5,
+                                        "title": "Calendrier Personnel",
+                                        "description": "Mes événements personnels",
+                                        "share_token": "abc123...",
+                                        "visibility": "private",
+                                        "max_members": 1000,
+                                        "color": "#3174ad",
+                                        "timezone": "America/Montreal",
+                                        "created_at": "2025-10-17 10:00:00",
+                                        "updated_at": "2025-10-17 10:00:00"
+                                    }
+                                ],
+                                "count": 1
+                            }
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 500,
+                            "message": "Erreur lors de la récupération des calendriers",
+                            "trigger": "Exception levée lors de Calendar::getUserCalendars()",
+                            "logged": "LogService::error avec exception message",
+                            "example": {
+                                "success": false,
+                                "message": "Erreur lors de la récupération des calendriers"
+                            }
+                        }
+                    ]
+                },
+                {   "method": "POST", "path": "/calendars/{id}/share",
+                    "description": "Partager un calendrier avec un autre utilisateur",
+                    "auth": "JWT Bearer Token requis",
+                    "route_handler": "ICS\\Routing\\RouteHandlers\\CalendarRouteHandler::handleRoute",
+                    "controller": "ICS\\Controllers\\CalendarController::shareCalendar",
+                    "request": {
+                        "user_id": 5,
+                        "permission": "read"
+                    },
+                    "validation": {
+                        "user_id": "requis, integer, ID de l'utilisateur avec qui partager",
+                        "permission": "optionnel, string, valeurs: read|write"
+                    },
+                    "business_rules": {
+                        "calendar_ownership": "L'utilisateur doit être propriétaire du calendrier OU le calendrier doit être public (erreur 404)"
+                    },
+                    "success_response": {
+                        "status_code": 200,
+                        "success": true,
+                        "message": "Calendrier partagé avec succès",
+                        "data": {
+                            "share": "Objet retourné par Calendar::shareWith()"
+                        },
+                        "logged": "LogService::info avec calendar_id, shared_with_user_id, shared_by_user_id",
+                        "example": {
+                            "success": true,
+                            "message": "Calendrier partagé avec succès",
+                            "data": {
+                                "share": {
+                                    "id": 1,
+                                    "calendar_id": 1,
+                                    "shared_with_user_id": 5,
+                                    "permission": "read",
+                                    "created_at": "2025-10-21 15:30:00"
+                                }
+                            }
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 400,
+                            "message": "Données invalides",
+                            "trigger": "Échec de validation (user_id manquant ou permissions invalide)",
+                            "logged": "LogService::warning avec erreurs de validation",
+                            "example": {
+                                "success": false,
+                                "message": "Données invalides",
+                                "errors": {
+                                    "user_id": ["Le champ user_id est requis"]
+                                }
+                            }
+                        },
+                        {
+                            "code": 404,
+                            "message": "Calendrier non trouvé",
+                            "trigger": "Calendrier inexistant OU (utilisateur non propriétaire ET calendrier non public)",
+                            "logged": "LogService::warning - Tentative de partage d'un calendrier non possédé",
+                            "example": {
+                                "success": false,
+                                "message": "Calendrier non trouvé"
+                            }
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors du partage du calendrier",
+                            "trigger": "Exception levée lors de Calendar::shareWith()",
+                            "logged": "LogService::error avec exception message",
+                            "example": {
+                                "success": false,
+                                "message": "Erreur lors du partage du calendrier"
+                            }
+                        }
+                    ]
+                },
+                {   "method": "DELETE", "path": "/calendars/{id}/share",
+                    "description": "Supprimer un partage de calendrier par user_id ou email dans le body (soft delete)",
+                    "auth": "JWT Bearer Token requis",
+                    "route_handler": "ICS\\Routing\\RouteHandlers\\CalendarRouteHandler::handleRoute",
+                    "controller": "ICS\\Controllers\\CalendarController::removeCalendarShare",
+                    "path_params": {
+                        "id": "ID du calendrier"
+                    },
+                    "request_body": {
+                        "user_id": "ID de l'utilisateur à départager (optionnel)",
+                        "email": "Email de l'utilisateur à départager (optionnel)"
+                    },
+                    "validation": {
+                        "user_id": "optionnel, integer, ID de l'utilisateur à départager",
+                        "email": "optionnel, email, adresse email de l'utilisateur à départager",
+                        "requirement": "Au moins user_id OU email doit être fourni dans le body",
+                        "priority": "Si user_id et email sont fournis, user_id a la priorité"
+                    },
+                    "business_rules": {
+                        "owner_permission": "Le propriétaire du calendrier peut supprimer n'importe quel partage",
+                        "self_permission": "Un utilisateur peut supprimer le partage qui le concerne (user_id = son propre ID)",
+                        "email_permission": "Pour les partages par email, seul le propriétaire peut les supprimer",
+                        "existence": "Le partage doit exister et ne pas être déjà supprimé (deleted_at IS NULL)"
+                    },
+                    "request_examples": [
+                        {
+                            "description": "Supprimer partage par user_id",
+                            "body": {
+                                "user_id": 5
+                            }
+                        },
+                        {
+                            "description": "Supprimer partage par email", 
+                            "body": {
+                                "email": "user@example.com"
+                            }
+                        }
+                    ],
+                    "success_response": {
+                        "status_code": 200,
+                        "success": true,
+                        "message": "Partage de calendrier supprimé avec succès",
+                        "data": {
+                            "share_id": "ID du partage supprimé",
+                            "calendar_id": "ID du calendrier", 
+                            "shared_with_user_id": "ID de l'utilisateur départagé (null si partage par email)",
+                            "shared_with_email": "Email de l'utilisateur départagé (null si partage par user_id)",
+                            "deleted_at": "Timestamp de suppression"
+                        },
+                        "logged": "LogService::info avec share_id, calendar_id, removed_by_user_id, target_user_id/email",
+                        "example": {
+                            "success": true,
+                            "message": "Partage de calendrier supprimé avec succès",
+                            "data": {
+                                "share_id": 15,
+                                "calendar_id": 3,
+                                "shared_with_user_id": 5,
+                                "shared_with_email": null,
+                                "deleted_at": "2025-10-21 16:30:00"
+                            }
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 400,
+                            "message": "Vous devez fournir soit user_id soit email",
+                            "trigger": "Ni user_id ni email n'est fourni dans le body de la requête",
+                            "logged": "LogService::warning avec paramètres manquants",
+                            "example": {
+                                "success": false,
+                                "message": "Vous devez fournir soit user_id soit email"
+                            }
+                        },
+                        {
+                            "code": 400,
+                            "message": "Données invalides", 
+                            "trigger": "Validation échouée (user_id non entier ou email invalide)",
+                            "logged": "LogService::warning avec erreurs de validation",
+                            "example": {
+                                "success": false,
+                                "message": "Données invalides",
+                                "errors": {
+                                    "user_id": ["Le champ user_id doit être un entier"]
+                                }
+                            }
+                        },
+                        {
+                            "code": 403,
+                            "message": "Permission insuffisante pour supprimer ce partage",
+                            "trigger": "Utilisateur n'est ni propriétaire du calendrier ni la personne avec qui il est partagé",
+                            "logged": "LogService::warning avec tentative d'accès non autorisé (calendar_id, current_user_id, target_user_id/email)",
+                            "example": {
+                                "success": false,
+                                "message": "Permission insuffisante pour supprimer ce partage"
+                            }
+                        },
+                        {
+                            "code": 404,
+                            "message": "Partage non trouvé",
+                            "trigger": "Aucun partage actif trouvé pour cet utilisateur/email OU calendrier inexistant",
+                            "logged": "LogService::warning avec calendar_id et critères de recherche",
+                            "example": {
+                                "success": false,
+                                "message": "Partage non trouvé"
+                            }
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors de la suppression du partage",
+                            "trigger": "Exception levée lors de Calendar::removeShare() ou échec de la suppression",
+                            "logged": "LogService::error avec exception message et contexte",
+                            "example": {
+                                "success": false,
+                                "message": "Erreur lors de la suppression du partage"
+                            }
                         }
                     ]
                 }
@@ -191,11 +566,10 @@
         {   "section": "Events Management", 
             "description": "Gestion des événements dans les calendriers",
             "endpoints": [
-                {
-                    "method": "POST",
-                    "path": "/calendars/{id}/events",
+                {   "method": "POST", "path": "/calendars/{id}/events",
                     "description": "Créer un nouvel événement dans un calendrier",
                     "auth": "JWT Bearer Token requis",
+                    "route_handler": "ICS\\Routing\\RouteHandlers\\CalendarRouteHandler::handleRoute",
                     "controller": "ICS\\Controllers\\CalendarController::createEvent",
                     "request": {
                         "title": "Réunion équipe",
@@ -220,93 +594,388 @@
                     },
                     "validation": {
                         "title": "requis, string",
-                        "start_datetime": "requis, datetime format YYYY-MM-DD HH:MM:SS",
-                        "end_datetime": "requis, datetime format YYYY-MM-DD HH:MM:SS, doit être après start_datetime",
+                        "start_datetime": "requis, date_or_datetime format YYYY-MM-DD ou YYYY-MM-DD HH:MM:SS",
+                        "end_datetime": "requis, date_or_datetime format YYYY-MM-DD ou YYYY-MM-DD HH:MM:SS, doit être après start_datetime",
                         "description": "optionnel, string",
                         "all_day": "optionnel, boolean, défaut: false",
-                        "location": "optionnel, string",
-                        "organizer_email": "optionnel, email valide",
-                        "attendees": "optionnel, array d'objets {email, name}",
-                        "recurrence_rule": "optionnel, string RRULE RFC 5545",
+                        "location": "optionnel, string, défaut: null",
+                        "organizer_email": "optionnel, email valide, défaut: null",
+                        "attendees": "optionnel, array d'objets {email, name}, défaut: []",
+                        "recurrence_rule": "optionnel, string RRULE RFC 5545 valide, défaut: null",
                         "status": "optionnel, enum: confirmed|tentative|cancelled, défaut: confirmed"
                     },
+                    "business_rules": {
+                        "date_validation": "end_datetime doit être après start_datetime (erreur 401)",
+                        "recurrence_validation": "Si recurrence_rule fournie, doit être valide selon RFC 5545 (erreur 400)",
+                        "calendar_access": "L'utilisateur doit être propriétaire du calendrier (erreur 404)"
+                    },
                     "success_response": {
+                        "status_code": 201,
                         "success": true,
                         "message": "Événement créé avec succès",
-                        "data": {
-                            "event": {
+                        "data": "Objet événement retourné par CalendarEvent::create()",
+                        "logged": "LogService::info avec event_id, calendar_id, user_id",
+                        "example": {
+                            "success": true,
+                            "message": "Événement créé avec succès",
+                            "data": {
                                 "id": 15,
                                 "calendar_id": 1,
                                 "title": "Réunion équipe",
+                                "description": "Réunion hebdomadaire de l'équipe",
                                 "start_datetime": "2025-10-20 14:00:00",
                                 "end_datetime": "2025-10-20 15:30:00",
                                 "all_day": false,
+                                "location": "Salle de conférence A",
+                                "organizer_email": "admin@example.com",
+                                "attendees": [
+                                    {"email": "user1@example.com", "name": "Jean Dupont"}
+                                ],
+                                "recurrence_rule": "FREQ=WEEKLY;BYDAY=MO",
                                 "status": "confirmed",
-                                "created_at": "2025-10-17 16:00:00"
+                                "created_at": "2025-10-21 16:00:00",
+                                "updated_at": "2025-10-21 16:00:00"
                             }
                         }
                     },
                     "error_responses": [
                         {
                             "code": 400,
-                            "message": "Données invalides"
+                            "message": "Données invalides",
+                            "trigger": "Échec de validation des champs requis (title, start_datetime, end_datetime)",
+                            "logged": "LogService::warning avec erreurs de validation",
+                            "example": {
+                                "success": false,
+                                "message": "Données invalides",
+                                "errors": {
+                                    "title": ["Le champ title est requis"],
+                                    "start_datetime": ["Le champ start_datetime est requis"]
+                                }
+                            }
                         },
                         {
                             "code": 401,
-                            "message": "Authentification requise"
+                            "message": "La date de fin doit être après la date de début",
+                            "trigger": "end_datetime < start_datetime",
+                            "logged": "LogService::warning avec les dates invalides",
+                            "example": {
+                                "success": false,
+                                "message": "La date de fin doit être après la date de début"
+                            }
+                        },
+                        {
+                            "code": 400,
+                            "message": "Règle de récurrence invalide",
+                            "trigger": "recurrence_rule fournie mais invalide selon CalendarEvent::isValidRecurrenceRule()",
+                            "logged": "LogService::warning avec la recurrence_rule invalide",
+                            "example": {
+                                "success": false,
+                                "message": "Règle de récurrence invalide"
+                            }
                         },
                         {
                             "code": 404,
-                            "message": "Calendrier non trouvé"
+                            "message": "Calendrier non trouvé",
+                            "trigger": "Calendrier inexistant OU utilisateur non propriétaire",
+                            "logged": "Non (pas de log spécifique pour ce cas)",
+                            "example": {
+                                "success": false,
+                                "message": "Calendrier non trouvé"
+                            }
                         },
                         {
                             "code": 500,
-                            "message": "Erreur lors de la création de l'événement"
+                            "message": "Erreur lors de la création de l'événement",
+                            "trigger": "Exception levée lors de CalendarEvent::create()",
+                            "logged": "LogService::error avec exception message",
+                            "example": {
+                                "success": false,
+                                "message": "Erreur lors de la création de l'événement"
+                            }
                         }
                     ]
                 },
-                {
-                    "method": "GET",
-                    "path": "/calendars/{id}/events",
+                {   "method": "GET", "path": "/calendars/{id}/events",
                     "description": "Récupérer tous les événements d'un calendrier",
                     "auth": "JWT Bearer Token requis",
+                    "route_handler": "ICS\\Routing\\RouteHandlers\\CalendarRouteHandler::handleRoute",
                     "controller": "ICS\\Controllers\\CalendarController::getCalendarEvents",
                     "query_parameters": {
-                        "start_date": "optionnel, YYYY-MM-DD, filtre par date de début",
-                        "end_date": "optionnel, YYYY-MM-DD, filtre par date de fin"
+                        "start_datetime": "optionnel, date_or_datetime YYYY-MM-DD ou YYYY-MM-DD HH:MM:SS, filtre les événements >= cette date",
+                        "end_datetime": "optionnel, date_or_datetime YYYY-MM-DD ou YYYY-MM-DD HH:MM:SS, filtre les événements <= cette date",
+                        "page": "optionnel, integer min:1, pour pagination",
+                        "limit": "optionnel, integer min:1 max:100, nombre d'événements par page"
+                    },
+                    "validation": {
+                        "start_datetime": "optionnel, date_or_datetime",
+                        "end_datetime": "optionnel, date_or_datetime",
+                        "page": "optionnel, integer, min:1",
+                        "limit": "optionnel, integer, min:1, max:100"
+                    },
+                    "filtering_logic": {
+                        "start_datetime": "Si fourni, retourne uniquement les événements dont start_datetime >= valeur",
+                        "end_datetime": "Si fourni, retourne uniquement les événements dont end_datetime <= valeur",
+                        "pagination": "Si page et limit fournis, applique la pagination après les filtres"
+                    },
+                    "business_rules": {
+                        "calendar_access": "L'utilisateur doit être propriétaire du calendrier (erreur 404)"
                     },
                     "success_response": {
+                        "status_code": 200,
                         "success": true,
                         "message": "Événements du calendrier récupérés avec succès",
                         "data": {
-                            "events": [
-                                {
-                                    "id": 15,
-                                    "title": "Réunion équipe",
-                                    "description": "Réunion hebdomadaire",
-                                    "start_datetime": "2025-10-20 14:00:00",
-                                    "end_datetime": "2025-10-20 15:30:00",
-                                    "all_day": false,
-                                    "location": "Salle A",
-                                    "status": "confirmed",
-                                    "duration_formatted": "1 h 30 min"
-                                }
-                            ],
-                            "count": 1
+                            "events": "Array d'événements après filtrage et pagination",
+                            "count": "Nombre d'événements retournés"
+                        },
+                        "logged": "LogService::info avec calendar_id, user_id, event_count",
+                        "example": {
+                            "success": true,
+                            "message": "Événements du calendrier récupérés avec succès",
+                            "data": {
+                                "events": [
+                                    {
+                                        "id": 15,
+                                        "calendar_id": 1,
+                                        "title": "Réunion équipe",
+                                        "description": "Réunion hebdomadaire",
+                                        "start_datetime": "2025-10-20 14:00:00",
+                                        "end_datetime": "2025-10-20 15:30:00",
+                                        "all_day": false,
+                                        "location": "Salle A",
+                                        "status": "confirmed"
+                                    }
+                                ],
+                                "count": 1
+                            }
                         }
                     },
                     "error_responses": [
                         {
-                            "code": 401,
-                            "message": "Authentification requise"
-                        },
-                        {
                             "code": 404,
-                            "message": "Calendrier non trouvé"
+                            "message": "Calendrier non trouvé",
+                            "trigger": "Calendrier inexistant OU utilisateur non propriétaire",
+                            "logged": "LogService::warning - Tentative d'accès aux événements d'un calendrier non possédé",
+                            "example": {
+                                "success": false,
+                                "message": "Calendrier non trouvé"
+                            }
                         },
                         {
                             "code": 500,
-                            "message": "Erreur lors de la récupération des événements"
+                            "message": "Erreur lors de la récupération des événements",
+                            "trigger": "Exception levée lors du traitement",
+                            "logged": "LogService::error avec exception message",
+                            "example": {
+                                "success": false,
+                                "message": "Erreur lors de la récupération des événements"
+                            }
+                        }
+                    ]
+                },
+                {   "method": "PUT", "path": "/calendars/{id}/events/{eventId}",
+                    "description": "Mettre à jour un événement existant",
+                    "auth": "JWT Bearer Token requis",
+                    "route_handler": "ICS\\Routing\\RouteHandlers\\CalendarRouteHandler::handleRoute",
+                    "controller": "ICS\\Controllers\\CalendarController::updateEvent",
+                    "request": {
+                        "title": "Nouveau titre",
+                        "start_datetime": "2025-10-25 10:00:00",
+                        "end_datetime": "2025-10-25 11:30:00",
+                        "description": "Description mise à jour",
+                        "location": "Nouvelle salle",
+                        "status": "confirmed"
+                    },
+                    "validation": {
+                        "title": "optionnel, string",
+                        "start_datetime": "optionnel, date_or_datetime",
+                        "end_datetime": "optionnel, date_or_datetime",
+                        "description": "optionnel, string",
+                        "all_day": "optionnel, boolean",
+                        "location": "optionnel, string",
+                        "organizer_email": "optionnel, email",
+                        "attendees": "optionnel, array",
+                        "recurrence_rule": "optionnel, string RRULE RFC 5545 valide",
+                        "status": "optionnel, enum: confirmed|tentative|cancelled"
+                    },
+                    "business_rules": {
+                        "calendar_ownership": "L'utilisateur doit être propriétaire du calendrier (erreur 404)",
+                        "event_belongs_to_calendar": "L'événement doit appartenir au calendrier spécifié (erreur 404)",
+                        "date_validation": "Si les deux dates fournies, end_datetime doit être après start_datetime (erreur 401)",
+                        "recurrence_validation": "Si recurrence_rule fournie, doit être valide (erreur 400)",
+                        "partial_update": "Seuls les champs fournis sont mis à jour"
+                    },
+                    "success_response": {
+                        "status_code": 200,
+                        "success": true,
+                        "message": "Événement mis à jour avec succès",
+                        "data": "Objet événement mis à jour retourné par CalendarEvent::update()",
+                        "logged": "LogService::info avec event_id, calendar_id, user_id, updated_fields",
+                        "example": {
+                            "success": true,
+                            "message": "Événement mis à jour avec succès",
+                            "data": {
+                                "id": 15,
+                                "calendar_id": 1,
+                                "title": "Nouveau titre",
+                                "start_datetime": "2025-10-25 10:00:00",
+                                "end_datetime": "2025-10-25 11:30:00",
+                                "location": "Nouvelle salle",
+                                "status": "confirmed",
+                                "updated_at": "2025-10-21 17:00:00"
+                            }
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 400,
+                            "message": "Données invalides OU Règle de récurrence invalide",
+                            "trigger": "Échec validation OU recurrence_rule invalide",
+                            "logged": "LogService::warning",
+                            "example": {
+                                "success": false,
+                                "message": "Données invalides"
+                            }
+                        },
+                        {
+                            "code": 401,
+                            "message": "La date de fin doit être après la date de début",
+                            "trigger": "end_datetime < start_datetime",
+                            "logged": "LogService::warning avec les dates",
+                            "example": {
+                                "success": false,
+                                "message": "La date de fin doit être après la date de début"
+                            }
+                        },
+                        {
+                            "code": 404,
+                            "message": "Calendrier non trouvé OU Événement non trouvé",
+                            "trigger": "Calendrier inexistant/non autorisé OU événement inexistant/pas associé au calendrier",
+                            "logged": "LogService::warning",
+                            "example": {
+                                "success": false,
+                                "message": "Événement non trouvé"
+                            }
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors de la mise à jour de l'événement",
+                            "trigger": "Exception levée lors de CalendarEvent::update()",
+                            "logged": "LogService::error avec exception message",
+                            "example": {
+                                "success": false,
+                                "message": "Erreur lors de la mise à jour de l'événement"
+                            }
+                        }
+                    ]
+                },
+                {   "method": "DELETE", "path": "/calendars/{id}/events/{eventId}",
+                    "description": "Supprimer un événement (soft delete)",
+                    "auth": "JWT Bearer Token requis",
+                    "route_handler": "ICS\\Routing\\RouteHandlers\\CalendarRouteHandler::handleRoute",
+                    "controller": "ICS\\Controllers\\CalendarController::deleteEvent",
+                    "parameters": {
+                        "id": "ID du calendrier (integer)",
+                        "eventId": "ID de l'événement (integer)"
+                    },
+                    "business_rules": {
+                        "calendar_ownership": "L'utilisateur doit être propriétaire du calendrier",
+                        "event_belongs_to_calendar": "L'événement doit appartenir au calendrier spécifié",
+                        "soft_delete": "L'événement est marqué comme supprimé (deleted_at) mais reste en base",
+                        "recoverable": "Peut être restauré ultérieurement"
+                    },
+                    "success_response": {
+                        "status_code": 200,
+                        "success": true,
+                        "message": "Événement supprimé avec succès",
+                        "data": {
+                            "event_id": "ID de l'événement supprimé",
+                            "deleted_at": "Timestamp de la suppression"
+                        },
+                        "logged": "LogService::info - Événement supprimé (soft delete)",
+                        "example": {
+                            "success": true,
+                            "message": "Événement supprimé avec succès",
+                            "data": {
+                                "event_id": 15,
+                                "deleted_at": "2025-10-21 17:15:00"
+                            }
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 404,
+                            "message": "Calendrier non trouvé OU Événement non trouvé",
+                            "trigger": "Calendrier inexistant/non autorisé OU événement inexistant/pas associé",
+                            "logged": "LogService::warning",
+                            "example": {
+                                "success": false,
+                                "message": "Événement non trouvé"
+                            }
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors de la suppression de l'événement",
+                            "trigger": "Exception levée lors de CalendarEvent::softDelete()",
+                            "logged": "LogService::error avec exception message",
+                            "example": {
+                                "success": false,
+                                "message": "Erreur lors de la suppression de l'événement"
+                            }
+                        }
+                    ]
+                },
+                {   "method": "DELETE", "path": "/calendars/{id}/events/{eventId}/hard",
+                    "description": "Supprimer définitivement un événement (hard delete - suppression physique)",
+                    "auth": "JWT Bearer Token requis",
+                    "route_handler": "ICS\\Routing\\RouteHandlers\\CalendarRouteHandler::handleRoute",
+                    "controller": "ICS\\Controllers\\CalendarController::hardDeleteEvent",
+                    "parameters": {
+                        "id": "ID du calendrier (integer)",
+                        "eventId": "ID de l'événement (integer)"
+                    },
+                    "business_rules": {
+                        "calendar_ownership": "L'utilisateur doit être propriétaire du calendrier",
+                        "event_belongs_to_calendar": "L'événement doit appartenir au calendrier spécifié",
+                        "hard_delete": "L'événement est DÉFINITIVEMENT supprimé de la base de données",
+                        "irreversible": "⚠️ ATTENTION: Cette action est IRRÉVERSIBLE"
+                    },
+                    "success_response": {
+                        "status_code": 200,
+                        "success": true,
+                        "message": "Événement supprimé définitivement avec succès",
+                        "data": {
+                            "event_id": "ID de l'événement supprimé"
+                        },
+                        "logged": "LogService::info - Événement supprimé définitivement (hard delete)",
+                        "example": {
+                            "success": true,
+                            "message": "Événement supprimé définitivement avec succès",
+                            "data": {
+                                "event_id": 15
+                            }
+                        }
+                    },
+                    "error_responses": [
+                        {
+                            "code": 404,
+                            "message": "Calendrier non trouvé OU Événement non trouvé",
+                            "trigger": "Calendrier inexistant/non autorisé OU événement inexistant/pas associé",
+                            "logged": "LogService::warning",
+                            "example": {
+                                "success": false,
+                                "message": "Événement non trouvé"
+                            }
+                        },
+                        {
+                            "code": 500,
+                            "message": "Erreur lors de la suppression définitive de l'événement",
+                            "trigger": "Exception levée lors de CalendarEvent::hardDelete()",
+                            "logged": "LogService::error avec exception message",
+                            "example": {
+                                "success": false,
+                                "message": "Erreur lors de la suppression définitive de l'événement"
+                            }
                         }
                     ]
                 }
@@ -315,20 +984,28 @@
         {   "section": "ICS Export",
             "description": "Génération et téléchargement de fichiers ICS",
             "endpoints": [
-                {
-                    "method": "GET",
-                    "path": "/calendar/{token}.ics",
+                {   "method": "GET", "path": "/calendar/{token}.ics",
                     "description": "Télécharger le fichier ICS d'un calendrier public (sans authentification)",
                     "auth": "Aucun - Accès public via token de partage",
-                    "controller": "ICS\\Controllers\\CalendarController::getPublicCalendarIcs",
+                    "route_handler": "ICS\\Routing\\RouteHandlers\\CalendarRouteHandler::handlePublicIcsDownload",
+                    "controller": "ICS\\Controllers\\CalendarController::getCalendarIcs",
                     "parameters": {
                         "token": "Token de partage unique du calendrier (64 caractères)"
                     },
                     "response_type": "text/calendar",
                     "success_response": {
+                        "status_code": 200,
                         "content_type": "text/calendar; charset=utf-8",
-                        "content_disposition": "attachment; filename=\"Nom_Calendrier.ics\"",
-                        "body": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\n..."
+                        "content_disposition": "attachment; filename=\"{calendar_title}.ics\"",
+                        "body": "Contenu ICS généré par Calendar::generateIcsContent()",
+                        "logged": "LogService::info - ICS généré pour le calendrier public avec calendar_id et share_token",
+                        "example": {
+                            "headers": {
+                                "Content-Type": "text/calendar; charset=utf-8",
+                                "Content-Disposition": "attachment; filename=\"Mon_Calendrier.ics\""
+                            },
+                            "body": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//CMEM Calendar//FR\r\n..."
+                        }
                     },
                     "ics_example": {
                         "BEGIN": "VCALENDAR",
@@ -344,12 +1021,24 @@
                         {
                             "code": 404,
                             "message": "Calendrier non trouvé",
-                            "format": "JSON (pas ICS)"
+                            "format": "JSON (pas ICS)",
+                            "trigger": "Token de partage invalide ou calendrier inexistant",
+                            "logged": "LogService::warning avec share_token",
+                            "example": {
+                                "success": false,
+                                "message": "Calendrier non trouvé"
+                            }
                         },
                         {
                             "code": 500,
                             "message": "Erreur lors de la génération du fichier ICS",
-                            "format": "JSON (pas ICS)"
+                            "format": "JSON (pas ICS)",
+                            "trigger": "Exception levée lors de la génération",
+                            "logged": "LogService::error avec exception message",
+                            "example": {
+                                "success": false,
+                                "message": "Erreur lors de la génération du fichier ICS"
+                            }
                         }
                     ],
                     "usage_examples": {
@@ -362,30 +1051,53 @@
                 {
                     "method": "GET", 
                     "path": "/calendars/{id}/ics",
-                    "description": "Télécharger le fichier ICS d'un calendrier (authentification requise)",
+                    "description": "Télécharger le fichier ICS d'un calendrier par son ID (authentification requise)",
                     "auth": "JWT Bearer Token requis",
-                    "controller": "ICS\\Controllers\\CalendarController::getCalendarIcsUserId",
+                    "route_handler": "ICS\\Routing\\RouteHandlers\\CalendarRouteHandler::handleRoute",
+                    "controller": "ICS\\Controllers\\CalendarController::getCalendarIcsByIdAndUserId",
                     "parameters": {
-                        "id": "ID du calendrier"
+                        "id": "ID du calendrier (integer)"
+                    },
+                    "business_rules": {
+                        "calendar_access": "L'utilisateur doit être propriétaire du calendrier (erreur 404)"
                     },
                     "response_type": "text/calendar",
                     "success_response": {
+                        "status_code": 200,
                         "content_type": "text/calendar; charset=utf-8",
-                        "content_disposition": "attachment; filename=\"Calendrier.ics\"",
-                        "body": "Contenu ICS complet avec tous les événements"
+                        "content_disposition": "attachment; filename=\"{calendar_title}.ics\"",
+                        "body": "Contenu ICS généré par Calendar::generateIcsContent() avec tous les événements du calendrier",
+                        "logged": "LogService::info - ICS généré pour le calendrier avec calendar_id et user_id",
+                        "example": {
+                            "headers": {
+                                "Content-Type": "text/calendar; charset=utf-8",
+                                "Content-Disposition": "attachment; filename=\"Mon_Calendrier.ics\""
+                            },
+                            "body": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//CMEM Calendar//FR\r\nX-WR-CALNAME:Mon Calendrier\r\nX-WR-TIMEZONE:America/Montreal\r\n[...événements...]\r\nEND:VCALENDAR"
+                        }
                     },
                     "error_responses": [
                         {
-                            "code": 401,
-                            "message": "Authentification requise"
-                        },
-                        {
                             "code": 404,
-                            "message": "Calendrier non trouvé"
+                            "message": "Calendrier non trouvé",
+                            "format": "JSON (pas ICS)",
+                            "trigger": "Calendrier inexistant OU utilisateur non propriétaire",
+                            "logged": "LogService::warning - Calendrier non trouvé ou accès non autorisé",
+                            "example": {
+                                "success": false,
+                                "message": "Calendrier non trouvé"
+                            }
                         },
                         {
                             "code": 500,
-                            "message": "Erreur lors de la génération du fichier ICS"
+                            "message": "Erreur lors de la génération du fichier ICS",
+                            "format": "JSON (pas ICS)",
+                            "trigger": "Exception levée lors de la génération",
+                            "logged": "LogService::error avec exception message",
+                            "example": {
+                                "success": false,
+                                "message": "Erreur lors de la génération du fichier ICS"
+                            }
                         }
                     ]
                 }
@@ -404,7 +1116,7 @@
                     "description": "TEXT",
                     "timezone": "VARCHAR(50) DEFAULT 'America/Montreal'",
                     "color": "VARCHAR(7) DEFAULT '#3174ad'",
-                    "is_public": "BOOLEAN DEFAULT FALSE", 
+                    "visibility": "ENUM('private', 'public') DEFAULT 'private'", 
                     "max_members": "INT DEFAULT 1000",
                     "share_token": "VARCHAR(64) UNIQUE",
                     "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
@@ -448,21 +1160,71 @@
         ]
     },
     "integration_notes": {
-        "status": "Module développé séparément",
+        "status": "Module développé et intégré",
         "namespace": "ICS\\",
         "location": "src/ics/",
-        "routing": "Non intégré au routeur principal pour le moment",
+        "routing": "Intégré via CalendarRouteHandler (extends BaseRouteHandler)",
         "dependencies": [
             "AuthGroups\\Utils\\Response",
             "AuthGroups\\Utils\\Validator", 
             "AuthGroups\\Middleware\\LoggingMiddleware",
             "AuthGroups\\Services\\LogService",
-            "AuthGroups\\Models\\BaseModel"
+            "AuthGroups\\Models\\BaseModel",
+            "AuthGroups\\Routing\\BaseRouteHandler"
         ],
-        "future_integration": {
-            "router_handler": "ICS\\Routing\\RouteHandlers\\CalendarRouteHandler",
-            "endpoint_prefix": "/calendars",
-            "public_endpoints": "/calendar/{token}.ics"
+        "route_handler": {
+            "class": "ICS\\Routing\\RouteHandlers\\CalendarRouteHandler",
+            "extends": "AuthGroups\\Routing\\BaseRouteHandler",
+            "supported_controllers": ["calendars", "calendar"],
+            "description": "Gère le routage pour les endpoints /calendars et /calendar"
+        },
+        "routing_details": {
+            "match_conditions": {
+                "POST /calendars": "($action === '' && $method === 'POST')",
+                "GET /calendars": "($action === '' && $method === 'GET')",
+                "GET /calendar/{token}.ics": "($request['controller'] === 'calendar' && $method === 'GET' && str_ends_with($action, '.ics'))",
+                "GET /calendars/{id}/ics": "($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'ics' && $method === 'GET')",
+                "POST /calendars/{id}/events": "($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && $method === 'POST')",
+                "POST /calendars/{id}/share": "($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'share' && $method === 'POST')",
+                "DELETE /calendars/{id}/shares": "($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'shares' && $method === 'DELETE')",
+                "GET /calendars/{id}/events": "($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && $method === 'GET')"
+            },
+            "authenticated_endpoints": {
+                "POST /calendars": "createCalendar($user['user_id'])",
+                "GET /calendars": "getUserCalendars($user['user_id'])",
+                "GET /calendars/{id}/ics": "getCalendarIcsByIdAndUserId($id, $user['user_id'])",
+                "POST /calendars/{id}/events": "createEvent($id, $user['user_id'])",
+                "POST /calendars/{id}/share": "shareCalendar($id, $user['user_id'])",
+                "DELETE /calendars/{id}/shares": "removeCalendarShare($id, $user['user_id'])",
+                "GET /calendars/{id}/events": "getCalendarEvents($id, $user['user_id'])"
+            },
+            "public_endpoints": {
+                "GET /calendar/{token}.ics": "handlePublicIcsDownload($action) -> getCalendarIcs($shareToken) - Téléchargement public sans auth"
+            },
+            "default_handler": "Response::error('Endpoint non trouvé', 404)"
+        },
+        "controller_methods": {
+            "active_methods": [
+                "createCalendar($userId) - Créer un calendrier",
+                "getUserCalendars($userId) - Liste des calendriers",
+                "shareCalendar($calendarId, $userId) - Partager un calendrier",
+                "createEvent($calendarId, $userId) - Créer un événement",
+                "getCalendarEvents($calendarId, $userId) - Liste des événements",
+                "getCalendarIcs($shareToken) - Télécharger ICS public",
+                "getCalendarIcsByIdAndUserId($calendarId, $userId) - Télécharger ICS authentifié"
+            ],
+            "unused_methods": [
+                {
+                    "method": "getPublicCalendarIcs($shareToken)",
+                    "description": "Version alternative de getCalendarIcs avec exit explicite",
+                    "status": "Non utilisée par le RouteHandler, remplacée par getCalendarIcs"
+                },
+                {
+                    "method": "getCalendarIcsUserId($shareToken, $userId)",
+                    "description": "Télécharger ICS avec token de partage + userId",
+                    "status": "Non utilisée par le RouteHandler, utilise getCalendarIcsByIdAndUserId à la place"
+                }
+            ]
         }
     }
 }

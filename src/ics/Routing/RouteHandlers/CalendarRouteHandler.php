@@ -16,7 +16,7 @@ class CalendarRouteHandler extends BaseRouteHandler
     }
     
     protected function getSupportedControllers(): array {
-        return ['calendars', 'calendar'];
+        return ['calendars'];
     }
     
     protected function handleRoute(array $request): void {
@@ -34,22 +34,50 @@ class CalendarRouteHandler extends BaseRouteHandler
             // GET /calendars - Lister les calendriers de l'utilisateur
             ($action === '' && $method === 'GET') => 
                 $this->controller->getUserCalendars($user['user_id']),
+                               
+            // PUT /calendars/{id} - Mettre à jour un calendrier
+            ($action && ctype_digit($action) && !isset($segments[2]) && $method === 'PUT') => 
+                $this->controller->updateCalendar((int)$action, $user['user_id']),
                 
-            // GET /calendar/{token}.ics - Télécharger fichier ICS (public)
-            ($request['controller'] === 'calendar' && $method === 'GET' && str_ends_with($action, '.ics')) => 
-                $this->handlePublicIcsDownload($action),
+            // DELETE /calendars/{id} - Supprimer un calendrier (soft delete)
+            ($action && ctype_digit($action) && !isset($segments[2]) && $method === 'DELETE') => 
+                $this->controller->deleteCalendar((int)$action, $user['user_id']),
+                
+            // DELETE /calendars/{id}/hard - Supprimer définitivement un calendrier
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'hard' && $method === 'DELETE') => 
+                $this->controller->hardDeleteCalendar((int)$action, $user['user_id']),
+                
+            // GET /calendars/{id}/ics - Télécharger fichier ICS (authentifié)
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'ics' && $method === 'GET') => 
+                $this->controller->getCalendarIcsByIdAndUserId((int)$action, $user['user_id']),
                 
             // POST /calendars/{id}/events - Créer un événement
             ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && $method === 'POST') => 
                 $this->controller->createEvent((int)$action, $user['user_id']),
                 
+            // GET /calendars/{id}/events - Lister les événements d'un calendrier
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && $method === 'GET') => 
+                $this->controller->getCalendarEvents((int)$action, $user['user_id']),
+                
+            // PUT /calendars/{id}/events/{eventId} - Mettre à jour un événement
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && isset($segments[3]) && ctype_digit($segments[3]) && $method === 'PUT') => 
+                $this->controller->updateEvent((int)$segments[3], (int)$action, $user['user_id']),
+                
+            // DELETE /calendars/{id}/events/{eventId} - Supprimer un événement (soft delete)
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && isset($segments[3]) && ctype_digit($segments[3]) && !isset($segments[4]) && $method === 'DELETE') => 
+                $this->controller->deleteEvent((int)$segments[3], (int)$action, $user['user_id']),
+                
+            // DELETE /calendars/{id}/events/{eventId}/hard - Supprimer définitivement un événement
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && isset($segments[3]) && ctype_digit($segments[3]) && isset($segments[4]) && $segments[4] === 'hard' && $method === 'DELETE') => 
+                $this->controller->hardDeleteEvent((int)$segments[3], (int)$action, $user['user_id']),
+                
             // POST /calendars/{id}/share - Partager un calendrier
             ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'share' && $method === 'POST') => 
                 $this->controller->shareCalendar((int)$action, $user['user_id']),
                 
-            // GET /calendars/{id}/events - Lister les événements d'un calendrier
-            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && $method === 'GET') => 
-                $this->controller->getCalendarEvents((int)$action, $user['user_id']),
+            // DELETE /calendars/{id}/shares - Supprimer un partage de calendrier
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'share' && $method === 'DELETE') => 
+                $this->controller->removeCalendarShare((int)$action, $user['user_id']),
                 
             default => Response::error('Endpoint non trouvé', 404)
         };
@@ -60,4 +88,5 @@ class CalendarRouteHandler extends BaseRouteHandler
         $shareToken = str_replace('.ics', '', $filename);
         $this->controller->getCalendarIcs($shareToken);
     }
+   
 }
