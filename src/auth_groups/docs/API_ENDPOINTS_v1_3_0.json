@@ -1,0 +1,759 @@
+{
+  "api": {
+    "name": "AuthGroups API",
+    "version": "1.3.0",
+    "description": "API REST complète pour la gestion d'authentification, groupes, fichiers et tags",
+    "generated": "2025-10-23",
+    "base_url": "/",
+    "authentication": {
+      "types": ["JWT", "API_KEY"],
+      "jwt_header": "Authorization: Bearer {token}",
+      "api_key_header": "X-API-Key: {key}"
+    }
+  },
+  "endpoints": {
+    "public": {
+      "description": "Endpoints accessibles sans authentification",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/",
+          "description": "Informations générales sur l'API",
+          "auth_required": false,
+          "response": "Information de l'API avec version et endpoints disponibles"
+        },
+        {
+          "method": "GET",
+          "path": "/help",
+          "description": "Liste de tous les endpoints disponibles",
+          "auth_required": false,
+          "response": "Documentation interactive des endpoints"
+        },
+        {
+          "method": "GET",
+          "path": "/health",
+          "description": "Vérifier l'état de santé de l'API",
+          "auth_required": false,
+          "response": "Statut de l'API (healthy/unhealthy)"
+        },
+        {
+          "method": "POST",
+          "path": "/users/register",
+          "description": "Inscription d'un nouvel utilisateur",
+          "auth_required": false,
+          "body": {
+            "name": "string (required)",
+            "email": "string (required, email format)",
+            "password": "string (required, min 6 characters)"
+          },
+          "response": "User object avec token JWT"
+        },
+        {
+          "method": "POST",
+          "path": "/users/login",
+          "description": "Connexion utilisateur",
+          "auth_required": false,
+          "body": {
+            "email": "string (required)",
+            "password": "string (required)"
+          },
+          "response": "User object avec token JWT"
+        },
+        {
+          "method": "POST",
+          "path": "/users/forgot-password",
+          "description": "Demander un lien de réinitialisation de mot de passe",
+          "auth_required": false,
+          "body": {
+            "email": "string (required)"
+          },
+          "response": "Message de confirmation"
+        },
+        {
+          "method": "POST",
+          "path": "/users/reset-password",
+          "description": "Réinitialiser le mot de passe avec un token",
+          "auth_required": false,
+          "body": {
+            "token": "string (required)",
+            "new_password": "string (required, min 6 characters)"
+          },
+          "response": "Message de confirmation"
+        },
+        {
+          "method": "GET",
+          "path": "/groups",
+          "description": "Liste des groupes publics",
+          "auth_required": false,
+          "response": "Liste des groupes publics"
+        },
+        {
+          "method": "POST",
+          "path": "/groups/join",
+          "description": "Rejoindre un groupe avec un code d'invitation",
+          "auth_required": false,
+          "body": {
+            "code": "string (required)"
+          },
+          "response": "Confirmation de l'ajout au groupe"
+        }
+      ]
+    },
+    "users": {
+      "description": "Gestion des utilisateurs",
+      "base_path": "/users",
+      "auth_required": true,
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/users",
+          "description": "Liste de tous les utilisateurs",
+          "roles": ["ADMINISTRATEUR"],
+          "response": "Array d'utilisateurs"
+        },
+        {
+          "method": "GET",
+          "path": "/users/me",
+          "description": "Obtenir son propre profil",
+          "response": "User object"
+        },
+        {
+          "method": "PUT",
+          "path": "/users/me",
+          "description": "Modifier son propre profil",
+          "body": {
+            "name": "string (optional)",
+            "email": "string (optional)",
+            "bio": "string (optional)"
+          },
+          "response": "User object mis à jour"
+        },
+        {
+          "method": "DELETE",
+          "path": "/users/me",
+          "description": "Supprimer son propre compte",
+          "response": "Message de confirmation"
+        },
+        {
+          "method": "GET",
+          "path": "/users/{id}",
+          "description": "Obtenir les détails d'un utilisateur",
+          "params": {
+            "id": "integer (required)"
+          },
+          "response": "User object"
+        },
+        {
+          "method": "PUT",
+          "path": "/users/{id}",
+          "description": "Modifier un utilisateur",
+          "params": {
+            "id": "integer (required)"
+          },
+          "roles": ["ADMINISTRATEUR", "MODERATEUR"],
+          "body": {
+            "name": "string (optional)",
+            "email": "string (optional)",
+            "role": "string (optional)"
+          },
+          "response": "User object mis à jour"
+        },
+        {
+          "method": "DELETE",
+          "path": "/users/{id}",
+          "description": "Supprimer un utilisateur",
+          "params": {
+            "id": "integer (required)"
+          },
+          "roles": ["ADMINISTRATEUR"],
+          "response": "Message de confirmation"
+        },
+        {
+          "method": "POST",
+          "path": "/users/avatar",
+          "description": "Uploader son avatar",
+          "body": "multipart/form-data avec fichier image",
+          "response": "URL de l'avatar"
+        },
+        {
+          "method": "POST",
+          "path": "/users/{id}/avatar",
+          "description": "Uploader l'avatar d'un utilisateur",
+          "params": {
+            "id": "integer (required)"
+          },
+          "roles": ["ADMINISTRATEUR"],
+          "body": "multipart/form-data avec fichier image",
+          "response": "URL de l'avatar"
+        },
+        {
+          "method": "PUT",
+          "path": "/users/password",
+          "description": "Changer son mot de passe",
+          "body": {
+            "old_password": "string (required)",
+            "new_password": "string (required, min 6 characters)"
+          },
+          "response": "Message de confirmation"
+        },
+        {
+          "method": "PUT",
+          "path": "/users/{id}/password",
+          "description": "Changer le mot de passe d'un utilisateur",
+          "params": {
+            "id": "integer (required)"
+          },
+          "roles": ["ADMINISTRATEUR"],
+          "body": {
+            "new_password": "string (required, min 6 characters)"
+          },
+          "response": "Message de confirmation"
+        },
+        {
+          "method": "POST",
+          "path": "/users/logout",
+          "description": "Se déconnecter",
+          "response": "Message de confirmation"
+        },
+        {
+          "method": "POST",
+          "path": "/users/{id}/restore",
+          "description": "Restaurer un utilisateur supprimé",
+          "params": {
+            "id": "integer (required)"
+          },
+          "roles": ["ADMINISTRATEUR"],
+          "response": "User object restauré"
+        }
+      ]
+    },
+    "groups": {
+      "description": "Gestion des groupes",
+      "base_path": "/groups",
+      "auth_required": true,
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/groups",
+          "description": "Créer un nouveau groupe",
+          "body": {
+            "name": "string (required)",
+            "description": "string (optional)",
+            "is_public": "boolean (optional, default: false)"
+          },
+          "response": "Group object"
+        },
+        {
+          "method": "GET",
+          "path": "/groups/search",
+          "description": "Rechercher des groupes",
+          "query": {
+            "q": "string (optional)",
+            "is_public": "boolean (optional)"
+          },
+          "response": "Array de groupes"
+        },
+        {
+          "method": "GET",
+          "path": "/groups/my-groups",
+          "description": "Obtenir ses propres groupes",
+          "response": "Array de groupes"
+        },
+        {
+          "method": "GET",
+          "path": "/groups/my-invitations",
+          "description": "Obtenir ses invitations en attente",
+          "response": "Array d'invitations"
+        },
+        {
+          "method": "GET",
+          "path": "/groups/user/{user_id}",
+          "description": "Obtenir les groupes d'un utilisateur",
+          "params": {
+            "user_id": "integer (required)"
+          },
+          "response": "Array de groupes"
+        },
+        {
+          "method": "GET",
+          "path": "/groups/{id}",
+          "description": "Obtenir les détails d'un groupe",
+          "params": {
+            "id": "integer (required)"
+          },
+          "response": "Group object"
+        },
+        {
+          "method": "PUT",
+          "path": "/groups/{id}",
+          "description": "Modifier un groupe",
+          "params": {
+            "id": "integer (required)"
+          },
+          "body": {
+            "name": "string (optional)",
+            "description": "string (optional)",
+            "is_public": "boolean (optional)"
+          },
+          "response": "Group object mis à jour"
+        },
+        {
+          "method": "DELETE",
+          "path": "/groups/{id}",
+          "description": "Supprimer un groupe",
+          "params": {
+            "id": "integer (required)"
+          },
+          "response": "Message de confirmation"
+        },
+        {
+          "method": "POST",
+          "path": "/groups/{id}/restore",
+          "description": "Restaurer un groupe supprimé",
+          "params": {
+            "id": "integer (required)"
+          },
+          "response": "Group object restauré"
+        },
+        {
+          "method": "POST",
+          "path": "/groups/{id}/invite",
+          "description": "Inviter un utilisateur au groupe",
+          "params": {
+            "id": "integer (required)"
+          },
+          "body": {
+            "email": "string (required)",
+            "role": "string (optional, default: MEMBRE)"
+          },
+          "response": "Message de confirmation"
+        },
+        {
+          "method": "POST",
+          "path": "/groups/{id}/leave",
+          "description": "Quitter un groupe",
+          "params": {
+            "id": "integer (required)"
+          },
+          "response": "Message de confirmation"
+        },
+        {
+          "method": "GET",
+          "path": "/groups/{id}/members",
+          "description": "Obtenir les membres d'un groupe",
+          "params": {
+            "id": "integer (required)"
+          },
+          "response": "Array de membres"
+        },
+        {
+          "method": "PUT",
+          "path": "/groups/{group_id}/members/{user_id}",
+          "description": "Modifier le rôle d'un membre",
+          "params": {
+            "group_id": "integer (required)",
+            "user_id": "integer (required)"
+          },
+          "body": {
+            "role": "string (required)"
+          },
+          "response": "Message de confirmation"
+        }
+      ]
+    },
+    "files": {
+      "description": "Gestion des fichiers",
+      "base_path": "/files",
+      "auth_required": true,
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/files",
+          "description": "Uploader un ou plusieurs fichiers",
+          "body": "multipart/form-data avec fichier(s)",
+          "response": "Array de File objects"
+        },
+        {
+          "method": "GET",
+          "path": "/files/{id}",
+          "description": "Télécharger un fichier",
+          "params": {
+            "id": "integer (required)"
+          },
+          "response": "Fichier binaire"
+        },
+        {
+          "method": "GET",
+          "path": "/files/{id}/info",
+          "description": "Obtenir les informations d'un fichier",
+          "params": {
+            "id": "integer (required)"
+          },
+          "response": "File object"
+        },
+        {
+          "method": "DELETE",
+          "path": "/files/{id}",
+          "description": "Supprimer un fichier",
+          "params": {
+            "id": "integer (required)"
+          },
+          "response": "Message de confirmation"
+        },
+        {
+          "method": "POST",
+          "path": "/files/{id}/restore",
+          "description": "Restaurer un fichier supprimé",
+          "params": {
+            "id": "integer (required)"
+          },
+          "response": "File object restauré"
+        },
+        {
+          "method": "GET",
+          "path": "/files/user/{user_id}",
+          "description": "Obtenir les fichiers d'un utilisateur",
+          "params": {
+            "user_id": "integer (required)"
+          },
+          "response": "Array de File objects"
+        }
+      ]
+    },
+    "tags": {
+      "description": "Gestion des tags",
+      "base_path": "/tags",
+      "auth_required": true,
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/tags",
+          "description": "Rechercher des tags",
+          "query": {
+            "q": "string (optional)",
+            "user_id": "integer (optional)"
+          },
+          "response": "Array de tags"
+        },
+        {
+          "method": "POST",
+          "path": "/tags",
+          "description": "Créer un nouveau tag",
+          "body": {
+            "name": "string (required)",
+            "color": "string (optional)",
+            "description": "string (optional)"
+          },
+          "response": "Tag object"
+        },
+        {
+          "method": "GET",
+          "path": "/tags/{id}",
+          "description": "Obtenir les détails d'un tag",
+          "params": {
+            "id": "integer (required)"
+          },
+          "response": "Tag object"
+        },
+        {
+          "method": "PUT",
+          "path": "/tags/{id}",
+          "description": "Modifier un tag",
+          "params": {
+            "id": "integer (required)"
+          },
+          "body": {
+            "name": "string (optional)",
+            "color": "string (optional)",
+            "description": "string (optional)"
+          },
+          "response": "Tag object mis à jour"
+        },
+        {
+          "method": "DELETE",
+          "path": "/tags/{id}",
+          "description": "Supprimer un tag",
+          "params": {
+            "id": "integer (required)"
+          },
+          "response": "Message de confirmation"
+        },
+        {
+          "method": "POST",
+          "path": "/tags/{id}/restore",
+          "description": "Restaurer un tag supprimé",
+          "params": {
+            "id": "integer (required)"
+          },
+          "response": "Tag object restauré"
+        },
+        {
+          "method": "GET",
+          "path": "/tags/my-tags",
+          "description": "Obtenir ses propres tags",
+          "response": "Array de tags"
+        },
+        {
+          "method": "GET",
+          "path": "/tags/by-table/{table}",
+          "description": "Obtenir les tags par table d'association",
+          "params": {
+            "table": "string (required, values: groups|files|all)"
+          },
+          "response": "Array de tags"
+        },
+        {
+          "method": "GET",
+          "path": "/tags/most-used",
+          "description": "Obtenir les tags les plus utilisés",
+          "response": "Array de tags avec compteur d'utilisation"
+        },
+        {
+          "method": "POST",
+          "path": "/tags/get-or-create",
+          "description": "Obtenir ou créer un tag",
+          "body": {
+            "name": "string (required)",
+            "color": "string (optional)"
+          },
+          "response": "Tag object"
+        },
+        {
+          "method": "GET",
+          "path": "/tags/user/{user_id}",
+          "description": "Obtenir les tags d'un utilisateur",
+          "params": {
+            "user_id": "integer (required)"
+          },
+          "response": "Array de tags"
+        },
+        {
+          "method": "PUT",
+          "path": "/tags/{tag_id}/{item_id}",
+          "description": "Associer/Dissocier un tag à un élément",
+          "params": {
+            "tag_id": "integer (required)",
+            "item_id": "integer (required)"
+          },
+          "body": {
+            "action": "string (required, values: associate|dissociate)",
+            "table": "string (required, values: groups|files)"
+          },
+          "response": "Message de confirmation"
+        }
+      ]
+    },
+    "stats": {
+      "description": "Statistiques et analytics",
+      "base_path": "/stats",
+      "auth_required": true,
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/stats/build",
+          "description": "Générer toutes les statistiques",
+          "roles": ["ADMINISTRATEUR"],
+          "response": "Message de confirmation"
+        },
+        {
+          "method": "GET",
+          "path": "/stats/platform",
+          "description": "Statistiques globales de la plateforme",
+          "roles": ["ADMINISTRATEUR", "MODERATEUR"],
+          "response": "Object avec statistiques globales"
+        },
+        {
+          "method": "GET",
+          "path": "/stats/groups",
+          "description": "Statistiques par groupe",
+          "roles": ["ADMINISTRATEUR", "MODERATEUR"],
+          "response": "Array de statistiques par groupe"
+        },
+        {
+          "method": "GET",
+          "path": "/stats/users",
+          "description": "Statistiques de tous les utilisateurs",
+          "roles": ["ADMINISTRATEUR", "MODERATEUR"],
+          "response": "Array de statistiques par utilisateur"
+        },
+        {
+          "method": "GET",
+          "path": "/stats/users/{id}",
+          "description": "Statistiques d'un utilisateur spécifique",
+          "params": {
+            "id": "integer (required)"
+          },
+          "response": "Object avec statistiques utilisateur"
+        },
+        {
+          "method": "GET",
+          "path": "/stats/my-stats",
+          "description": "Obtenir ses propres statistiques",
+          "response": "Object avec statistiques utilisateur"
+        }
+      ]
+    },
+    "api-keys": {
+      "description": "Gestion des clés API",
+      "base_path": "/api-keys",
+      "auth_required": true,
+      "auth_type": "JWT only",
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/api-keys",
+          "description": "Créer une nouvelle clé API",
+          "body": {
+            "name": "string (required)",
+            "scopes": "array (required, values: read|write|delete|admin)",
+            "expires_in_days": "integer (optional, default: 365)",
+            "environment": "string (optional, values: production|test, default: production)"
+          },
+          "response": "ApiKey object avec clé complète (visible une seule fois)"
+        },
+        {
+          "method": "GET",
+          "path": "/api-keys",
+          "description": "Lister toutes ses clés API",
+          "response": "Array de ApiKey objects (sans les clés complètes)"
+        },
+        {
+          "method": "GET",
+          "path": "/api-keys/{id}",
+          "description": "Obtenir les détails d'une clé API",
+          "params": {
+            "id": "integer (required)"
+          },
+          "response": "ApiKey object (sans la clé complète)"
+        },
+        {
+          "method": "DELETE",
+          "path": "/api-keys/{id}",
+          "description": "Révoquer une clé API",
+          "params": {
+            "id": "integer (required)"
+          },
+          "response": "Message de confirmation"
+        },
+        {
+          "method": "POST",
+          "path": "/api-keys/{id}/regenerate",
+          "description": "Régénérer une clé API",
+          "params": {
+            "id": "integer (required)"
+          },
+          "response": "ApiKey object avec nouvelle clé complète (visible une seule fois)"
+        }
+      ]
+    },
+    "data": {
+      "description": "Synchronisation des données",
+      "base_path": "/data",
+      "auth_required": true,
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/data/merge",
+          "description": "Fusionner les données hors-ligne",
+          "body": {
+            "groups": "array (optional)",
+            "files": "array (optional)",
+            "tags": "array (optional)"
+          },
+          "response": "Object avec résumé de la fusion"
+        }
+      ]
+    },
+    "webhooks": {
+      "description": "Webhooks pour intégrations tierces",
+      "base_path": "/webhook",
+      "auth_required": false,
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/webhook/payment",
+          "description": "Webhook générique de paiement",
+          "body": "Provider-specific payload",
+          "response": "Confirmation de traitement"
+        },
+        {
+          "method": "POST",
+          "path": "/webhook/stripe",
+          "description": "Webhook Stripe",
+          "headers": {
+            "Stripe-Signature": "string (required)"
+          },
+          "body": "Stripe event payload",
+          "response": "Confirmation de traitement"
+        },
+        {
+          "method": "POST",
+          "path": "/webhook/paypal",
+          "description": "Webhook PayPal",
+          "body": "PayPal IPN payload",
+          "response": "Confirmation de traitement"
+        }
+      ]
+    },
+    "secret-admin": {
+      "description": "Endpoints d'administration secrets (non documentés publiquement)",
+      "base_path": "/secret-admin",
+      "auth_required": true,
+      "roles": ["ADMINISTRATEUR"],
+      "additional_security": "Secret key required in request body",
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/secret-admin/execute-procedure",
+          "description": "Exécuter une procédure stockée MySQL",
+          "body": {
+            "secret": "string (required)",
+            "procedure_name": "string (required)",
+            "params": "array (optional)"
+          },
+          "response": "Résultat de l'exécution"
+        },
+        {
+          "method": "GET",
+          "path": "/secret-admin/procedures",
+          "description": "Lister les procédures disponibles",
+          "body": {
+            "secret": "string (required)"
+          },
+          "response": "Array des procédures disponibles"
+        }
+      ]
+    }
+  },
+  "http_codes": {
+    "200": "Success - Requête réussie",
+    "201": "Created - Ressource créée avec succès",
+    "400": "Bad Request - Paramètres invalides",
+    "401": "Unauthorized - Authentification requise ou invalide",
+    "403": "Forbidden - Permissions insuffisantes",
+    "404": "Not Found - Ressource non trouvée",
+    "409": "Conflict - Conflit avec l'état actuel",
+    "422": "Unprocessable Entity - Validation échouée",
+    "500": "Internal Server Error - Erreur serveur"
+  },
+  "response_format": {
+    "success": {
+      "success": true,
+      "data": "mixed",
+      "message": "string (optional)"
+    },
+    "error": {
+      "success": false,
+      "error": "string",
+      "details": "mixed (optional)",
+      "code": "integer"
+    }
+  },
+  "notes": {
+    "pagination": "Certains endpoints supportent la pagination via les paramètres ?page=1&limit=20",
+    "soft_delete": "Les suppressions sont des soft deletes - les ressources peuvent être restaurées",
+    "rate_limiting": "Rate limiting appliqué pour les API Keys selon les scopes configurés",
+    "cors": "CORS activé pour les origines autorisées",
+    "logging": "Toutes les requêtes sont loggées pour l'audit"
+  }
+}
