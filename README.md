@@ -12,21 +12,22 @@ API REST moderne pour la gestion d'authentification, de groupes et de fichiers a
 
 ## 📋 Table des matières
 
-- [Vue d'ensemble](#vue-densemble)
-- [Fonctionnalités](#fonctionnalités)
-- [Technologies](#technologies)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Architecture](#architecture)
-- [Endpoints API](#endpoints-api)
-- [Authentification](#authentification)
-- [Documentation](#documentation)
-- [Tests](#tests)
-- [Licence](#licence)
+- [Vue d'ensemble](#-vue-densemble)
+- [Fonctionnalités](#-fonctionnalités)
+- [Technologies](#%EF%B8%8F-technologies)
+- [Installation](#-installation)
+- [Configuration](#%EF%B8%8F-configuration)
+- [Architecture](#%EF%B8%8F-architecture)
+- [Endpoints API](#-endpoints-api)
+- [Authentification](#-authentification)
+- [Documentation](#-documentation)
+- [Tests](#-tests)
+- [Licence](#-licence)
 
 ## 🎯 Vue d'ensemble
 
 AuthGroups API est une solution complète pour gérer :
+
 - **Authentification** : Système JWT avec gestion des sessions
 - **Utilisateurs** : Inscription, connexion, profils, avatars
 - **Groupes** : Création, gestion des membres, invitations
@@ -38,6 +39,7 @@ AuthGroups API est une solution complète pour gérer :
 ## ✨ Fonctionnalités
 
 ### Gestion des utilisateurs
+
 - 🔐 Inscription et authentification JWT
 - 👤 Profils utilisateurs personnalisables
 - 🖼️ Upload d'avatars
@@ -47,6 +49,7 @@ AuthGroups API est une solution complète pour gérer :
 - 🔑 **API Keys pour authentification machine-to-machine**
 
 ### Gestion des groupes
+
 - 👥 Création et administration de groupes
 - 📨 Système d'invitations par email
 - 🏷️ Images de groupe
@@ -54,6 +57,7 @@ AuthGroups API est une solution complète pour gérer :
 - 🔍 Recherche avancée
 
 ### Système de fichiers
+
 - 📁 Upload de fichiers multiples
 - 🖼️ Support images, vidéos, documents, audio
 - ✅ Validation et sécurité
@@ -61,12 +65,14 @@ AuthGroups API est une solution complète pour gérer :
 - 📊 Gestion du stockage
 
 ### Tags et catégorisation
+
 - 🏷️ Tags personnalisables avec couleurs
 - 🔗 Association à groupes et fichiers
 - 📊 Tags les plus utilisés
 - 🔍 Recherche par tags
 
 ### Statistiques
+
 - 📈 Statistiques utilisateurs
 - 📊 Analytics groupes
 - 💾 Utilisation du stockage
@@ -93,58 +99,66 @@ AuthGroups API est une solution complète pour gérer :
 ### Installation
 
 1. **Cloner le projet**
+
 ```bash
 git clone https://github.com/Jrobitaille360/cmem2.git
 cd cmem2_API
 ```
 
-2. **Installer les dépendances**
+1. **Installer les dépendances**
+
 ```bash
 composer install
 ```
 
-3. **Créer la base de données**
+1. **Créer la base de données**
+
 ```bash
-mysql -u root -p < docs/create_database.sql
+mysql -u root -p < src/auth_groups/docs/create_database.sql
 ```
 
-4. **Configurer l'environnement**
+1. **Configurer l'environnement**
+
 ```bash
-cp config/environment.example.php config/environment.php
+cp .env.auth_groups.example .env.auth_groups
 ```
 
-Éditer `config/environment.php` avec vos paramètres :
-```php
-// Base de données
-define('DB_HOST', 'localhost');
-define('DB_NAME', 'cmem2_db');
-define('DB_USER', 'your_user');
-define('DB_PASS', 'your_password');
+Éditer `.env.auth_groups` avec vos paramètres :
 
-// JWT
-define('JWT_SECRET_KEY', 'your-secret-key-here');
+```env
+# Base de données
+DB_HOST=localhost
+DB_NAME=cmem2_db
+DB_USER=your_user
+DB_PASS=your_password
 
-// Emails
-$_ENV['MAIL_HOST'] = 'smtp.example.com';
-$_ENV['MAIL_PORT'] = 587;
-$_ENV['MAIL_USERNAME'] = 'your-email@example.com';
-$_ENV['MAIL_PASSWORD'] = 'your-password';
+# JWT
+JWT_SECRET=your-secret-key-here-minimum-32-characters
+JWT_EXPIRATION=86400
+
+# Emails
+MAIL_HOST=smtp.example.com
+MAIL_PORT=587
+MAIL_USERNAME=your-email@example.com
+MAIL_PASSWORD=your-password
 ```
 
-5. **Configurer les permissions**
+1. **Configurer les permissions**
+
 ```bash
-chmod -R 755 config/uploads/
+chmod -R 755 uploads/
+chmod -R 755 tmp_assets/
 ```
 
 ## ⚙️ Configuration
 
 ### Structure des fichiers de configuration
 
-```
-config/
+```text
+src/auth_groups/
 ├── database.php          # Configuration base de données
 ├── environment.php       # Variables d'environnement
-├── loader.php           # Autoloader
+├── loader.php           # Chargeur de configuration
 └── uploads/             # Dossier uploads
     ├── avatars/         # Avatars utilisateurs
     ├── groups/          # Images de groupes
@@ -153,13 +167,15 @@ config/
 
 ### Variables d'environnement
 
+Le fichier `.env.auth_groups` à la racine contient toutes les variables d'environnement.
+
 | Variable | Description | Défaut |
 |----------|-------------|--------|
 | `DB_HOST` | Hôte de la base de données | localhost |
 | `DB_NAME` | Nom de la base de données | cmem2_db |
 | `DB_USER` | Utilisateur de la base | - |
 | `DB_PASS` | Mot de passe de la base | - |
-| `JWT_SECRET_KEY` | Clé secrète JWT | - |
+| `JWT_SECRET` | Clé secrète JWT (min 32 caractères) | - |
 | `JWT_EXPIRATION` | Durée de validité JWT (secondes) | 86400 |
 | `MAIL_HOST` | Serveur SMTP | - |
 | `MAIL_PORT` | Port SMTP | 587 |
@@ -170,20 +186,31 @@ config/
 
 ### Structure du projet
 
-```
+```text
 cmem2_API/
-├── config/              # Configuration
-├── docs/                # Documentation
 ├── src/
-│   └── auth_groups/     # Code source principal
-│       ├── Controllers/ # Contrôleurs
-│       ├── Models/      # Modèles de données
-│       ├── Services/    # Services métier
-│       ├── Routing/     # Routeur et handlers
-│       ├── Middleware/  # Middlewares
-│       └── Utils/       # Utilitaires
-├── tests/               # Tests
+│   ├── auth_groups/     # Module principal d'authentification
+│   │   ├── Controllers/ # Contrôleurs
+│   │   ├── Models/      # Modèles de données
+│   │   ├── Services/    # Services métier
+│   │   ├── Routing/     # Routeur et handlers
+│   │   ├── Middleware/  # Middlewares
+│   │   ├── Utils/       # Utilitaires
+│   │   ├── docs/        # Documentation API
+│   │   ├── database.php # Configuration DB
+│   │   ├── environment.php # Chargeur .env
+│   │   └── loader.php   # Chargeur principal
+│   ├── ics/             # Module calendrier ICS/CalDAV
+│   │   ├── Controllers/ # Contrôleurs calendrier
+│   │   ├── Models/      # Modèles calendrier
+│   │   ├── Services/    # Services CalDAV
+│   │   └── docs_ICS/    # Documentation calendrier
+│   └── logs/            # Logs applicatifs
+├── tests/               # Tests unitaires et d'intégration
+├── uploads/             # Fichiers uploadés
+├── tmp_assets/          # Fichiers temporaires
 ├── vendor/              # Dépendances Composer
+├── .env.auth_groups     # Configuration (ne pas versionner)
 ├── index.php            # Point d'entrée
 └── composer.json        # Configuration Composer
 ```
@@ -255,6 +282,27 @@ L'API utilise une architecture modulaire avec séparation des responsabilités :
 | GET | `/tags/by-table/{table}` | Tags par table | Oui |
 | GET | `/tags/most-used` | Tags populaires | Oui |
 
+### Calendriers
+
+| Méthode | Endpoint | Description | Auth |
+|---------|----------|-------------|------|
+| GET | `/calendars` | Liste des calendriers | Oui |
+| POST | `/calendars` | Créer un calendrier | Oui |
+| GET | `/calendars/{id}` | Détails d'un calendrier | Oui |
+| PUT | `/calendars/{id}` | Modifier un calendrier | Oui |
+| DELETE | `/calendars/{id}` | Supprimer un calendrier | Oui |
+| GET | `/calendar/{token}.ics` | Export ICS public | Non |
+| * | `/caldav/` | Support CalDAV | Oui |
+
+### Webhooks
+
+| Méthode | Endpoint | Description | Auth |
+|---------|----------|-------------|------|
+| POST | `/webhooks` | Créer un webhook | Oui |
+| GET | `/webhooks` | Liste des webhooks | Oui |
+| PUT | `/webhooks/{id}` | Modifier un webhook | Oui |
+| DELETE | `/webhooks/{id}` | Supprimer un webhook | Oui |
+
 ### API Keys
 
 | Méthode | Endpoint | Description | Auth |
@@ -265,14 +313,14 @@ L'API utilise une architecture modulaire avec séparation des responsabilités :
 | DELETE | `/api-keys/{id}` | Révoquer une clé | JWT |
 | POST | `/api-keys/{id}/regenerate` | Régénérer une clé | JWT |
 
-### Statistiques
+### Analytics et statistiques
 
 | Méthode | Endpoint | Description | Auth |
 |---------|----------|-------------|------|
 | GET | `/stats/user/{id}` | Stats utilisateur | Oui |
 | GET | `/stats/online` | Utilisateurs en ligne | Oui |
 
-Voir la [documentation complète des endpoints](docs/) pour plus de détails.
+Voir la [documentation complète](src/auth_groups/docs/README.md) pour plus de détails.
 
 ## 🔐 Authentification
 
@@ -282,7 +330,7 @@ L'API supporte deux méthodes d'authentification :
 
 Pour les applications web et mobiles avec utilisateurs.
 
-**Obtenir un token**
+#### Obtenir un token
 
 ```http
 POST /users/login
@@ -295,6 +343,7 @@ Content-Type: application/json
 ```
 
 Réponse :
+
 ```json
 {
   "success": true,
@@ -310,7 +359,7 @@ Réponse :
 }
 ```
 
-**Utiliser le token**
+#### Utiliser le token
 
 Incluez le token dans l'en-tête `Authorization` :
 
@@ -319,7 +368,8 @@ GET /users/me
 Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGc...
 ```
 
-**Durée de validité**
+#### Durée de validité
+
 - Token valide pendant 24h par défaut
 - Configurable via `JWT_EXPIRATION`
 - Stockage des sessions actives en base de données
@@ -328,7 +378,7 @@ Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGc...
 
 Pour les intégrations serveur-à-serveur et scripts automatisés.
 
-**Créer une clé API**
+#### Créer une clé API
 
 ```http
 POST /api-keys
@@ -342,14 +392,15 @@ Content-Type: application/json
 }
 ```
 
-**Utiliser une clé API**
+#### Utiliser une clé API
 
 ```http
 GET /groups
 X-API-Key: ag_live_a1b2c3d4e5f6...
 ```
 
-**Avantages des API keys**
+#### Avantages des API keys
+
 - ✅ Pas besoin de login/logout
 - ✅ Idéal pour scripts et cron jobs
 - ✅ Scopes granulaires (read, write, delete, admin)
@@ -357,25 +408,37 @@ X-API-Key: ag_live_a1b2c3d4e5f6...
 - ✅ Révocation instantanée
 - ✅ Environnements séparés (production/test)
 
-Voir [ENDPOINTS_API_KEYS.md](docs/ENDPOINTS_API_KEYS.md) pour plus de détails.
+Voir [ENDPOINTS_API_KEYS.md](src/auth_groups/docs/ENDPOINTS_API_KEYS.md) pour plus de détails.
 
 ## 📚 Documentation
 
+### Documentation complète
+
+➡️ **[Documentation principale](src/auth_groups/docs/README.md)** - Point d'entrée de toute la documentation
+
 ### Documentation des endpoints
 
-- [Endpoints utilisateurs](docs/ENDPOINTS_USERS.md)
-- [Endpoints groupes](docs/ENDPOINTS_GROUPS.md)
-- [Endpoints fichiers](docs/ENDPOINTS_FILES.md)
-- [Endpoints tags](docs/ENDPOINTS_TAGS.md)
-- [Endpoints API Keys](docs/ENDPOINTS_API_KEYS.md) 🆕
-- [Endpoints statistiques](docs/ENDPOINTS_STATS.md)
-- [Endpoints publics](docs/ENDPOINTS_PUBLIC.md)
+- [Endpoints utilisateurs](src/auth_groups/docs/ENDPOINTS_USERS.md)
+- [Endpoints groupes](src/auth_groups/docs/ENDPOINTS_GROUPS.md)
+- [Endpoints fichiers](src/auth_groups/docs/ENDPOINTS_FILES.md)
+- [Endpoints tags](src/auth_groups/docs/ENDPOINTS_TAGS.md)
+- [Endpoints API Keys](src/auth_groups/docs/ENDPOINTS_API_KEYS.md) 🆕
+- [Endpoints statistiques](src/auth_groups/docs/ENDPOINTS_STATS.md)
+- [Endpoints publics](src/auth_groups/docs/ENDPOINTS_PUBLIC.md)
 
-### Documentation technique
+### Modules spécialisés
 
-- [Endpoints admin secret](docs/ADMIN_SECRET_ENDPOINT.md)
-- [Structure base de données](docs/create_database.sql)
-- [Triggers et procédures](docs/create_triggers_auth_groups.sql)
+- [Module ICS/CalDAV](src/ics/docs_ICS/README.md) - Calendriers et synchronisation CalDAV
+- [Webhooks](src/auth_groups/docs/WEBHOOKS_README.md) - Configuration et utilisation des webhooks
+- [Système de licences](src/auth_groups/docs/FLUTTER_LICENSE_SYSTEM.md) - Gestion des abonnements
+
+### Guides techniques
+
+- [Démarrage rapide](src/auth_groups/docs/QUICKSTART.md)
+- [Vue d'ensemble de l'API](src/auth_groups/docs/API_OVERVIEW.md)
+- [Référence API complète](src/auth_groups/docs/API_REFERENCE.md)
+- [Structure base de données](src/auth_groups/docs/create_database.sql)
+- [Migrations](src/auth_groups/docs/MIGRATION_v1.3.0.md)
 
 ## 🧪 Tests
 
@@ -394,32 +457,30 @@ php tests/test_tags_entrypoints.php
 
 ### Structure des tests
 
-```
+```text
 tests/
 ├── users/              # Tests utilisateurs
 ├── groups/             # Tests groupes
 ├── files/              # Tests fichiers
 ├── tags/               # Tests tags
-└── public/             # Tests endpoints publics
+├── webhooks/           # Tests webhooks
+└── test_base.php       # Fonctions communes
 ```
 
 ## 🔧 Développement
 
 ### Logs
 
-Les logs sont enregistrés dans `logs/` :
+Les logs sont enregistrés dans `src/logs/` :
+
 - `app.log` - Logs applicatifs
 - `error.log` - Erreurs
 - Rotation automatique quotidienne
 
 ### Base de données
 
-Créer la table des API keys:
-```sql
-SOURCE docs/create_table_api_keys.sql
-```
-
 Réinitialiser les données de test :
+
 ```sql
 CALL reset_auth_groups_data();
 ```
@@ -438,7 +499,7 @@ Ce projet utilise plusieurs dépendances open-source. Voir [THIRD_PARTY_LICENSES
 
 ## 🤝 Contribution
 
-Les contributions sont les bienvenues ! 
+Les contributions sont les bienvenues !
 
 1. Fork le projet
 2. Créer une branche (`git checkout -b feature/AmazingFeature`)
@@ -449,24 +510,28 @@ Les contributions sont les bienvenues !
 ## 📞 Support
 
 Pour toute question ou problème :
-- Email : support@authgroups.local
+
+- Email : <support@authgroups.local>
 - Issues : [GitHub Issues](https://github.com/Jrobitaille360/cmem2/issues)
 
 ## 🗺️ Roadmap
 
-- [x] API key setup ✅
-- [ ] Admin dynamic feature creation
-  - [ ] Create tables via admin panel
-  - [ ] Generate PHP endpoints
-  - [ ] Examples: Calendar, Todo list
-- [ ] Rate limiting
+- [x] Système d'API Keys ✅
+- [x] Module calendrier ICS/CalDAV ✅
+- [x] Webhooks ✅
+- [x] Système de licences ✅
+- [ ] Administration dynamique
+  - [ ] Création de tables via admin
+  - [ ] Génération d'endpoints PHP
+- [ ] Rate limiting avancé
 - [ ] Cache layer (Redis)
 - [ ] WebSockets pour notifications temps réel
-- [ ] Export de données
+- [ ] Export de données (CSV, JSON)
 - [ ] Audit logs détaillés
+- [ ] Support multi-tenant
 
 ---
 
-**Version** : 1.2.0  
+**Version** : 1.3.0  
 **Dernière mise à jour** : Octobre 2025  
 **Auteur** : [Jrobitaille360](https://github.com/Jrobitaille360)

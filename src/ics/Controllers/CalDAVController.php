@@ -31,7 +31,7 @@ class CalDAVController
         
         try {
             // Créer une instance du serveur CalDAV
-            require_once __DIR__ . '/../../../config/database.php';
+            require_once __DIR__ . '/../../auth_groups/database.php';
             $db = \Database::getInstance()->getConnection();
             $caldavServer = new CalDAVServer($db, $userId);
             
@@ -93,7 +93,7 @@ class CalDAVController
         }
         
         try {
-            require_once __DIR__ . '/../../../config/database.php';
+            require_once __DIR__ . '/../../auth_groups/database.php';
             $db = \Database::getInstance()->getConnection();
             $caldavServer = new CalDAVServer($db, null);
             
@@ -205,7 +205,7 @@ class CalDAVController
         
         try {
             // Récupérer les informations de l'utilisateur
-            require_once __DIR__ . '/../../../config/database.php';
+            require_once __DIR__ . '/../../auth_groups/database.php';
             $stmt = \Database::getInstance()->getConnection()->prepare("
                 SELECT email, firstname, lastname FROM users WHERE id = ?
             ");

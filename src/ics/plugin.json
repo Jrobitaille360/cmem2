@@ -1,7 +1,7 @@
 {
     "name": "ICS Calendar",
     "version": "1.0.0",
-    "description": "Module de gestion des calendriers ICS avec support complet RFC 5545",
+    "description": "Module de gestion des calendriers ICS/iCalendar avec support CalDAV RFC 5545 et synchronisation bidirectionnelle",
     "author": "CMEM Team",
     "namespace": "ICS",
     "main_class": "ICS\\CalendarPlugin",
@@ -12,21 +12,32 @@
     },
     "routes": {
         "prefix": "/calendars",
-        "public_routes": ["/calendar/{token}.ics"],
+        "public_routes": [
+            "/calendar/{token}.ics",
+            "/caldav/"
+        ],
         "auth_routes": [
             "/calendars",
             "/calendars/{id}",
             "/calendars/{id}/events",
-            "/calendars/{id}/share"
+            "/calendars/{id}/share",
+            "/caldav/calendars/{user_id}/{calendar_id}/"
         ]
     },
     "route_handlers": {
         "public": "ICS\\Routing\\RouteHandlers\\CalendarPublicRoute",
-        "authenticated": "ICS\\Routing\\RouteHandlers\\CalendarRouteHandler"
+        "authenticated": "ICS\\Routing\\RouteHandlers\\CalendarRouteHandler",
+        "caldav": "ICS\\Routing\\RouteHandlers\\CalDAVRouteHandler"
     },
     "database": {
-        "tables": ["calendars", "calendar_events", "calendar_shares"],
-        "migrations_path": "docs_ICS/migrations/"
+        "tables": [
+            "calendars",
+            "calendar_events",
+            "calendar_shares",
+            "caldav_sync_log",
+            "caldav_locks"
+        ],
+        "migrations_path": "docs_ICS/"
     },
     "permissions": [
         "calendar.create",
@@ -37,14 +48,31 @@
         "event.create",
         "event.read",
         "event.update",
-        "event.delete"
+        "event.delete",
+        "caldav.sync"
     ],
     "config": {
         "max_calendars_per_user": 100,
         "max_events_per_calendar": 10000,
         "default_timezone": "America/Montreal",
         "enable_public_sharing": true,
-        "enable_user_sharing": true
+        "enable_user_sharing": true,
+        "enable_caldav": true,
+        "caldav_url_base": "/caldav/"
+    },
+    "features": {
+        "ics_export": true,
+        "caldav_sync": true,
+        "recurrence_support": true,
+        "attendees_support": true,
+        "timezone_support": true,
+        "compatible_with": [
+            "Google Calendar",
+            "Microsoft Outlook",
+            "Apple Calendar",
+            "Mozilla Thunderbird",
+            "DAVx5 (Android)"
+        ]
     },
     "assets": {
         "js": ["assets/calendar.js"],

@@ -13,7 +13,7 @@ require_once __DIR__ . '/environment.php';
 require_once __DIR__ . '/database.php';
 
 // Charger l'autoloader AuthGroups en premier
-require_once __DIR__ . '/../src/auth_groups/autoloader.php';
+require_once __DIR__ . '/autoloader.php';
 
 // Charger les configurations du module auth_groups
 // Note: pas de fichier de config spécifique pour l'instant
@@ -114,11 +114,11 @@ if (!empty($config_errors)) {
 function loadPlugins(): void {
     try {
         // Charger l'autoloader pour auth_groups en premier
-        require_once __DIR__ . '/../src/auth_groups/autoloader.php';
+        require_once __DIR__ . '/autoloader.php';
         
         // Charger les classes Core nécessaires
-        require_once __DIR__ . '/../src/Core/PluginInterface.php';
-        require_once __DIR__ . '/../src/Core/PluginManager.php';
+        require_once __DIR__ . '/../Core/PluginInterface.php';
+        require_once __DIR__ . '/../Core/PluginManager.php';
 
         $pluginManager = \Core\PluginManager::getInstance();
         

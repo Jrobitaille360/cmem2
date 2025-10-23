@@ -8,7 +8,7 @@
 require_once __DIR__ . '/vendor/autoload.php';
 
 // Configuration modulaire (remplace config.php et database.php)
-require_once __DIR__ . '/config/loader.php';
+require_once __DIR__ . '/src/auth_groups/loader.php';
 
 use AuthGroups\Routing\Router;
 use AuthGroups\Services\LogService;

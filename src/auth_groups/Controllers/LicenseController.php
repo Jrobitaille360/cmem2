@@ -57,7 +57,7 @@ class LicenseController {
             $expiryDate = $this->calculateExpiry($plan);
             
             // 4. Mettre à jour les informations de paiement de l'utilisateur via requête SQL directe
-            require_once __DIR__ . '/../../../config/database.php';
+            require_once __DIR__ . '/../database.php';
             $db = \Database::getInstance()->getConnection();
             $stmt = $db->prepare("
                 UPDATE users 
@@ -273,7 +273,7 @@ class LicenseController {
             }
             
             // Mettre à jour le statut utilisateur via requête SQL directe
-            require_once __DIR__ . '/../../../config/database.php';
+            require_once __DIR__ . '/../database.php';
             $db = \Database::getInstance()->getConnection();
             $stmt = $db->prepare("
                 UPDATE users 

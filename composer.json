@@ -2,6 +2,7 @@
     "name": "memories/cmem2-backend",
     "description": "Backend API pour l'application Memories v2",
     "type": "project",
+    "license": "MIT",
     "require": {
         "php": ">=8.0",
         "firebase/php-jwt": "^6.0",
