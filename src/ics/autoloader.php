@@ -107,6 +107,9 @@ function registerICSRoutes() {
             },
             'calendar' => function($authService) {
                 return new \ICS\Routing\RouteHandlers\CalendarRouteHandler($authService);
+            },
+            'caldav' => function($authService) {
+                return new \ICS\Routing\RouteHandlers\CalDAVRouteHandler($authService);
             }
         ];
         
@@ -114,7 +117,7 @@ function registerICSRoutes() {
         $pluginManager->registerPluginRoutes('ics', $icsRouteHandlers);
         
         // Logging pour le débogage
-        error_log("ICS Autoloader: Routes enregistrées avec succès via PluginManager (calendars, calendar)");
+        error_log("ICS Autoloader: Routes enregistrées avec succès via PluginManager (calendars, calendar, caldav)");
         if (defined('APP_DEBUG') && APP_DEBUG) {
             error_log("ICS: Routes enregistrées avec succès (calendars, calendar)");
         }
@@ -134,9 +137,10 @@ function integrateICSWithRouter() {
         // Ajouter les handlers ICS directement au router si possible
         $routerInstance->addRouteHandler('calendars', '\ICS\Routing\RouteHandlers\CalendarRouteHandler');
         $routerInstance->addRouteHandler('calendar', '\ICS\Routing\RouteHandlers\CalendarRouteHandler');
+        $routerInstance->addRouteHandler('caldav', '\ICS\Routing\RouteHandlers\CalDAVRouteHandler');
         
         if (defined('APP_DEBUG') && APP_DEBUG) {
-            error_log("ICS: Intégration directe avec le Router réussie");
+            error_log("ICS: Intégration directe avec le Router réussie (calendars, calendar, caldav)");
         }
         
         return true;
@@ -156,11 +160,12 @@ if (!registerICSRoutes()) {
         
         $GLOBALS['pending_route_handlers']['ics'] = [
             'calendars' => '\ICS\Routing\RouteHandlers\CalendarRouteHandler',
-            'calendar' => '\ICS\Routing\RouteHandlers\CalendarRouteHandler'
+            'calendar' => '\ICS\Routing\RouteHandlers\CalendarRouteHandler',
+            'caldav' => '\ICS\Routing\RouteHandlers\CalDAVRouteHandler'
         ];
         
         if (defined('APP_DEBUG') && APP_DEBUG) {
-            error_log("ICS: Routes mises en attente pour enregistrement ultérieur");
+            error_log("ICS: Routes mises en attente pour enregistrement ultérieur (calendars, calendar, caldav)");
         }
     }
 }

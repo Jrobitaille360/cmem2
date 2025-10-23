@@ -30,10 +30,14 @@ class Calendar extends BaseModel
     {    
         // Générer un token de partage unique
         $shareToken = bin2hex(random_bytes(32));
+        
+        // Générer les valeurs CalDAV
+        $ctag = md5(uniqid('ctag_', true));
+        $syncToken = md5(uniqid('sync_', true));
 
         $query ="
-            INSERT INTO calendars (user_id, title, description, timezone, color, visibility, max_members, share_token)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO calendars (user_id, title, description, timezone, color, visibility, max_members, share_token, ctag, sync_token)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ";
 
         $stmt = $this->getDb()->prepare($query);
@@ -46,7 +50,9 @@ class Calendar extends BaseModel
             $this->color ?? '#3174ad',
             $this->visibility ?? 'private',
             $this->maxMembers ?? 1000,
-            $shareToken
+            $shareToken,
+            $ctag,
+            $syncToken
         ]);
 
         $calendarId = $this->getDb()->lastInsertId();
@@ -54,7 +60,9 @@ class Calendar extends BaseModel
         return [
             'id' => $calendarId,
             'share_token' => $shareToken,
-            'ics_url' => self::generateIcsUrl($shareToken)
+            'ics_url' => self::generateIcsUrl($shareToken),
+            'ctag' => $ctag,
+            'sync_token' => $syncToken
         ];
     }
     

@@ -33,8 +33,11 @@ header('Access-Control-Allow-Methods: ' . implode(', ', ALLOWED_METHODS));
 header('Access-Control-Allow-Headers: ' . implode(', ', ALLOWED_HEADERS));
 header('Access-Control-Max-Age: 86400');
 
-// Gérer les requêtes OPTIONS
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+// Gérer les requêtes OPTIONS (sauf pour CalDAV qui nécessite des headers spécifiques)
+$requestUri = $_SERVER['REQUEST_URI'] ?? '';
+$isCalDAVRequest = strpos($requestUri, '/caldav') !== false;
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS' && !$isCalDAVRequest) {
     LoggingMiddleware::logExit(200);
     http_response_code(200);
     exit();
@@ -43,8 +46,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, X-API-Key, Authorization');
 
-// Gérer les requêtes OPTIONS (preflight)
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+// Gérer les requêtes OPTIONS (preflight) sauf CalDAV
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS' && !$isCalDAVRequest) {
     http_response_code(200);
     exit;
 }

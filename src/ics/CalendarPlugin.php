@@ -5,11 +5,15 @@ namespace ICS;
 use Core\PluginInterface;
 use Core\PluginManager;
 use ICS\Routing\RouteHandlers\CalendarRouteHandler;
+use ICS\Routing\RouteHandlers\CalendarPublicRoute;
+use ICS\Routing\RouteHandlers\CalDAVRouteHandler;
 
 class CalendarPlugin implements PluginInterface
 {
     private array $config;
     private ?CalendarRouteHandler $routeHandler = null;
+    private ?CalendarPublicRoute $publicRouteHandler = null;
+    private ?CalDAVRouteHandler $caldavRouteHandler = null;
 
     /**
      * Logging sûr qui vérifie si LogService est disponible
@@ -48,6 +52,19 @@ class CalendarPlugin implements PluginInterface
                     $this->routeHandler = new CalendarRouteHandler($authService);
                 }
                 return $this->routeHandler;
+            },
+            'caldav' => function($authService) {
+                if ($this->caldavRouteHandler === null) {
+                    $this->caldavRouteHandler = new CalDAVRouteHandler($authService);
+                }
+                return $this->caldavRouteHandler;
+            },
+            'calendar' => function($authService) {
+                // Route publique pour les fichiers ICS
+                if ($this->publicRouteHandler === null) {
+                    $this->publicRouteHandler = new CalendarPublicRoute();
+                }
+                return $this->publicRouteHandler;
             }
         ]);
         
@@ -71,6 +88,18 @@ class CalendarPlugin implements PluginInterface
                     $this->routeHandler = new CalendarRouteHandler($authService);
                 }
                 return $this->routeHandler;
+            },
+            'caldav' => function($authService) {
+                if ($this->caldavRouteHandler === null) {
+                    $this->caldavRouteHandler = new CalDAVRouteHandler($authService);
+                }
+                return $this->caldavRouteHandler;
+            },
+            'calendar' => function($authService) {
+                if ($this->publicRouteHandler === null) {
+                    $this->publicRouteHandler = new CalendarPublicRoute();
+                }
+                return $this->publicRouteHandler;
             }
         ];
     }
