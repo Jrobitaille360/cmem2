@@ -8,6 +8,23 @@
         calendar
         todo list
   
+est possible de rendre ical compatible avec webdav ou caldav
+
+Crée un serveur CalDAV complet avec synchronisation bidirectionnelle ?
+Ajoute seulement WebDAV simple pour accès lecture seule amélioré ?
+Garde l'actuel et ajoute juste des headers WebDAV pour compatibilité ?
+
+
+
+
+📝 Un guide de développement de plugins pour les développeurs externes ?
+🔌 Un template de plugin vierge prêt à l'emploi ?
+🛡️ Un système de validation/sécurité pour les plugins tiers ?
+📦 Un marketplace/registre de plugins disponibles ?
+
+
+
+
   Flutter Client
     - 
 }
