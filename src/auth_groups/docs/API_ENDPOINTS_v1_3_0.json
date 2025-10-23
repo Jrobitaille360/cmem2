@@ -25,9 +25,56 @@
         {
           "method": "GET",
           "path": "/help",
-          "description": "Liste de tous les endpoints disponibles",
+          "description": "Aide et liste des endpoints disponibles par catégorie",
           "auth_required": false,
-          "response": "Documentation interactive des endpoints"
+          "response": {
+            "success": true,
+            "data": {
+              "api": {
+                "name": "AuthGroups API",
+                "version": "1.3.0",
+                "documentation": "/src/auth_groups/docs/"
+              },
+              "endpoints": {
+                "public": [
+                  "POST /users/register - Inscription",
+                  "POST /users/login - Connexion",
+                  "POST /users/forgot-password - Demander réinitialisation",
+                  "GET /users/request-password-reset - Formulaire réinitialisation",
+                  "POST /users/reset-password - Réinitialiser mot de passe",
+                  "GET /users/reset-password - Formulaire réinitialisation",
+                  "GET /users/verify-email - Vérification email",
+                  "POST /users/resend-verification - Renvoyer email vérification",
+                  "GET /groups - Groupes publics",
+                  "POST /groups/join - Rejoindre avec code",
+                  "GET /health - Santé de l'API",
+                  "GET /help - Cette aide"
+                ],
+                "authenticated": {
+                  "users": "Gestion des utilisateurs (profil, avatar, mot de passe, etc.)",
+                  "groups": "Gestion des groupes (création, modification, membres, invitations)",
+                  "files": "Gestion des fichiers (upload, download, suppression)",
+                  "tags": "Gestion des tags (création, modification, association)",
+                  "stats": "Statistiques et analytics (plateforme, groupes, utilisateurs)",
+                  "api-keys": "Gestion des clés API (création, régénération, révocation)",
+                  "data": "Synchronisation et fusion des données hors-ligne"
+                },
+                "webhooks": {
+                  "payment": "Webhook générique de paiement",
+                  "stripe": "Webhook Stripe avec signature",
+                  "paypal": "Webhook PayPal IPN"
+                },
+                "admin": {
+                  "secret-admin": "Endpoints d'administration (authentification renforcée requise)"
+                }
+              },
+              "authentication": {
+                "jwt": "Authorization: Bearer {token}",
+                "api_key": "X-API-Key: {key}"
+              },
+              "documentation": "Voir /src/auth_groups/docs/ pour la documentation complète"
+            }
+          }
         },
         {
           "method": "GET",

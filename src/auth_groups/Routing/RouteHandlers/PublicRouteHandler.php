@@ -124,20 +124,48 @@ class PublicRouteHandler extends BaseRouteHandler
     
     private function showHelpInfo(): void {
         $info = [
+            'api' => [
+                'name' => 'AuthGroups API',
+                'version' => '1.3.0',
+                'documentation' => '/help'
+            ],
             'endpoints' => [
                 'public' => [
-                    'POST /help - Informations d\'aide sur l\'API',
-                    'POST /health - Statut de santé de l\'API',
+                    'GET / - Informations générales sur l\'API',
+                    'GET /help - Aide et liste des endpoints',
+                    'GET /health - Statut de santé de l\'API',
                     'POST /users/register - Inscription utilisateur',
                     'POST /users/login - Connexion utilisateur',
-                    'POST /groups/public - Groupes publics'
+                    'POST /users/request-password-reset - Demande de réinitialisation de mot de passe',
+                    'POST /users/reset-password - Réinitialisation de mot de passe avec token',
+                    'POST /users/verify-email - Vérification d\'email',
+                    'POST /users/resend-verification - Renvoi d\'email de vérification',
+                    'GET /groups - Liste des groupes publics',
+                    'POST /groups/join - Rejoindre un groupe avec code'
                 ],
                 'authenticated' => [
-                    'users' => 'Gestion des utilisateurs',
-                    'groups' => 'Gestion des groupes',
-                    'tags' => 'Gestion des tags'
+                    'users' => 'Gestion des utilisateurs (CRUD, avatar, password, restore)',
+                    'groups' => 'Gestion des groupes (CRUD, members, invitations, search)',
+                    'files' => 'Gestion des fichiers (upload, download, delete, restore)',
+                    'tags' => 'Gestion des tags (CRUD, associations, search, most-used)',
+                    'stats' => 'Statistiques et analytics (platform, users, groups)',
+                    'api-keys' => 'Gestion des clés API (create, list, revoke, regenerate)',
+                    'data' => 'Synchronisation des données hors-ligne'
+                ],
+                'webhooks' => [
+                    'POST /webhook/payment - Webhook générique de paiement',
+                    'POST /webhook/stripe - Webhook Stripe',
+                    'POST /webhook/paypal - Webhook PayPal'
+                ],
+                'admin' => [
+                    'secret-admin' => 'Endpoints d\'administration (authentification renforcée requise)'
                 ]
-            ]
+            ],
+            'authentication' => [
+                'jwt' => 'Authorization: Bearer {token}',
+                'api_key' => 'X-API-Key: {key}'
+            ],
+            'documentation' => 'Voir /src/auth_groups/docs/ pour la documentation complète'
         ];
         Response::success('help', $info);
     }
@@ -147,7 +175,7 @@ class PublicRouteHandler extends BaseRouteHandler
             "status" => "OK",
             "message" => "API AuthGroups opérationnelle",
             "timestamp" => date('Y-m-d H:i:s'),
-            "version" => "1.2.0"
+            "version" => "1.3.0"
         ];
         Response::success('health_status', $info);
     }
