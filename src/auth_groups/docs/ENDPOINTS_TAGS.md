@@ -5,11 +5,13 @@
 ---
 
 ## POST `/tags`
+
 **Description** : Créer un tag
 
 **Authentification** : 🔒 Utilisateur
 
 **Données attendues** :
+
 ```json
 {
   "name": "Histoire",
@@ -19,11 +21,13 @@
 ```
 
 **Validation** :
+
 - `name` : requis, 1-100 caractères
 - `table_associate` : optionnel, in('groups','memories','elements','files','all')
 - `color` : optionnel, format #RRGGBB
 
 **Réponse succès (201)** :
+
 ```json
 {
   "success": true,
@@ -42,6 +46,7 @@
 ```
 
 **Réponses d'erreur** :
+
 - `400` : Données invalides
 - `401` : Utilisateur non authentifié
 - `500` : Erreur lors de la création
@@ -49,17 +54,20 @@
 ---
 
 ## GET `/tags`
+
 **Description** : Lister/rechercher les tags
 
 **Authentification** : 🔒 Utilisateur
 
 **Paramètres de requête** :
+
 - `q` : terme de recherche (optionnel)
 - `table_associate` : filtrer par table (optionnel, in('groups','memories','elements','files','all'))
 - `page` : numéro de page (optionnel, >= 1)
 - `limit` : nombre d'éléments (optionnel, 1-50)
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -86,6 +94,7 @@
 ```
 
 **Réponses d'erreur** :
+
 - `401` : Authentification requise
 - `400` : Paramètres de validation invalides
 - `500` : Erreur serveur
@@ -93,14 +102,17 @@
 ---
 
 ## GET `/tags/{id}`
+
 **Description** : Détail d'un tag
 
 **Authentification** : 🔒 Utilisateur
 
 **Validation** :
+
 - `id` : requis, ID du tag numérique
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -120,6 +132,7 @@
 ```
 
 **Réponses d'erreur** :
+
 - `401` : Authentification requise
 - `403` : Accès non autorisé
 - `404` : Tag non trouvé
@@ -128,11 +141,13 @@
 ---
 
 ## PUT `/tags/{id}`
+
 **Description** : Modifier un tag
 
 **Authentification** : 🔒 Propriétaire ou Admin
 
 **Données attendues** :
+
 ```json
 {
   "name": "Nouveau nom",
@@ -142,12 +157,14 @@
 ```
 
 **Validation** :
+
 - `id` : requis, ID du tag numérique
 - `name` : optionnel, 1-100 caractères
 - `table_associate` : optionnel, in('groups','memories','elements','files','all')
 - `color` : optionnel, format #RRGGBB
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -164,6 +181,7 @@
 ```
 
 **Réponses d'erreur** :
+
 - `400` : Données de validation invalides
 - `401` : Authentification requise
 - `403` : Accès non autorisé
@@ -173,11 +191,13 @@
 ---
 
 ## DELETE `/tags/{id}`
+
 **Description** : Supprimer un tag (soft delete)
 
 **Authentification** : 🔒 Propriétaire ou Admin
 
 **Données attendues** :
+
 ```json
 {
   "force_delete": true
@@ -185,10 +205,12 @@
 ```
 
 **Validation** :
+
 - `force_delete` : optionnel, booléen pour suppression définitive
 - `id` : requis, ID du tag numérique
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -197,6 +219,7 @@
 ```
 
 **Réponses d'erreur** :
+
 - `401` : Authentification requise
 - `403` : Accès non autorisé
 - `404` : Tag non trouvé
@@ -206,14 +229,17 @@
 ---
 
 ## POST `/tags/{id}/restore`
+
 **Description** : Restaurer un tag supprimé
 
 **Authentification** : 🔒 Propriétaire ou Admin
 
 **Validation** :
+
 - `id` : requis, ID du tag numérique
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -222,6 +248,7 @@
 ```
 
 **Réponses d'erreur** :
+
 - `400` : Ce tag n'est pas supprimé
 - `401` : Authentification requise
 - `403` : Accès non autorisé
@@ -231,15 +258,18 @@
 ---
 
 ## GET `/tags/my-tags`
+
 **Description** : Mes tags
 
 **Authentification** : 🔒 Utilisateur
 
 **Paramètres de requête** :
+
 - `page` : numéro de page (optionnel, >= 1)
 - `limit` : nombre d'éléments (optionnel, 1-50)
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -264,24 +294,29 @@
 ```
 
 **Réponses d'erreur** :
+
 - `401` : Authentification requise
 - `500` : Erreur serveur
 
 ---
 
 ## GET `/tags/by-table/{table_associate}`
+
 **Description** : Tags par table associée
 
 **Authentification** : 🔒 Utilisateur
 
 **Validation** :
+
 - `table_associate` : requis, in('groups','memories','elements','files','all')
 
 **Paramètres de requête** :
+
 - `page` : numéro de page (optionnel, >= 1)
 - `limit` : nombre d'éléments (optionnel, 1-50)
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -305,6 +340,7 @@
 ```
 
 **Réponses d'erreur** :
+
 - `400` : Table associée invalide
 - `401` : Authentification requise
 - `500` : Erreur serveur
@@ -312,15 +348,18 @@
 ---
 
 ## GET `/tags/most-used`
+
 **Description** : Tags les plus utilisés
 
 **Authentification** : 🔒 Utilisateur
 
 **Paramètres de requête** :
+
 - `table_associate` : filtrer par table (optionnel, défaut 'memories')
 - `limit` : nombre d'éléments (optionnel, 1-50, défaut 10)
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -344,17 +383,20 @@
 ```
 
 **Réponses d'erreur** :
+
 - `401` : Authentification requise
 - `500` : Erreur serveur
 
 ---
 
 ## POST `/tags/get-or-create`
+
 **Description** : Obtenir ou créer un tag
 
 **Authentification** : 🔒 Utilisateur
 
 **Données attendues** :
+
 ```json
 {
   "name": "Nouveau tag",
@@ -364,11 +406,13 @@
 ```
 
 **Validation** :
+
 - `name` : requis, 1-100 caractères
 - `table_associate` : optionnel, in('groups','memories','elements','files','all'), défaut 'memories'
 - `color` : optionnel, format #RRGGBB, défaut '#3498db'
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -387,6 +431,7 @@
 ```
 
 **Réponses d'erreur** :
+
 - `400` : Données de validation invalides
 - `401` : Authentification requise
 - `500` : Erreur lors de la création
@@ -394,18 +439,22 @@
 ---
 
 ## GET `/tags/user/{user_id}`
+
 **Description** : Tags d'un utilisateur spécifique (admin seulement)
 
 **Authentification** : 🔒 Admin
 
 **Validation** :
+
 - `user_id` : requis, ID utilisateur numérique
 
 **Paramètres de requête** :
+
 - `page` : numéro de page (optionnel, >= 1)
 - `limit` : nombre d'éléments (optionnel, 1-50)
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -429,6 +478,7 @@
 ```
 
 **Réponses d'erreur** :
+
 - `400` : ID utilisateur doit être numérique
 - `401` : Authentification requise
 - `403` : Accès non autorisé
@@ -438,11 +488,13 @@
 ---
 
 ## PUT `/tags/{tagId}/{item_id}`
+
 **Description** : Associer ou dissocier un tag à un élément (mémoire, élément, fichier, groupe)
 
 **Authentification** : 🔒 Utilisateur
 
 **Données attendues** :
+
 ```json
 {
   "table_associate": "memories"
@@ -450,11 +502,13 @@
 ```
 
 **Validation** :
+
 - `table_associate` : requis, in('groups','memories','elements','files')
 - `tagId` : requis, ID de tag numérique, accessible par l'utilisateur
 - `item_id` : requis, ID d'élément numérique, accessible par l'utilisateur
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -470,6 +524,7 @@
 ```
 
 **Réponses d'erreur** :
+
 - `400` : Données de validation invalides
 - `401` : Authentification requise
 - `403` : Accès non autorisé à l'élément ou au tag

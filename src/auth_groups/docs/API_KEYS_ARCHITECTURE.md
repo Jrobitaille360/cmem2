@@ -350,7 +350,7 @@ Foreign Keys:
 
 ## 🎭 Scopes et permissions
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                      SCOPE HIERARCHY                         │
 └─────────────────────────────────────────────────────────────┘
@@ -405,7 +405,7 @@ if (!hasScope('write', $apiKey['scopes'])) {
 
 ## ⚡ Rate Limiting Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                    RATE LIMIT SYSTEM                         │
 └─────────────────────────────────────────────────────────────┘
@@ -474,7 +474,7 @@ IF LIMIT EXCEEDED:
 
 ## 🔒 Sécurité et Hashing
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │              SECURITY: KEY GENERATION & STORAGE              │
 └─────────────────────────────────────────────────────────────┘
@@ -536,7 +536,7 @@ DISPLAY (List view):
 
 ## 📁 Structure des fichiers
 
-```
+```text
 cmem2_API/
 │
 ├── src/auth_groups/

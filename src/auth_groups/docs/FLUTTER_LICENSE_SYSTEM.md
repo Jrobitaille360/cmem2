@@ -6,7 +6,7 @@ Ce guide explique comment créer une application Flutter mondiale avec un systè
 
 ## 🏗️ Architecture
 
-```
+```text
 Utilisateur → Paiement → API Key générée → Application Flutter → API Backend
 ```
 
@@ -39,7 +39,7 @@ flutter pub add shared_preferences
 
 ### 1.2 Structure de Dossiers
 
-```
+```text
 lib/
 ├── main.dart
 ├── config/
@@ -1071,12 +1071,14 @@ PAYPAL_WEBHOOK_ID=votre_webhook_id_ici
 
 ### 3.1 Bonnes Pratiques
 
-#### Côté Flutter:
+#### Côté Flutter
+
 1. **Stockage sécurisé** : `flutter_secure_storage` utilise:
    - Keychain (iOS)
    - Keystore (Android)
 
 2. **Ne jamais exposer les clés dans le code**:
+
    ```dart
    // ❌ MAL
    const String API_KEY = 'ag_live_abc123';
@@ -1086,12 +1088,15 @@ PAYPAL_WEBHOOK_ID=votre_webhook_id_ici
    ```
 
 3. **HTTPS obligatoire en production**:
+
    ```dart
    static const String baseUrl = 'https://cmem1.journauxdebord.com'; // Pas HTTP!
    ```
 
-#### Côté API:
+#### Côté API
+
 1. **Ne jamais logger les API Keys complètes**:
+
    ```php
    // ❌ MAL
    LogService::info('API Key: ' . $apiKey);
@@ -1101,6 +1106,7 @@ PAYPAL_WEBHOOK_ID=votre_webhook_id_ici
    ```
 
 2. **Vérifier les webhooks**:
+
    ```php
    // Vérifier la signature Stripe/PayPal
    if (!$this->verifyWebhookSignature($payload, $signature)) {
@@ -1109,6 +1115,7 @@ PAYPAL_WEBHOOK_ID=votre_webhook_id_ici
    ```
 
 3. **Rate limiting par plan**:
+
    ```php
    'rate_limit_per_minute' => $this->getRateLimitForPlan($plan)
    ```
@@ -1250,10 +1257,10 @@ flutter build ios --release
 
 ## 📞 Support et Documentation
 
-- **Documentation API**: https://cmem1.journauxdebord.com/docs
-- **Support**: support@cmem.com
-- **Webhook Stripe**: https://dashboard.stripe.com/webhooks
-- **Webhook PayPal**: https://developer.paypal.com/dashboard/webhooks
+- **Documentation API**: <https://cmem1.journauxdebord.com/docs>
+- **Support**: <support@cmem.com>
+- **Webhook Stripe**: <https://dashboard.stripe.com/webhooks>
+- **Webhook PayPal**: <https://developer.paypal.com/dashboard/webhooks>
 
 ---
 

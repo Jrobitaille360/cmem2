@@ -5,11 +5,13 @@
 ---
 
 ## POST `/stats/build`
+
 **Description** : Générer toutes les statistiques de la plateforme
 
 **Authentification** : 🔒 Admin
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -29,6 +31,7 @@
 ```
 
 **Réponses d'erreur** :
+
 - `401` : Authentification requise
 - `403` : Accès non autorisé
 - `500` : Erreur lors de la génération
@@ -36,11 +39,13 @@
 ---
 
 ## GET `/stats/platform`
+
 **Description** : Récupérer les statistiques globales de la plateforme
 
 **Authentification** : 🔒 Admin
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -82,6 +87,7 @@
 ```
 
 **Réponses d'erreur** :
+
 - `401` : Authentification requise
 - `403` : Accès non autorisé
 - `404` : Statistiques non générées
@@ -90,15 +96,18 @@
 ---
 
 ## GET `/stats/groups`
+
 **Description** : Récupérer les statistiques par groupe
 
 **Authentification** : 🔒 Admin
 
 **Paramètres de requête** :
+
 - `offset` : décalage pour la pagination (optionnel, défaut 0)
 - `limit` : nombre d'éléments (optionnel, défaut 20)
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -124,6 +133,7 @@
 ```
 
 **Réponses d'erreur** :
+
 - `401` : Authentification requise
 - `403` : Accès non autorisé
 - `404` : Statistiques non générées
@@ -132,15 +142,18 @@
 ---
 
 ## GET `/stats/users`
+
 **Description** : Récupérer les statistiques par utilisateur
 
 **Authentification** : 🔒 Admin
 
 **Paramètres de requête** :
+
 - `offset` : décalage pour la pagination (optionnel, défaut 0)
 - `limit` : nombre d'éléments (optionnel, défaut 20)
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -168,6 +181,7 @@
 ```
 
 **Réponses d'erreur** :
+
 - `401` : Authentification requise
 - `403` : Accès non autorisé
 - `404` : Statistiques non générées
@@ -176,14 +190,17 @@
 ---
 
 ## GET `/stats/users/{id}`
+
 **Description** : Récupère les statistiques d'un utilisateur
 
 **Authentification** : 🔒 Utilisateur (soi-même) ou Admin
 
 **Validation** :
+
 - `id` : requis, ID utilisateur valide
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -211,6 +228,7 @@
 ```
 
 **Réponses d'erreur** :
+
 - `401` : Authentification requise
 - `403` : Accès non autorisé
 - `404` : Utilisateur non trouvé ou statistiques non générées
@@ -219,11 +237,13 @@
 ---
 
 ## GET `/stats/my-stats`
+
 **Description** : Statistiques de l'utilisateur connecté
 
 **Authentification** : 🔒 Utilisateur
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -256,6 +276,7 @@
 ```
 
 **Réponses d'erreur** :
+
 - `401` : Authentification requise
 - `404` : Statistiques non générées pour cet utilisateur
 - `500` : Erreur serveur

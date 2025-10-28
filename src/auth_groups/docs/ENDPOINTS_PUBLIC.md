@@ -6,22 +6,26 @@
 
 **⚠️ BREAKING CHANGE** : Depuis la version 1.3.0, **toutes** les connexions nécessitent une API key valide.
 
-### Impact sur les endpoints publics :
+### Impact sur les endpoints publics
+
 - **`/users/login`** : API key maintenant **obligatoire**
 - **Autres endpoints** : Restent accessibles sans authentification
 - **Migration** : Les applications doivent intégrer une API key pour les connexions
 
-### Obtention d'une API key :
+### Obtention d'une API key
+
 Les API keys sont désormais gérées exclusivement via les endpoints `/secret-admin/api-keys/*` avec authentification renforcée. Consultez le [Guide Secret-Admin](./API_KEYS_SECRET_ADMIN_GUIDE.md) pour plus de détails.
 
 ---
 
 ## GET `/`
+
 **Description** : Obtenir des informations sur l'API
 
 **Authentification** : ⭐ Non requise
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -46,16 +50,19 @@ Les API keys sont désormais gérées exclusivement via les endpoints `/secret-a
 ```
 
 **Réponses d'erreur** :
+
 - `500` : Erreur serveur critique
 
 ---
 
 ## GET `/help`
+
 **Description** : Fourni de l'aide sur les endpoints de l'API
 
 **Authentification** : ⭐ Non requise
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -69,16 +76,19 @@ Les API keys sont désormais gérées exclusivement via les endpoints `/secret-a
 ```
 
 **Réponses d'erreur** :
+
 - `500` : Erreur serveur lors de la génération de l'aide
 
 ---
 
 ## GET `/health`
+
 **Description** : Vérifier le statut de l'API
 
 **Authentification** : ⭐ Non requise
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -95,17 +105,20 @@ Les API keys sont désormais gérées exclusivement via les endpoints `/secret-a
 ```
 
 **Réponses d'erreur** :
+
 - `500` : Erreur serveur lors de la vérification du statut
 - `503` : Service temporairement indisponible
 
 ---
 
 ## POST `/users/register`
+
 **Description** : Créer un nouveau compte utilisateur
 
 **Authentification** : ⭐ Non requise
 
 **Données attendues** :
+
 ```json
 {
   "name": "Jean Dupont",
@@ -119,6 +132,7 @@ Les API keys sont désormais gérées exclusivement via les endpoints `/secret-a
 ```
 
 **Validation** :
+
 - `name` : requis, 2-255 caractères
 - `email` : requis, email valide, unique
 - `password` : requis, 6 caractères minimum
@@ -128,6 +142,7 @@ Les API keys sont désormais gérées exclusivement via les endpoints `/secret-a
 - `location` : optionnel, lieu de résidence
 
 **Réponse succès (201)** :
+
 ```json
 {
   "success": true,
@@ -147,6 +162,7 @@ Les API keys sont désormais gérées exclusivement via les endpoints `/secret-a
 ```
 
 **Réponses d'erreur** :
+
 - `400` : Données invalides
 - `409` : Cet email est déjà utilisé, peut-être désactivé. Vous devez vous connecter ou le réactiver
 - `500` : Erreur lors de la création de l'utilisateur
@@ -154,6 +170,7 @@ Les API keys sont désormais gérées exclusivement via les endpoints `/secret-a
 ---
 
 ## POST `/users/login`
+
 **Description** : Se connecter
 
 **⚠️ IMPORTANT v1.3.0** : API key maintenant **obligatoire** pour tous les logins
@@ -161,6 +178,7 @@ Les API keys sont désormais gérées exclusivement via les endpoints `/secret-a
 **Authentification** : ⭐ Non requise (mais API key obligatoire)
 
 **Données attendues** :
+
 ```json
 {
   "email": "user@example.com",
@@ -170,11 +188,13 @@ Les API keys sont désormais gérées exclusivement via les endpoints `/secret-a
 ```
 
 **Validation** :
+
 - `email` : requis, email valide
 - `password` : requis, 6 caractères minimum
 - `api_key` : **requis depuis v1.3.0**, clé API valide
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -194,6 +214,7 @@ Les API keys sont désormais gérées exclusivement via les endpoints `/secret-a
 ```
 
 **Réponses d'erreur** :
+
 - `400` : Données de validation invalides ou API key manquante
 - `401` : Identifiants invalides
 - `403` : Compte désactivé, email non vérifié, ou API key invalide
@@ -201,6 +222,7 @@ Les API keys sont désormais gérées exclusivement via les endpoints `/secret-a
 - `500` : Erreur interne du serveur
 
 **Exemple de réponse API key manquante (410)** :
+
 ```json
 {
   "success": false,
@@ -219,6 +241,7 @@ Les API keys sont désormais gérées exclusivement via les endpoints `/secret-a
 ```
 
 **Exemple de réponse API key invalide (403)** :
+
 ```json
 {
   "success": false,
@@ -237,6 +260,7 @@ Les API keys sont désormais gérées exclusivement via les endpoints `/secret-a
 ```
 
 **Exemple de réponse email non vérifié (403)** :
+
 ```json
 {
   "success": false,
@@ -264,11 +288,13 @@ Les API keys sont désormais gérées exclusivement via les endpoints `/secret-a
 ---
 
 ## POST `/users/request-password-reset`
+
 **Description** : Demander une réinitialisation de mot de passe (par email)
 
 **Authentification** : ⭐ Non requise
 
 **Données attendues** :
+
 ```json
 {
   "email": "user@example.com"
@@ -276,9 +302,11 @@ Les API keys sont désormais gérées exclusivement via les endpoints `/secret-a
 ```
 
 **Validation** :
+
 - `email` : requis, email valide
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -287,6 +315,7 @@ Les API keys sont désormais gérées exclusivement via les endpoints `/secret-a
 ```
 
 **Réponses d'erreur** :
+
 - `400` : Données de validation invalides
 - `404` : Utilisateur non trouvé
 - `500` : Erreur lors de la génération du token ou de l'envoi de l'email
@@ -294,11 +323,13 @@ Les API keys sont désormais gérées exclusivement via les endpoints `/secret-a
 ---
 
 ## POST `/users/reset-password`
+
 **Description** : Changer le mot de passe avec un token
 
 **Authentification** : ⭐ Non requise
 
 **Données attendues** :
+
 ```json
 {
   "token": "dsfélg...",
@@ -307,10 +338,12 @@ Les API keys sont désormais gérées exclusivement via les endpoints `/secret-a
 ```
 
 **Validation** :
+
 - `token` : requis, token valide non expiré
 - `new_password` : requis, 6 caractères minimum
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -319,6 +352,7 @@ Les API keys sont désormais gérées exclusivement via les endpoints `/secret-a
 ```
 
 **Réponses d'erreur** :
+
 - `400` : Données de validation invalides
 - `404` : Token non trouvé, invalide ou expiré
 - `404` : Utilisateur non trouvé
@@ -327,11 +361,13 @@ Les API keys sont désormais gérées exclusivement via les endpoints `/secret-a
 ---
 
 ## POST `/users/resend-verification`
+
 **Description** : Renvoyer l'email de vérification pour un compte non vérifié
 
 **Authentification** : ⭐ Non requise
 
 **Données attendues** :
+
 ```json
 {
   "email": "user@example.com"
@@ -339,9 +375,11 @@ Les API keys sont désormais gérées exclusivement via les endpoints `/secret-a
 ```
 
 **Validation** :
+
 - `email` : requis, email valide
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -354,6 +392,7 @@ Les API keys sont désormais gérées exclusivement via les endpoints `/secret-a
 ```
 
 **Réponses d'erreur** :
+
 - `400` : Données de validation invalides ou email déjà vérifié
 - `404` : Aucun compte associé à cette adresse email
 - `500` : Erreur lors de l'envoi de l'email
@@ -361,11 +400,13 @@ Les API keys sont désormais gérées exclusivement via les endpoints `/secret-a
 ---
 
 ## POST `/users/verify-email`
+
 **Description** : Vérifier l'adresse email avec un token
 
 **Authentification** : ⭐ Non requise
 
 **Données attendues** :
+
 ```json
 {
   "token": "ajsdfhkasdf"
@@ -373,9 +414,11 @@ Les API keys sont désormais gérées exclusivement via les endpoints `/secret-a
 ```
 
 **Validation** :
+
 - `token` : requis, token valide
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -384,22 +427,26 @@ Les API keys sont désormais gérées exclusivement via les endpoints `/secret-a
 ```
 
 **Réponses d'erreur** :
+
 - `404` : Utilisateur non trouvé ou token invalide
 - `500` : Erreur lors de la vérification
 
 ---
 
 ## GET `/groups/public`
+
 **Description** : Lister les groupes publics
 
 **Authentification** : ⭐ Non requise
 
 **Paramètres de requête** :
+
 - `q` : terme recherché (optionnel, 2-255 caractères)
 - `page` : numéro de page (optionnel, entier >= 1)
 - `page_size` : taille de page (optionnel, entier 1-100)
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -425,6 +472,7 @@ Les API keys sont désormais gérées exclusivement via les endpoints `/secret-a
 ```
 
 **Réponses d'erreur** :
+
 - `400` : Paramètres de validation invalides
 - `500` : Erreur serveur lors de la récupération
 

@@ -161,17 +161,19 @@ END$$
 
 Format : `{prefix}_{random_string}`
 
-```
+```text
 ag_live_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6
 ```
 
 Stockage :
+
 - `key_prefix` = "ag_live"
 - `key_hash` = SHA256 de la clé complète
 - `last_4` = "o5p6"
 
 Affichage client :
-```
+
+```text
 ag_live••••o5p6
 ```
 

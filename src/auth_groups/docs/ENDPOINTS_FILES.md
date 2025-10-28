@@ -5,21 +5,25 @@
 ---
 
 ## POST `/files`
+
 **Description** : Upload d'un fichier générique
 
 **Authentification** : 🔒 Utilisateur
 
 **Données attendues** :
+
 - Fichier : `file` (multipart/form-data)
 - `description` : Description du fichier (optionnel)
 
 **Validation** :
+
 - `file` : requis, fichier valide selon les types autorisés
 - `description` : optionnel, texte libre
 - **Limites de taille** : Images: 5MB, Documents: 10MB, Audio: 20MB, Vidéo: 50MB
 - **Types autorisés** : JPEG, PNG, GIF, WebP, PDF, TXT, DOC, DOCX, MP3, WAV, OGG, MP4, AVI, MOV
 
 **Réponse succès (201)** :
+
 ```json
 {
   "success": true,
@@ -39,6 +43,7 @@
 ```
 
 **Réponses d'erreur** :
+
 - `400` : Aucun fichier valide uploadé
 - `401` : Authentification requise
 - `413` : Fichier trop volumineux
@@ -48,22 +53,26 @@
 ---
 
 ## GET `/files/{id}`
+
 **Description** : Télécharger un fichier
 
 **Authentification** : 🔒 Utilisateur
 
 **Validation** :
+
 - `id` : requis, ID du fichier numérique
 
 **Réponse succès (200)** :
 Retourne le fichier binaire avec les en-têtes appropriés :
-```
+
+```text
 Content-Type: application/pdf (exemple)
 Content-Disposition: attachment; filename="document.pdf"
 Content-Length: 2048576
 ```
 
 **Réponses d'erreur** :
+
 - `401` : Authentification requise
 - `403` : Accès non autorisé
 - `404` : Fichier non trouvé
@@ -72,14 +81,17 @@ Content-Length: 2048576
 ---
 
 ## GET `/files/{id}/info`
+
 **Description** : Obtenir des informations sur un fichier
 
 **Authentification** : 🔒 Utilisateur
 
 **Validation** :
+
 - `id` : requis, ID du fichier numérique
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -101,6 +113,7 @@ Content-Length: 2048576
 ```
 
 **Réponses d'erreur** :
+
 - `401` : Authentification requise
 - `403` : Accès non autorisé
 - `404` : Fichier non trouvé
@@ -109,11 +122,13 @@ Content-Length: 2048576
 ---
 
 ## DELETE `/files/{id}`
+
 **Description** : Supprimer un fichier. Force_delete pour suppression définitive du fichier également
 
 **Authentification** : 🔒 Propriétaire ou Admin
 
 **Données attendues** :
+
 ```json
 {
   "force_delete": true
@@ -121,10 +136,12 @@ Content-Length: 2048576
 ```
 
 **Validation** :
+
 - `id` : requis, ID du fichier numérique
 - `force_delete` : optionnel, booléen pour suppression physique du fichier
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -133,6 +150,7 @@ Content-Length: 2048576
 ```
 
 **Réponses d'erreur** :
+
 - `401` : Authentification requise
 - `403` : Accès non autorisé
 - `404` : Fichier non trouvé
@@ -141,14 +159,17 @@ Content-Length: 2048576
 ---
 
 ## POST `/files/{id}/restore`
+
 **Description** : Restaurer un fichier supprimé (softdelete)
 
 **Authentification** : 🔒 Propriétaire ou Admin
 
 **Validation** :
+
 - `id` : requis, ID du fichier numérique
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -157,6 +178,7 @@ Content-Length: 2048576
 ```
 
 **Réponses d'erreur** :
+
 - `400` : Ce fichier n'est pas supprimé
 - `401` : Authentification requise
 - `403` : Accès non autorisé
@@ -166,18 +188,22 @@ Content-Length: 2048576
 ---
 
 ## GET `/files/user/{user_id}`
+
 **Description** : Lister les fichiers d'un utilisateur
 
 **Authentification** : 🔒 Propriétaire ou Admin
 
 **Paramètres de requête** :
+
 - `limit` : nombre d'éléments (optionnel, 1-100, défaut 20)
 
 **Validation** :
+
 - `user_id` : requis, ID utilisateur numérique
 - `limit` : optionnel, nombre d'éléments 1-100, défaut 20
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -200,6 +226,7 @@ Content-Length: 2048576
 ```
 
 **Réponses d'erreur** :
+
 - `401` : Authentification requise
 - `403` : Accès non autorisé
 - `404` : Utilisateur non trouvé

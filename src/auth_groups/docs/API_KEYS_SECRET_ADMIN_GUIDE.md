@@ -6,7 +6,7 @@ Le système **Secret-Admin** est le nouveau point central de gestion des API Key
 
 ### 🔒 Architecture de sécurité
 
-```
+```text
 Authentification Double Requise :
 ┌─────────────────────────┐
 │ 1. JWT Admin Token      │ ← Authentification utilisateur admin
@@ -53,7 +53,8 @@ ADMIN_SECRET_KEY=Ak9#mZ$7LpQ@vX2nR8sE!dF6gH4jK0uY
 ## 📚 Endpoints disponibles
 
 ### Base URL
-```
+
+```text
 POST /secret-admin/api-keys/*
 ```
 
@@ -71,7 +72,8 @@ POST /secret-admin/api-keys/*
 
 ### 1. Authentification administrative
 
-**Étape 1 : Obtenir un JWT Admin**
+#### **Étape 1 : Obtenir un JWT Admin**
+
 ```bash
 curl -X POST "http://localhost/auth-groups/login" \
   -H "Content-Type: application/json" \
@@ -83,6 +85,7 @@ curl -X POST "http://localhost/auth-groups/login" \
 ```
 
 **Réponse :**
+
 ```json
 {
   "success": true,
@@ -110,6 +113,7 @@ curl -X POST "http://localhost/auth-groups/secret-admin/api-keys/list" \
 ```
 
 **Réponse :**
+
 ```json
 {
   "success": true,
@@ -148,6 +152,7 @@ curl -X POST "http://localhost/auth-groups/secret-admin/api-keys/create" \
 ```
 
 **Réponse :**
+
 ```json
 {
   "success": true,
@@ -223,6 +228,7 @@ curl -X POST "http://localhost/auth-groups/secret-admin/api-keys/bulk-actions" \
 ### Exemples de réponses d'erreur
 
 **JWT manquant :**
+
 ```json
 {
   "success": false,
@@ -233,6 +239,7 @@ curl -X POST "http://localhost/auth-groups/secret-admin/api-keys/bulk-actions" \
 ```
 
 **Secret key invalide :**
+
 ```json
 {
   "success": false,
@@ -243,6 +250,7 @@ curl -X POST "http://localhost/auth-groups/secret-admin/api-keys/bulk-actions" \
 ```
 
 **API Key introuvable :**
+
 ```json
 {
   "success": false,
@@ -259,6 +267,7 @@ curl -X POST "http://localhost/auth-groups/secret-admin/api-keys/bulk-actions" \
 ### Logs automatiques
 
 Le système enregistre automatiquement :
+
 - Toutes les tentatives d'accès aux endpoints secret-admin
 - Créations, modifications et suppressions d'API keys
 - Échecs d'authentification avec détails
@@ -266,7 +275,7 @@ Le système enregistre automatiquement :
 
 ### Fichiers de logs
 
-```
+```text
 logs/
 ├── secret_admin_access.log      # Accès aux endpoints secret-admin
 ├── api_keys_operations.log      # Opérations CRUD sur les API keys
@@ -337,18 +346,21 @@ grep -c "ADMIN_SECRET_INVALID" logs/security_events.log
 ### Étapes de migration
 
 1. **Préparation**
+
    ```bash
    # Sauvegarder les API keys existantes
    curl -X GET "http://localhost/auth-groups/api-keys" > backup_api_keys.json
    ```
 
 2. **Configuration**
+
    ```bash
    # Définir ADMIN_SECRET_KEY
    echo "ADMIN_SECRET_KEY=your-secret-key" >> .env
    ```
 
 3. **Test de migration**
+
    ```bash
    # Tester l'accès secret-admin
    curl -X POST "http://localhost/auth-groups/secret-admin/api-keys/list" \
@@ -357,6 +369,7 @@ grep -c "ADMIN_SECRET_INVALID" logs/security_events.log
    ```
 
 4. **Mise à jour des applications**
+
    ```javascript
    // Ancien code
    const response = await fetch('/auth-groups/api-keys', {
@@ -413,4 +426,4 @@ En cas de problème avec le système Secret-Admin :
 
 ---
 
-*Document mis à jour pour cmem2 API v1.3.0 - Janvier 2024*
+Document mis à jour pour cmem2 API v1.3.0 - octobre 2025

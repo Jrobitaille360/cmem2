@@ -8,7 +8,7 @@ AuthGroups API est une API REST complète conçue pour gérer l'authentification
 
 ### Flux de requête
 
-```
+```text
 Client → index.php → Router → RouteHandler → Controller → Model → Database
                                                      ↓
                                                  Response
@@ -17,12 +17,15 @@ Client → index.php → Router → RouteHandler → Controller → Model → Da
 ### Composants principaux
 
 #### 1. Router (`src/auth_groups/Routing/Router.php`)
+
 - Point d'entrée principal du routage
 - Analyse les URLs et dirige vers les handlers appropriés
 - Gestion centralisée des erreurs
 
 #### 2. Route Handlers
+
 Handlers spécialisés par module :
+
 - `UserRouteHandler` - Gestion des utilisateurs
 - `GroupRouteHandler` - Gestion des groupes
 - `FileRouteHandler` - Gestion des fichiers
@@ -34,7 +37,9 @@ Handlers spécialisés par module :
 - `ApiKeyRouteHandler` - 🆕 Gestion des clés API
 
 #### 3. Controllers
+
 Contrôleurs par fonctionnalité :
+
 - `UserController` - Opérations utilisateurs
 - `GroupController` - Opérations groupes
 - `FileController` - Opérations fichiers
@@ -43,7 +48,9 @@ Contrôleurs par fonctionnalité :
 - etc.
 
 #### 4. Models
+
 Modèles de données :
+
 - `User` - Utilisateur
 - `Group` - Groupe
 - `File` - Fichier
@@ -52,19 +59,25 @@ Modèles de données :
 - `BaseModel` - Classe de base avec CRUD
 
 #### 5. Services
+
 Services partagés :
+
 - `AuthService` - Authentification JWT
 - `EmailService` - Envoi d'emails
 - `LogService` - Logging avancé
 - `ValidTokenService` - Gestion des sessions
 
 #### 6. Middleware
+
 Middleware d'authentification :
+
 - `JWTAuthMiddleware` - Authentification par JWT tokens
 - `ApiKeyAuthMiddleware` - 🆕 Authentification par API keys
 
 #### 7. Utils
+
 Utilitaires :
+
 - `Response` - Formatage des réponses
 - `Validator` - Validation des données
 - `FileValidator` - Validation de fichiers
@@ -117,6 +130,7 @@ Utilitaires :
 L'API supporte deux méthodes d'authentification :
 
 #### 1. JWT Tokens (pour utilisateurs)
+
 - **Usage** : Applications web, mobiles, authentification utilisateur
 - **Durée** : 24 heures par défaut
 - **Header** : `Authorization: Bearer {token}`
@@ -129,6 +143,7 @@ $user = $authMiddleware->authenticate($request);
 ```
 
 #### 2. API Keys (pour machines/intégrations)
+
 - **Usage** : Intégrations machine-to-machine, automatisations, services externes
 - **Durée** : Configurable (jours ou jamais)
 - **Header** : `X-API-Key: {key}` ou `Authorization: Bearer {key}`
@@ -144,6 +159,7 @@ $user = $apiKeyAuth->authenticate($request);
 ```
 
 #### 3. Authentification flexible (JWT ou API Key)
+
 ```php
 // Accepte JWT ou API Key
 $apiKeyAuth = new ApiKeyAuthMiddleware();
@@ -212,26 +228,30 @@ $validation = $validator->validate($input, $rules);
 
 ### Types de fichiers supportés
 
-**Images**
+#### **Images**
+
 - JPG, JPEG, PNG, GIF, WEBP
 - Taille max : 5 MB
 - Dimensions max : 4096x4096 px
 
-**Vidéos**
+#### **Vidéos**
+
 - MP4, WEBM, OGG, AVI, MOV
 - Taille max : 50 MB
 
-**Documents**
+#### **Documents**
+
 - PDF, DOC, DOCX, TXT, XLS, XLSX
 - Taille max : 10 MB
 
-**Audio**
+#### **Audio**
+
 - MP3, WAV, OGG
 - Taille max : 10 MB
 
 ### Structure de stockage
 
-```
+```text
 config/uploads/
 ├── avatars/           # Avatars utilisateurs
 │   └── {user_id}.{ext}
@@ -245,6 +265,7 @@ config/uploads/
 ### Tables associables
 
 Les tags peuvent être associés à :
+
 - `groups` - Groupes
 - `files` - Fichiers
 - `all` - Toutes les tables
@@ -305,12 +326,14 @@ $_ENV['MAIL_ENCRYPTION'] = 'tls';
 
 ### Données collectées
 
-**Par utilisateur**
+#### **Par utilisateur**
+
 - Nombre de groupes
 - Stockage utilisé
 - Date de dernière activité
 
-**Système**
+#### **Système**
+
 - Utilisateurs en ligne
 - Activité globale
 - Utilisation ressources
@@ -318,6 +341,7 @@ $_ENV['MAIL_ENCRYPTION'] = 'tls';
 ### Génération
 
 Les statistiques sont générées :
+
 - À la demande via API
 - Périodiquement (tâche planifiée recommandée)
 
@@ -398,16 +422,19 @@ Les statistiques sont générées :
 
 ### Tâches recommandées
 
-**Quotidien**
+#### **Quotidien**
+
 - Vérifier les logs d'erreur
 - Monitorer l'espace disque
 
-**Hebdomadaire**
+#### **Hebdomadaire**
+
 - Nettoyer fichiers temporaires
 - Archiver vieux logs
 - Backup base de données
 
-**Mensuel**
+#### **Mensuel**
+
 - Audit sécurité
 - Mise à jour dépendances
 - Optimisation DB
@@ -440,4 +467,4 @@ Les statistiques sont générées :
 
 ---
 
-Pour toute question : support@authgroups.local
+Pour toute question : <support@authgroups.local>

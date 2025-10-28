@@ -152,6 +152,7 @@
 - `403` : Accès non autorisé
 - `404` : Utilisateur non trouvé
 - `500` : Erreur lors du changement de mot de passe
+
 ---
 
 ## POST `/users/logout`

@@ -5,11 +5,13 @@
 ---
 
 ## POST `/groups`
+
 **Description** : Créer un groupe
 
 **Authentification** : 🔒 Utilisateur
 
 **Données attendues** :
+
 ```json
 {
   "name": "Nom du groupe",
@@ -20,12 +22,14 @@
 ```
 
 **Validation** :
+
 - `name` : requis, 2-255 caractères
 - `description` : optionnel, texte libre
 - `visibility` : optionnel, in('public','private'), défaut 'private'
 - `max_members` : optionnel, >0 <=1000, défaut 50
 
 **Réponse succès (201)** :
+
 ```json
 {
   "success": true,
@@ -44,6 +48,7 @@
 ```
 
 **Réponses d'erreur** :
+
 - `400` : Données de validation invalides
 - `401` : Authentification requise
 - `500` : Erreur lors de la création
@@ -51,14 +56,17 @@
 ---
 
 ## GET `/groups/{id}`
+
 **Description** : Détails d'un groupe
 
 **Authentification** : 🔒 Membre, Admin, ou ⭐ Non (si public)
 
 **Validation** :
+
 - `id` : requis, ID de groupe valide
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -82,6 +90,7 @@
 ```
 
 **Réponses d'erreur** :
+
 - `403` : Accès non autorisé (groupe privé)
 - `404` : Groupe non trouvé
 - `500` : Erreur serveur
@@ -89,11 +98,13 @@
 ---
 
 ## PUT `/groups/{id}`
+
 **Description** : Modifier un groupe
 
 **Authentification** : 🔒 Admin du groupe ou Admin
 
 **Données attendues** :
+
 ```json
 {
   "name": "Nouveau nom",
@@ -104,6 +115,7 @@
 ```
 
 **Validation** :
+
 - `id` : requis, ID de groupe valide
 - `name` : optionnel, 2-255 caractères
 - `description` : optionnel, texte libre
@@ -111,6 +123,7 @@
 - `max_members` : optionnel, >0 <=1000
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -127,6 +140,7 @@
 ```
 
 **Réponses d'erreur** :
+
 - `400` : Données de validation invalides
 - `401` : Authentification requise
 - `403` : Accès non autorisé
@@ -136,11 +150,13 @@
 ---
 
 ## DELETE `/groups/{id}`
+
 **Description** : Supprimer un groupe
 
 **Authentification** : 🔒 Admin du groupe ou Admin
 
 **Données attendues** :
+
 ```json
 {
   "force_delete": true
@@ -148,10 +164,12 @@
 ```
 
 **Validation** :
+
 - `id` : requis, ID de groupe valide
 - `force_delete` : optionnel, booléen pour suppression définitive
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -160,6 +178,7 @@
 ```
 
 **Réponses d'erreur** :
+
 - `401` : Authentification requise
 - `403` : Accès non autorisé
 - `404` : Groupe non trouvé
@@ -168,14 +187,17 @@
 ---
 
 ## POST `/groups/{id}/restore`
+
 **Description** : Restaurer un groupe supprimé
 
 **Authentification** : 🔒 Admin
 
 **Validation** :
+
 - `id` : requis, ID de groupe valide
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -184,6 +206,7 @@
 ```
 
 **Réponses d'erreur** :
+
 - `400` : Ce groupe n'est pas supprimé
 - `401` : Authentification requise
 - `403` : Accès non autorisé
@@ -193,17 +216,21 @@
 ---
 
 ## GET `/groups/user/{user_id}`
+
 **Description** : Groupes d'un utilisateur
 
 **Authentification** : 🔒 Utilisateur (soi-même) ou Admin
 
 **Validation** :
+
 - `user_id` : requis, ID utilisateur valide
 
 **Paramètres de requête** :
+
 - `page_size` : taille de page (optionnel, 1-100, défaut 20)
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -227,6 +254,7 @@
 ```
 
 **Réponses d'erreur** :
+
 - `401` : Authentification requise
 - `403` : Accès non autorisé
 - `404` : Utilisateur non trouvé
@@ -235,14 +263,17 @@
 ---
 
 ## GET `/groups/my-groups`
+
 **Description** : Mes groupes
 
 **Authentification** : 🔒 Utilisateur
 
 **Paramètres de requête** :
+
 - `page_size` : taille de page (optionnel, entier 1-100)
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -266,22 +297,26 @@
 ```
 
 **Réponses d'erreur** :
+
 - `401` : Authentification requise
 - `500` : Erreur serveur
 
 ---
 
 ## GET `/groups/search`
+
 **Description** : Rechercher des groupes
 
 **Authentification** : 🔒 Utilisateur
 
 **Paramètres de requête** :
+
 - `q` : terme de recherche (optionnel)
 - `visibility` : filtrer par visibilité (optionnel)
 - `page_size` : taille de page (optionnel, 1-100)
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -304,17 +339,20 @@
 ```
 
 **Réponses d'erreur** :
+
 - `401` : Authentification requise
 - `500` : Erreur serveur
 
 ---
 
 ## POST `/groups/{id}/invite`
+
 **Description** : Inviter un utilisateur
 
 **Authentification** : 🔒 Admin du groupe ou Admin
 
 **Données attendues** :
+
 ```json
 {
   "user_email": "user@example.com",
@@ -323,11 +361,13 @@
 ```
 
 **Validation** :
+
 - `id` : requis, ID de groupe valide
 - `user_email` : requis, email valide d'un utilisateur existant
 - `role` : optionnel, in('member','moderator','admin'), défaut 'member'
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -345,6 +385,7 @@
 ```
 
 **Réponses d'erreur** :
+
 - `400` : Données de validation invalides
 - `401` : Authentification requise
 - `403` : Accès non autorisé
@@ -355,11 +396,13 @@
 ---
 
 ## POST `/groups/join`
+
 **Description** : Rejoindre un groupe avec un code d'invitation
 
 **Authentification** : 🔒 Utilisateur
 
 **Données attendues** :
+
 ```json
 {
   "code": "ABC123XYZ"
@@ -367,9 +410,11 @@
 ```
 
 **Validation** :
+
 - `code` : requis, chaîne de caractères (code d'invitation valide)
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -384,6 +429,7 @@
 ```
 
 **Réponses d'erreur** :
+
 - `400` : Code d'invitation requis
 - `401` : Authentification requise
 - `404` : Code d'invitation invalide ou expiré
@@ -394,11 +440,13 @@
 ---
 
 ## PUT `/groups/{group_id}/members/{user_id}`
+
 **Description** : Mettre à jour le rôle d'un utilisateur dans un groupe
 
 **Authentification** : 🔒 Admin du groupe ou Admin
 
 **Données attendues** :
+
 ```json
 {
   "role": "moderator"
@@ -406,11 +454,13 @@
 ```
 
 **Validation** :
+
 - `group_id` : requis, ID de groupe valide
 - `user_id` : requis, ID utilisateur valide (membre du groupe)
 - `role` : requis, in('member','moderator','admin')
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -428,6 +478,7 @@
 ```
 
 **Réponses d'erreur** :
+
 - `400` : Données de validation invalides
 - `401` : Authentification requise
 - `403` : Accès non autorisé
@@ -438,11 +489,13 @@
 ---
 
 ## GET `/groups/my-invitations`
+
 **Description** : Mes invitations en attente
 
 **Authentification** : 🔒 Utilisateur
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -466,20 +519,24 @@
 ```
 
 **Réponses d'erreur** :
+
 - `401` : Authentification requise
 - `500` : Erreur serveur
 
 ---
 
 ## POST `/groups/{id}/leave`
+
 **Description** : Quitter un groupe. Le propriétaire ne peut pas quitter le groupe
 
 **Authentification** : 🔒 Utilisateur
 
 **Validation** :
+
 - `id` : requis, ID de groupe valide
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -488,6 +545,7 @@
 ```
 
 **Réponses d'erreur** :
+
 - `401` : Authentification requise
 - `403` : Le propriétaire ne peut pas quitter le groupe
 - `404` : Groupe non trouvé
@@ -497,18 +555,22 @@
 ---
 
 ## GET `/groups/{id}/members`
+
 **Description** : Récupérer les membres d'un groupe
 
 **Authentification** : 🔒 Membre ou Admin
 
 **Validation** :
+
 - `id` : requis, ID de groupe valide
 
 **Paramètres de requête** :
+
 - `page` : numéro de page (optionnel, >= 1)
 - `limit` : nombre d'éléments (optionnel, 1-100)
 
 **Réponse succès (200)** :
+
 ```json
 {
   "success": true,
@@ -533,6 +595,7 @@
 ```
 
 **Réponses d'erreur** :
+
 - `401` : Authentification requise
 - `403` : Accès non autorisé (pas membre du groupe)
 - `404` : Groupe non trouvé
