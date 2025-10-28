@@ -2,13 +2,15 @@
   "api": {
     "name": "AuthGroups API",
     "version": "1.3.0",
-    "description": "API REST complète pour la gestion d'authentification, groupes, fichiers et tags",
-    "generated": "2025-10-23",
+    "description": "API REST complète pour la gestion d'authentification, groupes, fichiers et tags avec sécurité renforcée",
+    "generated": "2025-10-27",
     "base_url": "/",
     "authentication": {
       "types": ["JWT", "API_KEY"],
       "jwt_header": "Authorization: Bearer {token}",
-      "api_key_header": "X-API-Key: {key}"
+      "api_key_header": "X-API-Key: {key}",
+      "security_update": "TOUS les logins nécessitent maintenant une API key valide",
+      "api_key_management": "Gestion des API keys UNIQUEMENT via secret-admin avec authentification renforcée"
     }
   },
   "endpoints": {
@@ -56,7 +58,6 @@
                   "files": "Gestion des fichiers (upload, download, suppression)",
                   "tags": "Gestion des tags (création, modification, association)",
                   "stats": "Statistiques et analytics (plateforme, groupes, utilisateurs)",
-                  "api-keys": "Gestion des clés API (création, régénération, révocation)",
                   "data": "Synchronisation et fusion des données hors-ligne"
                 },
                 "webhooks": {
@@ -65,7 +66,8 @@
                   "paypal": "Webhook PayPal IPN"
                 },
                 "admin": {
-                  "secret-admin": "Endpoints d'administration (authentification renforcée requise)"
+                  "secret-admin": "Endpoints d'administration (authentification renforcée requise)",
+                  "secret-admin/api-keys": "Gestion sécurisée des clés API (création, révocation, régénération)"
                 }
               },
               "authentication": {
@@ -98,13 +100,17 @@
         {
           "method": "POST",
           "path": "/users/login",
-          "description": "Connexion utilisateur",
-          "auth_required": false,
+          "description": "Connexion utilisateur - NÉCESSITE UNE API KEY VALIDE",
+          "auth_required": "API_KEY_MANDATORY",
+          "headers": {
+            "X-API-Key": "string (required) - API key valide obligatoire"
+          },
           "body": {
             "email": "string (required)",
             "password": "string (required)"
           },
-          "response": "User object avec token JWT"
+          "response": "User object avec token JWT",
+          "security_note": "Toutes les tentatives de connexion sans API key seront rejetées avec HTTP 401"
         },
         {
           "method": "POST",
@@ -156,6 +162,9 @@
           "path": "/users",
           "description": "Liste de tous les utilisateurs",
           "roles": ["ADMINISTRATEUR"],
+          "body": {
+            "email": "string (optional)"
+          },
           "response": "Array d'utilisateurs"
         },
         {
@@ -641,55 +650,27 @@
       ]
     },
     "api-keys": {
-      "description": "Gestion des clés API",
+      "description": "🚨 ENDPOINTS DÉPLACÉS - Sécurité renforcée",
       "base_path": "/api-keys",
-      "auth_required": true,
-      "auth_type": "JWT only",
-      "routes": [
+      "status": "DEPRECATED - HTTP 410 Gone",
+      "migration_info": {
+        "reason": "Sécurité renforcée - Gestion des API keys uniquement via secret admin",
+        "new_location": "/secret-admin/api-keys",
+        "auth_requirements": ["JWT avec rôle ADMINISTRATEUR", "ADMIN_SECRET_KEY dans le body"],
+        "migration_date": "2025-10-27",
+        "breaking_change": true
+      },
+      "deprecated_routes": [
         {
-          "method": "POST",
-          "path": "/api-keys",
-          "description": "Créer une nouvelle clé API",
-          "body": {
-            "name": "string (required)",
-            "scopes": "array (required, values: read|write|delete|admin)",
-            "expires_in_days": "integer (optional, default: 365)",
-            "environment": "string (optional, values: production|test, default: production)"
-          },
-          "response": "ApiKey object avec clé complète (visible une seule fois)"
-        },
-        {
-          "method": "GET",
-          "path": "/api-keys",
-          "description": "Lister toutes ses clés API",
-          "response": "Array de ApiKey objects (sans les clés complètes)"
-        },
-        {
-          "method": "GET",
-          "path": "/api-keys/{id}",
-          "description": "Obtenir les détails d'une clé API",
-          "params": {
-            "id": "integer (required)"
-          },
-          "response": "ApiKey object (sans la clé complète)"
-        },
-        {
-          "method": "DELETE",
-          "path": "/api-keys/{id}",
-          "description": "Révoquer une clé API",
-          "params": {
-            "id": "integer (required)"
-          },
-          "response": "Message de confirmation"
-        },
-        {
-          "method": "POST",
-          "path": "/api-keys/{id}/regenerate",
-          "description": "Régénérer une clé API",
-          "params": {
-            "id": "integer (required)"
-          },
-          "response": "ApiKey object avec nouvelle clé complète (visible une seule fois)"
+          "method": "ALL",
+          "path": "/api-keys/*",
+          "status": "HTTP 410 Gone",
+          "description": "Tous les endpoints API keys publics sont désactivés",
+          "response": {
+            "error": "Endpoint déplacé - Utilisez le système d'administration secret pour gérer les API keys",
+            "message": "La gestion des API keys nécessite maintenant une authentification renforcée",
+            "details": "Contactez votre administrateur système pour l'accès aux fonctionnalités de gestion des API keys"
+          }
         }
       ]
     },
@@ -743,11 +724,11 @@
       ]
     },
     "secret-admin": {
-      "description": "Endpoints d'administration secrets (non documentés publiquement)",
+      "description": "Endpoints d'administration secrets avec sécurité renforcée",
       "base_path": "/secret-admin",
       "auth_required": true,
       "roles": ["ADMINISTRATEUR"],
-      "additional_security": "Secret key required in request body",
+      "additional_security": "ADMIN_SECRET_KEY required in request body/params",
       "routes": [
         {
           "method": "POST",
@@ -764,10 +745,74 @@
           "method": "GET",
           "path": "/secret-admin/procedures",
           "description": "Lister les procédures disponibles",
-          "body": {
+          "params": {
             "secret": "string (required)"
           },
           "response": "Array des procédures disponibles"
+        },
+        {
+          "method": "POST",
+          "path": "/secret-admin/api-keys",
+          "description": "Créer une nouvelle API key (sécurisé)",
+          "body": {
+            "admin_secret": "string (required) - ADMIN_SECRET_KEY",
+            "user_id": "integer (required) - ID utilisateur propriétaire",
+            "name": "string (required) - Nom descriptif de la clé",
+            "scopes": "array (optional) - Permissions [read, write, delete, admin]",
+            "environment": "string (optional) - production|test",
+            "expires_in_days": "integer (optional) - Expiration en jours",
+            "rate_limit_per_minute": "integer (optional) - Limite par minute",
+            "rate_limit_per_hour": "integer (optional) - Limite par heure",
+            "notes": "string (optional) - Notes administratives"
+          },
+          "response": "ApiKey object avec clé complète (visible une seule fois)",
+          "security_warning": "⚠️ Clé visible uniquement à la création - sauvegardez immédiatement"
+        },
+        {
+          "method": "GET",
+          "path": "/secret-admin/api-keys",
+          "description": "Lister toutes les API keys (administrateur)",
+          "params": {
+            "admin_secret": "string (required) - ADMIN_SECRET_KEY",
+            "user_id": "integer (optional) - Filtrer par utilisateur"
+          },
+          "response": "Array de toutes les API keys avec détails administrateur"
+        },
+        {
+          "method": "GET",
+          "path": "/secret-admin/api-keys/{id}",
+          "description": "Obtenir les détails d'une API key spécifique",
+          "params": {
+            "id": "integer (required) - ID de la clé",
+            "admin_secret": "string (required) - ADMIN_SECRET_KEY"
+          },
+          "response": "ApiKey object avec détails complets (sans la clé secrète)"
+        },
+        {
+          "method": "DELETE",
+          "path": "/secret-admin/api-keys/{id}",
+          "description": "Révoquer une API key",
+          "params": {
+            "id": "integer (required) - ID de la clé"
+          },
+          "body": {
+            "admin_secret": "string (required) - ADMIN_SECRET_KEY",
+            "reason": "string (optional) - Raison de la révocation"
+          },
+          "response": "Confirmation de révocation avec détails administrateur"
+        },
+        {
+          "method": "POST",
+          "path": "/secret-admin/api-keys/{id}/regenerate",
+          "description": "Régénérer une API key (nouvelle clé, ancienne révoquée)",
+          "params": {
+            "id": "integer (required) - ID de la clé à régénérer"
+          },
+          "body": {
+            "admin_secret": "string (required) - ADMIN_SECRET_KEY"
+          },
+          "response": "Nouvelle ApiKey object avec clé complète (visible une seule fois)",
+          "security_warning": "⚠️ Nouvelle clé visible uniquement à la régénération"
         }
       ]
     }
@@ -776,11 +821,13 @@
     "200": "Success - Requête réussie",
     "201": "Created - Ressource créée avec succès",
     "400": "Bad Request - Paramètres invalides",
-    "401": "Unauthorized - Authentification requise ou invalide",
+    "401": "Unauthorized - Authentification requise ou invalide (API key manquante/invalide)",
     "403": "Forbidden - Permissions insuffisantes",
     "404": "Not Found - Ressource non trouvée",
     "409": "Conflict - Conflit avec l'état actuel",
+    "410": "Gone - Endpoint déplacé/supprimé (ex: anciens endpoints API keys)",
     "422": "Unprocessable Entity - Validation échouée",
+    "429": "Too Many Requests - Rate limit dépassé",
     "500": "Internal Server Error - Erreur serveur"
   },
   "response_format": {
@@ -801,6 +848,13 @@
     "soft_delete": "Les suppressions sont des soft deletes - les ressources peuvent être restaurées",
     "rate_limiting": "Rate limiting appliqué pour les API Keys selon les scopes configurés",
     "cors": "CORS activé pour les origines autorisées",
-    "logging": "Toutes les requêtes sont loggées pour l'audit"
+    "logging": "Toutes les requêtes sont loggées pour l'audit",
+    "security_update_v1_3_0": {
+      "api_key_requirement": "TOUS les logins nécessitent maintenant une API key valide",
+      "api_key_management": "Gestion des API keys UNIQUEMENT via /secret-admin/api-keys avec authentification renforcée",
+      "deprecated_endpoints": "Les anciens endpoints /api-keys/* retournent HTTP 410 Gone",
+      "breaking_change": "Cette mise à jour contient des changements incompatibles - migration requise",
+      "bootstrap_script": "Utilisez bootstrap_create_first_api_key.php pour créer votre première API key"
+    }
   }
 }

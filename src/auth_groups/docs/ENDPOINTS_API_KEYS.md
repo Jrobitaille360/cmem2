@@ -1,26 +1,40 @@
-# Endpoints API Keys - AuthGroups API
+# ⚠️ ENDPOINTS API KEYS - DÉPRÉCIÉS ⚠️
 
-Documentation complète des endpoints de gestion des clés API pour l'authentification machine-to-machine.
+**AVERTISSEMENT IMPORTANT** : Ces endpoints sont **DÉPRÉCIÉS** depuis la version 1.3.0 et retournent maintenant **HTTP 410 Gone**.
 
-## 📋 Vue d'ensemble
+## � Migration Obligatoire
 
-Les clés API permettent une authentification alternative au JWT, idéale pour:
-- Intégrations serveur-à-serveur
-- Scripts automatisés
-- Applications backend
-- Services externes
+### Anciens endpoints (DÉPRÉCIÉS)
 
-## 🔐 Authentification
+- ~~`POST /api-keys`~~ → `POST /secret-admin/api-keys`
+- ~~`GET /api-keys`~~ → `GET /secret-admin/api-keys`  
+- ~~`GET /api-keys/{id}`~~ → `GET /secret-admin/api-keys/{id}`
+- ~~`DELETE /api-keys/{id}`~~ → `DELETE /secret-admin/api-keys/{id}`
+- ~~`PUT /api-keys/{id}/regenerate`~~ → `PUT /secret-admin/api-keys/{id}/regenerate`
 
-**Pour gérer les clés API**: Authentification JWT requise  
-**Pour utiliser une clé API**: Header `X-API-Key` ou `Authorization: Bearer <api_key>`
+### Nouveaux endpoints sécurisés
 
-### Format des clés
+👉 **Utilisez maintenant** : `/secret-admin/api-keys/*` avec authentification renforcée
 
-```
-Production: ag_live_<64 caractères hexadécimaux>
-Test:       ag_test_<64 caractères hexadécimaux>
-```
+## � Nouvelle Sécurité v1.3.0
+
+1. **API Keys obligatoires** : Tous les logins nécessitent une API key valide
+2. **Gestion centralisée** : Seuls les administrateurs peuvent gérer les API keys
+3. **Double authentification** : JWT Admin + ADMIN_SECRET_KEY requis
+4. **Script bootstrap** : `bootstrap_create_first_api_key.php` pour la première clé
+
+## 📖 Documentation
+
+Pour la documentation à jour des nouveaux endpoints sécurisés, consultez :
+
+- [API_ENDPOINTS_v1_3_0.json](API_ENDPOINTS_v1_3_0.json) - Spécification complète
+- [MIGRATION_v1.3.0.md](MIGRATION_v1.3.0.md) - Guide de migration
+
+---
+
+## ⚠️ DOCUMENTATION HISTORIQUE (Endpoints supprimés)
+
+*Cette documentation est conservée à titre historique uniquement. Ces endpoints ne fonctionnent plus.*
 
 ## 👑 Fonctionnalités Administrateur
 
@@ -53,6 +67,7 @@ Content-Type: application/json
 ```
 
 **Body:**
+
 ```json
 {
   "name": "Production API Key",
@@ -85,6 +100,7 @@ Content-Type: application/json
 | `metadata` | object | ❌ | Métadonnées personnalisées (JSON) |
 
 **Scopes disponibles:**
+
 - `read` - Lecture seule
 - `write` - Création et modification
 - `delete` - Suppression
@@ -92,6 +108,7 @@ Content-Type: application/json
 - `*` - Tous les scopes (accès complet)
 
 **Réponse succès (201):**
+
 ```json
 {
   "success": true,
@@ -120,6 +137,7 @@ Content-Type: application/json
 ⚠️ **IMPORTANT**: La clé complète n'est affichée qu'UNE SEULE FOIS lors de la création!
 
 **Erreurs:**
+
 - `400` - Validation échouée
 - `401` - Token JWT manquant ou invalide
 - `500` - Erreur serveur
@@ -143,6 +161,7 @@ Authorization: Bearer <jwt_token>
 | `user_id` | int | **Admin uniquement** : ID utilisateur dont lister les clés |
 
 **Réponse succès (200):**
+
 ```json
 {
   "success": true,
@@ -225,11 +244,13 @@ Authorization: Bearer <jwt_token>
 ```
 
 **Statuts possibles:**
+
 - `active` - Clé active et utilisable
 - `expired` - Clé expirée
 - `revoked` - Clé révoquée manuellement
 
 **Erreurs:**
+
 - `401` - Non authentifié
 - `500` - Erreur serveur
 
@@ -251,6 +272,7 @@ Authorization: Bearer <jwt_token>
 | `id` | int | ID de la clé API |
 
 **Réponse succès (200):**
+
 ```json
 {
   "success": true,
@@ -295,6 +317,7 @@ Authorization: Bearer <jwt_token>
 ```
 
 **Erreurs:**
+
 - `401` - Non authentifié
 - `403` - Accès refusé (clé appartient à un autre utilisateur)
 - `404` - Clé non trouvée
@@ -319,6 +342,7 @@ Content-Type: application/json
 | `id` | int | ID de la clé API à révoquer |
 
 **Body (optionnel):**
+
 ```json
 {
   "reason": "Clé compromise"
@@ -326,6 +350,7 @@ Content-Type: application/json
 ```
 
 **Réponse succès (200):**
+
 ```json
 {
   "success": true,
@@ -339,6 +364,7 @@ Content-Type: application/json
 ```
 
 **Erreurs:**
+
 - `400` - Clé déjà révoquée
 - `401` - Non authentifié
 - `403` - Accès refusé
@@ -363,6 +389,7 @@ Authorization: Bearer <jwt_token>
 | `id` | int | ID de la clé API à régénérer |
 
 **Réponse succès (201):**
+
 ```json
 {
   "success": true,
@@ -387,6 +414,7 @@ Authorization: Bearer <jwt_token>
 ⚠️ **IMPORTANT**: L'ancienne clé est immédiatement révoquée. La nouvelle clé n'est affichée qu'une seule fois!
 
 **Erreurs:**
+
 - `401` - Non authentifié
 - `403` - Accès refusé
 - `404` - Clé non trouvée
@@ -422,7 +450,7 @@ curl "https://api.example.com/tags?api_key=ag_test_xyz..."
 
 Les headers suivants sont inclus dans chaque réponse lors de l'utilisation d'une API key:
 
-```
+```text
 X-RateLimit-Remaining: 58
 X-RateLimit-Reset: 1696680000
 ```
@@ -460,6 +488,7 @@ Les scopes déterminent les actions autorisées avec une clé API:
 ### Exemples de combinaisons
 
 **Lecture seule:**
+
 ```json
 {
   "scopes": ["read"]
@@ -467,6 +496,7 @@ Les scopes déterminent les actions autorisées avec une clé API:
 ```
 
 **Lecture et écriture standard:**
+
 ```json
 {
   "scopes": ["read", "write"]
@@ -474,6 +504,7 @@ Les scopes déterminent les actions autorisées avec une clé API:
 ```
 
 **Accès complet:**
+
 ```json
 {
   "scopes": ["*"]
@@ -631,8 +662,10 @@ const listUserKeys = async (userId) => {
 3. **Les clés expirées sont automatiquement révoquées** par le système
 4. **Seuls les propriétaires et administrateurs peuvent gérer les clés** - administrateurs ont accès cross-user
 5. **Les métadonnées sont flexibles** - utilisez-les pour identifier vos intégrations
-# IMPORTANT: Sauvegarder immédiatement!
-```
+
+## IMPORTANT: Sauvegarder immédiatement
+
+```text
 
 ### PHP
 
@@ -659,7 +692,7 @@ curl_close($ch);
 
 ## 🛡️ Bonnes pratiques
 
-### Sécurité
+### Sécurité2
 
 1. ✅ **Stocker les clés de manière sécurisée**
    - Variables d'environnement
@@ -696,7 +729,7 @@ curl_close($ch);
    - Clés `ag_test_xxx` pour le développement
    - Peut avoir des limites différentes
 
-## 🔍 Codes d'erreur spécifiques
+## 🔍 Codes d'erreur spécifiques1
 
 | Code | Message | Solution |
 |------|---------|----------|
@@ -705,7 +738,7 @@ curl_close($ch);
 | `INSUFFICIENT_PERMISSIONS` | Scope requis manquant | Utiliser une clé avec les bons scopes |
 | `RATE_LIMIT_EXCEEDED` | Limite dépassée | Attendre le reset ou augmenter la limite |
 
-## 📝 Notes importantes
+## 📝 Notes importantes2
 
 1. **La clé complète n'est montrée qu'une seule fois** lors de la création ou régénération
 2. **Les clés révoquées ne peuvent pas être réactivées** - créer une nouvelle clé
@@ -716,6 +749,7 @@ curl_close($ch);
 ---
 
 **Voir aussi:**
+
 - [Documentation principale](../README.md)
 - [Référence API complète](./API_REFERENCE.md)
 - [Guide sécurité](./API_OVERVIEW.md#sécurité)

@@ -46,7 +46,8 @@ grep -n "ApiKeyRouteHandler" src/auth_groups/Routing/Router.php
 ```
 
 **Résultat attendu :**
-```
+
+```text
 Tous les fichiers doivent exister
 Router.php doit contenir:
   - use AuthGroups\Routing\RouteHandlers\ApiKeyRouteHandler;
@@ -87,6 +88,7 @@ SHOW PROCEDURE STATUS WHERE Db = 'cmem2_db';
 ```
 
 **Résultat attendu :**
+
 - Table `api_keys` créée avec 20 colonnes
 - 8 indexes présents
 - Vue `active_api_keys` créée
@@ -116,6 +118,7 @@ curl http://localhost/cmem2_API/health
 ```
 
 **Résultat attendu :**
+
 ```json
 {
   "success": true,
@@ -143,6 +146,7 @@ curl -X GET http://localhost/cmem2_API/api-keys \
 ```
 
 **Résultat attendu :**
+
 ```json
 {
   "success": true,
@@ -163,7 +167,8 @@ php tests/api_keys/test_api_keys_basic.php
 ```
 
 **Résultat attendu :**
-```
+
+```text
 ╔════════════════════════════════════════════════════════════╗
 ║         TESTS API KEYS - AuthGroups API v1.3.0            ║
 ╚════════════════════════════════════════════════════════════╝
@@ -225,6 +230,7 @@ php scripts/cleanup_api_keys.php
 ### Checklist complète
 
 - [ ] **Base de données**
+
   ```sql
   SELECT COUNT(*) FROM information_schema.tables 
   WHERE table_schema = 'cmem2_db' AND table_name = 'api_keys';
@@ -232,24 +238,28 @@ php scripts/cleanup_api_keys.php
   ```
 
 - [ ] **Fichiers PHP**
+
   ```bash
   find src/auth_groups -name "*ApiKey*" -type f
   # Doit lister 4 fichiers
   ```
 
 - [ ] **Routing**
+
   ```bash
   grep -c "ApiKeyRouteHandler" src/auth_groups/Routing/Router.php
   # Doit retourner : 2 (use + array)
   ```
 
 - [ ] **Tests**
+
   ```bash
   php tests/api_keys/test_api_keys_basic.php
   # Doit passer sans erreurs
   ```
 
 - [ ] **Documentation**
+
   ```bash
   ls docs/ENDPOINTS_API_KEYS.md
   ls docs/API_KEYS_IMPLEMENTATION.md
@@ -294,11 +304,13 @@ DROP PROCEDURE IF EXISTS cleanup_expired_api_keys;
 ### Problème : Table déjà existante
 
 **Erreur :**
-```
+
+```text
 ERROR 1050 (42S01): Table 'api_keys' already exists
 ```
 
 **Solution :**
+
 ```sql
 -- Vérifier s'il y a des données
 SELECT COUNT(*) FROM api_keys;
@@ -315,11 +327,13 @@ SOURCE docs/create_table_api_keys.sql;
 ### Problème : Class not found ApiKey
 
 **Erreur :**
-```
+
+```text
 PHP Fatal error: Class 'AuthGroups\Models\ApiKey' not found
 ```
 
 **Solution :**
+
 ```bash
 # Régénérer l'autoload
 composer dump-autoload
@@ -333,6 +347,7 @@ grep -n "namespace AuthGroups" src/auth_groups/Models/ApiKey.php
 ### Problème : Route /api-keys returns 404
 
 **Erreur :**
+
 ```json
 {
   "success": false,
@@ -343,6 +358,7 @@ grep -n "namespace AuthGroups" src/auth_groups/Models/ApiKey.php
 ```
 
 **Solution :**
+
 ```bash
 # Vérifier Router.php
 grep -A5 "routeHandlers" src/auth_groups/Routing/Router.php
@@ -359,6 +375,7 @@ grep "use.*ApiKeyRouteHandler" src/auth_groups/Routing/Router.php
 ### Problème : Tests échouent
 
 **Solution :**
+
 ```bash
 # Vérifier la connexion DB
 mysql -u root -p -e "SELECT 1 FROM cmem2_db.api_keys LIMIT 1;"
@@ -441,11 +458,13 @@ ORDER BY expires_at ASC;
 En cas de problème :
 
 1. **Vérifier les logs**
+
    ```bash
    tail -f /var/log/apache2/error.log
    ```
 
 2. **Activer le mode debug PHP**
+
    ```php
    // Dans config/environment.php
    define('DEBUG_MODE', true);
@@ -465,7 +484,7 @@ En cas de problème :
 
 ---
 
-## ✅ Migration réussie !
+## ✅ Migration réussie
 
 Si tous les tests passent, la migration est complète. Vous pouvez maintenant :
 

@@ -1,8 +1,8 @@
-# API Keys - Résumé d'Implémentation
+# API Keys - Résumé d'Implémentation v1.3.0
 
 ## 📋 Vue d'ensemble
 
-Implémentation complète du système d'API Keys pour l'authentification machine-to-machine dans AuthGroups API (v1.3.0).
+Implémentation complète du système d'API Keys pour l'authentification machine-to-machine dans AuthGroups API (v1.3.0) avec **sécurité renforcée et gestion centralisée**.
 
 ## 🎯 Objectifs atteints
 
@@ -14,6 +14,8 @@ Implémentation complète du système d'API Keys pour l'authentification machine
 ✅ **Statistiques** : Tracking complet des usages (requests, IP, timestamps)  
 ✅ **Cycle de vie** : Expiration automatique, révocation avec raison  
 ✅ **Documentation** : Guide complet avec exemples en 3 langages  
+✅ **🔒 Gestion centralisée** : Seuls les administrateurs peuvent gérer les API keys
+✅ **🔑 API Keys obligatoires** : Requis pour TOUS les logins  
 
 ## 📁 Fichiers créés
 
@@ -59,53 +61,53 @@ Implémentation complète du système d'API Keys pour l'authentification machine
 
 ### 5. Routing
 
-- **`src/auth_groups/Routing/RouteHandlers/ApiKeyRouteHandler.php`** (95 lignes)
-  - Handler dédié aux endpoints `/api-keys`
-  - Intégration dans l'architecture Router
+- **`src/auth_groups/Routing/RouteHandlers/ApiKeyRouteHandler.php`** (95 lignes) - **DÉPRÉCIÉ v1.3.0**
+  - Handler des anciens endpoints `/api-keys` - Retourne maintenant HTTP 410 Gone
+  - Remplacé par `SecretAdminRouteHandler` pour la gestion sécurisée
+  
+- **`src/auth_groups/Routing/RouteHandlers/SecretAdminRouteHandler.php`** (NOUVEAU v1.3.0)
+  - Handler sécurisé pour `/secret-admin/api-keys/*`
+  - Double authentification : JWT Admin + ADMIN_SECRET_KEY
+  - Gestion complète CRUD avec sécurité renforcée
   
 - **`src/auth_groups/Routing/Router.php`** (modifié)
-  - Ajout de `ApiKeyRouteHandler` dans les handlers
+  - Intégration des handlers de sécurité
+  - Route mapping vers endpoints sécurisés
 
 ### 6. Documentation
 
-- **`docs/ENDPOINTS_API_KEYS.md`** (520 lignes)
-  - Spécification complète des 5 endpoints
-  - Méthodes d'authentification
-  - Guide des scopes et permissions
-  - Rate limiting expliqué
-  - Exemples complets en JavaScript, Python, PHP
-  - Meilleures pratiques de sécurité
-  - Référence des codes d'erreur
+- **`docs/ENDPOINTS_API_KEYS.md`** (756 lignes) - **TRANSFORMÉ en guide de dépréciation**
+  - Avertissement de suppression des anciens endpoints
+  - Guide de migration vers les nouveaux endpoints sécurisés
+  - Documentation historique conservée pour référence
 
-- **`README.md`** (mis à jour, 7 sections modifiées)
-  - Fonctionnalités : Ajout API Keys
-  - Endpoints : Table avec 5 nouveaux endpoints
-  - Authentification : Section duale JWT + API Keys
-  - Documentation : Lien vers ENDPOINTS_API_KEYS.md
-  - Base de données : Commande `create_table_api_keys.sql`
-  - Roadmap : Marqué "API key setup" comme ✅
+- **`docs/API_KEYS_QUICK_REFERENCE.md`** (RÉÉCRIT v1.3.0)
+  - Guide complet des nouveaux endpoints `/secret-admin/api-keys/*`
+  - Commandes curl mises à jour avec authentification renforcée
+  - Scripts de maintenance et monitoring sécurisés
 
-- **`CHANGELOG.md`** (mis à jour)
-  - Version 1.3.0 ajoutée
-  - Liste complète des features
-  - Détails sécurité
-  - Documentation des endpoints
-  - Aucun breaking change
+- **`docs/SECURITY_UPDATE_v1.3.0.md`** (NOUVEAU)
+  - Guide complet de migration et d'impact
+  - Comparaisons avant/après avec breaking changes
+  - Plan de migration détaillé en 3 phases
+  - Checklist de déploiement et rollback d'urgence
 
-- **`docs/API_REFERENCE.md`** (mis à jour)
-  - Authentification : Section API Keys
-  - Endpoints : Table des 5 routes API Keys
-  - Exemples JavaScript : Support API key
-
-- **`docs/API_OVERVIEW.md`** (mis à jour, 5 sections)
-  - RouteHandlers : `ApiKeyRouteHandler`
-  - Controllers : `ApiKeyController`
-  - Models : `ApiKey`
-  - Middleware : `ApiKeyAuthMiddleware`
-  - Authentification : Guide complet JWT + API Keys
+- **`README.md`** (mis à jour, sections de sécurité)
+  - Avertissements de breaking changes
+  - Section authentification mise à jour avec API keys obligatoires
+  - Variables d'environnement ADMIN_SECRET_KEY
+  - Tableaux d'endpoints avec statuts de dépréciation
 
 - **`docs/QUICKSTART.md`** (mis à jour)
-  - Ressources : Lien vers ENDPOINTS_API_KEYS.md
+  - Étapes de bootstrap pour première API key
+  - Exemples de requêtes avec API keys obligatoires
+  - Section dépannage pour erreurs de sécurité
+
+- **`docs/API_ENDPOINTS_v1_3_0.json`** (NOUVEAU)
+  - Spécification OpenAPI complète du nouveau système
+  - Documentation des endpoints secret-admin
+  - Codes d'erreur 410, 429 et autres nouveaux statuts
+  - Schémas de sécurité renforcée
 
 ## 🔐 Schéma de sécurité
 

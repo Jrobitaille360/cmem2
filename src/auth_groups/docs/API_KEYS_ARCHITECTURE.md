@@ -2,7 +2,7 @@
 
 ## 🏗️ Vue d'ensemble
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                        CLIENT REQUEST                        │
 │   (Browser, Mobile App, Server Script, CLI Tool, etc.)      │
@@ -114,7 +114,7 @@
 
 ### Scénario A : Authentification par JWT (utilisateur)
 
-```
+```text
 User Login
     │
     ├─► POST /users/login
@@ -140,7 +140,7 @@ User Login
 
 ### Scénario B : Création d'API Key
 
-```
+```text
 User has JWT Token
     │
     ├─► POST /api-keys
@@ -185,7 +185,7 @@ User has JWT Token
 
 ### Scénario C : Authentification par API Key
 
-```
+```text
 External Service/Script
     │
     ├─► GET /groups
@@ -291,7 +291,7 @@ Foreign Keys:
 
 ## 📊 Cycle de vie d'une clé
 
-```
+```text
   ┌─────────────┐
   │   CREATED   │  POST /api-keys
   │   (Active)  │  ← User creates key with JWT
@@ -575,26 +575,31 @@ cmem2_API/
 ## 🎯 Architecture Decisions
 
 ### 1. Pourquoi SHA-256 et pas bcrypt ?
+
 - **SHA-256** : Hash rapide, idéal pour tokens (vitesse importante)
 - **bcrypt** : Hash lent intentionnellement (mots de passe seulement)
 - API keys doivent être validées rapidement sur chaque requête
 
 ### 2. Pourquoi 2 préfixes (ag_live, ag_test) ?
+
 - **Séparation des environnements**
 - Empêche utilisation accidentelle de clés test en prod
 - Facilite le debugging (visuel immédiat)
 
 ### 3. Pourquoi afficher la clé une seule fois ?
+
 - **Sécurité** : Force le stockage sécurisé immédiat
 - Standard de l'industrie (AWS, GitHub, Stripe)
 - Empêche copies multiples non contrôlées
 
 ### 4. Pourquoi scopes et pas rôles ?
+
 - **Granularité** : Une clé = permissions spécifiques
 - **Principe du moindre privilège**
 - Flexibilité (même user peut avoir clés différentes)
 
 ### 5. Pourquoi rate limiting par clé ?
+
 - **Protection contre abus**
 - Isolement (une clé compromise n'affecte pas les autres)
 - Différenciation (clés premium vs standard)

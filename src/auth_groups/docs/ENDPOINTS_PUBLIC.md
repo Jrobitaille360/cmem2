@@ -2,6 +2,18 @@
 
 > Endpoints accessibles sans authentification
 
+## 🚨 Changements de sécurité v1.3.0
+
+**⚠️ BREAKING CHANGE** : Depuis la version 1.3.0, **toutes** les connexions nécessitent une API key valide.
+
+### Impact sur les endpoints publics :
+- **`/users/login`** : API key maintenant **obligatoire**
+- **Autres endpoints** : Restent accessibles sans authentification
+- **Migration** : Les applications doivent intégrer une API key pour les connexions
+
+### Obtention d'une API key :
+Les API keys sont désormais gérées exclusivement via les endpoints `/secret-admin/api-keys/*` avec authentification renforcée. Consultez le [Guide Secret-Admin](./API_KEYS_SECRET_ADMIN_GUIDE.md) pour plus de détails.
+
 ---
 
 ## GET `/`
@@ -16,7 +28,7 @@
   "message": "API_info",
   "data": {
     "name": "Collective Memories API",
-    "version": "1.1.0",
+    "version": "1.3.0",
     "description": "API REST pour l'application de mémoires collectives",
     "status": "Opérationnelle",
     "server_time": "2025-09-10 17:56:34",
@@ -50,7 +62,7 @@
   "message": "help",
   "data": {
     "endpoints": { /* Liste complète des endpoints disponibles */ },
-    "authentication": "JWT Bearer Token",
+    "authentication": "JWT Bearer Token + API Key (obligatoire v1.3.0)",
     "base_url": "https://votre site/cmem1_API/"
   }
 }
@@ -73,9 +85,9 @@
   "message": "health_status",
   "data": {
     "status": "OK",
-    "message": "API Collective Memories opérationnelle",
+    "message": "Connexion réussie avec API key",
     "timestamp": "2025-09-10 14:30:00",
-    "version": "1.1.0",
+    "version": "1.3.0",
     "database": "Connectée",
     "smtp": "Fonctionnel"
   }
@@ -144,20 +156,23 @@
 ## POST `/users/login`
 **Description** : Se connecter
 
+**⚠️ IMPORTANT v1.3.0** : API key maintenant **obligatoire** pour tous les logins
 **Note** : L'email doit être vérifié pour pouvoir se connecter
-**Authentification** : ⭐ Non requise
+**Authentification** : ⭐ Non requise (mais API key obligatoire)
 
 **Données attendues** :
 ```json
 {
   "email": "user@example.com",
-  "password": "motdepasse123"
+  "password": "motdepasse123",
+  "api_key": "ak_live_..."
 }
 ```
 
 **Validation** :
 - `email` : requis, email valide
 - `password` : requis, 6 caractères minimum
+- `api_key` : **requis depuis v1.3.0**, clé API valide
 
 **Réponse succès (200)** :
 ```json
@@ -179,10 +194,47 @@
 ```
 
 **Réponses d'erreur** :
-- `400` : Données de validation invalides
+- `400` : Données de validation invalides ou API key manquante
 - `401` : Identifiants invalides
-- `403` : Compte désactivé ou email non vérifié
+- `403` : Compte désactivé, email non vérifié, ou API key invalide
+- `410` : API key requise (migration v1.3.0)
 - `500` : Erreur interne du serveur
+
+**Exemple de réponse API key manquante (410)** :
+```json
+{
+  "success": false,
+  "error": "API_KEY_REQUIRED",
+  "message": "Une API key est requise pour se connecter depuis la v1.3.0",
+  "data": {
+    "code": "API_KEY_REQUIRED",
+    "migration_guide": "Consultez le guide de migration v1.3.0",
+    "endpoints": {
+      "secret_admin": "/secret-admin/api-keys/",
+      "documentation": "/docs/API_KEYS_SECRET_ADMIN_GUIDE.md"
+    },
+    "version": "1.3.0"
+  }
+}
+```
+
+**Exemple de réponse API key invalide (403)** :
+```json
+{
+  "success": false,
+  "error": "API_KEY_INVALID",
+  "message": "L'API key fournie est invalide ou expirée",
+  "data": {
+    "code": "API_KEY_INVALID",
+    "api_key_prefix": "ak_live_...",
+    "suggestions": [
+      "Vérifier que l'API key est correcte",
+      "Vérifier que l'API key n'est pas expirée",
+      "Contacter l'administrateur pour une nouvelle API key"
+    ]
+  }
+}
+```
 
 **Exemple de réponse email non vérifié (403)** :
 ```json
