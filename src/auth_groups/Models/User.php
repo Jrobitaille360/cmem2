@@ -210,16 +210,26 @@ class User extends BaseModel {
     /**
      * Obtenir tous les utilisateurs (avec pagination)
      */
-    public function getAll($limit = 20, $offset = 0) {
+    public function getAll($limit = 20, $offset = 0, $email = null) {
         $query = "SELECT id, name, email, role, profile_image, bio, phone, date_of_birth, location, email_verified, last_login, created_at 
                  FROM {$this->table} 
                  WHERE deleted_at IS NULL 
                  ORDER BY created_at DESC 
                  LIMIT :limit OFFSET :offset";
         
+        if ($email) {
+            $query = "SELECT id, name, email, role, profile_image, bio, phone, date_of_birth, location, email_verified, last_login, created_at 
+                      FROM {$this->table} 
+                      WHERE deleted_at IS NULL AND email = :email
+                      ORDER BY created_at DESC 
+                      LIMIT :limit OFFSET :offset";
+        }
         $stmt = $this->getDb()->prepare($query);
         $stmt->bindParam(':limit', $limit, PDO::PARAM_INT);
         $stmt->bindParam(':offset', $offset, PDO::PARAM_INT);
+        if ($email) {
+            $stmt->bindParam(':email', $email);
+        }
         $stmt->execute();
         
         return $stmt->fetchAll(PDO::FETCH_ASSOC);

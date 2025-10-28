@@ -26,44 +26,21 @@ class ApiKeyRouteHandler extends BaseRouteHandler
     
     protected function handleRoute(array $request): void
     {
-        $action = $request['action'];
-        $method = $request['method'];
-        $id = $request['id'];
-        $segments = $request['segments'];
+        // SÉCURITÉ : La gestion des API keys a été déplacée vers le système d'administration secret
+        // Toutes les opérations sur les API keys nécessitent maintenant l'authentification 
+        // via secretadminkey pour des raisons de sécurité renforcée
         
-        // Routes disponibles:
-        // POST   /api-keys              - Créer une nouvelle clé
-        // GET    /api-keys              - Lister toutes les clés
-        // GET    /api-keys/:id          - Obtenir une clé spécifique
-        // DELETE /api-keys/:id          - Révoquer une clé
-        // POST   /api-keys/:id/regenerate - Régénérer une clé
+        \AuthGroups\Services\LogService::warning('Tentative d\'accès aux API keys via endpoint public désactivé', [
+            'method' => $request['method'],
+            'action' => $request['action'],
+            'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+            'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown'
+        ]);
         
-        match(true) {
-            // POST /api-keys - Créer une nouvelle clé
-            ($action === '' && $method === 'POST') =>
-                $this->controller->create(),
-            
-            // GET /api-keys - Liste de toutes les clés
-            ($action === '' && $method === 'GET') =>
-                $this->controller->list(),
-            
-            // GET /api-keys/:id - Détails d'une clé
-            ($action && ctype_digit($action) && $method === 'GET' && !$id) =>
-                $this->validateIdAndCall($action, fn($keyId) => 
-                    $this->controller->get($keyId)),
-            
-            // DELETE /api-keys/:id - Révoquer une clé
-            ($action && ctype_digit($action) && $method === 'DELETE' && !$id) =>
-                $this->validateIdAndCall($action, fn($keyId) => 
-                    $this->controller->revoke($keyId)),
-            
-            // POST /api-keys/:id/regenerate - Régénérer une clé
-            (isset($segments[2]) && $segments[2] === 'regenerate' && $method === 'POST') =>
-                $this->validateIdAndCall($action, fn($keyId) => 
-                    $this->controller->regenerate($keyId)),
-            
-            default => Response::error('Route API key non trouvée', null, 404)
-        };
+        Response::error('Endpoint déplacé - Utilisez le système d\'administration secret pour gérer les API keys', [
+            'message' => 'La gestion des API keys nécessite maintenant une authentification renforcée',
+            'details' => 'Contactez votre administrateur système pour l\'accès aux fonctionnalités de gestion des API keys'
+        ], 410); // 410 Gone - Resource permanently moved
     }
     
     private function validateIdAndCall($id, callable $callback, string $fieldName = 'ID de clé API'): void

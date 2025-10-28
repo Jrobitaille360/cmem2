@@ -7,7 +7,7 @@ use AuthGroups\Controllers\{
     UserController, 
     GroupController, 
 };
-
+use AuthGroups\Services\LogService;
 use AuthGroups\Utils\Response;
 
 class PublicRouteHandler extends BaseRouteHandler 
@@ -37,9 +37,8 @@ class PublicRouteHandler extends BaseRouteHandler
                 foreach ($publicHandlers as $pluginName => $handlerClass) {
                     if (class_exists($handlerClass)) {
                         $this->pluginPublicHandlers[$pluginName] = new $handlerClass();
-                        
-                        if (defined('APP_DEBUG') && APP_DEBUG && class_exists('\AuthGroups\Services\LogService')) {
-                            \AuthGroups\Services\LogService::info("Route handler public de plugin chargé", [
+                        if (defined('APP_DEBUG') && APP_DEBUG && class_exists(LogService::class)) {
+                            LogService::info("Route handler public de plugin chargé", [
                                 'plugin' => $pluginName,
                                 'handler' => $handlerClass
                             ]);
@@ -49,7 +48,7 @@ class PublicRouteHandler extends BaseRouteHandler
             }
         } catch (\Exception $e) {
             if (defined('APP_DEBUG') && APP_DEBUG && class_exists('\AuthGroups\Services\LogService')) {
-                \AuthGroups\Services\LogService::warning("Erreur lors du chargement des routes publiques de plugins", [
+                LogService::warning("Erreur lors du chargement des routes publiques de plugins", [
                     'error' => $e->getMessage()
                 ]);
             }
@@ -97,10 +96,11 @@ class PublicRouteHandler extends BaseRouteHandler
             ($controller === 'users' && $action === 'register' && $method === 'POST') => 
                 $this->controllers['users']->create(),
                 
-            // Route de connexion publique
+            // Route de connexion publique - AVEC VALIDATION API KEY OBLIGATOIRE
             ($controller === 'users' && $action === 'login' && $method === 'POST') => 
-                $this->controllers['users']->authenticate(),
-                
+                $this->handleLoginWithApiKey(),
+            // PAR pour créer la première clé API si aucune n'existe encore:
+            //    $this->controllers['users']->authenticate(),    
             // Route de demande de changement de mot de passe publique
             ($controller === 'users' && $action === 'request-password-reset' && $method === 'POST') => 
                 $this->controllers['users']->requestPasswordChange(),
@@ -202,6 +202,67 @@ class PublicRouteHandler extends BaseRouteHandler
         }
         
         return !empty($authHeader) && strpos($authHeader, 'Bearer ') === 0;
+    }
+    
+    /**
+     * Gestion du login avec validation obligatoire d'API key
+     * 
+     * NOUVELLE SÉCURITÉ : Tous les logins nécessitent maintenant une API key valide
+     * Cette méthode vérifie d'abord la présence et validité d'une API key,
+     * puis procède à l'authentification standard si la clé est valide.
+     */
+    private function handleLoginWithApiKey(): void
+    {
+        try {
+            // ÉTAPE 1: Vérifier qu'une API key valide est fournie
+            $apiKeyData = \AuthGroups\Middleware\ApiKeyAuthMiddleware::requireApiKey();
+            
+            if (!$apiKeyData) {
+                // L'erreur a déjà été envoyée par requireApiKey()
+                return;
+            }
+            
+            // ÉTAPE 2: Vérifier que la clé a les permissions appropriées pour le login
+            // On peut exiger un scope spécifique si nécessaire
+            if (!isset($apiKeyData['scopes']) || !is_array($apiKeyData['scopes'])) {
+                LogService::warning('API key sans scopes valides utilisée pour login', [
+                    'api_key_id' => $apiKeyData['id'],
+                    'user_id' => $apiKeyData['user_id'],
+                    'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown'
+                ]);
+                
+               Response::error('API key invalide', [
+                    'error' => 'INVALID_API_KEY_SCOPES',
+                    'message' => 'Cette API key n\'a pas les permissions appropriées'
+                ], 403);
+                return;
+            }
+            
+            // ÉTAPE 3: Log de sécurité pour traçabilité
+            LogService::info('Login tenté avec API key valide', [
+                'api_key_id' => $apiKeyData['id'],
+                'api_key_user_id' => $apiKeyData['user_id'],
+                'api_key_environment' => $apiKeyData['environment'],
+                'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+                'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown'
+            ]);
+            
+            // ÉTAPE 4: Procéder au login standard maintenant que l'API key est validée
+            $this->controllers['users']->authenticate();
+            
+        } catch (\Exception $e) {
+            LogService::error('Erreur lors de la validation API key pour login', [
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown'
+            ]);
+            
+            Response::error('Erreur de validation de sécurité', [
+                'error' => 'SECURITY_VALIDATION_ERROR',
+                'message' => 'Une erreur est survenue lors de la validation de sécurité'
+            ], 500);
+        }
     }
 
 }

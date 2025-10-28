@@ -210,4 +210,100 @@ class ApiKeyAuthMiddleware
         
         return $keyData['environment'] === ApiKey::ENV_TEST;
     }
+    
+    /**
+     * Exiger une API key valide (pour les logins et autres opérations critiques)
+     * Cette méthode est plus stricte que authenticate() - elle EXIGE une API key
+     * 
+     * @param string|null $requiredScope Scope requis (optionnel)
+     * @return array|null Données de la clé si valide, null sinon (envoie une réponse d'erreur)
+     */
+    public static function requireApiKey(?string $requiredScope = null): ?array
+    {
+        // Récupérer la clé API depuis les headers
+        $apiKey = self::getApiKeyFromRequest();
+        
+        if (!$apiKey) {
+            \AuthGroups\Services\LogService::warning('Tentative d\'accès sans API key requise', [
+                'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+                'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
+                'endpoint' => $_SERVER['REQUEST_URI'] ?? 'unknown'
+            ]);
+            
+            Response::error('API key obligatoire', [
+                'error' => 'API_KEY_REQUIRED',
+                'message' => 'Une API key valide est obligatoire pour accéder à cette fonctionnalité',
+                'details' => 'Utilisez le header X-API-Key ou Authorization: Bearer <key>',
+                'security_notice' => 'Cette restriction a été mise en place pour renforcer la sécurité'
+            ], 401);
+            return null;
+        }
+        
+        // Valider la clé API
+        $keyData = ApiKey::validate($apiKey);
+        
+        if (!$keyData) {
+            \AuthGroups\Services\LogService::warning('Tentative d\'utilisation d\'API key invalide', [
+                'api_key_prefix' => substr($apiKey, 0, 10) . '...',
+                'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+                'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown'
+            ]);
+            
+            Response::error('API key invalide', [
+                'error' => 'INVALID_API_KEY',
+                'message' => 'La clé API fournie est invalide, expirée ou révoquée'
+            ], 401);
+            return null;
+        }
+        
+        // Vérifier le scope si requis
+        if ($requiredScope && !ApiKey::hasScope($keyData, $requiredScope)) {
+            \AuthGroups\Services\LogService::warning('API key avec permissions insuffisantes', [
+                'api_key_id' => $keyData['id'],
+                'required_scope' => $requiredScope,
+                'available_scopes' => $keyData['scopes'],
+                'user_id' => $keyData['user_id']
+            ]);
+            
+            Response::error('Permissions insuffisantes', [
+                'error' => 'INSUFFICIENT_PERMISSIONS',
+                'message' => "Cette clé API ne dispose pas du scope requis: {$requiredScope}",
+                'required_scope' => $requiredScope,
+                'available_scopes' => $keyData['scopes']
+            ], 403);
+            return null;
+        }
+        
+        // Vérifier le rate limiting
+        $rateLimit = ApiKey::checkRateLimit($keyData['id']);
+        
+        if (!$rateLimit['allowed']) {
+            \AuthGroups\Services\LogService::warning('Rate limit dépassé pour API key', [
+                'api_key_id' => $keyData['id'],
+                'user_id' => $keyData['user_id'],
+                'limit' => $keyData['rate_limit_per_minute']
+            ]);
+            
+            Response::error('Limite de taux dépassée', [
+                'error' => 'RATE_LIMIT_EXCEEDED',
+                'message' => 'Limite de taux dépassée pour cette clé API',
+                'limit' => $keyData['rate_limit_per_minute'],
+                'reset_at' => $rateLimit['reset_at']
+            ], 429); // Too Many Requests
+            return null;
+        }
+        
+        // Ajouter les informations de rate limiting aux headers
+        header("X-RateLimit-Remaining: " . $rateLimit['remaining']);
+        header("X-RateLimit-Reset: " . $rateLimit['reset_at']);
+        
+        \AuthGroups\Services\LogService::info('API key validée avec succès', [
+            'api_key_id' => $keyData['id'],
+            'user_id' => $keyData['user_id'],
+            'environment' => $keyData['environment'],
+            'scopes' => $keyData['scopes']
+        ]);
+        
+        return $keyData;
+    }
 }

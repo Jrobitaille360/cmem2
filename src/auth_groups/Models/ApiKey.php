@@ -8,6 +8,7 @@ namespace AuthGroups\Models;
 
 use PDO;
 use PDOException;
+use Exception;
 
 class ApiKey extends BaseModel
 {
@@ -37,7 +38,7 @@ class ApiKey extends BaseModel
     public function create()
     {
         // Non utilisé directement - utiliser la méthode static generate() à la place
-        throw new \Exception("Use ApiKey::generate() instead of create()");
+        throw new Exception("Use ApiKey::generate() instead of create()");
     }
     
     /**
@@ -376,7 +377,7 @@ class ApiKey extends BaseModel
     }
     
     /**
-     * Nettoyer les clés expirées (marquer comme révoquées)
+     * Nettoyer les clés expirées
      */
     public static function cleanupExpired(): int
     {
@@ -393,5 +394,180 @@ class ApiKey extends BaseModel
         
         $stmt->execute();
         return $stmt->rowCount();
+    }
+    
+    /**
+     * Obtenir toutes les API keys (pour administration uniquement)
+     */
+    public static function getAll(): array
+    {
+        $model = new self();
+        $db = $model->getDb();
+        $stmt = $db->prepare("
+            SELECT 
+                ak.id,
+                ak.user_id,
+                u.name as user_name,
+                u.email as user_email,
+                ak.name,
+                ak.key_prefix,
+                ak.last_4,
+                ak.environment,
+                ak.scopes,
+                ak.rate_limit_per_minute,
+                ak.rate_limit_per_hour,
+                ak.total_requests,
+                ak.last_used_at,
+                ak.last_used_ip,
+                ak.expires_at,
+                ak.revoked_at,
+                ak.revoked_reason,
+                ak.notes,
+                ak.created_at,
+                ak.updated_at,
+                CASE 
+                    WHEN ak.revoked_at IS NOT NULL THEN 'revoked'
+                    WHEN ak.expires_at IS NOT NULL AND ak.expires_at < NOW() THEN 'expired'
+                    ELSE 'active'
+                END as status
+            FROM api_keys ak
+            LEFT JOIN users u ON ak.user_id = u.id
+            ORDER BY ak.created_at DESC
+        ");
+        
+        $stmt->execute();
+        $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Transformer les données
+        foreach ($results as &$key) {
+            $key['scopes'] = json_decode($key['scopes'], true);
+            $key['key_preview'] = $key['key_prefix'] . '_****' . $key['last_4'];
+        }
+        
+        return $results;
+    }
+    
+    /**
+     * Obtenir une API key par son ID
+     */
+    public static function getById(int $keyId): ?array
+    {
+        $model = new self();
+        $db = $model->getDb();
+        $stmt = $db->prepare("
+            SELECT 
+                ak.id,
+                ak.user_id,
+                u.name as user_name,
+                u.email as user_email,
+                ak.name,
+                ak.key_prefix,
+                ak.last_4,
+                ak.environment,
+                ak.scopes,
+                ak.rate_limit_per_minute,
+                ak.rate_limit_per_hour,
+                ak.total_requests,
+                ak.last_used_at,
+                ak.last_used_ip,
+                ak.expires_at,
+                ak.revoked_at,
+                ak.revoked_reason,
+                ak.notes,
+                ak.created_at,
+                ak.updated_at,
+                CASE 
+                    WHEN ak.revoked_at IS NOT NULL THEN 'revoked'
+                    WHEN ak.expires_at IS NOT NULL AND ak.expires_at < NOW() THEN 'expired'
+                    ELSE 'active'
+                END as status
+            FROM api_keys ak
+            LEFT JOIN users u ON ak.user_id = u.id
+            WHERE ak.id = :id
+        ");
+        
+        $stmt->execute([':id' => $keyId]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$result) {
+            return null;
+        }
+        
+        // Transformer les données
+        $result['scopes'] = json_decode($result['scopes'], true);
+        $result['key_preview'] = $result['key_prefix'] . '_****' . $result['last_4'];
+        
+        return $result;
+    }
+    
+    /**
+     * Régénérer une API key (créer une nouvelle et révoquer l'ancienne)
+     */
+    public static function regenerate(int $keyId): ?array
+    {
+        $model = new self();
+        $db = $model->getDb();
+        
+        // Commencer une transaction
+        $db->beginTransaction();
+        
+        try {
+            // Récupérer les informations de l'ancienne clé
+            $stmt = $db->prepare("
+                SELECT user_id, name, environment, scopes, rate_limit_per_minute, 
+                       rate_limit_per_hour, notes, expires_at
+                FROM api_keys 
+                WHERE id = :id AND revoked_at IS NULL
+            ");
+            $stmt->execute([':id' => $keyId]);
+            $oldKeyData = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$oldKeyData) {
+                $db->rollBack();
+                return null;
+            }
+            
+            // Préparer les options pour la nouvelle clé
+            $options = [
+                'environment' => $oldKeyData['environment'],
+                'scopes' => json_decode($oldKeyData['scopes'], true),
+                'rate_limit_per_minute' => $oldKeyData['rate_limit_per_minute'],
+                'rate_limit_per_hour' => $oldKeyData['rate_limit_per_hour'],
+                'notes' => $oldKeyData['notes']
+            ];
+            
+            // Calculer expires_in_days si nécessaire
+            if ($oldKeyData['expires_at']) {
+                $expiresAt = new \DateTime($oldKeyData['expires_at']);
+                $now = new \DateTime();
+                $diff = $now->diff($expiresAt);
+                if ($diff->days > 0) {
+                    $options['expires_in_days'] = $diff->days;
+                }
+            }
+            
+            // Créer la nouvelle clé
+            $newKeyResult = self::generate(
+                $oldKeyData['user_id'],
+                $oldKeyData['name'],
+                $options
+            );
+            
+            // Révoquer l'ancienne clé
+            $stmt = $db->prepare("
+                UPDATE api_keys 
+                SET revoked_at = NOW(),
+                    revoked_reason = 'Regenerated - replaced by new key'
+                WHERE id = :id
+            ");
+            $stmt->execute([':id' => $keyId]);
+            
+            $db->commit();
+            return $newKeyResult;
+            
+        } catch (Exception $e) {
+            $db->rollBack();
+            throw $e;
+        }
     }
 }

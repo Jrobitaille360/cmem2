@@ -8,6 +8,9 @@
       ✓ example
           ✓ calendar
           todo list
+      API Manage by secretadmin
+      Login only possible with APIkey
+      
     Mot de passe SOFT ou STRONG
     📝 Un guide de développement de plugins pour les développeurs externes ?
     🔌 Un template de plugin vierge prêt à l'emploi ?

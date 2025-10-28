@@ -202,18 +202,56 @@ class Validator {
     
     /**
      * Vérifier si une date est valide
+     * Accepte plusieurs formats: Y-m-d, d/m/Y, m/d/Y, Y/m/d, d-m-Y, m-d-Y
      */
     private function isValidDate($date) {
-        $d = \DateTime::createFromFormat('Y-m-d', $date);
-        return $d && $d->format('Y-m-d') === $date;
+        $formats = ['Y-m-d', 'd/m/Y', 'm/d/Y', 'Y/m/d', 'd-m-Y', 'm-d-Y'];
+        
+        foreach ($formats as $format) {
+            $d = \DateTime::createFromFormat($format, $date);
+            if ($d && $d->format($format) === $date) {
+                return true;
+            }
+        }
+        
+        return false;
     }
     
     /**
      * Vérifier si une date/heure est valide
+     * Accepte plusieurs formats avec ou sans secondes, avec différents séparateurs
      */
     private function isValidDateTime($datetime) {
-        $d = \DateTime::createFromFormat('Y-m-d H:i:s', $datetime);
-        return $d && $d->format('Y-m-d H:i:s') === $datetime;
+        $formats = [
+            'Y-m-d H:i:s',
+            'Y-m-d H:i',
+            'd/m/Y H:i:s',
+            'd/m/Y H:i',
+            'm/d/Y H:i:s',
+            'm/d/Y H:i',
+            'Y/m/d H:i:s',
+            'Y/m/d H:i',
+            'd-m-Y H:i:s',
+            'd-m-Y H:i',
+            'm-d-Y H:i:s',
+            'm-d-Y H:i',
+            'Y-m-d\TH:i:s',          // Format ISO 8601
+            'Y-m-d\TH:i:s.v',        // Format ISO 8601 avec millisecondes
+            'Y-m-d\TH:i:s.u',        // Format ISO 8601 avec microsecondes
+            'Y-m-d\TH:i:sP',         // Format ISO 8601 avec timezone
+            'Y-m-d\TH:i:s.vP',       // Format ISO 8601 avec millisecondes et timezone
+            'Y-m-d\TH:i:s\Z',        // Format ISO 8601 UTC
+            'Y-m-d\TH:i:s.v\Z',      // Format ISO 8601 UTC avec millisecondes
+        ];
+        
+        foreach ($formats as $format) {
+            $d = \DateTime::createFromFormat($format, $datetime);
+            if ($d && $d->format($format) === $datetime) {
+                return true;
+            }
+        }
+        
+        return false;
     }
     
     /**

@@ -35,10 +35,17 @@ class UserListController {
             }            
             LogService::info("Récupération de la liste des utilisateurs par un administrateur", [
                 'admin_role' => $currentUserRole
-            ]);            
+            ]);
+            $input = Response::getRequestParams();
+            $validator = new Validator();
+            $validate = $validator->validate($input, [
+                'email' => 'optional|email',
+                'page' => 'optional|integer|min:1',
+                'limit' => 'optional|integer|min:1|max:100'
+            ]);
             $pagination = Response::getPaginationParams();            
             $user = new User(); // Instantiation simplifiée !
-            $users = $user->getAll($pagination['limit'], ($pagination['page'] - 1) * $pagination['limit']);            
+            $users = $user->getAll($pagination['limit'], ($pagination['page'] - 1) * $pagination['limit'], $input['email'] ?? null);            
             // Compter le total
             $total = $user->count();            
             LogService::info("Liste des utilisateurs récupérée avec succès", [
