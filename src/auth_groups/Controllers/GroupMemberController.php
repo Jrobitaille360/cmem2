@@ -3,6 +3,7 @@
 namespace AuthGroups\Controllers;
 
 use AuthGroups\Models\Group;
+use AuthGroups\Models\User;
 use AuthGroups\Utils\Response;
 use AuthGroups\Utils\Validator;
 use AuthGroups\Services\LogService;
@@ -228,6 +229,118 @@ class GroupMemberController
             ]);
             LoggingMiddleware::logExit(500);
             Response::error('Erreur serveur lors de la mise à jour du rôle');
+        }
+    }
+
+    /**
+     * Ajouter un utilisateur à un groupe (pour les administrateurs)
+     */
+    public function addMember($groupId, $userId, $currentUserId, $currentUserRole) {
+        try {
+            LoggingMiddleware::logEntry();
+            
+            $input = Response::getRequestParams();
+            $validator = new Validator();
+            $validation = $validator->validate($input, [
+                'role' => 'string|in:admin,moderator,member'
+            ]);
+
+            if (!$validation['valid']) {
+                LogService::warning("Données invalides pour l'ajout d'un membre", [
+                    'errors' => $validation['errors']
+                ]);
+                LoggingMiddleware::logExit(400);
+                Response::error('Données invalides', $validation['errors'], 400);
+            }
+
+            $role = $input['role'] ?? 'member';
+
+            $group = new Group();
+            $groupData = $group->findById($groupId);
+
+            if (!$groupData) {
+                LogService::warning("Groupe non trouvé", [
+                    'group_id' => $groupId
+                ]);
+                LoggingMiddleware::logExit(404);
+                Response::error('Groupe non trouvé', null, 404);
+            }
+
+            // Vérifier que l'utilisateur cible existe
+            $user = new User();
+            $userData = $user->findById($userId);
+            
+            if (!$userData) {
+                LogService::warning("Utilisateur cible non trouvé", [
+                    'user_id' => $userId
+                ]);
+                LoggingMiddleware::logExit(404);
+                Response::error('Utilisateur non trouvé', null, 404);
+            }
+
+            // Vérifier les permissions - seuls les administrateurs système et les admins du groupe peuvent ajouter des membres
+            $currentUserGroupRole = $group->getMemberRole($groupId, $currentUserId);
+            $canAddMembers = (
+                $currentUserRole === 'ADMINISTRATEUR' ||
+                $currentUserGroupRole === 'admin'
+            );
+
+            if (!$canAddMembers) {
+                LogService::warning("Tentative d'ajout de membre non autorisée", [
+                    'group_id' => $groupId,
+                    'current_user_id' => $currentUserId,
+                    'target_user_id' => $userId,
+                    'current_user_role_in_group' => $currentUserGroupRole
+                ]);
+                LoggingMiddleware::logExit(403);
+                Response::error('Vous n\'avez pas les permissions pour ajouter des membres à ce groupe', null, 403);
+            }
+
+            // Vérifier que l'utilisateur cible existe et n'est pas déjà membre
+            if ($group->isMember($groupId, $userId)) {
+                LogService::warning("L'utilisateur est déjà membre du groupe", [
+                    'group_id' => $groupId,
+                    'user_id' => $userId
+                ]);
+                LoggingMiddleware::logExit(400);
+                Response::error('L\'utilisateur est déjà membre de ce groupe', null, 400);
+            }
+
+            // Ajouter le membre directement
+            $success = $group->addMemberDirect($groupId, $userId, $role, $currentUserId);
+
+            if (!$success) {
+                LogService::error("Échec de l'ajout du membre", [
+                    'group_id' => $groupId,
+                    'user_id' => $userId,
+                    'role' => $role,
+                    'added_by' => $currentUserId
+                ]);
+                LoggingMiddleware::logExit(500);
+                Response::error('Erreur lors de l\'ajout du membre au groupe');
+            }
+
+            LogService::info("Membre ajouté au groupe", [
+                'group_id' => $groupId,
+                'user_id' => $userId,
+                'role' => $role,
+                'added_by' => $currentUserId
+            ]);
+
+            LoggingMiddleware::logExit(201);
+            Response::success('Membre ajouté au groupe avec succès', [
+                'group_id' => $groupId,
+                'user_id' => $userId,
+                'role' => $role
+            ], 201);
+        } catch (Exception $e) {
+            LogService::error("Erreur lors de l'ajout du membre", [
+                'group_id' => $groupId,
+                'user_id' => $userId,
+                'error' => $e->getMessage()
+            ]);
+            LoggingMiddleware::logExit(500);
+            Response::error('Erreur serveur lors de l\'ajout du membre');
         }
     }
 

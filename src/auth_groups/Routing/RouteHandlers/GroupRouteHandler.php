@@ -4,15 +4,18 @@ namespace AuthGroups\Routing\RouteHandlers;
 
 use AuthGroups\Routing\BaseRouteHandler;
 use AuthGroups\Controllers\GroupController;
+use AuthGroups\Controllers\GroupMemberController;
 use AuthGroups\Utils\Response;
 
 class GroupRouteHandler extends BaseRouteHandler 
 {
     private GroupController $controller;
+    private GroupMemberController $memberController;
     
     public function __construct($authService) {
         parent::__construct($authService);
         $this->controller = new GroupController();
+        $this->memberController = new GroupMemberController();
     }
     
     protected function getSupportedControllers(): array {
@@ -66,12 +69,21 @@ class GroupRouteHandler extends BaseRouteHandler
             // GET /groups/{id}/members
             (isset($segments[2]) && $segments[2] === 'members' && $method === 'GET') => 
                 $this->validateIdAndCall($action, fn($groupId) => 
-                    $this->controller->getMembers($groupId, $user['user_id'], $user['role'])),
+                    $this->memberController->getMembers($groupId, $user['user_id'], $user['role'])),
+
+            // POST /groups/{group_id}/members/{user_id}
+            (isset($segments[2]) && $segments[2] === 'members' && $method === 'POST' 
+            && isset($segments[3])) =>
+                $this->memberController->addMember(
+                    $segments[1], 
+                    $segments[3],
+                    $user['user_id'], 
+                    $user['role']),
             
             // PUT /groups/{group_id}/members/{user_id}
             (isset($segments[2]) && $segments[2] === 'members' && $method === 'PUT' 
             && isset($segments[3])) =>
-                $this->controller->updateUserRole( 
+                $this->memberController->updateUserRole( 
                     $user['user_id'], 
                     $user['role'], 
                     $segments[3],

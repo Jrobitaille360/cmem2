@@ -439,6 +439,50 @@
 
 ---
 
+## POST `/groups/{group_id}/members/{user_id}`
+
+**Description** : Ajouter un utilisateur à un groupe (pour administrateurs)
+
+**Authentification** : 🔒 Admin du groupe ou Admin système
+
+**Données attendues** :
+
+```json
+{
+  "role": "member"
+}
+```
+
+**Validation** :
+
+- `group_id` : requis, ID de groupe valide
+- `user_id` : requis, ID utilisateur valide (non membre du groupe)
+- `role` : optionnel, in('member','moderator','admin'), défaut 'member'
+
+**Réponse succès (201)** :
+
+```json
+{
+  "success": true,
+  "message": "Membre ajouté au groupe avec succès",
+  "data": {
+    "group_id": 1,
+    "user_id": 2,
+    "role": "member"
+  }
+}
+```
+
+**Réponses d'erreur** :
+
+- `400` : L'utilisateur est déjà membre de ce groupe
+- `401` : Authentification requise
+- `403` : Permissions insuffisantes
+- `404` : Groupe non trouvé
+- `500` : Erreur lors de l'ajout du membre
+
+---
+
 ## PUT `/groups/{group_id}/members/{user_id}`
 
 **Description** : Mettre à jour le rôle d'un utilisateur dans un groupe

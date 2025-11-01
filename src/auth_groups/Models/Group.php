@@ -364,6 +364,33 @@ class Group extends BaseModel
     }
 
     /**
+     * Ajouter un membre directement au groupe (sans invitation)
+     */
+    public function addMemberDirect($groupId, $userId, $role, $addedBy)
+    {
+        $role = strtolower($role);
+        $allowedRoles = ['admin', 'moderator', 'member'];
+        if (!in_array($role, $allowedRoles, true)) {
+            return false;
+        }
+
+        try {
+            $query = "INSERT INTO group_members (group_id, user_id, role, invited_by, joined_at) 
+                     VALUES (:group_id, :user_id, :role, :added_by, NOW())";
+
+            $stmt = $this->getDb()->prepare($query);
+            $stmt->bindParam(':group_id', $groupId, PDO::PARAM_INT);
+            $stmt->bindParam(':user_id', $userId, PDO::PARAM_INT);
+            $stmt->bindParam(':role', $role);
+            $stmt->bindParam(':added_by', $addedBy, PDO::PARAM_INT);
+
+            return $stmt->execute();
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+
+    /**
      * Retirer un membre du groupe
      */
     public function removeMember($groupId, $userId)

@@ -403,6 +403,19 @@
           "response": "Array de membres"
         },
         {
+          "method": "POST",
+          "path": "/groups/{group_id}/members/{user_id}",
+          "description": "Ajouter un utilisateur à un groupe (pour administrateurs)",
+          "params": {
+            "group_id": "integer (required)",
+            "user_id": "integer (required)"
+          },
+          "body": {
+            "role": "string (optional, default: member)"
+          },
+          "response": "Message de confirmation"
+        },
+        {
           "method": "PUT",
           "path": "/groups/{group_id}/members/{user_id}",
           "description": "Modifier le rôle d'un membre",
