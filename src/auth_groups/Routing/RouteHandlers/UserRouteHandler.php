@@ -4,15 +4,18 @@ namespace AuthGroups\Routing\RouteHandlers;
 
 use AuthGroups\Routing\BaseRouteHandler;
 use AuthGroups\Controllers\UserController;
+use AuthGroups\Controllers\PlanController;
 use AuthGroups\Utils\Response;
 
 class UserRouteHandler extends BaseRouteHandler 
 {
     private UserController $controller;
+    private PlanController $planController;
     
     public function __construct($authService) {
         parent::__construct($authService);
         $this->controller = new UserController();
+        $this->planController = new PlanController();
     }
     
     protected function getSupportedControllers(): array {
@@ -48,6 +51,14 @@ class UserRouteHandler extends BaseRouteHandler
             // POST /users/logout
             ($action === 'logout' && $method === 'POST') => 
                 $this->controller->logout($user['user_id']),
+
+            // GET /users/choose-plan?token=xxx - Afficher invitation plan (public)
+            ($action === 'choose-plan' && $method === 'GET') =>
+                $this->handlePlanInvitationView(),
+
+            // POST /users/choose-plan - Sélectionner un plan via token (public)
+            ($action === 'choose-plan' && $method === 'POST') =>
+                $this->handlePlanSelection(),
 
             // GET /users
             ($action === '' && $method === 'GET') =>
@@ -94,5 +105,33 @@ class UserRouteHandler extends BaseRouteHandler
             return;
         }
         $callback($id);
+    }
+
+    /**
+     * Gère l'affichage d'une invitation plan (public)
+     */
+    private function handlePlanInvitationView(): void {
+        // Cette route est publique, donc on désactive temporairement l'auth
+        $originalRequiresAuth = $this->requiresAuth;
+        $this->requiresAuth = false;
+        
+        $this->planController->viewPlanInvitation();
+        
+        // Remettre l'auth comme avant
+        $this->requiresAuth = $originalRequiresAuth;
+    }
+
+    /**
+     * Gère la sélection d'un plan (public)
+     */
+    private function handlePlanSelection(): void {
+        // Cette route est publique, donc on désactive temporairement l'auth
+        $originalRequiresAuth = $this->requiresAuth;
+        $this->requiresAuth = false;
+        
+        $this->planController->choosePlan();
+        
+        // Remettre l'auth comme avant
+        $this->requiresAuth = $originalRequiresAuth;
     }
 }

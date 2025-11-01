@@ -9,7 +9,8 @@
           ✓ calendar
           todo list
       API Manage by secretadmin
-      Login only possible with APIkey
+      ✓ Login only possible with APIkey
+      ✓ When user register, create a limited Api_key(free). Send it and ask to choose a plan (free, bronze argent or platine) and confirm email. On email confirmation, expand free use to time to ask again for a plan. 
       
     Mot de passe SOFT ou STRONG
     📝 Un guide de développement de plugins pour les développeurs externes ?
@@ -18,6 +19,7 @@
     📦 Un marketplace/registre de plugins disponibles ?
 
 
+utilisation de login_code?
 
 
   Flutter Client

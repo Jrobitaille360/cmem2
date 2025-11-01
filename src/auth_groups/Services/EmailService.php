@@ -404,6 +404,82 @@ class EmailService {
     }
     
     /**
+     * Envoyer un email d'inscription avec API key gratuite et invitation aux plans
+     */
+    public function sendRegistrationWithApiKeyAndPlanInvitation($email, $username, $verificationToken, $apiKey, $planInvitationToken) {
+        LogService::info("EmailService: Envoi email inscription avec API key et invitation plan", [
+            'email' => $email,
+            'username' => $username,
+            'has_api_key' => !empty($apiKey)
+        ]);
+        
+        $subject = "🎉 Bienvenue sur AuthGroups API - Votre clé gratuite et invitation aux plans premium";
+        
+        $verificationUrl = $_ENV['APP_URL'] . '/users/verify-email?token=' . $verificationToken;
+        $planInvitationUrl = $_ENV['APP_URL'] . '/users/choose-plan?token=' . $planInvitationToken;
+        
+        $body = $this->buildRegistrationWithApiKeyTemplate([
+            'username' => $username,
+            'email' => $email,
+            'apiKey' => $apiKey,
+            'verificationUrl' => $verificationUrl,
+            'planInvitationUrl' => $planInvitationUrl,
+            'planInvitationToken' => $planInvitationToken
+        ]);
+        
+        $result = $this->sendEmail($email, $subject, $body, true);
+        
+        if ($result) {
+            LogService::info("EmailService: Email d'inscription avec API key envoyé avec succès", [
+                'email' => $email
+            ]);
+        } else {
+            LogService::error("EmailService: Échec d'envoi email d'inscription avec API key", [
+                'email' => $email
+            ]);
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * Envoyer un email de félicitations après confirmation avec rappel des plans
+     */
+    public function sendEmailConfirmedWithPlanReminder($email, $username, $planInvitationToken, $extendedDays) {
+        LogService::info("EmailService: Envoi email félicitations avec rappel plans", [
+            'email' => $email,
+            'username' => $username,
+            'extended_days' => $extendedDays
+        ]);
+        
+        $subject = "🎉 Email confirmé ! Votre plan gratuit est étendu + Invitation premium";
+        
+        $planInvitationUrl = $_ENV['APP_URL'] . '/users/choose-plan?token=' . $planInvitationToken;
+        
+        $body = $this->buildEmailConfirmedWithPlanReminderTemplate([
+            'username' => $username,
+            'email' => $email,
+            'extendedDays' => $extendedDays,
+            'planInvitationUrl' => $planInvitationUrl,
+            'planInvitationToken' => $planInvitationToken
+        ]);
+        
+        $result = $this->sendEmail($email, $subject, $body, true);
+        
+        if ($result) {
+            LogService::info("EmailService: Email félicitations avec rappel plans envoyé avec succès", [
+                'email' => $email
+            ]);
+        } else {
+            LogService::error("EmailService: Échec d'envoi email félicitations", [
+                'email' => $email
+            ]);
+        }
+        
+        return $result;
+    }
+    
+    /**
      * Envoyer une notification de changement de rôle dans un groupe
      */
     public function sendRoleChangeNotification($email, $username, $groupName, $newRole, $changedBy) {
@@ -1186,6 +1262,402 @@ class EmailService {
                         <a href='{$data['confirmationUrl']}' class='button'>Confirmer l'action</a>
                     </p>
                     <p><small>Ce lien expire dans 24 heures. Si vous n'avez pas demandé cette action, ignorez cet email.</small></p>
+                </div>
+            </div>
+        </body>
+        </html>";
+    }
+    
+    /**
+     * Template pour email d'inscription avec API key gratuite et invitation plans
+     */
+    private function buildRegistrationWithApiKeyTemplate($data) {
+        return "
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset='UTF-8'>
+            <title>Bienvenue sur AuthGroups API</title>
+            <style>
+                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                .container { max-width: 700px; margin: 0 auto; padding: 20px; }
+                .header { background: linear-gradient(135deg, #00BCD4, #4CAF50); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+                .content { padding: 30px; background-color: #f9f9f9; }
+                .api-key-box { 
+                    background: #e3f2fd; 
+                    border: 2px solid #2196F3; 
+                    padding: 20px; 
+                    margin: 20px 0; 
+                    border-radius: 8px;
+                    font-family: monospace;
+                    word-break: break-all;
+                }
+                .plan-section { 
+                    background: #fff3e0; 
+                    border-left: 4px solid #FF9800; 
+                    padding: 20px; 
+                    margin: 20px 0; 
+                    border-radius: 0 8px 8px 0;
+                }
+                .plan-grid {
+                    display: grid;
+                    grid-template-columns: repeat(3, 1fr);
+                    gap: 15px;
+                    margin: 20px 0;
+                }
+                .plan-card {
+                    background: white;
+                    border: 2px solid #ddd;
+                    padding: 15px;
+                    text-align: center;
+                    border-radius: 8px;
+                    transition: all 0.3s ease;
+                }
+                .plan-bronze { border-color: #CD7F32; }
+                .plan-argent { border-color: #C0C0C0; }
+                .plan-platine { border-color: #E5E4E2; }
+                .button { 
+                    display: inline-block; 
+                    background: linear-gradient(135deg, #4CAF50, #45a049); 
+                    color: white; 
+                    padding: 15px 30px; 
+                    text-decoration: none; 
+                    border-radius: 25px; 
+                    margin: 15px 10px;
+                    font-weight: bold;
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                }
+                .button-secondary {
+                    background: linear-gradient(135deg, #FF9800, #F57C00);
+                }
+                .warning { 
+                    background: #fff3cd; 
+                    border: 1px solid #ffeaa7; 
+                    padding: 15px; 
+                    border-radius: 5px; 
+                    margin: 15px 0; 
+                    color: #856404;
+                }
+                .footer { text-align: center; padding: 20px; font-size: 12px; color: #666; }
+                .highlight { background: #ffeb3b; padding: 2px 6px; border-radius: 3px; }
+                .steps {
+                    counter-reset: step-counter;
+                    list-style: none;
+                    padding: 0;
+                }
+                .steps li {
+                    counter-increment: step-counter;
+                    margin: 15px 0;
+                    padding: 15px;
+                    background: white;
+                    border-left: 4px solid #4CAF50;
+                    border-radius: 0 8px 8px 0;
+                    position: relative;
+                }
+                .steps li::before {
+                    content: counter(step-counter);
+                    position: absolute;
+                    left: -20px;
+                    top: 15px;
+                    background: #4CAF50;
+                    color: white;
+                    width: 30px;
+                    height: 30px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-weight: bold;
+                }
+            </style>
+        </head>
+        <body>
+            <div class='container'>
+                <div class='header'>
+                    <h1>🎉 Bienvenue {$data['username']} !</h1>
+                    <p>Votre compte AuthGroups API est créé avec succès</p>
+                </div>
+                <div class='content'>
+                    <h2>🚀 Commencez immédiatement avec votre clé API gratuite</h2>
+                    <p>Nous avons généré pour vous une <strong>clé API gratuite</strong> pour commencer à utiliser notre service immédiatement :</p>
+                    
+                    <div class='api-key-box'>
+                        <h3 style='margin-top: 0; color: #2196F3;'>🔑 Votre clé API gratuite :</h3>
+                        <code style='font-size: 16px; font-weight: bold; color: #1976D2;'>{$data['apiKey']}</code>
+                        <p style='margin-bottom: 0; font-size: 14px; color: #666;'>
+                            <strong>⚠️ Sauvegardez cette clé maintenant !</strong> Elle ne sera plus jamais affichée.
+                        </p>
+                    </div>
+                    
+                    <div class='warning'>
+                        <strong>🕐 Limitations du plan gratuit :</strong>
+                        <ul>
+                            <li>📊 <strong>10 requêtes/minute</strong> maximum</li>
+                            <li>📖 <strong>Lecture seule</strong> (scope: read)</li>
+                            <li>⏰ <strong>Expire dans 7 jours</strong></li>
+                            <li>🎯 Parfait pour tester notre API !</li>
+                        </ul>
+                    </div>
+                    
+                    <h2>💎 Passez à un plan premium pour plus de fonctionnalités</h2>
+                    <div class='plan-section'>
+                        <p>Débloquez tout le potentiel de l'API avec nos plans premium :</p>
+                        
+                        <div class='plan-grid'>
+                            <div class='plan-card plan-bronze'>
+                                <h4>🥉 Bronze</h4>
+                                <div style='font-size: 20px; font-weight: bold; color: #CD7F32;'>9.99€/mois</div>
+                                <ul style='text-align: left; font-size: 14px;'>
+                                    <li>100 req/min</li>
+                                    <li>Lecture + Écriture</li>
+                                    <li>Support email</li>
+                                </ul>
+                            </div>
+                            <div class='plan-card plan-argent'>
+                                <h4>🥈 Argent</h4>
+                                <div style='font-size: 20px; font-weight: bold; color: #C0C0C0;'>19.99€/mois</div>
+                                <ul style='text-align: left; font-size: 14px;'>
+                                    <li>300 req/min</li>
+                                    <li>Toutes opérations</li>
+                                    <li>Support prioritaire</li>
+                                    <li>Webhooks</li>
+                                </ul>
+                            </div>
+                            <div class='plan-card plan-platine'>
+                                <h4>🏆 Platine</h4>
+                                <div style='font-size: 20px; font-weight: bold; color: #E5E4E2;'>49.99€/mois</div>
+                                <ul style='text-align: left; font-size: 14px;'>
+                                    <li>1000 req/min</li>
+                                    <li>Accès admin</li>
+                                    <li>Support dédié</li>
+                                    <li>Intégrations custom</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <p style='text-align: center;'>
+                            <a href='{$data['planInvitationUrl']}' class='button button-secondary'>
+                                🎯 Choisir mon plan premium
+                            </a>
+                        </p>
+                    </div>
+                    
+                    <h2>📋 Prochaines étapes</h2>
+                    <ol class='steps'>
+                        <li>
+                            <strong>Confirmez votre email</strong><br>
+                            <span style='color: #666;'>Cliquez sur le bouton ci-dessous pour activer votre compte</span>
+                        </li>
+                        <li>
+                            <strong>Testez votre API key gratuite</strong><br>
+                            <span style='color: #666;'>Utilisez votre clé pour faire vos premiers appels API</span>
+                        </li>
+                        <li>
+                            <strong>Choisissez un plan premium</strong><br>
+                            <span style='color: #666;'>Débloquez toutes les fonctionnalités avant expiration</span>
+                        </li>
+                    </ol>
+                    
+                    <p style='text-align: center; margin: 40px 0;'>
+                        <a href='{$data['verificationUrl']}' class='button'>
+                            ✅ Confirmer mon email
+                        </a>
+                        <a href='{$data['planInvitationUrl']}' class='button button-secondary'>
+                            💎 Voir les plans premium
+                        </a>
+                    </p>
+                    
+                    <h3>📖 Documentation et support</h3>
+                    <p>
+                        • <strong>Documentation API :</strong> <a href='{$_ENV['APP_URL']}/docs'>Guide complet</a><br>
+                        • <strong>Exemples de code :</strong> <a href='{$_ENV['APP_URL']}/examples'>Démarrage rapide</a><br>
+                        • <strong>Support :</strong> <a href='mailto:support@authgroups.com'>support@authgroups.com</a>
+                    </p>
+                    
+                    <div style='background: #e8f5e8; padding: 15px; border-radius: 8px; margin: 20px 0;'>
+                        <p style='margin: 0;'><strong>💡 Astuce :</strong> 
+                        Utilisez le header <code>X-API-Key: {$data['apiKey']}</code> 
+                        dans vos requêtes pour vous authentifier avec votre clé gratuite.</p>
+                    </div>
+                </div>
+                <div class='footer'>
+                    <p>© AuthGroups API - Votre plateforme de développement</p>
+                    <p>Email envoyé à {$data['email']} | <a href='{$_ENV['APP_URL']}/unsubscribe'>Se désabonner</a></p>
+                </div>
+            </div>
+        </body>
+        </html>";
+    }
+    
+    /**
+     * Template pour email de félicitations après confirmation avec rappel plans
+     */
+    private function buildEmailConfirmedWithPlanReminderTemplate($data) {
+        return "
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset='UTF-8'>
+            <title>Email confirmé - Plan étendu !</title>
+            <style>
+                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                .container { max-width: 700px; margin: 0 auto; padding: 20px; }
+                .header { background: linear-gradient(135deg, #4CAF50, #8BC34A); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+                .content { padding: 30px; background-color: #f9f9f9; }
+                .success-box { 
+                    background: #e8f5e8; 
+                    border: 2px solid #4CAF50; 
+                    padding: 20px; 
+                    margin: 20px 0; 
+                    border-radius: 8px;
+                }
+                .upgrade-section { 
+                    background: linear-gradient(135deg, #fff3e0, #fce4ec); 
+                    border-left: 4px solid #FF9800; 
+                    padding: 25px; 
+                    margin: 25px 0; 
+                    border-radius: 0 8px 8px 0;
+                }
+                .plan-comparison {
+                    display: grid;
+                    grid-template-columns: repeat(2, 1fr);
+                    gap: 20px;
+                    margin: 20px 0;
+                }
+                .plan-card {
+                    background: white;
+                    border: 2px solid #ddd;
+                    padding: 20px;
+                    text-align: center;
+                    border-radius: 8px;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                }
+                .plan-free { border-color: #4CAF50; }
+                .plan-premium { border-color: #FF9800; background: linear-gradient(135deg, #fff3e0, #fce4ec); }
+                .button { 
+                    display: inline-block; 
+                    background: linear-gradient(135deg, #FF9800, #F57C00); 
+                    color: white; 
+                    padding: 15px 30px; 
+                    text-decoration: none; 
+                    border-radius: 25px; 
+                    margin: 15px 10px;
+                    font-weight: bold;
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+                }
+                .button:hover {
+                    background: linear-gradient(135deg, #F57C00, #FF9800);
+                    transform: translateY(-2px);
+                    transition: all 0.3s ease;
+                }
+                .improvement-list {
+                    background: #e3f2fd;
+                    padding: 20px;
+                    border-radius: 8px;
+                    margin: 20px 0;
+                }
+                .footer { text-align: center; padding: 20px; font-size: 12px; color: #666; }
+                .celebration { font-size: 48px; text-align: center; margin: 20px 0; }
+                .countdown {
+                    background: #ffeb3b;
+                    border: 2px solid #fbc02d;
+                    padding: 15px;
+                    border-radius: 8px;
+                    text-align: center;
+                    margin: 20px 0;
+                    font-weight: bold;
+                }
+            </style>
+        </head>
+        <body>
+            <div class='container'>
+                <div class='header'>
+                    <div class='celebration'>🎉🎊✨</div>
+                    <h1>Félicitations {$data['username']} !</h1>
+                    <p>Votre email est confirmé et votre plan gratuit est étendu !</p>
+                </div>
+                <div class='content'>
+                    <div class='success-box'>
+                        <h2 style='color: #4CAF50; margin-top: 0;'>✅ Email confirmé avec succès !</h2>
+                        <p>Votre compte est maintenant pleinement activé. En bonus, nous avons automatiquement étendu votre plan gratuit !</p>
+                    </div>
+                    
+                    <h2>🚀 Votre plan gratuit a été amélioré !</h2>
+                    <div class='improvement-list'>
+                        <h3 style='color: #2196F3; margin-top: 0;'>Nouvelles limites améliorées :</h3>
+                        <ul style='font-size: 16px;'>
+                            <li>⏰ <strong>Durée :</strong> Étendu à <strong>{$data['extendedDays']} jours</strong> (au lieu de 7)</li>
+                            <li>📊 <strong>Requêtes :</strong> <strong>30/minute</strong> (au lieu de 10)</li>
+                            <li>🔄 <strong>Quota horaire :</strong> <strong>1,800/heure</strong> (au lieu de 600)</li>
+                            <li>📖 <strong>Accès :</strong> Toujours en lecture seule</li>
+                        </ul>
+                    </div>
+                    
+                    <div class='countdown'>
+                        ⏰ Vous avez maintenant <strong>{$data['extendedDays']} jours</strong> pour explorer notre API avec des limites étendues !
+                    </div>
+                    
+                    <h2>💎 Prêt à débloquer toute la puissance ?</h2>
+                    <div class='upgrade-section'>
+                        <p>Votre période d'essai étendue est parfaite pour tester, mais pourquoi ne pas débloquer tout le potentiel dès maintenant ?</p>
+                        
+                        <div class='plan-comparison'>
+                            <div class='plan-card plan-free'>
+                                <h4>🆓 Plan Gratuit (Actuel)</h4>
+                                <div style='font-size: 18px; color: #4CAF50; margin: 10px 0;'><strong>{$data['extendedDays']} jours</strong></div>
+                                <ul style='text-align: left; font-size: 14px; color: #666;'>
+                                    <li>30 requêtes/minute</li>
+                                    <li>Lecture seule</li>
+                                    <li>Support communautaire</li>
+                                    <li>Expire bientôt ⏰</li>
+                                </ul>
+                            </div>
+                            <div class='plan-card plan-premium'>
+                                <h4>🏆 Plans Premium</h4>
+                                <div style='font-size: 18px; color: #FF9800; margin: 10px 0;'><strong>Dès 9.99€/mois</strong></div>
+                                <ul style='text-align: left; font-size: 14px;'>
+                                    <li>✅ Jusqu'à 1000 req/min</li>
+                                    <li>✅ Lecture + Écriture + Admin</li>
+                                    <li>✅ Support prioritaire</li>
+                                    <li>✅ Pas d'expiration</li>
+                                    <li>✅ Webhooks & intégrations</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <p style='text-align: center; margin: 30px 0;'>
+                            <a href='{$data['planInvitationUrl']}' class='button'>
+                                🚀 Découvrir les plans premium
+                            </a>
+                        </p>
+                        
+                        <p style='text-align: center; font-size: 14px; color: #666;'>
+                            💡 <strong>Astuce :</strong> Passez au premium maintenant et gardez tous vos paramètres actuels !
+                        </p>
+                    </div>
+                    
+                    <h3>📚 Ressources pour bien commencer</h3>
+                    <div style='background: white; padding: 20px; border-radius: 8px; margin: 20px 0;'>
+                        <p>
+                            • <strong>Documentation complète :</strong> <a href='{$_ENV['APP_URL']}/docs'>Guide d'utilisation</a><br>
+                            • <strong>Exemples de code :</strong> <a href='{$_ENV['APP_URL']}/examples'>Tutoriels pratiques</a><br>
+                            • <strong>Dashboard :</strong> <a href='{$_ENV['APP_URL']}/dashboard'>Gérer vos API keys</a><br>
+                            • <strong>Support :</strong> <a href='mailto:support@authgroups.com'>Nous contacter</a>
+                        </p>
+                    </div>
+                    
+                    <div style='background: #e8f5e8; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #4CAF50;'>
+                        <h4 style='color: #4CAF50; margin-top: 0;'>🎯 Conseil d'expert</h4>
+                        <p style='margin-bottom: 0;'>
+                            Profitez de vos {$data['extendedDays']} jours étendus pour développer votre intégration. 
+                            Quand vous serez prêt à passer en production, 
+                            <a href='{$data['planInvitationUrl']}'>choisissez le plan premium</a> qui correspond à vos besoins !
+                        </p>
+                    </div>
+                </div>
+                <div class='footer'>
+                    <p>© AuthGroups API - Merci de nous faire confiance !</p>
+                    <p>Email envoyé à {$data['email']} | <a href='{$_ENV['APP_URL']}/unsubscribe'>Se désabonner</a></p>
                 </div>
             </div>
         </body>

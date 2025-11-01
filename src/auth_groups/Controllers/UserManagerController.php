@@ -3,14 +3,15 @@
 namespace AuthGroups\Controllers;
 
 use AuthGroups\Models\User;
+use AuthGroups\Models\Plan;
+use AuthGroups\Models\ApiKey;
 use AuthGroups\Services\EmailService;
 use AuthGroups\Services\AuthService;
 use AuthGroups\Utils\Response;
 use AuthGroups\Utils\Validator;
 use AuthGroups\Utils\Database;
-use Firebase\JWT\JWT;
 use AuthGroups\Services\LogService;
-use AuthGroups\Services\ValidTokenService;
+use AuthGroups\Services\UserSessionService;
 use AuthGroups\Middleware\LoggingMiddleware;
 use Exception;
 
@@ -71,12 +72,74 @@ class UserManagerController {
             $user->profile_image = 'default.jpg'; // Avatar par défaut            
             if ($user->create()) {
                 // Récupérer l'utilisateur créé avec toutes ses données
-                $createdUser = $user->findById($user->id);                
-                // Générer un token de vérification d'email
+                $createdUser = $user->findById($user->id);
+                
+                // 1. Assigner le plan gratuit par défaut
+                $freePlan = Plan::findByName(Plan::PLAN_FREE);
+                if ($freePlan) {
+                    $pdo = \Database::getInstance()->getConnection();
+                    $stmt = $pdo->prepare("
+                        UPDATE users 
+                        SET plan_id = :plan_id, plan_expires_at = DATE_ADD(NOW(), INTERVAL 7 DAY)
+                        WHERE id = :user_id
+                    ");
+                    $stmt->execute([
+                        'plan_id' => $freePlan['id'],
+                        'user_id' => $createdUser['id']
+                    ]);
+                    
+                    LogService::info("Plan gratuit assigné", [
+                        'user_id' => $createdUser['id'],
+                        'plan_id' => $freePlan['id']
+                    ]);
+                }
+                
+                // 2. Créer une API key limitée (plan free)
+                try {
+                    $apiKeyConfig = Plan::getApiKeyConfigForPlan(Plan::PLAN_FREE);
+                    $apiKeyResult = ApiKey::generate(
+                        $createdUser['id'],
+                        "Clé API gratuite - " . $createdUser['name'],
+                        $apiKeyConfig
+                    );
+                    
+                    // Marquer cette API key comme liée au plan gratuit
+                    if ($freePlan && $apiKeyResult) {
+                        $stmt = $pdo->prepare("
+                            UPDATE api_keys 
+                            SET plan_id = :plan_id, plan_limited = 1
+                            WHERE id = :api_key_id
+                        ");
+                        $stmt->execute([
+                            'plan_id' => $freePlan['id'],
+                            'api_key_id' => $apiKeyResult['data']['id']
+                        ]);
+                    }
+                    
+                    LogService::info("API key gratuite créée", [
+                        'user_id' => $createdUser['id'],
+                        'api_key_id' => $apiKeyResult['data']['id'],
+                        'key_prefix' => substr($apiKeyResult['key'], 0, 12) . '...'
+                    ]);
+                    
+                } catch (Exception $apiKeyError) {
+                    LogService::error("Erreur lors de la création de l'API key gratuite", [
+                        'user_id' => $createdUser['id'],
+                        'error' => $apiKeyError->getMessage()
+                    ]);
+                    // Continuer même si l'API key n'est pas créée
+                    $apiKeyResult = null;
+                }
+                
+                // 3. Générer un token de vérification d'email
                 $verificationToken = bin2hex(random_bytes(32));
-                $expiresAt = date('Y-m-d H:i:s', time() + (24 * 60 * 60)); // Expire dans 24h                
+                $expiresAt = date('Y-m-d H:i:s', time() + (24 * 60 * 60)); // Expire dans 24h
+                
+                // 4. Créer un token d'invitation pour choisir un plan
+                $planInvitationToken = bin2hex(random_bytes(32));
+                $planInvitationExpires = date('Y-m-d H:i:s', time() + (7 * 24 * 60 * 60)); // 7 jours
+                
                 // Insérer le token de vérification dans la base de données
-                $pdo = \Database::getInstance()->getConnection();
                 $stmt = $pdo->prepare("
                     INSERT INTO email_verifications (user_id, token, expires_at) 
                     VALUES (:user_id, :token, :expires_at)
@@ -85,46 +148,54 @@ class UserManagerController {
                     'user_id' => $createdUser['id'],
                     'token' => $verificationToken,
                     'expires_at' => $expiresAt
-                ]);             
-                // Envoyer l'email de vérification
+                ]);
+                
+                // Insérer l'invitation au choix de plan
+                $stmt = $pdo->prepare("
+                    INSERT INTO plan_invitations (user_id, invitation_token, expires_at) 
+                    VALUES (:user_id, :token, :expires_at)
+                ");
+                $stmt->execute([
+                    'user_id' => $createdUser['id'],
+                    'token' => $planInvitationToken,
+                    'expires_at' => $planInvitationExpires
+                ]);
+                
+                // 5. Envoyer l'email avec API key + invitation au choix de plan
                 try {
                     $emailService = new EmailService();
-                    $emailSent = $emailService->sendEmailVerification(
+                    $emailSent = $emailService->sendRegistrationWithApiKeyAndPlanInvitation(
                         $createdUser['email'],
                         $createdUser['name'],
-                        $verificationToken
-                    );                    
+                        $verificationToken,
+                        $apiKeyResult ? $apiKeyResult['key'] : null,
+                        $planInvitationToken
+                    );
+                    
                     if ($emailSent) {
-                        LogService::info("Email de vérification envoyé", [
+                        LogService::info("Email d'inscription avec API key et invitation plan envoyé", [
                             'user_id' => $createdUser['id'],
                             'email' => $createdUser['email']
                         ]);
                     } else {
-                        LogService::warning("Échec envoi email de vérification", [
+                        LogService::warning("Échec envoi email d'inscription", [
                             'user_id' => $createdUser['id'],
                             'email' => $createdUser['email']
                         ]);
-                        Response::error("Échec de l'envoi de l'email de vérification", null, 500);
+                        Response::error("Échec de l'envoi de l'email d'inscription", null, 500);
                     }
                 } catch (Exception $emailError) {
                     // Ne pas faire échouer la création si l'email ne peut pas être envoyé
-                    LogService::error("Erreur lors de l'envoi de l'email de vérification", [
+                    LogService::error("Erreur lors de l'envoi de l'email d'inscription", [
                         'user_id' => $createdUser['id'],
                         'email' => $createdUser['email'],
                         'error' => $emailError->getMessage()
                     ]);
-                    Response::error("Échec de l'envoi de l'email de vérification", null, 500);
+                    Response::error("Échec de l'envoi de l'email d'inscription", null, 500);
                     return false;
                 }               
-                // Générer un token JWT
-                $tokenPayload = [
-                    'user_id' => $createdUser['id'],
-                    'email' => $createdUser['email'],
-                    'role' => $createdUser['role'],
-                    'iat' => time(),
-                    'exp' => time() + (24 * 60 * 60) // 24 heures
-                ];                
-                $token = JWT::encode($tokenPayload, $_ENV['JWT_SECRET'] ?? 'default_secret', 'HS256');                
+                
+                
                 LogService::info("Nouvel utilisateur créé", [
                     'user_id' => $createdUser['id'],
                     'name' => $createdUser['name'],
@@ -147,14 +218,34 @@ class UserManagerController {
                         'last_login' => $createdUser['last_login'],
                         'created_at' => $createdUser['created_at'],
                         'updated_at' => $createdUser['updated_at'],
-                        'deleted_at' => $createdUser['deleted_at']
+                        'plan' => 'free'
                     ],
-                    'token' => $token,
-                    // TODO LIGNE À ENLEVER EN PRODUCTION
-                    'verification_token' => $verificationToken
-                ];                
+                    'api_key' => [
+                        'key' => $apiKeyResult ? $apiKeyResult['key'] : null,
+                        'name' => $apiKeyResult ? $apiKeyResult['data']['name'] : null,
+                        'environment' => $apiKeyResult ? $apiKeyResult['data']['environment'] : null,
+                        'scopes' => $apiKeyResult ? json_decode($apiKeyResult['data']['scopes'], true) : [],
+                        'rate_limit_per_minute' => $apiKeyResult ? $apiKeyResult['data']['rate_limit_per_minute'] : null,
+                        'expires_at' => $apiKeyResult ? $apiKeyResult['data']['expires_at'] : null,
+                        'plan_limited' => true
+                    ],
+                    'plan_invitation' => [
+                        'token' => $planInvitationToken,
+                        'expires_at' => $planInvitationExpires,
+                        'available_plans' => ['bronze', 'argent', 'platine']
+                    ],
+                    'verification_token' => $verificationToken,
+                    'auth_method' => 'api_key'
+                ];
+                
+                // En développement, inclure les tokens pour les tests
+                if(defined('APP_ENV') && APP_ENV === 'development') {
+                    $responseData['verification_token'] = $verificationToken;
+                    $responseData['plan_invitation_token'] = $planInvitationToken;
+                }
+
                 LoggingMiddleware::logExit(201);
-                Response::success('Nouvel utilisateur créé. Un email de vérification a été envoyé.', $responseData, 201);
+                Response::success('Nouvel utilisateur créé avec API key gratuite. Un email de confirmation avec invitation aux plans payants a été envoyé.', $responseData, 201);
                 return true;
             } else {
                 LogService::error("Échec de la création utilisateur", [
@@ -314,9 +405,7 @@ class UserManagerController {
             return false;
         }
     }
-
-    
-    
+   
     /**
      * Authentification utilisateur pour LOGIN STRICT
      * Nécessite TOUJOURS email + password. Force le logout automatique par sécurité.
@@ -326,41 +415,6 @@ class UserManagerController {
             LoggingMiddleware::logEntry();
             
             $input = Response::getRequestParams();
-            
-            // 🛡️ SÉCURITÉ: Route /login DOIT avoir des identifiants
-            $hasLoginData = isset($input['email']) && isset($input['password']) 
-                && !empty($input['email']) && !empty($input['password']);
-            
-            if (!$hasLoginData) {
-                // 🚨 SÉCURITÉ: Appel login sans identifiants = suspect
-                LogService::warning("Tentative d'utilisation de /login sans identifiants - logout forcé", [
-                    'input_keys' => array_keys($input),
-                    'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown'
-                ]);
-                
-                // Forcer logout par sécurité
-                $this->silentLogout();
-                
-                LoggingMiddleware::logExit(400);
-                Response::error('Identifiants requis pour la connexion', [
-                    'email' => ['Le champ email est requis'],
-                    'password' => ['Le champ password est requis']
-                ], 400);
-                return false;
-            }
-            
-            // 🔥 LOGOUT AUTOMATIQUE FORCÉ pour route /login
-            if (AUTH_AUTO_LOGOUT_BEFORE_LOGIN) {
-                $tokensCleared = $this->silentLogout();
-                if ($tokensCleared > 0 && AUTH_AUTO_LOGOUT_LOG_LEVEL !== 'none') {
-                    LogService::info("Logout automatique effectué avant authentification", [
-                        'tokens_cleared' => $tokensCleared
-                    ]);
-                }
-            }
-            
-
-            //TODO JE CROIS QU'ON SE RÉPÈTE ICI. cette solution est plus conforme à la doc
             // Validation stricte des identifiants
             $validator = new Validator();
             $validation = $validator->validate($input, [
@@ -375,6 +429,16 @@ class UserManagerController {
                 LoggingMiddleware::logExit(400);
                 Response::error('Données invalides', $validation['errors'], 400);
                 return false;
+            }
+            
+            // 🔥 LOGOUT AUTOMATIQUE FORCÉ pour route /login
+            if (AUTH_AUTO_LOGOUT_BEFORE_LOGIN) {
+                $tokensCleared = $this->silentLogout();
+                if ($tokensCleared > 0 && AUTH_AUTO_LOGOUT_LOG_LEVEL !== 'none') {
+                    LogService::info("Logout automatique effectué avant authentification", [
+                        'tokens_cleared' => $tokensCleared
+                    ]);
+                }
             }
             
             // Authentifier avec email/password
@@ -417,42 +481,50 @@ class UserManagerController {
                 return false;
             }
             
-            // Générer le token JWT
-                $payload = [
+            // Récupérer les informations de l'API Key utilisée pour ce login
+            $apiKeyData = \AuthGroups\Middleware\ApiKeyAuthMiddleware::requireApiKey();
+            if (!$apiKeyData) {
+                LogService::error("Impossible de récupérer les données API Key lors du login");
+                LoggingMiddleware::logExit(500);
+                Response::error('Erreur d\'authentification API Key', null, 500);
+                return false;
+            }
+            
+            // Créer une nouvelle session utilisateur
+            $sessionId = UserSessionService::createSession(
+                $userData['id'], 
+                $apiKeyData['id']
+            );
+            
+            if (!$sessionId) {
+                LogService::error("Impossible de créer la session utilisateur", [
                     'user_id' => $userData['id'],
-                    'email' => $userData['email'],
-                    'role' => $userData['role'],
-                    'iat' => time(),
-                    'exp' => time() + (24 * 60 * 60) // 24 heures
-                ];                
-                $jwt = JWT::encode($payload, $_ENV['JWT_SECRET'] ?? 'default_secret', 'HS256');
-                
-                // Enregistrer le token dans la table des tokens valides
-                $tokenRegistered = ValidTokenService::registerToken($jwt, $userData['id']);
-                if (!$tokenRegistered) {
-                    LogService::warning("Échec de l'enregistrement du token", [
-                        'user_id' => $userData['id']
-                    ]);
-                    // On continue même si l'enregistrement du token échoue
-                    // pour ne pas bloquer la connexion
-                }
-                
-                LogService::info("Authentification réussie (login)", [
-                    'user_id' => $userData['id'],
-                    'email' => $userData['email'],
-                    'token_registered' => $tokenRegistered
+                    'api_key_id' => $apiKeyData['id']
                 ]);
+                LoggingMiddleware::logExit(500);
+                Response::error('Erreur lors de la création de session', null, 500);
+                return false;
+            }
                 
-                LoggingMiddleware::logExit(200);
-                Response::success("Connexion réussie", [
-                    'token' => $jwt,
-                    'user' => [
-                        'id' => $userData['id'],
-                        'name' => $userData['name'],
-                        'email' => $userData['email'],
-                        'role' => $userData['role']
-                    ]
-                ]);
+            LogService::info("Authentification réussie (login)", [
+                'user_id' => $userData['id'],
+                'email' => $userData['email'],
+                'session_id' => $sessionId,
+                'api_key_id' => $apiKeyData['id']
+            ]);
+            
+            LoggingMiddleware::logExit(200);
+            Response::success("Connexion réussie", [
+                'session_id' => $sessionId,
+                'auth_method' => 'api_key',
+                'api_key_name' => $apiKeyData['name'],
+                'user' => [
+                    'id' => $userData['id'],
+                    'name' => $userData['name'],
+                    'email' => $userData['email'],
+                    'role' => $userData['role']
+                ]
+            ]);
             
             return true;
             
@@ -481,40 +553,43 @@ class UserManagerController {
                 return false;
             }
             
-            // Extraire le token depuis les headers en utilisant AuthService
-            $token = AuthService::extractTokenFromHeader();
+            // Déterminer le mode d'authentification et gérer le logout en conséquence
+            $sessionsEnded = 0;
+            $authMode = 'api_key'; // Maintenant, tout est API Key obligatoire
             
-            $tokensRemoved = 0;
+            // Récupérer les informations de l'API Key utilisée
+            $apiKeyData = \AuthGroups\Middleware\ApiKeyAuthMiddleware::requireApiKey();
             
-            if ($token) {
-                // Supprimer le token spécifique
-                if (ValidTokenService::removeToken($token)) {
-                    $tokensRemoved = 1;
-                    LogService::info("Token spécifique supprimé lors du logout", [
-                        'user_id' => $userId
-                    ]);
-                } else {
-                    LogService::warning("Échec de la suppression du token spécifique", [
-                        'user_id' => $userId
-                    ]);
-                }
-            } else {
-                // Si pas de token dans les headers, supprimer tous les tokens de l'utilisateur
-                $tokensRemoved = ValidTokenService::removeAllUserTokens($userId);
-                LogService::info("Tous les tokens utilisateur supprimés lors du logout", [
+            if ($apiKeyData) {
+                // Terminer la session spécifique pour cette API Key
+                $sessionsEnded = UserSessionService::endSession($userId, $apiKeyData['id']);
+                LogService::info("Logout avec API Key - Session terminée", [
                     'user_id' => $userId,
-                    'tokens_removed' => $tokensRemoved
+                    'auth_mode' => $authMode,
+                    'api_key_id' => $apiKeyData['id'],
+                    'sessions_ended' => $sessionsEnded
+                ]);
+            } else {
+                // Fallback : terminer toutes les sessions actives de l'utilisateur
+                $sessionsEnded = UserSessionService::endAllUserSessions($userId);
+                LogService::info("Logout sans API Key détectée - Toutes les sessions terminées", [
+                    'user_id' => $userId,
+                    'auth_mode' => $authMode,
+                    'sessions_ended' => $sessionsEnded
                 ]);
             }
             
             LogService::info("Déconnexion réussie", [
                 'user_id' => $userId,
-                'tokens_removed' => $tokensRemoved
+                'auth_mode' => $authMode,
+                'sessions_ended' => $sessionsEnded
             ]);
             
             LoggingMiddleware::logExit(200);
             Response::success('Déconnexion réussie', [
-                'tokens_invalidated' => $tokensRemoved
+                'auth_mode' => $authMode,
+                'sessions_ended' => $sessionsEnded,
+                'message' => 'Session(s) utilisateur terminée(s) avec succès'
             ]);
             return true;
             
@@ -531,48 +606,43 @@ class UserManagerController {
 
     /**
      * Logout silencieux (pour usage interne, sans réponse HTTP)
-     * Utilisé par loginAuthenticate() pour nettoyer les tokens existants
+     * Utilisé par loginAuthenticate() pour nettoyer les sessions existantes
      */
     private function silentLogout(): int {
         try {
-            // Extraire le token depuis les headers en utilisant AuthService
-            $token = AuthService::extractTokenFromHeader();
+            // Récupérer les informations de l'API Key utilisée
+            $apiKeyData = \AuthGroups\Middleware\ApiKeyAuthMiddleware::requireApiKey();
             
-            if ($token) {
+            if ($apiKeyData) {
                 if (AUTH_AUTO_LOGOUT_ALL_TOKENS) {
-                    // Récupérer l'ID utilisateur depuis le token pour nettoyer tous ses tokens
-                    $authService = new AuthService();
-                    $userData = $authService->validateToken($token);
-                    if ($userData && isset($userData['user_id'])) {
-                        $tokensRemoved = ValidTokenService::removeAllUserTokens($userData['user_id']);
-                        if (AUTH_AUTO_LOGOUT_LOG_LEVEL !== 'none') {
-                            LogService::info("Tous les tokens utilisateur nettoyés avant authentification", [
-                                'user_id' => $userData['user_id'],
-                                'tokens_removed' => $tokensRemoved
-                            ]);
-                        }
-                        return $tokensRemoved;
+                    // Nettoyer toutes les sessions de l'utilisateur propriétaire de l'API Key
+                    $sessionsEnded = UserSessionService::endAllUserSessions($apiKeyData['user_id']);
+                    if (AUTH_AUTO_LOGOUT_LOG_LEVEL !== 'none') {
+                        LogService::info("Toutes les sessions utilisateur nettoyées avant authentification", [
+                            'user_id' => $apiKeyData['user_id'],
+                            'api_key_id' => $apiKeyData['id'],
+                            'sessions_ended' => $sessionsEnded
+                        ]);
                     }
+                    return $sessionsEnded;
                 } else {
-                    // Supprimer seulement le token spécifique
-                    if (ValidTokenService::removeToken($token)) {
-                        if (AUTH_AUTO_LOGOUT_LOG_LEVEL !== 'none') {
-                            LogService::info("Token existant nettoyé avant authentification");
-                        }
-                        return 1;
-                    } else {
-                        if (AUTH_AUTO_LOGOUT_LOG_LEVEL !== 'none') {
-                            LogService::warning("Échec du nettoyage du token existant");
-                        }
-                        return 0;
+                    // Nettoyer seulement les sessions pour cette API Key spécifique
+                    $sessionsEnded = UserSessionService::endSession($apiKeyData['user_id'], $apiKeyData['id']);
+                    if (AUTH_AUTO_LOGOUT_LOG_LEVEL !== 'none') {
+                        LogService::info("Sessions API Key spécifique nettoyées avant authentification", [
+                            'user_id' => $apiKeyData['user_id'],
+                            'api_key_id' => $apiKeyData['id'],
+                            'sessions_ended' => $sessionsEnded
+                        ]);
                     }
+                    return $sessionsEnded;
                 }
             }
             
-            return 0; // Aucun token à nettoyer
+            return 0; // Aucune session à nettoyer
             
         } catch (Exception $e) {
-            LogService::warning("Erreur lors du nettoyage des tokens", [
+            LogService::warning("Erreur lors du nettoyage des sessions", [
                 'error' => $e->getMessage()
             ]);
             return 0;
@@ -709,12 +779,111 @@ class UserManagerController {
                 return false;
             }
             // Update email_verified
-            $userModel->markEmailAsVerified($userId);            
+            $userModel->markEmailAsVerified($userId);
+            
+            // 1. Étendre les limites du plan free après confirmation d'email
+            try {
+                // Étendre l'expiration du plan gratuit à 30 jours au lieu de 7
+                $stmt = $pdo->prepare("
+                    UPDATE users 
+                    SET plan_expires_at = DATE_ADD(NOW(), INTERVAL 30 DAY)
+                    WHERE id = :user_id AND plan_id = (SELECT id FROM plans WHERE name = 'free' LIMIT 1)
+                ");
+                $stmt->execute(['user_id' => $userId]);
+                
+                // Étendre l'expiration des API keys liées au plan gratuit
+                $stmt = $pdo->prepare("
+                    UPDATE api_keys 
+                    SET expires_at = DATE_ADD(NOW(), INTERVAL 30 DAY),
+                        rate_limit_per_minute = 30,
+                        rate_limit_per_hour = 1800
+                    WHERE user_id = :user_id 
+                    AND plan_limited = 1 
+                    AND plan_id = (SELECT id FROM plans WHERE name = 'free' LIMIT 1)
+                ");
+                $stmt->execute(['user_id' => $userId]);
+                
+                LogService::info("Plan gratuit étendu après confirmation email", [
+                    'user_id' => $userId,
+                    'new_expiry' => '30 jours',
+                    'new_rate_limit' => '30/minute'
+                ]);
+                
+            } catch (Exception $planError) {
+                LogService::error("Erreur lors de l'extension du plan gratuit", [
+                    'user_id' => $userId,
+                    'error' => $planError->getMessage()
+                ]);
+                // Ne pas faire échouer la confirmation d'email pour cette erreur
+            }
+            
+            // 2. Créer une nouvelle invitation aux plans payants avec délai étendu
+            try {
+                $planInvitationToken = bin2hex(random_bytes(32));
+                $planInvitationExpires = date('Y-m-d H:i:s', time() + (15 * 24 * 60 * 60)); // 15 jours
+                
+                // Invalider les anciennes invitations
+                $stmt = $pdo->prepare("
+                    UPDATE plan_invitations 
+                    SET status = 'expired' 
+                    WHERE user_id = :user_id AND status = 'pending'
+                ");
+                $stmt->execute(['user_id' => $userId]);
+                
+                // Créer nouvelle invitation
+                $stmt = $pdo->prepare("
+                    INSERT INTO plan_invitations (user_id, invitation_token, expires_at) 
+                    VALUES (:user_id, :token, :expires_at)
+                ");
+                $stmt->execute([
+                    'user_id' => $userId,
+                    'token' => $planInvitationToken,
+                    'expires_at' => $planInvitationExpires
+                ]);
+                
+                // 3. Envoyer email de félicitations avec nouvelle invitation aux plans
+                $emailService = new EmailService();
+                $emailSent = $emailService->sendEmailConfirmedWithPlanReminder(
+                    $userData['email'],
+                    $userData['name'],
+                    $planInvitationToken,
+                    30 // jours d'extension
+                );
+                
+                if ($emailSent) {
+                    LogService::info("Email de félicitations avec invitation plan envoyé", [
+                        'user_id' => $userId,
+                        'email' => $userData['email']
+                    ]);
+                } else {
+                    LogService::warning("Échec envoi email félicitations", [
+                        'user_id' => $userId,
+                        'email' => $userData['email']
+                    ]);
+                }
+                
+            } catch (Exception $invitationError) {
+                LogService::error("Erreur lors de la création d'invitation plan", [
+                    'user_id' => $userId,
+                    'error' => $invitationError->getMessage()
+                ]);
+                // Ne pas faire échouer la confirmation d'email pour cette erreur
+            }
+            
             // Soft delete du token de reset s'il a été utilisé
             $stmt = $pdo->prepare("UPDATE email_verifications SET deleted_at = NOW() WHERE token = :token");
             $stmt->execute(['token' => $input['token']]);
+            
             LoggingMiddleware::logExit(200);
-            Response::success('Email confirmé avec succès');
+            Response::success('Email confirmé avec succès. Votre plan gratuit a été étendu à 30 jours avec des limites améliorées !', [
+                'email_verified' => true,
+                'plan_extended' => true,
+                'new_plan_expiry_days' => 30,
+                'improved_limits' => [
+                    'rate_limit_per_minute' => 30,
+                    'rate_limit_per_hour' => 1800
+                ]
+            ]);
             return true;
         } catch (Exception $e) {
             LogService::error("Erreur lors de la confirmation de l'email", [

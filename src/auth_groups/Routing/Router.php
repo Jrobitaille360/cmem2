@@ -13,7 +13,8 @@ use AuthGroups\Routing\RouteHandlers\{
     StatsRouteHandler,
     DataRouteHandler,
     SecretAdminRouteHandler,
-    ApiKeyRouteHandler
+    ApiKeyRouteHandler,
+    PlanRouteHandler
 };
 use AuthGroups\Routing\WebhookRouteHandler;
 use AuthGroups\Services\{AuthService, LogService};
@@ -45,7 +46,8 @@ class Router
             'stats' => new StatsRouteHandler($this->authService),
             'data' => new DataRouteHandler($this->authService),
             'secret-admin' => new SecretAdminRouteHandler(),
-            'api-keys' => new ApiKeyRouteHandler($this->authService)
+            'api-keys' => new ApiKeyRouteHandler($this->authService),
+            'plans' => new PlanRouteHandler($this->authService)
         ];
         
         // Intégrer les route handlers des plugins

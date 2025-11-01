@@ -14,7 +14,10 @@
     "autoload": {
         "psr-4": {
             "AuthGroups\\": "src/auth_groups/"
-        }
+        },
+        "files": [
+            "src/auth_groups/database.php"
+        ]
     },
     "scripts": {
         "test": "phpunit",

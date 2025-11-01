@@ -107,11 +107,8 @@ class UserAvatarController {
                     'file' => $secureName
                 ]);
                 LoggingMiddleware::logExit(200);
-                Response::success([
-                    'message' => 'Avatar mis à jour avec succès',
-                    'data' => [
+                Response::success('Avatar mis à jour avec succès', [                  
                         'avatar_url' => '/uploads/avatars/' . $secureName
-                    ]
                 ]);
                 return true;
             } else {

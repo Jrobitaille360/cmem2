@@ -8,11 +8,14 @@ BEGIN
 
 -- === SUPPRESSION DES VUES ET TABLES (ordre correct des dépendances) ===
 
+-- Désactiver temporairement les vérifications de clés étrangères
+SET FOREIGN_KEY_CHECKS = 0;
+
 -- 1. SUPPRESSION DES VUES EN PREMIER
 DROP VIEW IF EXISTS api_keys_stats_by_user;
 DROP VIEW IF EXISTS active_api_keys;
-DROP TABLE IF EXISTS api_keys;
-
+DROP VIEW IF EXISTS active_user_sessions;
+DROP VIEW IF EXISTS user_sessions_stats;
 DROP VIEW IF EXISTS v_online_users_stats;
 DROP VIEW IF EXISTS v_active_sessions;
 DROP VIEW IF EXISTS v_admin_dashboard;
@@ -25,7 +28,6 @@ DROP TABLE IF EXISTS file_tag_relations;
 DROP TABLE IF EXISTS group_tag_relations;
 DROP TABLE IF EXISTS group_invitations;
 DROP TABLE IF EXISTS group_members;
-DROP TABLE IF EXISTS valid_tokens;
 DROP TABLE IF EXISTS user_stats_snapshot;
 DROP TABLE IF EXISTS group_stats_snapshot;
 DROP TABLE IF EXISTS platform_stats;
@@ -34,15 +36,29 @@ DROP TABLE IF EXISTS password_resets;
 DROP TABLE IF EXISTS notifications;
 DROP TABLE IF EXISTS login_codes;
 
--- 3. SUPPRESSION DES TABLES DÉPENDANTES
+-- 3. SUPPRESSION DES TABLES LIÉES AUX SESSIONS ET API KEYS
+DROP TABLE IF EXISTS user_sessions;
+DROP TABLE IF EXISTS api_keys;
+
+-- 4. SUPPRESSION DES TABLES LIÉES AUX PLANS
+DROP TABLE IF EXISTS plan_invitations;
+DROP TABLE IF EXISTS user_plan_history;
+
+-- 5. SUPPRESSION DES TABLES DÉPENDANTES
 DROP TABLE IF EXISTS files;
 
--- 4. SUPPRESSION DES TABLES AVEC RÉFÉRENCES CROISÉES
+-- 6. SUPPRESSION DES TABLES AVEC RÉFÉRENCES CROISÉES
 DROP TABLE IF EXISTS groups;
 DROP TABLE IF EXISTS tags;
 
--- 5. SUPPRESSION DES TABLES PRINCIPALES
+-- 7. SUPPRESSION DES TABLES DES PLANS
+DROP TABLE IF EXISTS plans;
+
+-- 8. SUPPRESSION DES TABLES PRINCIPALES
 DROP TABLE IF EXISTS users;
+
+-- Réactiver les vérifications de clés étrangères
+SET FOREIGN_KEY_CHECKS = 1;
 
 -- ===== TABLE : Tags =====
 CREATE TABLE tags (
@@ -90,8 +106,9 @@ CREATE TABLE users (
 	KEY idx_users_last_login (last_login)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT INTO users (id, name, email, password_hash, role,  email_verified) VALUES
-    (1, 'TEMPORARY ADMINISTRATOR', 'TMP_admin@cmem2.com', '$2y$10$GxWCcbHdnPY3PmBrmLwPCeQ/nKokme.bKhmhcpKSfvIJhrzj0pQ/.', 'ADMINISTRATEUR', 1);
+INSERT INTO `users` (`id`, `name`, `email`, `password_hash`, `role`, `profile_image`, `bio`, `phone`, `date_of_birth`, `location`, `email_verified`, `last_login`, `payment_status`, `license_expires_at`, `payment_plan`, `payment_date`, `created_at`, `deleted_at`, `updated_at`) VALUES
+(1, 'Super Administrator', 'jrobitaille04@pm.me', '$2y$10$Q90qTqVLPNXwrJe./2fne.CTF/TlAyPr5ae1pbNqHYqRJdolt0WNS', 'ADMINISTRATEUR', NULL, NULL, NULL, NULL, NULL, 1, '2025-10-28 16:16:28', 'pending', NULL, 'basic', NULL, '2025-10-27 15:37:01', NULL, '2025-10-28 16:16:28'),
+(2, 'Utilisateur Test', 'user@cmem2.com', '$2y$10$ySaVqxDEwZLH0hCtXPOltuER2D6exPPCqz2QSn3v/rxMFVXHlLgMS', 'UTILISATEUR', 'default.jpg', NULL, NULL, NULL, NULL, 1, '2025-10-28 20:07:33', 'pending', NULL, 'basic', NULL, '2025-10-27 19:56:04', NULL, '2025-10-28 20:07:33');
 
 
 -- Ajout de la contrainte de clé étrangère pour tag_owner maintenant que la table users existe
@@ -314,63 +331,6 @@ CREATE TABLE IF NOT EXISTS email_verifications (
     INDEX idx_deleted_att (deleted_at)
 );
 
--- Table pour gérer les tokens JWT valides (sessions actives)
--- Cette table permet de :
--- 1. Invalider les tokens au logout (DELETE)
--- 2. Connaître le nombre d'utilisateurs connectés en temps réel
--- 3. Générer des statistiques d'usage
--- 4. Avoir un contrôle total sur les sessions actives
-
-CREATE TABLE IF NOT EXISTS valid_tokens (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    token_hash VARCHAR(64) NOT NULL UNIQUE COMMENT 'Hash SHA256 du token pour sécurité',
-    user_id INT NOT NULL,
-    user_agent TEXT COMMENT 'User-Agent du client pour identification',
-    ip_address VARCHAR(45) COMMENT 'Adresse IP du client (IPv4/IPv6)',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'Quand le token a été créé',
-    last_used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Dernière utilisation du token',
-    expires_at DATETIME NULL DEFAULT NULL COMMENT 'Quand le token expire naturellement',
-    
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    
-    INDEX idx_token_hash (token_hash),
-    INDEX idx_user_id (user_id),
-    INDEX idx_expires_at (expires_at),
-    INDEX idx_last_used_at (last_used_at),
-    INDEX idx_created_at (created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-COMMENT='Table des tokens JWT valides pour sessions actives';
-
--- Vue pour les utilisateurs actuellement connectés
-CREATE VIEW v_active_sessions AS
-SELECT 
-    vt.id,
-    vt.user_id,
-    u.name as user_name,
-    u.email as user_email,
-    vt.ip_address,
-    vt.user_agent,
-    vt.created_at as login_time,
-    vt.last_used_at,
-    vt.expires_at,
-    TIMESTAMPDIFF(MINUTE, vt.last_used_at, NOW()) as minutes_inactive
-FROM valid_tokens vt
-JOIN users u ON vt.user_id = u.id
-WHERE vt.expires_at IS NULL OR vt.expires_at > NOW()
-ORDER BY vt.last_used_at DESC;
-
--- Vue pour les statistiques d'utilisateurs en ligne
-CREATE VIEW v_online_users_stats AS
-SELECT 
-    COUNT(DISTINCT vt.user_id) as users_online,
-    COUNT(vt.id) as total_sessions,
-    AVG(TIMESTAMPDIFF(MINUTE, vt.created_at, NOW())) as avg_session_duration_minutes,
-    COUNT(CASE WHEN TIMESTAMPDIFF(MINUTE, vt.last_used_at, NOW()) <= 5 THEN 1 END) as active_last_5min,
-    COUNT(CASE WHEN TIMESTAMPDIFF(MINUTE, vt.last_used_at, NOW()) <= 30 THEN 1 END) as active_last_30min
-FROM valid_tokens vt
-WHERE vt.expires_at IS NULL OR vt.expires_at > NOW();
-
-
 -- =========================================================== TABLES : Statistiques =====
 
 -- ===== TABLE : Statistiques globales =====
@@ -439,6 +399,7 @@ SELECT
     (SELECT ROUND(COALESCE(SUM(file_size), 0) / 1024 / 1024, 2) FROM files) as total_storage_mb,
         (SELECT COUNT(*) FROM group_invitations WHERE status = 'pending' AND (expires_at IS NULL OR expires_at > NOW())) as pending_invitations;
 
+
 CREATE TABLE IF NOT EXISTS api_keys (
     id INT(11) AUTO_INCREMENT PRIMARY KEY,
     user_id INT(11) NOT NULL,
@@ -497,7 +458,6 @@ COMMENT='Stockage des clés API pour authentification';
 
 
 -- Vue pour voir uniquement les clés actives
-
 CREATE OR REPLACE VIEW active_api_keys AS
 SELECT 
     id,
@@ -537,6 +497,164 @@ SELECT
     MAX(created_at) AS most_recent_key_created
 FROM api_keys
 GROUP BY user_id;
+
+-- Table simplifiée pour le suivi des sessions utilisateurs
+-- Remplace le système JWT complexe par un tracking simple avec API Keys
+
+CREATE TABLE IF NOT EXISTS `user_sessions` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `api_key_id` int(11) NOT NULL,
+  `login_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `last_activity_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `logout_at` timestamp NULL DEFAULT NULL,
+  `expires_at` timestamp NOT NULL,
+  `ip_address` varchar(45) DEFAULT NULL,
+  `user_agent` text DEFAULT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `session_data` json DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_api_key_id` (`api_key_id`),
+  KEY `idx_active_sessions` (`user_id`, `is_active`, `expires_at`),
+  KEY `idx_cleanup` (`expires_at`, `is_active`),
+  CONSTRAINT `fk_user_sessions_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_user_sessions_api_key` FOREIGN KEY (`api_key_id`) REFERENCES `api_keys` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- Vue pour les sessions actives
+CREATE OR REPLACE VIEW `active_user_sessions` AS
+SELECT 
+    us.*,
+    u.email,
+    u.name as username,
+    u.role,
+    ak.name as api_key_name,
+    ak.environment,
+    TIMESTAMPDIFF(MINUTE, us.last_activity_at, NOW()) as minutes_since_activity,
+    TIMESTAMPDIFF(MINUTE, us.login_at, IFNULL(us.logout_at, NOW())) as session_duration_minutes
+FROM user_sessions us
+JOIN users u ON us.user_id = u.id
+JOIN api_keys ak ON us.api_key_id = ak.id
+WHERE us.is_active = 1 
+  AND us.expires_at > NOW()
+  AND u.deleted_at IS NULL;
+
+-- Vue pour les statistiques
+CREATE OR REPLACE VIEW `user_sessions_stats` AS
+SELECT 
+    COUNT(*) as total_active_sessions,
+    COUNT(DISTINCT user_id) as unique_users_online,
+    AVG(TIMESTAMPDIFF(MINUTE, login_at, IFNULL(logout_at, NOW()))) as avg_session_duration_minutes,
+    COUNT(CASE WHEN last_activity_at > NOW() - INTERVAL 5 MINUTE THEN 1 END) as active_last_5min,
+    COUNT(CASE WHEN last_activity_at > NOW() - INTERVAL 30 MINUTE THEN 1 END) as active_last_30min,
+    COUNT(CASE WHEN login_at > NOW() - INTERVAL 1 DAY THEN 1 END) as sessions_today
+FROM active_user_sessions;
+
+
+-- Migration pour ajouter le système de plans et gérer les API keys limitées lors de l'inscription
+
+-- 1. Table des plans de paiement
+CREATE TABLE IF NOT EXISTS `plans` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(50) NOT NULL COMMENT 'Nom unique du plan (free, bronze, argent, platine)',
+  `display_name` varchar(100) NOT NULL COMMENT 'Nom d affichage du plan',
+  `description` text COMMENT 'Description du plan',
+  `price` decimal(10,2) NOT NULL DEFAULT '0.00' COMMENT 'Prix en devise spécifiée',
+  `currency` varchar(3) NOT NULL DEFAULT 'EUR' COMMENT 'Code devise (EUR, USD, etc.)',
+  `duration_days` int(11) DEFAULT NULL COMMENT 'Durée en jours (NULL = illimité)',
+  `api_rate_limit` int(11) NOT NULL DEFAULT '60' COMMENT 'Limite de requêtes par minute',
+  `features` json DEFAULT NULL COMMENT 'Fonctionnalités et limites en JSON',
+  `is_active` tinyint(1) NOT NULL DEFAULT '1' COMMENT 'Plan actif ou non',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`),
+  KEY `is_active` (`is_active`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 2. Ajouter colonne plan_id à la table users (si elle n'existe pas déjà)
+ALTER TABLE `users` 
+ADD COLUMN `plan_id` int(11) DEFAULT NULL COMMENT 'Plan actuel de l utilisateur' AFTER `role`,
+ADD COLUMN `plan_expires_at` timestamp NULL DEFAULT NULL COMMENT 'Date d expiration du plan' AFTER `plan_id`,
+ADD COLUMN `plan_auto_renew` tinyint(1) NOT NULL DEFAULT '0' COMMENT 'Renouvellement automatique' AFTER `plan_expires_at`;
+
+-- Ajouter une clé étrangère vers la table plans
+ALTER TABLE `users` 
+ADD CONSTRAINT `fk_users_plan` FOREIGN KEY (`plan_id`) REFERENCES `plans` (`id`) ON DELETE SET NULL;
+
+-- 3. Table pour gérer l'historique des souscriptions de plans
+CREATE TABLE IF NOT EXISTS `user_plan_history` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `plan_id` int(11) NOT NULL,
+  `started_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `expires_at` timestamp NULL DEFAULT NULL,
+  `auto_renewed` tinyint(1) NOT NULL DEFAULT '0',
+  `payment_method` varchar(50) DEFAULT NULL COMMENT 'stripe, paypal, manual, etc.',
+  `payment_reference` varchar(255) DEFAULT NULL COMMENT 'Référence du paiement',
+  `amount_paid` decimal(10,2) DEFAULT NULL,
+  `currency` varchar(3) DEFAULT 'EUR',
+  `status` enum('active','expired','cancelled','refunded') NOT NULL DEFAULT 'active',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `user_id` (`user_id`),
+  KEY `plan_id` (`plan_id`),
+  KEY `status` (`status`),
+  KEY `expires_at` (`expires_at`),
+  CONSTRAINT `fk_plan_history_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_plan_history_plan` FOREIGN KEY (`plan_id`) REFERENCES `plans` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 4. Ajouter des colonnes à la table api_keys pour mieux gérer les limites par plan
+ALTER TABLE `api_keys` 
+ADD COLUMN `plan_id` int(11) DEFAULT NULL COMMENT 'Plan associé à cette API key' AFTER `user_id`,
+ADD COLUMN `plan_limited` tinyint(1) NOT NULL DEFAULT '0' COMMENT 'API key limitée par plan' AFTER `plan_id`;
+
+-- Ajouter une clé étrangère vers la table plans
+ALTER TABLE `api_keys` 
+ADD CONSTRAINT `fk_api_keys_plan` FOREIGN KEY (`plan_id`) REFERENCES `plans` (`id`) ON DELETE SET NULL;
+
+-- 5. Insérer les plans par défaut
+INSERT INTO `plans` (`name`, `display_name`, `description`, `price`, `currency`, `duration_days`, `api_rate_limit`, `features`, `is_active`) VALUES
+('free', 'Plan Gratuit', 'Plan gratuit avec limitations pour tester l\'API', 0.00, 'EUR', 30, 10, '{"scopes":["read"],"max_requests_per_day":1000,"expires_in_days":7,"email_support":false,"priority_support":false}', 1),
+('bronze', 'Plan Bronze', 'Plan bronze avec fonctionnalités essentielles', 9.99, 'EUR', 30, 100, '{"scopes":["read","write"],"max_requests_per_day":10000,"expires_in_days":null,"email_support":true,"priority_support":false}', 1),
+('argent', 'Plan Argent', 'Plan argent avec fonctionnalités avancées', 19.99, 'EUR', 30, 300, '{"scopes":["read","write","delete"],"max_requests_per_day":50000,"expires_in_days":null,"email_support":true,"priority_support":true,"webhook_support":true}', 1),
+('platine', 'Plan Platine', 'Plan platine avec toutes les fonctionnalités premium', 49.99, 'EUR', 30, 1000, '{"scopes":["read","write","delete","admin"],"max_requests_per_day":"unlimited","expires_in_days":null,"email_support":true,"priority_support":true,"webhook_support":true,"custom_integrations":true,"dedicated_support":true}', 1)
+ON DUPLICATE KEY UPDATE `updated_at` = CURRENT_TIMESTAMP;
+
+-- 6. Mettre à jour les utilisateurs existants pour leur assigner le plan gratuit par défaut
+UPDATE `users` 
+SET `plan_id` = (SELECT `id` FROM `plans` WHERE `name` = 'free' LIMIT 1)
+WHERE `plan_id` IS NULL;
+
+-- 7. Créer des index pour améliorer les performances
+CREATE INDEX `idx_users_plan_expires` ON `users` (`plan_id`, `plan_expires_at`);
+CREATE INDEX `idx_api_keys_plan_limited` ON `api_keys` (`plan_id`, `plan_limited`);
+CREATE INDEX `idx_plan_history_user_status` ON `user_plan_history` (`user_id`, `status`);
+
+-- 8. Ajouter une table pour gérer les invitations à choisir un plan
+CREATE TABLE IF NOT EXISTS `plan_invitations` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `invitation_token` varchar(64) NOT NULL COMMENT 'Token unique pour l invitation',
+  `sent_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `expires_at` timestamp NOT NULL COMMENT 'Date d expiration de l invitation',
+  `clicked_at` timestamp NULL DEFAULT NULL COMMENT 'Date du premier clic',
+  `selected_plan` varchar(50) DEFAULT NULL COMMENT 'Plan sélectionné (si applicable)',
+  `selected_at` timestamp NULL DEFAULT NULL COMMENT 'Date de sélection du plan',
+  `status` enum('pending','clicked','selected','expired') NOT NULL DEFAULT 'pending',
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `invitation_token` (`invitation_token`),
+  KEY `user_id` (`user_id`),
+  KEY `status` (`status`),
+  KEY `expires_at` (`expires_at`),
+  CONSTRAINT `fk_plan_invitations_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
 
@@ -702,4 +820,22 @@ BEGIN
     SELECT ROW_COUNT() AS keys_auto_revoked;
 END$$
 
+DELIMITER ;
+
+DELIMITER //
+CREATE OR REPLACE PROCEDURE CleanupExpiredSessions()
+BEGIN
+    -- Marquer les sessions expirées comme inactives
+    UPDATE user_sessions 
+    SET is_active = 0, logout_at = NOW()
+    WHERE is_active = 1 
+      AND expires_at < NOW();
+      
+    -- Supprimer les anciennes sessions (plus de 30 jours)
+    DELETE FROM user_sessions 
+    WHERE logout_at < NOW() - INTERVAL 30 DAY
+       OR (is_active = 0 AND login_at < NOW() - INTERVAL 30 DAY);
+       
+    SELECT ROW_COUNT() as cleaned_sessions;
+END //
 DELIMITER ;
