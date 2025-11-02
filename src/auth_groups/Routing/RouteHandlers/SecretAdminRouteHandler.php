@@ -11,17 +11,17 @@ use AuthGroups\Utils\Response;
  * Ne doit pas être documenté publiquement
  * 
  * SÉCURITÉ RENFORCÉE : Double authentification requise
- * 1. Token JWT valide avec rôle ADMINISTRATEUR
- * 2. Clé secrète admin dans le request
+ * 1. API Key valide avec rôle ADMINISTRATEUR
+ * 2. Session active dans user_sessions
  */
 class SecretAdminRouteHandler extends BaseRouteHandler 
 {
-    protected bool $requiresAuth = true; // Authentification JWT requise
+    protected bool $requiresAuth = true; // Authentification requise
     private SecretAdminController $controller;
     private \AuthGroups\Controllers\SecretApiKeyController $apiKeyController;
     
     public function __construct() {
-        // Passer l'AuthService pour l'authentification JWT
+        // Passer l'AuthService pour l'authentification
         parent::__construct(new \AuthGroups\Services\AuthService());
         $this->controller = new SecretAdminController();
         $this->apiKeyController = new \AuthGroups\Controllers\SecretApiKeyController();

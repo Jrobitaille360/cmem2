@@ -162,8 +162,7 @@ class PublicRouteHandler extends BaseRouteHandler
                 ]
             ],
             'authentication' => [
-                'jwt' => 'Authorization: Bearer {token}',
-                'api_key' => 'X-API-Key: {key}'
+                'api_key' => 'X-API-Key: {key} ou Authorization: Bearer {key}'
             ],
             'documentation' => 'Voir /src/auth_groups/docs/ pour la documentation complète'
         ];
@@ -207,9 +206,9 @@ class PublicRouteHandler extends BaseRouteHandler
     /**
      * Gestion du login avec validation obligatoire d'API key
      * 
-     * NOUVELLE SÉCURITÉ : Tous les logins nécessitent maintenant une API key valide
+     * SÉCURITÉ : Tous les logins nécessitent une API key valide
      * Cette méthode vérifie d'abord la présence et validité d'une API key,
-     * puis procède à l'authentification standard si la clé est valide.
+     * puis procède à l'authentification (email + password).
      */
     private function handleLoginWithApiKey(): void
     {
@@ -223,7 +222,6 @@ class PublicRouteHandler extends BaseRouteHandler
             }
             
             // ÉTAPE 2: Vérifier que la clé a les permissions appropriées pour le login
-            // On peut exiger un scope spécifique si nécessaire
             if (!isset($apiKeyData['scopes']) || !is_array($apiKeyData['scopes'])) {
                 LogService::warning('API key sans scopes valides utilisée pour login', [
                     'api_key_id' => $apiKeyData['id'],
@@ -247,7 +245,7 @@ class PublicRouteHandler extends BaseRouteHandler
                 'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown'
             ]);
             
-            // ÉTAPE 4: Procéder au login standard maintenant que l'API key est validée
+            // ÉTAPE 4: Procéder au login avec api_key + email + password
             $this->controllers['users']->authenticate();
             
         } catch (\Exception $e) {

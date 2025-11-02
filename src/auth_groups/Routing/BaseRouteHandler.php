@@ -41,16 +41,21 @@ abstract class BaseRouteHandler implements RouteHandlerInterface
      * Met à jour l'activité de l'utilisateur si authentifié avec API Key
      */
     protected function updateUserActivity($user): void {
-        if (!$user || !isset($user['api_key_id'])) {
+        if (!$user || !isset($user['user_id'])) {
             return;
         }
         
         try {
-            $userSessionService = new UserSessionService();
-            $userSessionService->updateActivity($user['id'], $user['api_key_id']);
+            $apiKeyId = isset($user['api_key_id']) ? $user['api_key_id'] : null;
+            if ($apiKeyId) {
+                UserSessionService::updateActivity($user['user_id'], $apiKeyId);
+            }
         } catch (Exception $e) {
             // Log l'erreur mais ne pas interrompre le processus
-            Response::error("Erreur mise à jour activité session: " . $e->getMessage(), null, 500);
+            \AuthGroups\Services\LogService::error("Erreur mise à jour activité session", [
+                'error' => $e->getMessage(),
+                'user_id' => $user['user_id']
+            ]);
         }
     }
     

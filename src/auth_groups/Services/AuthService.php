@@ -4,112 +4,67 @@ namespace AuthGroups\Services;
 
 use AuthGroups\Models\User;
 use AuthGroups\Services\LogService;
-use AuthGroups\Services\ValidTokenService;
+use AuthGroups\Services\UserSessionService;
 use AuthGroups\Middleware\ApiKeyAuthMiddleware;
 use Exception;
 
+/**
+ * Service d'authentification
+ * Gère l'authentification par API Key et validation de sessions
+ */
 class AuthService 
 {
     /**
-     * Authentifier l'utilisateur à partir du header Authorization (JWT ou API Key)
+     * Authentifier l'utilisateur à partir de l'API Key et vérifier la session active
      * @return array|null Données utilisateur ou null si non authentifié
      */
     public function authenticate(): ?array {
-        // D'abord, vérifier s'il y a une API Key
-        if (ApiKeyAuthMiddleware::hasApiKey()) {
-            // Utiliser l'authentification flexible qui gère les API Keys
-            $authData = ApiKeyAuthMiddleware::authenticateFlexible();
-            
-            // Si l'authentification API Key a échoué, authenticateFlexible() 
-            // a déjà envoyé une réponse d'erreur, donc on retourne null
-            if (!$authData) {
-                return null;
-            }
-            
-            // Récupérer les données utilisateur complètes depuis la base de données
-            $user = new User();
-            $userData = $user->findById($authData['user_id']);
-            
-            if (!$userData) {
-                return null;
-            }
-            
-            // Retourner les données utilisateur avec le rôle
-            return [
-                'user_id' => $userData['id'],
-                'email' => $userData['email'],
-                'role' => $userData['role'] ?? 'UTILISATEUR',
-                'username' => $userData['username'] ?? $userData['email'],
-                'auth_type' => 'api_key'
-            ];
-        }
-        
-        // Sinon, utiliser l'authentification JWT classique
-        $token = self::extractTokenFromHeader();
-        if (!$token) {
+        // Vérifier s'il y a une API Key
+        if (!ApiKeyAuthMiddleware::hasApiKey()) {
             return null;
         }
-        return self::validateToken($token);
-    }
-
-    /**
-     * Valider un token JWT et retourner les données utilisateur
-     */
-    public static function validateToken(string $token): ?array {
-        try {
-            if (empty($token) || strlen($token) < 10) {
-                return null;
-            }
-            
-            // 1. Vérifier que le token est dans la table des tokens valides
-            if (!ValidTokenService::isTokenValid($token)) {
-                LogService::warning('Token non trouvé dans les tokens valides ou expiré');
-                return null;
-            }
-            
-            // 2. Décoder le token JWT (garde la logique existante)
-            $parts = explode('.', $token);
-            if (count($parts) !== 3) {
-                return null;
-            }
-            
-            // Décoder le payload
-            $payload = base64_decode($parts[1]);
-            $data = json_decode($payload, true);
-            
-            if (!$data || !isset($data['user_id'])) {
-                return null;
-            }
-            
-            // 3. Vérifier que l'utilisateur existe encore
-            $user = new User();
-            $userData = $user->findById($data['user_id']);
-            
-            if (!$userData) {
-                // Si l'utilisateur n'existe plus, supprimer le token
-                ValidTokenService::removeToken($token);
-                return null;
-            }
-            
-            // Retourner les données utilisateur avec le rôle
-            return [
-                'user_id' => $userData['id'],
-                'email' => $userData['email'],
-                'role' => $userData['role'] ?? 'UTILISATEUR',
-                'username' => $userData['username'] ?? $userData['email']
-            ];
-            
-        } catch (Exception $e) {
-            LogService::error('Erreur lors de la validation du token', [
-                'error' => $e->getMessage(),
-                'token_length' => strlen($token)
+        
+        // Utiliser l'authentification flexible qui gère les API Keys
+        $authData = ApiKeyAuthMiddleware::authenticateFlexible();
+        
+        if (!$authData) {
+            return null;
+        }
+        
+        // Vérifier qu'une session active existe
+        $sessionActive = UserSessionService::hasActiveSession(
+            $authData['user_id'], 
+            $authData['api_key_id'] ?? null
+        );
+        
+        if (!$sessionActive) {
+            LogService::warning('Tentative d\'accès sans session active', [
+                'user_id' => $authData['user_id'],
+                'api_key_id' => $authData['api_key_id'] ?? null
             ]);
             return null;
         }
+        
+        // Récupérer les données utilisateur complètes depuis la base de données
+        $user = new User();
+        $userData = $user->findById($authData['user_id']);
+        
+        if (!$userData) {
+            return null;
+        }
+        
+        // Retourner les données utilisateur avec le rôle
+        return [
+            'user_id' => $userData['id'],
+            'email' => $userData['email'],
+            'role' => $userData['role'] ?? 'UTILISATEUR',
+            'username' => $userData['username'] ?? $userData['email'],
+            'auth_type' => 'api_key'
+        ];
     }
     
     /**
-     * Extraire le token depuis l'en-tête Authorization
+     * Extraire le token depuis l'en-tête Authorization (conservé pour compatibilité)
      */
     public static function extractTokenFromHeader(): ?string {
         $authHeader = null;
@@ -141,35 +96,5 @@ class AuthService
         }
 
         return null;
-    }
-    
-    /**
-     * Générer un token JWT pour un utilisateur
-     */
-    public static function generateToken(array $userData): string {
-        try {
-            $header = json_encode(['typ' => 'JWT', 'alg' => 'HS256']);
-            $payload = json_encode([
-                'user_id' => $userData['id'],
-                'email' => $userData['email'],
-                'role' => $userData['role'] ?? 'UTILISATEUR',
-                'exp' => time() + (24 * 60 * 60) // 24 heures
-            ]);
-            
-            $headerEncoded = base64_encode($header);
-            $payloadEncoded = base64_encode($payload);
-            
-            // Signature simplifiée (en production, utiliser une vraie signature HMAC)
-            $signature = base64_encode(hash_hmac('sha256', $headerEncoded . '.' . $payloadEncoded, 'secret_key', true));
-            
-            return $headerEncoded . '.' . $payloadEncoded . '.' . $signature;
-            
-        } catch (Exception $e) {
-            LogService::error('Erreur lors de la génération du token', [
-                'error' => $e->getMessage(),
-                'user_id' => $userData['id'] ?? 'unknown'
-            ]);
-            throw $e;
-        }
     }
 }

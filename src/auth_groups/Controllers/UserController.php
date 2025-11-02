@@ -58,9 +58,10 @@ class UserController {
    
     /**
      * Authentification utilisateur pour LOGIN
+     * Nécessite: api_key, email, password
      */
     public function authenticate() {
-        return $this->userManagerController->loginAuthenticate();
+        return $this->userManagerController->authenticate();
     }
 
     /**

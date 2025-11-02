@@ -51,7 +51,7 @@ DELETE /secret-admin/api-keys/{id}
 
 Pour gérer les API keys, vous devez maintenant avoir :
 
-1. **Token JWT Administrateur** (`Authorization: Bearer <jwt_admin>`)
+1. **API key Administrateur** (`X-API-Key: ag_live_abc123...`)
 2. **Clé Secrète Admin** (`X-Admin-Secret: <ADMIN_SECRET_KEY>`)
 
 ## 🎯 Impact sur Votre Application

@@ -407,15 +407,17 @@ class UserManagerController {
     }
    
     /**
-     * Authentification utilisateur pour LOGIN STRICT
-     * Nécessite TOUJOURS email + password. Force le logout automatique par sécurité.
+     * Authentification utilisateur pour LOGIN
+     * Nécessite: api_key, email, password
+     * Crée une session dans user_sessions
      */
-    public function loginAuthenticate() {
+    public function authenticate() {
         try {
             LoggingMiddleware::logEntry();
             
             $input = Response::getRequestParams();
-            // Validation stricte des identifiants
+            
+            // Validation des identifiants
             $validator = new Validator();
             $validation = $validator->validate($input, [
                 'email' => 'required|email',
@@ -431,14 +433,13 @@ class UserManagerController {
                 return false;
             }
             
-            // 🔥 LOGOUT AUTOMATIQUE FORCÉ pour route /login
-            if (AUTH_AUTO_LOGOUT_BEFORE_LOGIN) {
-                $tokensCleared = $this->silentLogout();
-                if ($tokensCleared > 0 && AUTH_AUTO_LOGOUT_LOG_LEVEL !== 'none') {
-                    LogService::info("Logout automatique effectué avant authentification", [
-                        'tokens_cleared' => $tokensCleared
-                    ]);
-                }
+            // Vérifier que l'API Key est présente
+            $apiKeyData = \AuthGroups\Middleware\ApiKeyAuthMiddleware::requireApiKey();
+            if (!$apiKeyData) {
+                LogService::error("API Key manquante pour le login");
+                LoggingMiddleware::logExit(401);
+                Response::error('API Key requise pour le login', null, 401);
+                return false;
             }
             
             // Authentifier avec email/password
@@ -481,16 +482,7 @@ class UserManagerController {
                 return false;
             }
             
-            // Récupérer les informations de l'API Key utilisée pour ce login
-            $apiKeyData = \AuthGroups\Middleware\ApiKeyAuthMiddleware::requireApiKey();
-            if (!$apiKeyData) {
-                LogService::error("Impossible de récupérer les données API Key lors du login");
-                LoggingMiddleware::logExit(500);
-                Response::error('Erreur d\'authentification API Key', null, 500);
-                return false;
-            }
-            
-            // Créer une nouvelle session utilisateur
+            // Créer une nouvelle session utilisateur dans user_sessions
             $sessionId = UserSessionService::createSession(
                 $userData['id'], 
                 $apiKeyData['id']
@@ -516,7 +508,6 @@ class UserManagerController {
             LoggingMiddleware::logExit(200);
             Response::success("Connexion réussie", [
                 'session_id' => $sessionId,
-                'auth_method' => 'api_key',
                 'api_key_name' => $apiKeyData['name'],
                 'user' => [
                     'id' => $userData['id'],
@@ -539,6 +530,10 @@ class UserManagerController {
     }
 
 
+    /**
+     * Déconnexion - termine la session utilisateur
+     * Nécessite: api_key pour identifier la session
+     */
     public function logout($userId) {
         try {
             LoggingMiddleware::logEntry();            
@@ -553,43 +548,31 @@ class UserManagerController {
                 return false;
             }
             
-            // Déterminer le mode d'authentification et gérer le logout en conséquence
-            $sessionsEnded = 0;
-            $authMode = 'api_key'; // Maintenant, tout est API Key obligatoire
-            
-            // Récupérer les informations de l'API Key utilisée
+            // Récupérer l'API Key pour identifier la session à terminer
             $apiKeyData = \AuthGroups\Middleware\ApiKeyAuthMiddleware::requireApiKey();
+            $sessionsEnded = 0;
             
             if ($apiKeyData) {
                 // Terminer la session spécifique pour cette API Key
                 $sessionsEnded = UserSessionService::endSession($userId, $apiKeyData['id']);
-                LogService::info("Logout avec API Key - Session terminée", [
+                LogService::info("Logout - Session terminée", [
                     'user_id' => $userId,
-                    'auth_mode' => $authMode,
                     'api_key_id' => $apiKeyData['id'],
                     'sessions_ended' => $sessionsEnded
                 ]);
             } else {
                 // Fallback : terminer toutes les sessions actives de l'utilisateur
                 $sessionsEnded = UserSessionService::endAllUserSessions($userId);
-                LogService::info("Logout sans API Key détectée - Toutes les sessions terminées", [
+                LogService::info("Logout - Toutes les sessions terminées", [
                     'user_id' => $userId,
-                    'auth_mode' => $authMode,
                     'sessions_ended' => $sessionsEnded
                 ]);
             }
             
-            LogService::info("Déconnexion réussie", [
-                'user_id' => $userId,
-                'auth_mode' => $authMode,
-                'sessions_ended' => $sessionsEnded
-            ]);
-            
             LoggingMiddleware::logExit(200);
             Response::success('Déconnexion réussie', [
-                'auth_mode' => $authMode,
                 'sessions_ended' => $sessionsEnded,
-                'message' => 'Session(s) utilisateur terminée(s) avec succès'
+                'message' => 'Session(s) terminée(s) avec succès'
             ]);
             return true;
             
@@ -599,53 +582,8 @@ class UserManagerController {
                 'error' => $e->getMessage()
             ]);
             LoggingMiddleware::logExit(500);
-            Response::error('Erreur serveur lors de la déconnexion', null, 500);
+            Response::error('Erreur serveur lors de la déconnexion');
             return false;
-        }
-    }
-
-    /**
-     * Logout silencieux (pour usage interne, sans réponse HTTP)
-     * Utilisé par loginAuthenticate() pour nettoyer les sessions existantes
-     */
-    private function silentLogout(): int {
-        try {
-            // Récupérer les informations de l'API Key utilisée
-            $apiKeyData = \AuthGroups\Middleware\ApiKeyAuthMiddleware::requireApiKey();
-            
-            if ($apiKeyData) {
-                if (AUTH_AUTO_LOGOUT_ALL_TOKENS) {
-                    // Nettoyer toutes les sessions de l'utilisateur propriétaire de l'API Key
-                    $sessionsEnded = UserSessionService::endAllUserSessions($apiKeyData['user_id']);
-                    if (AUTH_AUTO_LOGOUT_LOG_LEVEL !== 'none') {
-                        LogService::info("Toutes les sessions utilisateur nettoyées avant authentification", [
-                            'user_id' => $apiKeyData['user_id'],
-                            'api_key_id' => $apiKeyData['id'],
-                            'sessions_ended' => $sessionsEnded
-                        ]);
-                    }
-                    return $sessionsEnded;
-                } else {
-                    // Nettoyer seulement les sessions pour cette API Key spécifique
-                    $sessionsEnded = UserSessionService::endSession($apiKeyData['user_id'], $apiKeyData['id']);
-                    if (AUTH_AUTO_LOGOUT_LOG_LEVEL !== 'none') {
-                        LogService::info("Sessions API Key spécifique nettoyées avant authentification", [
-                            'user_id' => $apiKeyData['user_id'],
-                            'api_key_id' => $apiKeyData['id'],
-                            'sessions_ended' => $sessionsEnded
-                        ]);
-                    }
-                    return $sessionsEnded;
-                }
-            }
-            
-            return 0; // Aucune session à nettoyer
-            
-        } catch (Exception $e) {
-            LogService::warning("Erreur lors du nettoyage des sessions", [
-                'error' => $e->getMessage()
-            ]);
-            return 0;
         }
     }
 

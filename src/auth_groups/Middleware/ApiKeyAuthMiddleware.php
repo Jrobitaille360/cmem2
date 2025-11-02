@@ -128,66 +128,34 @@ class ApiKeyAuthMiddleware
     }
     
     /**
-     * Middleware combiné : accepte JWT OU API key
-     * Retourne les données user (depuis JWT ou API key)
+     * Authentifier avec API Key uniquement
+     * Retourne les données user depuis l'API key
      */
     public static function authenticateFlexible(?string $requiredScope = null): ?array
     {
-        // Si une API key est fournie, utiliser l'authentification API key
-        if (self::hasApiKey()) {
-            $keyData = self::authenticate($requiredScope);
-            
-            if (!$keyData) {
-                return null; // Erreur déjà envoyée par authenticate()
-            }
-            
-            // Retourner un format compatible avec l'authentification JWT
-            return [
-                'auth_type' => 'api_key',
-                'user_id' => $keyData['user_id'],
-                'api_key_id' => $keyData['id'],
-                'api_key_name' => $keyData['name'],
-                'scopes' => $keyData['scopes'],
-                'environment' => $keyData['environment']
-            ];
-        }
-        
-        // Sinon, utiliser l'authentification JWT classique
-        // (déléguer à AuthService ou autre middleware JWT existant)
-        require_once __DIR__ . '/../Services/AuthService.php';
-        $authService = new \AuthGroups\Services\AuthService();
-        
-        // Récupérer le token depuis le header
-        $token = null;
-        if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
-            $authHeader = $_SERVER['HTTP_AUTHORIZATION'];
-            if (preg_match('/^Bearer\s+(.+)$/i', $authHeader, $matches)) {
-                $token = trim($matches[1]);
-            }
-        }
-        
-        if (!$token) {
+        // Authentification par API key uniquement
+        if (!self::hasApiKey()) {
             Response::error('Authentification requise', [
-                'error' => 'MISSING_TOKEN',
-                'message' => 'Token JWT manquant'
+                'error' => 'MISSING_API_KEY',
+                'message' => 'Une API key est requise pour accéder à cette ressource'
             ], 401);
             return null;
         }
         
-        $userData = $authService->validateToken($token);
+        $keyData = self::authenticate($requiredScope);
         
-        if (!$userData) {
-            Response::error('Authentification invalide', [
-                'error' => 'INVALID_TOKEN',
-                'message' => 'Token JWT invalide ou expiré'
-            ], 401);
-            return null;
+        if (!$keyData) {
+            return null; // Erreur déjà envoyée par authenticate()
         }
         
+        // Retourner les données d'authentification
         return [
-            'auth_type' => 'jwt',
-            'user_id' => $userData['user_id'],
-            'email' => $userData['email'] ?? null
+            'auth_type' => 'api_key',
+            'user_id' => $keyData['user_id'],
+            'api_key_id' => $keyData['id'],
+            'api_key_name' => $keyData['name'],
+            'scopes' => $keyData['scopes'],
+            'environment' => $keyData['environment']
         ];
     }
     
