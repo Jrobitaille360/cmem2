@@ -6,8 +6,6 @@ use AuthGroups\Routing\RouteHandlers\{
     PublicRouteHandler,
     UserRouteHandler,
     GroupRouteHandler,
-   // MemoryRouteHandler,
-   // ElementRouteHandler,
     TagRouteHandler,
     FileRouteHandler,
     StatsRouteHandler,

@@ -224,11 +224,11 @@ class SecretApiKeyController
                 return;
             }
 
-            // Récupérer les détails de la clé
-            $apiKeyData = ApiKey::getById($keyId);
+            // Récupérer les détails de la clé (en excluant les clés révoquées)
+            $apiKeyData = ApiKey::getById($keyId, false);
 
             if (!$apiKeyData) {
-                LogService::warning('Tentative d\'accès à une API key inexistante', [
+                LogService::warning('Tentative d\'accès à une API key inexistante ou révoquée', [
                     'admin_user_id' => $authenticatedUser['user_id'],
                     'api_key_id' => $keyId
                 ]);
@@ -348,12 +348,6 @@ class SecretApiKeyController
     {
         try {
             $input = Response::getRequestParams();
-            
-            if (!$input) {
-                Response::error('Données JSON invalides', null, 400);
-                return;
-            }
-
             // Validation des données d'entrée
             $validator = new Validator();
             $validation = $validator->validate($input, [
@@ -397,9 +391,10 @@ class SecretApiKeyController
                     'id' => $result['data']['id'],
                     'name' => $result['data']['name'],
                     'key' => $result['key'], // IMPORTANT: Nouvelle clé montrée une seule fois
+                    'scopes' => json_decode($result['data']['scopes'], true),
+                    'environment' => $result['data']['environment'],
                     'prefix' => $result['data']['key_prefix'],
                     'last_4' => $result['data']['last_4'],
-                    'environment' => $result['data']['environment'],
                     'regenerated_at' => $result['data']['created_at']
                 ],
                 'warning' => '⚠️ IMPORTANT: Sauvegardez cette nouvelle clé maintenant - elle ne sera plus jamais affichée!',

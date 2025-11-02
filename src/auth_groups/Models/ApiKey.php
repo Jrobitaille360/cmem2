@@ -449,8 +449,12 @@ class ApiKey extends BaseModel
     
     /**
      * Obtenir une API key par son ID
+     * 
+     * @param int $keyId ID de la clé API
+     * @param bool $includeRevoked Si false, retourne null pour les clés révoquées (défaut: true)
+     * @return array|null
      */
-    public static function getById(int $keyId): ?array
+    public static function getById(int $keyId, bool $includeRevoked = true): ?array
     {
         $model = new self();
         $db = $model->getDb();
@@ -485,11 +489,18 @@ class ApiKey extends BaseModel
             LEFT JOIN users u ON ak.user_id = u.id
             WHERE ak.id = :id
         ");
+
+        // si status == expired on met à jour la clé
         
         $stmt->execute([':id' => $keyId]);
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if (!$result) {
+            return null;
+        }
+
+        // Filtrer les clés révoquées si demandé
+        if (!$includeRevoked && $result['revoked_at'] !== null) {
             return null;
         }
         
@@ -517,7 +528,7 @@ class ApiKey extends BaseModel
                 SELECT user_id, name, environment, scopes, rate_limit_per_minute, 
                        rate_limit_per_hour, notes, expires_at
                 FROM api_keys 
-                WHERE id = :id AND revoked_at IS NULL
+                WHERE id = :id 
             ");
             $stmt->execute([':id' => $keyId]);
             $oldKeyData = $stmt->fetch(PDO::FETCH_ASSOC);

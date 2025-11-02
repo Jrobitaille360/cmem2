@@ -51,7 +51,7 @@ class SecretAdminController
      * POST /secret-admin/execute-procedure
      * 
      * SÉCURITÉ RENFORCÉE : Double authentification requise
-     * 1. Token JWT valide avec rôle ADMINISTRATEUR (vérifié dans RouteHandler)
+     * 1. API Key valide avec rôle ADMINISTRATEUR (vérifié dans RouteHandler)
      * 2. Clé secrète admin dans le body JSON ou header
      * 
      * Deux modes d'authentification supportés :
@@ -101,12 +101,15 @@ class SecretAdminController
 
             // Liste des procédures autorisées
             $allowedProcedures = [
+                'AddCalDAVSupport',
+                'CleanupExpiredSessions',
                 'CleanupOldStats',
+                'cleanup_expired_api_keys',
                 'GenerateGroupStats',
                 'GeneratePlatformStats',
                 'GenerateUserStats',
-                'ResetAuthGroupsData',
-                'ResetAuthenticationGroups'
+                'ResetAuthenticationGroups',
+                'ResetICSTables'
             ];
 
             if (!in_array($procedure, $allowedProcedures))
@@ -169,14 +172,14 @@ class SecretAdminController
      * Liste les procédures stockées disponibles
      * 
      * SÉCURITÉ RENFORCÉE : Double authentification requise
-     * 1. Token JWT valide avec rôle ADMINISTRATEUR (vérifié dans RouteHandler)
+     * 1. API Key valide avec rôle ADMINISTRATEUR (vérifié dans RouteHandler)
      * 2. Clé secrète admin dans query param
      * 
      * Format d'appel :
      * GET /secret-admin/procedures?admin_secret=clé_secrète
-     * Headers: Authorization: Bearer {JWT_TOKEN}
+     * Headers: X-API-Key: {API_KEY}
      * 
-     * @param array $authenticatedUser Utilisateur authentifié via JWT (doit être ADMINISTRATEUR)
+     * @param array $authenticatedUser Utilisateur authentifié via API Key (doit être ADMINISTRATEUR)
      * @return void
      */
     public function listProcedures(array $authenticatedUser): void
@@ -204,19 +207,36 @@ class SecretAdminController
             }
 
             $procedures = [
-                'ResetAuthGroupsData' => [
-                    'name' => 'ResetAuthGroupsData',
-                    'description' => 'Remet à zéro toutes les données du module authentification/groupes en gardant la structure',
+                'AddCalDAVSupport' => [
+                    'name' => 'AddCalDAVSupport',
+                    'description' => 'Ajoute le support CalDAV aux calendriers existants (ajoute les colonnes ctag, etag, uid, etc.)',
                     'parameters' => [],
-                    'danger_level' => 'HIGH',
-                    'warning' => 'ATTENTION : Cette procédure supprime toutes les données utilisateurs, groupes, fichiers et tags'
+                    'danger_level' => 'MEDIUM',
+                    'warning' => 'Modifie la structure des tables calendars et calendar_events'
                 ],
-                'ResetAuthenticationGroups' => [
-                    'name' => 'ResetAuthenticationGroups',
-                    'description' => 'Recrée complètement la base de données (DROP et CREATE de toutes les tables)',
+                'CleanupExpiredSessions' => [
+                    'name' => 'CleanupExpiredSessions',
+                    'description' => 'Marque les sessions utilisateur expirées comme inactives',
                     'parameters' => [],
-                    'danger_level' => 'EXTREME',
-                    'warning' => 'DANGER EXTRÊME : Toute la base de données sera recréée, toutes les données seront perdues'
+                    'danger_level' => 'LOW'
+                ],
+                'CleanupOldStats' => [
+                    'name' => 'CleanupOldStats',
+                    'description' => 'Nettoie les anciennes statistiques (garde les 100 derniers snapshots et supprime ceux de +30 jours)',
+                    'parameters' => [],
+                    'danger_level' => 'MEDIUM'
+                ],
+                'cleanup_expired_api_keys' => [
+                    'name' => 'cleanup_expired_api_keys',
+                    'description' => 'Marque comme révoquées les clés API expirées non encore révoquées',
+                    'parameters' => [],
+                    'danger_level' => 'LOW'
+                ],
+                'GenerateGroupStats' => [
+                    'name' => 'GenerateGroupStats',
+                    'description' => 'Génère les statistiques pour chaque groupe (membres, fichiers, stockage)',
+                    'parameters' => [],
+                    'danger_level' => 'LOW'
                 ],
                 'GeneratePlatformStats' => [
                     'name' => 'GeneratePlatformStats',
@@ -230,44 +250,19 @@ class SecretAdminController
                     'parameters' => [],
                     'danger_level' => 'LOW'
                 ],
-                'GenerateGroupStats' => [
-                    'name' => 'GenerateGroupStats',
-                    'description' => 'Génère les statistiques pour chaque groupe',
+                'ResetAuthenticationGroups' => [
+                    'name' => 'ResetAuthenticationGroups',
+                    'description' => 'Recrée complètement la base de données (DROP et CREATE de toutes les tables users, groups, files, etc.)',
                     'parameters' => [],
-                    'danger_level' => 'LOW'
+                    'danger_level' => 'EXTREME',
+                    'warning' => 'DANGER EXTRÊME : Toute la base de données sera recréée, toutes les données seront perdues'
                 ],
-                'CleanupOldStats' => [
-                    'name' => 'CleanupOldStats',
-                    'description' => 'Nettoie les anciennes statistiques (garde les 100 derniers snapshots et supprime ceux de +30 jours)',
+                'ResetICSTables' => [
+                    'name' => 'ResetICSTables',
+                    'description' => 'Recrée les tables de calendrier ICS (calendars, calendar_events, calendar_shares)',
                     'parameters' => [],
-                    'danger_level' => 'MEDIUM'
-                ],
-                'cleanup_expired_api_keys' => [
-                    'name' => 'cleanup_expired_api_keys',
-                    'description' => 'Révoque automatiquement les clés API expirées',
-                    'parameters' => [],
-                    'danger_level' => 'LOW'
-                ],
-                'cleanup_expired_licenses' => [
-                    'name' => 'cleanup_expired_licenses',
-                    'description' => 'Nettoie les licences expirées et met à jour le statut des utilisateurs',
-                    'parameters' => [],
-                    'danger_level' => 'MEDIUM',
-                    'note' => 'Système de licence - Modifie le payment_status des utilisateurs'
-                ],
-                'get_license_status' => [
-                    'name' => 'get_license_status',
-                    'description' => 'Récupère le statut de licence d\'un utilisateur spécifique',
-                    'parameters' => [
-                        [
-                            'name' => 'p_user_id',
-                            'type' => 'INT',
-                            'required' => true,
-                            'description' => 'ID de l\'utilisateur'
-                        ]
-                    ],
-                    'danger_level' => 'LOW',
-                    'note' => 'Nécessite un paramètre user_id'
+                    'danger_level' => 'HIGH',
+                    'warning' => 'ATTENTION : Supprime toutes les données de calendriers et événements'
                 ]
             ];
 
@@ -289,7 +284,7 @@ class SecretAdminController
                 'authentication_info' => [
                     'type' => 'Double authentification',
                     'requirements' => [
-                        '1. Token JWT valide avec rôle ADMINISTRATEUR',
+                        '1. API Key valide avec rôle ADMINISTRATEUR',
                         '2. Clé secrète admin (ADMIN_SECRET_KEY)'
                     ]
                 ],
@@ -297,7 +292,7 @@ class SecretAdminController
                     'endpoint' => '/secret-admin/execute-procedure',
                     'method' => 'POST',
                     'headers' => [
-                        'Authorization' => 'Bearer {JWT_TOKEN}',
+                        'X-API-Key' => '{API_KEY}',
                         'Content-Type' => 'application/json'
                     ],
                     'body' => [

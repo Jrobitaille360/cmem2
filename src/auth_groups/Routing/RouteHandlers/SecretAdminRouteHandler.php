@@ -87,7 +87,7 @@ class SecretAdminRouteHandler extends BaseRouteHandler
                     
             // POST /secret-admin/api-keys/{id}/regenerate - Régénérer une API key
             ($controller === 'secret-admin' && $action === 'api-keys' && $id && ctype_digit($id) && 
-             isset($segments[4]) && $segments[4] === 'regenerate' && $method === 'POST') => 
+             isset($segments[3]) && $segments[3] === 'regenerate' && $method === 'POST') => 
                 $this->validateIdAndCall($id, fn($keyId) => 
                     $this->apiKeyController->regenerate($keyId, $user)),
                 
