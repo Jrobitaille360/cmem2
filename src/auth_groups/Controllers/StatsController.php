@@ -42,7 +42,9 @@ class StatsController
             $db = \Database::getInstance()->getConnection();
             
             // Générer toutes les statistiques via la procédure stockée
-            $stmt = $db->query("CALL GenerateAllStats()");
+            $stmt = $db->query("CALL GeneratePlatformStats()");
+            $stmt = $db->query("CALL GenerateUserStats()");
+            $stmt = $db->query("CALL GenerateGroupStats()");
             
             // Nettoyer les anciennes statistiques (garde les 30 derniers jours)
             $stmt = $db->query("CALL CleanupOldStats()");
@@ -229,26 +231,23 @@ class StatsController
             // Récupérer les statistiques de l'utilisateur
             $stmt = $db->prepare("
                 SELECT * FROM user_stats_snapshot 
-                WHERE user_id = :user_id 
+                WHERE user_id = :user_id1 
                 AND generated_at = (
-                    SELECT MAX(generated_at) FROM user_stats_snapshot WHERE user_id = :user_id
+                    SELECT MAX(generated_at) FROM user_stats_snapshot WHERE user_id = :user_id2
                 )
                 LIMIT 1
             ");
-            $stmt->bindValue(':user_id', $targetUserId, PDO::PARAM_INT);
+            $stmt->bindValue(':user_id1', $targetUserId, PDO::PARAM_INT);
+            $stmt->bindValue(':user_id2', $targetUserId, PDO::PARAM_INT);
             $stmt->execute();
             
             $userStats = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if (!$userStats) {
-                // Générer des statistiques temporaires si aucune n'existe
-                $userStats = [
-                    'user_id' => $targetUserId,
-                    'total_groups' => 0,
-                    'storage_used_mb' => 0,
-                    'generated_at' => date('Y-m-d H:i:s'),
-                    'note' => 'Statistiques non encore générées'
-                ];
+                LogService::info('Aucune statistique trouvée, génération de statistiques temporaires', [
+                    'target_user' => $targetUserId
+                ]);
+                Response::error('Aucune statistique trouvée pour cet utilisateur', null, 404);
             }
 
             Response::success('Statistiques utilisateur récupérées', $userStats);
