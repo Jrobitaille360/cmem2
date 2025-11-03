@@ -9,12 +9,10 @@ use AuthGroups\Routing\RouteHandlers\{
     TagRouteHandler,
     FileRouteHandler,
     StatsRouteHandler,
-    DataRouteHandler,
     SecretAdminRouteHandler,
     ApiKeyRouteHandler,
     PlanRouteHandler
 };
-use AuthGroups\Routing\WebhookRouteHandler;
 use AuthGroups\Services\{AuthService, LogService};
 use AuthGroups\Utils\Response;
 use AuthGroups\Middleware\LoggingMiddleware;
@@ -31,18 +29,15 @@ class Router
     }
     
     private PublicRouteHandler $publicHandler;
-    private WebhookRouteHandler $webhookHandler;
 
     private function initializeRouteHandlers(): void {
         $this->publicHandler = new PublicRouteHandler();
-        $this->webhookHandler = new WebhookRouteHandler();
         $this->routeHandlers = [
             'users' => new UserRouteHandler($this->authService),
             'groups' => new GroupRouteHandler($this->authService),
             'tags' => new TagRouteHandler($this->authService),
             'files' => new FileRouteHandler($this->authService),
             'stats' => new StatsRouteHandler($this->authService),
-            'data' => new DataRouteHandler($this->authService),
             'secret-admin' => new SecretAdminRouteHandler(),
             'plans' => new PlanRouteHandler($this->authService)
         ];
@@ -137,14 +132,7 @@ class Router
                 return;
             }
 
-            // Vérifier si c'est un webhook
-            if ($request['controller'] === 'webhook') {
-                $path = implode('/', array_slice($request['segments'], 0, 2));
-                $this->webhookHandler->handleRequest($path, $request['method']);
-                return;
-            }
-
-            // Sinon, on essaie les autres handlers
+            // Essayer les autres handlers
             $controller = $request['controller'];
             $handler = $this->routeHandlers[$controller] ?? null;
 
@@ -201,8 +189,7 @@ class Router
                 'groups' => 'Gestion des groupes et invitations',
                 'tags' => 'Système de tags et catégorisation',
                 'files' => 'Upload et gestion de fichiers',
-                'stats' => 'Statistiques et analytics',
-                'data' => 'Synchronisation hors-ligne'
+                'stats' => 'Statistiques et analytics'
             ],
             'improvements' => [
                 'Architecture modulaire implementée',

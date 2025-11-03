@@ -57,13 +57,7 @@
                   "groups": "Gestion des groupes (création, modification, membres, invitations)",
                   "files": "Gestion des fichiers (upload, download, suppression)",
                   "tags": "Gestion des tags (création, modification, association)",
-                  "stats": "Statistiques et analytics (plateforme, groupes, utilisateurs)",
-                  "data": "Synchronisation et fusion des données hors-ligne"
-                },
-                "webhooks": {
-                  "payment": "Webhook générique de paiement",
-                  "stripe": "Webhook Stripe avec signature",
-                  "paypal": "Webhook PayPal IPN"
+                  "stats": "Statistiques et analytics (plateforme, groupes, utilisateurs)"
                 },
                 "admin": {
                   "secret-admin": "Endpoints d'administration (authentification renforcée requise)",
@@ -752,55 +746,6 @@
           },
           "response": "Nouvelle ApiKey object avec clé complète (visible une seule fois)",
           "security_warning": "⚠️ Nouvelle clé visible uniquement à la régénération"
-        }
-      ]
-    },
-    "data": {
-      "description": "Synchronisation des données",
-      "base_path": "/data",
-      "auth_required": true,
-      "routes": [
-        {
-          "method": "POST",
-          "path": "/data/merge",
-          "description": "Fusionner les données hors-ligne",
-          "body": {
-            "groups": "array (optional)",
-            "files": "array (optional)",
-            "tags": "array (optional)"
-          },
-          "response": "Object avec résumé de la fusion"
-        }
-      ]
-    },
-    "webhooks": {
-      "description": "Webhooks pour intégrations tierces",
-      "base_path": "/webhook",
-      "auth_required": false,
-      "routes": [
-        {
-          "method": "POST",
-          "path": "/webhook/payment",
-          "description": "Webhook générique de paiement",
-          "body": "Provider-specific payload",
-          "response": "Confirmation de traitement"
-        },
-        {
-          "method": "POST",
-          "path": "/webhook/stripe",
-          "description": "Webhook Stripe",
-          "headers": {
-            "Stripe-Signature": "string (required)"
-          },
-          "body": "Stripe event payload",
-          "response": "Confirmation de traitement"
-        },
-        {
-          "method": "POST",
-          "path": "/webhook/paypal",
-          "description": "Webhook PayPal",
-          "body": "PayPal IPN payload",
-          "response": "Confirmation de traitement"
         }
       ]
     }
