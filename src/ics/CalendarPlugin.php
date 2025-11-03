@@ -42,8 +42,12 @@ class CalendarPlugin implements PluginInterface
 
     public function initialize(): void
     {
-        // Charger la configuration
+        // Charger la configuration d'abord
         $this->loadConfig();
+        
+        // Définir le timezone par défaut pour PHP
+        $defaultTimezone = $this->config['config']['default_timezone'] ?? 'America/Montreal';
+        date_default_timezone_set($defaultTimezone);
         
         // Enregistrer les route handlers dans le PluginManager (sans les instancier immédiatement)
         PluginManager::getInstance()->registerPluginRoutes('ics', [

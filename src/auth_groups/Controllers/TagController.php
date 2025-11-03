@@ -5,6 +5,7 @@ namespace AuthGroups\Controllers;
 use AuthGroups\Models\Tag;
 use AuthGroups\Utils\Response;
 use AuthGroups\Utils\Validator;
+use AuthGroups\Utils\ColorName;
 use AuthGroups\Services\LogService;
 use AuthGroups\Middleware\LoggingMiddleware;
 use Exception;
@@ -217,7 +218,7 @@ class TagController {
             $validation = $validator->validate($input, [
                 'name' => 'required|string|min:1|max:100',
                 'table_associate' => 'required|in:groups,files,all',
-                'color' => 'string|regex:/^#[0-9A-Fa-f]{6}$/'
+                'color' => 'color'
             ]);
             
             if (!$validation['valid']) {
@@ -231,7 +232,15 @@ class TagController {
             $tag = new Tag();
             $tag->name = trim($input['name']);
             $tag->table_associate = $input['table_associate'] ?? 'groups';
-            $tag->color = $input['color'] ?? '#3498db';
+            
+            // Normaliser la couleur au format #RRGGBB
+            if (isset($input['color'])) {
+                $colorRgb = ColorName::stringToColor($input['color']);
+                $tag->color = ColorName::colorToHexString($colorRgb);
+            } else {
+                $tag->color = '#3498db';
+            }
+            
             $tag->tag_owner = $currentUserId;
 
             // Valider les données du modèle 
@@ -318,7 +327,7 @@ class TagController {
             $validation = $validator->validate($input, [
                 'name' => 'string|min:1|max:100',
                 'table_associate' => 'in:groups,files,all',
-                'color' => 'string|regex:/^#[0-9A-Fa-f]{6}$/'
+                'color' => 'color'
             ]);
             
             if (!$validation['valid']) {
@@ -337,7 +346,9 @@ class TagController {
                 $tag->table_associate = $input['table_associate'];
             }
             if (isset($input['color'])) {
-                $tag->color = $input['color'];
+                // Normaliser la couleur au format #RRGGBB
+                $colorRgb = ColorName::stringToColor($input['color']);
+                $tag->color = ColorName::colorToHexString($colorRgb);
             }
             
             // Valider les nouvelles données
@@ -511,7 +522,7 @@ class TagController {
             $validation = $validator->validate($input, [
                 'name' => 'required|string|min:1|max:100',
                 'table_associate' => 'in:groups,files,all',
-                'color' => 'string|regex:/^#[0-9A-Fa-f]{6}$/'
+                'color' => 'color'
             ]);
             
             if (!$validation['valid']) {
@@ -523,11 +534,19 @@ class TagController {
             }
             
             $tag = new Tag();
+            
+            // Normaliser la couleur au format #RRGGBB
+            $color = '#3498db'; // Couleur par défaut
+            if (isset($input['color'])) {
+                $colorRgb = ColorName::stringToColor($input['color']);
+                $color = ColorName::colorToHexString($colorRgb);
+            }
+            
             $result = $tag->getOrCreate(
                 trim($input['name']),
                 $currentUserId,
                 $input['table_associate'] ?? 'groups',
-                $input['color'] ?? '#3498db'
+                $color
             );
             
             if ($result) {

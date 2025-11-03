@@ -2,6 +2,8 @@
 
 namespace AuthGroups\Utils;
 
+use AuthGroups\Utils\ColorName;
+
 class Validator {
     
     private $errors = [];
@@ -187,6 +189,20 @@ class Validator {
                     }
                 }
                 break;
+                
+            case 'color':
+                // Valide une couleur (hex, nom, RGB, HSL, etc.)
+                if ($value !== null && !$this->validateColor($value)) {
+                    $this->addError($field, "Le champ {$field} doit être une couleur valide (ex: #RRGGBB, RED, rgb(255,0,0), hsl(120,50%,50%))");
+                }
+                break;
+                
+            case 'hex_color':
+                // Valide uniquement le format hexadécimal
+                if ($value !== null && !$this->validateHexColor($value)) {
+                    $this->addError($field, "Le champ {$field} doit être une couleur hexadécimale valide (#RRGGBB)");
+                }
+                break;
         }
     }
     
@@ -329,9 +345,41 @@ class Validator {
     }
     
     /**
+     * Valider une couleur (tous formats supportés par ColorName)
+     */
+    public function validateColor($color) {
+        if (empty($color)) {
+            return false;
+        }
+        
+        // Utilise la méthode stringToColor de ColorName qui supporte:
+        // - Noms de couleurs (RED, BLUE, etc.)
+        // - Hexadécimal (#RRGGBB, 0xRRGGBB, %23RRGGBB)
+        // - RGB(r, g, b)
+        // - RGBA(r, g, b, a)
+        // - HSL(h, s%, l%)
+        // - HSLA(h, s%, l%, a)
+        $result = ColorName::stringToColor($color);
+        
+        return $result !== null;
+    }
+    
+    /**
      * Valider une couleur hexadécimale
      */
     public function validateHexColor($color) {
-        return preg_match('/^#[a-fA-F0-9]{6}$/', $color);
+        // Méthode mise à jour pour utiliser ColorName
+        if (empty($color)) {
+            return false;
+        }
+        
+        // Vérifier le format hexadécimal strict #RRGGBB
+        if (!preg_match('/^#[a-fA-F0-9]{6}$/', $color)) {
+            return false;
+        }
+        
+        // Vérifier que ColorName peut le parser
+        $result = ColorName::stringToColor($color);
+        return $result !== null;
     }
 }

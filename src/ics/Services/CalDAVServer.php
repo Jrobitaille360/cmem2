@@ -4,6 +4,7 @@ namespace ICS\Services;
 
 use ICS\Models\Calendar;
 use ICS\Models\CalendarEvent;
+use ICS\Utils\TimezoneHelper;
 use AuthGroups\Services\LogService;
 use PDO;
 
@@ -703,10 +704,25 @@ class CalDAVServer
 
     private function generateSingleEventIcs($event): string
     {
+        // Récupérer le timezone du calendrier
+        $calendarTimezone = 'America/Montreal';
+        if (isset($event['calendar_id'])) {
+            $stmt = $this->db->prepare("SELECT timezone FROM calendars WHERE id = ?");
+            $stmt->execute([$event['calendar_id']]);
+            $cal = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($cal && !empty($cal['timezone'])) {
+                $calendarTimezone = $cal['timezone'];
+            }
+        }
+        
         $ics = "BEGIN:VCALENDAR\r\n";
         $ics .= "VERSION:2.0\r\n";
         $ics .= "PRODID:-//CMEM2//CalDAV Server//EN\r\n";
         $ics .= "CALSCALE:GREGORIAN\r\n";
+        
+        // Ajouter VTIMEZONE
+        $ics .= TimezoneHelper::generateVTimezone($calendarTimezone);
+        
         $ics .= "BEGIN:VEVENT\r\n";
         $ics .= "UID:" . $event['uid'] . "\r\n";
         $ics .= "DTSTAMP:" . gmdate('Ymd\THis\Z') . "\r\n";
@@ -715,18 +731,18 @@ class CalDAVServer
             $ics .= "DTSTART;VALUE=DATE:" . date('Ymd', strtotime($event['start_datetime'])) . "\r\n";
             $ics .= "DTEND;VALUE=DATE:" . date('Ymd', strtotime($event['end_datetime'])) . "\r\n";
         } else {
-            $ics .= "DTSTART:" . gmdate('Ymd\THis\Z', strtotime($event['start_datetime'])) . "\r\n";
-            $ics .= "DTEND:" . gmdate('Ymd\THis\Z', strtotime($event['end_datetime'])) . "\r\n";
+            $ics .= "DTSTART:" . TimezoneHelper::toICalDateTimeUTC($event['start_datetime'], $calendarTimezone) . "\r\n";
+            $ics .= "DTEND:" . TimezoneHelper::toICalDateTimeUTC($event['end_datetime'], $calendarTimezone) . "\r\n";
         }
         
-        $ics .= "SUMMARY:" . $this->escapeIcsString($event['title']) . "\r\n";
+        $ics .= "SUMMARY:" . TimezoneHelper::escapeIcsText($event['title']) . "\r\n";
         
         if (!empty($event['description'])) {
-            $ics .= "DESCRIPTION:" . $this->escapeIcsString($event['description']) . "\r\n";
+            $ics .= "DESCRIPTION:" . TimezoneHelper::escapeIcsText($event['description']) . "\r\n";
         }
         
         if (!empty($event['location'])) {
-            $ics .= "LOCATION:" . $this->escapeIcsString($event['location']) . "\r\n";
+            $ics .= "LOCATION:" . TimezoneHelper::escapeIcsText($event['location']) . "\r\n";
         }
         
         if (!empty($event['organizer_email'])) {
@@ -737,7 +753,7 @@ class CalDAVServer
         $ics .= "SEQUENCE:" . ($event['sequence'] ?? 0) . "\r\n";
         
         if (!empty($event['last_modified'])) {
-            $ics .= "LAST-MODIFIED:" . gmdate('Ymd\THis\Z', strtotime($event['last_modified'])) . "\r\n";
+            $ics .= "LAST-MODIFIED:" . TimezoneHelper::toICalDateTimeUTC($event['last_modified'], $calendarTimezone) . "\r\n";
         }
         
         $ics .= "END:VEVENT\r\n";
@@ -814,26 +830,18 @@ class CalDAVServer
 
     private function parseICalDate($dateString): string
     {
-        // Format: 20231225T120000Z ou 20231225
-        $dateString = str_replace(['T', 'Z'], ['', ''], $dateString);
-        
-        if (strlen($dateString) == 8) {
-            // Date seulement
-            return date('Y-m-d 00:00:00', strtotime($dateString));
-        } else {
-            // Date et heure
-            return date('Y-m-d H:i:s', strtotime($dateString));
-        }
+        // Utiliser TimezoneHelper pour le parsing
+        return TimezoneHelper::fromICalDateTime($dateString, 'America/Montreal');
     }
 
     private function escapeIcsString($string): string
     {
-        return str_replace(["\n", "\r", ",", ";"], ["\\n", "", "\\,", "\\;"], $string);
+        return TimezoneHelper::escapeIcsText($string);
     }
 
     private function unescapeIcsString($string): string
     {
-        return str_replace(["\\n", "\\,", "\\;"], ["\n", ",", ";"], $string);
+        return TimezoneHelper::unescapeIcsText($string);
     }
 
     private function getCalendarIdFromPath($pathSegment): ?int

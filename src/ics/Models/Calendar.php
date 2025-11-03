@@ -3,6 +3,7 @@
 namespace ICS\Models;
 
 use AuthGroups\Models\BaseModel;
+use ICS\Utils\TimezoneHelper;
 use PDO;
 
 class Calendar extends BaseModel
@@ -277,20 +278,25 @@ class Calendar extends BaseModel
     
     public static function generateIcsContent($calendar, $events): string
     {
+        $timezone = $calendar['timezone'] ?? 'America/Montreal';
+        
         $ics = "BEGIN:VCALENDAR\r\n";
         $ics .= "VERSION:2.0\r\n";
         $ics .= "PRODID:-//CMEM Calendar//FR\r\n";
         $ics .= "CALSCALE:GREGORIAN\r\n";
-        $ics .= "X-WR-CALNAME:" . self::escapeIcsText($calendar['title']) . "\r\n";
+        $ics .= "X-WR-CALNAME:" . TimezoneHelper::escapeIcsText($calendar['title']) . "\r\n";
         
         if (!empty($calendar['description'])) {
-            $ics .= "X-WR-CALDESC:" . self::escapeIcsText($calendar['description']) . "\r\n";
+            $ics .= "X-WR-CALDESC:" . TimezoneHelper::escapeIcsText($calendar['description']) . "\r\n";
         }
         
-        $ics .= "X-WR-TIMEZONE:" . $calendar['timezone'] . "\r\n";
+        $ics .= "X-WR-TIMEZONE:" . $timezone . "\r\n";
+        
+        // Ajouter le bloc VTIMEZONE complet
+        $ics .= TimezoneHelper::generateVTimezone($timezone);
         
         foreach ($events as $event) {
-            $ics .= self::generateEventIcs($event);
+            $ics .= self::generateEventIcs($event, $timezone);
         }
         
         $ics .= "END:VCALENDAR\r\n";
@@ -298,28 +304,30 @@ class Calendar extends BaseModel
         return $ics;
     }
     
-    private static function generateEventIcs($event): string
+    private static function generateEventIcs($event, $calendarTimezone = 'America/Montreal'): string
     {
         $eventIcs = "BEGIN:VEVENT\r\n";
         $eventIcs .= "UID:event-" . $event['id'] . "@cmem-calendar.local\r\n";
         
-        // Dates
+        // Dates - Utiliser TimezoneHelper pour conversion correcte
         if ($event['all_day']) {
+            // Pour les événements toute la journée, utiliser VALUE=DATE
             $eventIcs .= "DTSTART;VALUE=DATE:" . date('Ymd', strtotime($event['start_datetime'])) . "\r\n";
             $eventIcs .= "DTEND;VALUE=DATE:" . date('Ymd', strtotime($event['end_datetime'] . ' +1 day')) . "\r\n";
         } else {
-            $eventIcs .= "DTSTART:" . gmdate('Ymd\THis\Z', strtotime($event['start_datetime'])) . "\r\n";
-            $eventIcs .= "DTEND:" . gmdate('Ymd\THis\Z', strtotime($event['end_datetime'])) . "\r\n";
+            // Pour les événements avec heure, convertir en UTC
+            $eventIcs .= "DTSTART:" . TimezoneHelper::toICalDateTimeUTC($event['start_datetime'], $calendarTimezone) . "\r\n";
+            $eventIcs .= "DTEND:" . TimezoneHelper::toICalDateTimeUTC($event['end_datetime'], $calendarTimezone) . "\r\n";
         }
         
-        $eventIcs .= "SUMMARY:" . self::escapeIcsText($event['title']) . "\r\n";
+        $eventIcs .= "SUMMARY:" . TimezoneHelper::escapeIcsText($event['title']) . "\r\n";
         
         if (!empty($event['description'])) {
-            $eventIcs .= "DESCRIPTION:" . self::escapeIcsText($event['description']) . "\r\n";
+            $eventIcs .= "DESCRIPTION:" . TimezoneHelper::escapeIcsText($event['description']) . "\r\n";
         }
         
         if (!empty($event['location'])) {
-            $eventIcs .= "LOCATION:" . self::escapeIcsText($event['location']) . "\r\n";
+            $eventIcs .= "LOCATION:" . TimezoneHelper::escapeIcsText($event['location']) . "\r\n";
         }
         
         if (!empty($event['organizer_email'])) {
@@ -329,8 +337,10 @@ class Calendar extends BaseModel
         // Participants
         if (!empty($event['attendees'])) {
             $attendees = json_decode($event['attendees'], true);
-            foreach ($attendees as $attendee) {
-                $eventIcs .= "ATTENDEE:mailto:" . $attendee['email'] . "\r\n";
+            if (is_array($attendees)) {
+                foreach ($attendees as $attendee) {
+                    $eventIcs .= "ATTENDEE:mailto:" . $attendee['email'] . "\r\n";
+                }
             }
         }
         
@@ -340,20 +350,13 @@ class Calendar extends BaseModel
         }
         
         $eventIcs .= "STATUS:" . strtoupper($event['status']) . "\r\n";
-        $eventIcs .= "CREATED:" . gmdate('Ymd\THis\Z', strtotime($event['created_at'])) . "\r\n";
-        $eventIcs .= "LAST-MODIFIED:" . gmdate('Ymd\THis\Z', strtotime($event['updated_at'])) . "\r\n";
+        $eventIcs .= "CREATED:" . TimezoneHelper::toICalDateTimeUTC($event['created_at'], $calendarTimezone) . "\r\n";
+        $eventIcs .= "LAST-MODIFIED:" . TimezoneHelper::toICalDateTimeUTC($event['updated_at'], $calendarTimezone) . "\r\n";
         $eventIcs .= "DTSTAMP:" . gmdate('Ymd\THis\Z') . "\r\n";
         
         $eventIcs .= "END:VEVENT\r\n";
         
         return $eventIcs;
-    }
-    
-    private static function escapeIcsText($text): string
-    {
-        // Échapper les caractères spéciaux pour ICS
-        $text = str_replace(['\\', ';', ',', "\n", "\r"], ['\\\\', '\\;', '\\,', '\\n', ''], $text);
-        return $text;
     }
     
     private static function generateIcsUrl($shareToken): string

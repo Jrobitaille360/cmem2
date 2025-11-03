@@ -4,8 +4,10 @@ namespace ICS\Controllers;
 
 use ICS\Models\Calendar;
 use ICS\Models\CalendarEvent;
+use ICS\Utils\TimezoneHelper;
 use AuthGroups\Utils\Response;
 use AuthGroups\Utils\Validator;
+use AuthGroups\Utils\ColorName;
 use AuthGroups\Middleware\LoggingMiddleware;
 use AuthGroups\Services\LogService;
 use AuthGroups\Services\EmailService;
@@ -28,7 +30,7 @@ class CalendarController
                 'description' => 'optionnal|string|max:1000',
                 'visibility' => 'optionnal|string|in:public,private',
                 'max_members' => 'optionnal|integer|min:1|max:1000',
-                'color' => 'optionnal|string|max:7',
+                'color' => 'optionnal|color',
                 'timezone' => 'optionnal|string|max:100',
             ]);
 
@@ -40,6 +42,16 @@ class CalendarController
                 Response::error('Données invalides', $validation['errors'], 400);
                 return;
             }
+            
+            // Valider le timezone si fourni
+            if (isset($input['timezone']) && !TimezoneHelper::isValidTimezone($input['timezone'])) {
+                LogService::warning("Timezone invalide", [
+                    'timezone' => $input['timezone']
+                ]);
+                LoggingMiddleware::logExit(400);
+                Response::error('Le timezone fourni est invalide', ['timezone' => 'Le timezone spécifié n\'est pas valide'], 400);
+                return;
+            }
        
         try {
             $cal = new Calendar();
@@ -48,7 +60,15 @@ class CalendarController
             $cal->description = $input['description'] ?? '';
             $cal->visibility = $input['visibility'] ?? 'private';
             $cal->maxMembers = $input['max_members'] ?? 1000;
-            $cal->color = $input['color'] ?? '#3174ad';
+            
+            // Normaliser la couleur au format #RRGGBB
+            if (isset($input['color'])) {
+                $colorRgb = ColorName::stringToColor($input['color']);
+                $cal->color = ColorName::colorToHexString($colorRgb);
+            } else {
+                $cal->color = '#3174ad';
+            }
+            
             $cal->timezone = $input['timezone'] ?? 'America/Montreal';
 
             $result = $cal->create();
@@ -520,7 +540,15 @@ class CalendarController
         $validation = $validator->validate($input, [
             'title' => 'required|string',
             'start_datetime' => 'required|date_or_datetime',
-            'end_datetime' => 'required|date_or_datetime'
+            'end_datetime' => 'required|date_or_datetime',
+            'description' => 'optionnal|string',
+            'all_day' => 'optionnal|boolean',
+            'location' => 'optionnal|string',
+            'organizer_email' => 'optionnal|email',
+            'color' => 'optionnal|color',
+            'recurrence_rule' => 'optionnal|string',
+            'status' => 'optionnal|string|in:confirmed,tentative,cancelled',
+            'timezone' => 'optionnal|string|max:100'
         ]);
         if(!$validation['valid']) {
             LogService::warning("Données d'événement invalides", [
@@ -530,6 +558,17 @@ class CalendarController
             Response::error('Données invalides', $validation['errors'], 400);
             return;
         }
+        
+        // Valider le timezone si fourni (bien que non utilisé actuellement - pour compatibilité future)
+        if (isset($input['timezone']) && !TimezoneHelper::isValidTimezone($input['timezone'])) {
+            LogService::warning("Timezone invalide lors de la création d'événement", [
+                'timezone' => $input['timezone']
+            ]);
+            LoggingMiddleware::logExit(400);
+            Response::error('Le timezone fourni est invalide', ['timezone' => 'Le timezone spécifié n\'est pas valide'], 400);
+            return;
+        }
+        
         // Vérifier que les dates sont valides
         if (strtotime($input['end_datetime']) < strtotime($input['start_datetime'])) {
             LogService::warning("Dates d'événement invalides", [
@@ -701,7 +740,7 @@ class CalendarController
             'description' => 'optionnal|string|max:1000',
             'visibility' => 'optionnal|string|in:public,private',
             'max_members' => 'optionnal|integer|min:1|max:1000',
-            'color' => 'optionnal|string|max:7',
+            'color' => 'optionnal|color',
             'timezone' => 'optionnal|string|max:100',
         ]);
         
@@ -711,6 +750,16 @@ class CalendarController
             ]);
             LoggingMiddleware::logExit(400);
             Response::error('Données invalides', $validation['errors'], 400);
+            return;
+        }
+        
+        // Valider le timezone si fourni
+        if (isset($input['timezone']) && !TimezoneHelper::isValidTimezone($input['timezone'])) {
+            LogService::warning("Timezone invalide lors de la mise à jour", [
+                'timezone' => $input['timezone']
+            ]);
+            LoggingMiddleware::logExit(400);
+            Response::error('Le timezone fourni est invalide', ['timezone' => 'Le timezone spécifié n\'est pas valide'], 400);
             return;
         }
         
@@ -749,7 +798,9 @@ class CalendarController
                 $updatedFields[] = 'max_members';
             }
             if (isset($input['color'])) {
-                $cal->color = $input['color'];
+                // Normaliser la couleur au format #RRGGBB
+                $colorRgb = ColorName::stringToColor($input['color']);
+                $cal->color = ColorName::colorToHexString($colorRgb);
                 $updatedFields[] = 'color';
             }
             if (isset($input['timezone'])) {
@@ -898,8 +949,10 @@ class CalendarController
             'all_day' => 'optionnal|boolean',
             'location' => 'optionnal|string',
             'organizer_email' => 'optionnal|email',
+            'color' => 'optionnal|color',
             'recurrence_rule' => 'optionnal|string',
-            'status' => 'optionnal|string|in:confirmed,tentative,cancelled'
+            'status' => 'optionnal|string|in:confirmed,tentative,cancelled',
+            'timezone' => 'optionnal|string|max:100'
         ]);
         
         if (!$validation['valid']) {
@@ -908,6 +961,16 @@ class CalendarController
             ]);
             LoggingMiddleware::logExit(400);
             Response::error('Données invalides', $validation['errors'], 400);
+            return;
+        }
+        
+        // Valider le timezone si fourni (bien que non utilisé actuellement - pour compatibilité future)
+        if (isset($input['timezone']) && !TimezoneHelper::isValidTimezone($input['timezone'])) {
+            LogService::warning("Timezone invalide lors de la mise à jour d'événement", [
+                'timezone' => $input['timezone']
+            ]);
+            LoggingMiddleware::logExit(400);
+            Response::error('Le timezone fourni est invalide', ['timezone' => 'Le timezone spécifié n\'est pas valide'], 400);
             return;
         }
         
