@@ -75,7 +75,7 @@ class CalendarRouteHandler extends BaseRouteHandler
             ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'share' && $method === 'POST') => 
                 $this->controller->shareCalendar((int)$action, $user['user_id']),
                 
-            // DELETE /calendars/{id}/shares - Supprimer un partage de calendrier
+            // DELETE /calendars/{id}/share - Supprimer un partage de calendrier
             ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'share' && $method === 'DELETE') => 
                 $this->controller->removeCalendarShare((int)$action, $user['user_id']),
                 
