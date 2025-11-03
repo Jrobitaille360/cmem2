@@ -44,7 +44,6 @@ class Router
             'stats' => new StatsRouteHandler($this->authService),
             'data' => new DataRouteHandler($this->authService),
             'secret-admin' => new SecretAdminRouteHandler(),
-            'api-keys' => new ApiKeyRouteHandler($this->authService),
             'plans' => new PlanRouteHandler($this->authService)
         ];
         
@@ -126,11 +125,11 @@ class Router
         try {
             $request = $this->parseRequest();
 
-            // Si pas de segments, afficher les informations de l'API
+/*             // Si pas de segments, afficher les informations de l'API
             if (empty($request['controller'])) {
                 $this->showAPIInfo();
                 return;
-            }
+            } */
 
             // On tente d'abord le handler public
             $publicResult = $this->publicHandler->handle($request);
@@ -188,7 +187,7 @@ class Router
         ];
     }
     
-    // getRouteHandler n'est plus utilisé
+    /* // getRouteHandler n'est plus utilisé
     
     private function showAPIInfo(): void {
         $info = [
@@ -216,5 +215,5 @@ class Router
         ];
         LoggingMiddleware::logExit(200);
         Response::success('API_info', $info);
-    }
+    } */
 }

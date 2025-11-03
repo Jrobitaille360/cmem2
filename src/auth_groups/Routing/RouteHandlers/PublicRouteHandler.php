@@ -78,6 +78,9 @@ class PublicRouteHandler extends BaseRouteHandler
         // Ensuite, traiter les routes publiques intégrées
         $res= match(true) {
             // Routes d'information
+            ($controller === '' && $action === '' && $method === 'GET') => 
+                $this->showWelcomeInfo(),
+                
             ($controller === 'help' && $action === '' && $method === 'GET') => 
                 $this->showHelpInfo(),
                 
@@ -122,59 +125,196 @@ class PublicRouteHandler extends BaseRouteHandler
         return $res;
     }
     
+    private function showWelcomeInfo(): void {
+        $info = [
+            'api' => [
+                'name' => 'CMEM2 API',
+                'version' => '2.0.0',
+                'description' => 'API complète de gestion d\'utilisateurs, groupes, fichiers, tags et plans',
+                'status' => 'operational'
+            ],
+            'quick_start' => [
+                'documentation' => 'GET /help - Liste complète des endpoints disponibles',
+                'health_check' => 'GET /health - Vérifier l\'état de l\'API',
+                'authentication' => 'Requiert une API Key pour la plupart des endpoints'
+            ],
+            'main_features' => [
+                'users' => 'Gestion complète des utilisateurs (inscription, authentification, profils)',
+                'groups' => 'Création et gestion de groupes avec rôles et permissions',
+                'files' => 'Upload, stockage et gestion de fichiers avec versioning',
+                'tags' => 'Système de tags avancé avec recherche et associations',
+                'plans' => 'Gestion des plans d\'abonnement et facturation',
+                'webhooks' => 'Intégration webhooks pour paiements (Stripe, PayPal)',
+                'plugins' => 'Système de plugins extensible (ICS Calendar, etc.)'
+            ],
+            'resources' => [
+                'help' => '/help',
+                'docs' => '/src/auth_groups/docs/',
+                'github' => 'https://github.com/Jrobitaille360/cmem2'
+            ],
+            'timestamp' => date('Y-m-d H:i:s')
+        ];
+        Response::success('welcome', $info);
+    }
+    
     private function showHelpInfo(): void {
         $info = [
             'api' => [
-                'name' => 'AuthGroups API',
-                'version' => '1.3.0',
-                'documentation' => '/help'
+                'name' => 'CMEM2 API',
+                'version' => '2.0.0',
+                'documentation' => '/help',
+                'base_url' => $_SERVER['REQUEST_SCHEME'] . '://' . $_SERVER['HTTP_HOST'] . dirname($_SERVER['SCRIPT_NAME'])
             ],
             'endpoints' => [
                 'public' => [
                     'GET / - Informations générales sur l\'API',
-                    'GET /help - Aide et liste des endpoints',
+                    'GET /help - Aide et liste complète des endpoints',
                     'GET /health - Statut de santé de l\'API',
-                    'POST /users/register - Inscription utilisateur',
-                    'POST /users/login - Connexion utilisateur',
+                    'GET /plans - Liste des plans d\'abonnement disponibles',
+                    'POST /users/register - Inscription d\'un nouvel utilisateur',
+                    'POST /users/login - Connexion utilisateur (requiert API Key)',
                     'POST /users/request-password-reset - Demande de réinitialisation de mot de passe',
                     'POST /users/reset-password - Réinitialisation de mot de passe avec token',
-                    'POST /users/verify-email - Vérification d\'email',
+                    'POST /users/verify-email - Vérification d\'email avec token',
                     'POST /users/resend-verification - Renvoi d\'email de vérification',
                     'GET /groups - Liste des groupes publics',
-                    'POST /groups/join - Rejoindre un groupe avec code'
+                    'POST /groups/join - Rejoindre un groupe avec code d\'invitation'
                 ],
                 'authenticated' => [
-                    'users' => 'Gestion des utilisateurs (CRUD, avatar, password, restore)',
-                    'groups' => 'Gestion des groupes (CRUD, members, invitations, search)',
-                    'files' => 'Gestion des fichiers (upload, download, delete, restore)',
-                    'tags' => 'Gestion des tags (CRUD, associations, search, most-used)',
-                    'stats' => 'Statistiques et analytics (platform, users, groups)',
-                    'api-keys' => 'Gestion des clés API (create, list, revoke, regenerate)',
-                    'data' => 'Synchronisation des données hors-ligne'
+                    'users' => [
+                        'description' => 'Gestion des utilisateurs',
+                        'operations' => 'CRUD complet, avatar, password, 2FA, restore'
+                    ],
+                    'groups' => [
+                        'description' => 'Gestion des groupes',
+                        'operations' => 'CRUD, membres, rôles, invitations, codes, search'
+                    ],
+                    'files' => [
+                        'description' => 'Gestion des fichiers',
+                        'operations' => 'upload, download, delete, restore, metadata, versioning'
+                    ],
+                    'tags' => [
+                        'description' => 'Gestion des tags',
+                        'operations' => 'CRUD, associations, search, most-used, suggestions'
+                    ],
+                    'plans' => [
+                        'description' => 'Gestion des abonnements',
+                        'operations' => 'subscribe, upgrade, cancel, billing history'
+                    ],
+                    'stats' => [
+                        'description' => 'Statistiques et analytics',
+                        'operations' => 'platform, users, groups, usage metrics'
+                    ],
+                    'api-keys' => [
+                        'description' => 'Gestion des clés API',
+                        'operations' => 'create, list, revoke, regenerate, scopes'
+                    ],
+                    'data' => [
+                        'description' => 'Synchronisation hors-ligne',
+                        'operations' => 'sync, conflict resolution, offline queue'
+                    ]
+                ],
+                'plugins' => [
+                    'ics' => [
+                        'description' => 'Plugin de calendriers ICS',
+                        'endpoints' => 'GET /calendars, POST /calendars, GET /calendars/{id}/events, etc.'
+                    ]
                 ],
                 'webhooks' => [
                     'POST /webhook/payment - Webhook générique de paiement',
-                    'POST /webhook/stripe - Webhook Stripe',
-                    'POST /webhook/paypal - Webhook PayPal'
+                    'POST /webhook/stripe - Webhook Stripe (signature verification)',
+                    'POST /webhook/paypal - Webhook PayPal (IPN validation)'
                 ],
                 'admin' => [
-                    'secret-admin' => 'Endpoints d\'administration (authentification renforcée requise)'
+                    'secret-admin' => 'Endpoints d\'administration (authentification super-admin requise)',
+                    'operations' => 'user management, system config, logs, monitoring'
                 ]
             ],
             'authentication' => [
-                'api_key' => 'X-API-Key: {key} ou Authorization: Bearer {key}'
+                'api_key' => [
+                    'header' => 'X-API-Key: {your_api_key}',
+                    'alternative' => 'Authorization: Bearer {your_api_key}',
+                    'scopes' => 'read, write, admin (selon les permissions)',
+                    'environments' => 'development, staging, production'
+                ],
+                'session' => [
+                    'after_login' => 'Token JWT retourné après POST /users/login',
+                    'usage' => 'Stocker et inclure dans les requêtes suivantes'
+                ]
             ],
-            'documentation' => 'Voir /src/auth_groups/docs/ pour la documentation complète'
+            'rate_limiting' => [
+                'public_endpoints' => '100 requêtes/heure',
+                'authenticated_endpoints' => '1000 requêtes/heure',
+                'admin_endpoints' => 'Illimité'
+            ],
+            'documentation' => [
+                'full_docs' => '/src/auth_groups/docs/',
+                'api_reference' => '/src/auth_groups/docs/API_REFERENCE.md',
+                'authentication_guide' => '/src/auth_groups/docs/AUTHENTICATION.md',
+                'plugins_guide' => '/src/auth_groups/docs/PLUGINS.md'
+            ],
+            'support' => [
+                'github_issues' => 'https://github.com/Jrobitaille360/cmem2/issues',
+                'repository' => 'https://github.com/Jrobitaille360/cmem2'
+            ]
         ];
         Response::success('help', $info);
     }
 
     private function showHealthInfo(): void {
+        // Vérifier la connexion à la base de données
+        $dbStatus = 'OK';
+        $dbMessage = 'Connecté';
+        try {
+            $db = \Database::getInstance();
+            $db->query("SELECT 1");
+        } catch (\Exception $e) {
+            $dbStatus = 'ERROR';
+            $dbMessage = 'Erreur de connexion: ' . $e->getMessage();
+        }
+        
+        // Vérifier les dossiers d'uploads
+        $uploadsWritable = is_writable(__DIR__ . '/../../uploads');
+        $logsWritable = is_writable(__DIR__ . '/../../../logs');
+        
+        // Vérifier les plugins
+        $pluginsLoaded = isset($GLOBALS['plugin_manager']) ? 
+            count($GLOBALS['plugin_manager']->getLoadedPlugins()) : 0;
+        
         $info = [
-            "status" => "OK",
-            "message" => "API AuthGroups opérationnelle",
-            "timestamp" => date('Y-m-d H:i:s'),
-            "version" => "1.3.0"
+            'status' => $dbStatus === 'OK' ? 'healthy' : 'degraded',
+            'message' => 'API CMEM2 opérationnelle',
+            'timestamp' => date('Y-m-d H:i:s'),
+            'version' => '2.0.0',
+            'uptime' => [
+                'server' => function_exists('sys_getloadavg') ? sys_getloadavg() : 'N/A',
+                'php_version' => PHP_VERSION,
+                'memory_usage' => round(memory_get_usage(true) / 1024 / 1024, 2) . ' MB',
+                'memory_peak' => round(memory_get_peak_usage(true) / 1024 / 1024, 2) . ' MB'
+            ],
+            'services' => [
+                'database' => [
+                    'status' => $dbStatus,
+                    'message' => $dbMessage
+                ],
+                'file_storage' => [
+                    'status' => $uploadsWritable ? 'OK' : 'ERROR',
+                    'writable' => $uploadsWritable
+                ],
+                'logging' => [
+                    'status' => $logsWritable ? 'OK' : 'ERROR',
+                    'writable' => $logsWritable
+                ],
+                'plugins' => [
+                    'status' => 'OK',
+                    'loaded' => $pluginsLoaded
+                ]
+            ],
+            'environment' => [
+                'mode' => defined('APP_ENV') ? APP_ENV : 'production',
+                'debug' => defined('APP_DEBUG') && APP_DEBUG ? 'enabled' : 'disabled',
+                'timezone' => date_default_timezone_get()
+            ]
         ];
         Response::success('health_status', $info);
     }

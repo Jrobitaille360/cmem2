@@ -1,9 +1,9 @@
 {
   "api": {
     "name": "AuthGroups API",
-    "version": "1.3.0",
+    "version": "2.0.0",
     "description": "API REST complète pour la gestion d'authentification, groupes, fichiers et tags avec sécurité renforcée",
-    "generated": "2025-10-27",
+    "generated": "2025-11-02",
     "base_url": "/",
     "authentication": {
       "types": ["JWT", "API_KEY"],
@@ -661,81 +661,7 @@
           "response": "Object avec statistiques utilisateur"
         }
       ]
-    },
-    "api-keys": {
-      "description": "🚨 ENDPOINTS DÉPLACÉS - Sécurité renforcée",
-      "base_path": "/api-keys",
-      "status": "DEPRECATED - HTTP 410 Gone",
-      "migration_info": {
-        "reason": "Sécurité renforcée - Gestion des API keys uniquement via secret admin",
-        "new_location": "/secret-admin/api-keys",
-        "auth_requirements": ["JWT avec rôle ADMINISTRATEUR", "ADMIN_SECRET_KEY dans le body"],
-        "migration_date": "2025-10-27",
-        "breaking_change": true
-      },
-      "deprecated_routes": [
-        {
-          "method": "ALL",
-          "path": "/api-keys/*",
-          "status": "HTTP 410 Gone",
-          "description": "Tous les endpoints API keys publics sont désactivés",
-          "response": {
-            "error": "Endpoint déplacé - Utilisez le système d'administration secret pour gérer les API keys",
-            "message": "La gestion des API keys nécessite maintenant une authentification renforcée",
-            "details": "Contactez votre administrateur système pour l'accès aux fonctionnalités de gestion des API keys"
-          }
-        }
-      ]
-    },
-    "data": {
-      "description": "Synchronisation des données",
-      "base_path": "/data",
-      "auth_required": true,
-      "routes": [
-        {
-          "method": "POST",
-          "path": "/data/merge",
-          "description": "Fusionner les données hors-ligne",
-          "body": {
-            "groups": "array (optional)",
-            "files": "array (optional)",
-            "tags": "array (optional)"
-          },
-          "response": "Object avec résumé de la fusion"
-        }
-      ]
-    },
-    "webhooks": {
-      "description": "Webhooks pour intégrations tierces",
-      "base_path": "/webhook",
-      "auth_required": false,
-      "routes": [
-        {
-          "method": "POST",
-          "path": "/webhook/payment",
-          "description": "Webhook générique de paiement",
-          "body": "Provider-specific payload",
-          "response": "Confirmation de traitement"
-        },
-        {
-          "method": "POST",
-          "path": "/webhook/stripe",
-          "description": "Webhook Stripe",
-          "headers": {
-            "Stripe-Signature": "string (required)"
-          },
-          "body": "Stripe event payload",
-          "response": "Confirmation de traitement"
-        },
-        {
-          "method": "POST",
-          "path": "/webhook/paypal",
-          "description": "Webhook PayPal",
-          "body": "PayPal IPN payload",
-          "response": "Confirmation de traitement"
-        }
-      ]
-    },
+    },    
     "secret-admin": {
       "description": "Endpoints d'administration secrets avec sécurité renforcée",
       "base_path": "/secret-admin",
@@ -826,6 +752,55 @@
           },
           "response": "Nouvelle ApiKey object avec clé complète (visible une seule fois)",
           "security_warning": "⚠️ Nouvelle clé visible uniquement à la régénération"
+        }
+      ]
+    },
+    "data": {
+      "description": "Synchronisation des données",
+      "base_path": "/data",
+      "auth_required": true,
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/data/merge",
+          "description": "Fusionner les données hors-ligne",
+          "body": {
+            "groups": "array (optional)",
+            "files": "array (optional)",
+            "tags": "array (optional)"
+          },
+          "response": "Object avec résumé de la fusion"
+        }
+      ]
+    },
+    "webhooks": {
+      "description": "Webhooks pour intégrations tierces",
+      "base_path": "/webhook",
+      "auth_required": false,
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/webhook/payment",
+          "description": "Webhook générique de paiement",
+          "body": "Provider-specific payload",
+          "response": "Confirmation de traitement"
+        },
+        {
+          "method": "POST",
+          "path": "/webhook/stripe",
+          "description": "Webhook Stripe",
+          "headers": {
+            "Stripe-Signature": "string (required)"
+          },
+          "body": "Stripe event payload",
+          "response": "Confirmation de traitement"
+        },
+        {
+          "method": "POST",
+          "path": "/webhook/paypal",
+          "description": "Webhook PayPal",
+          "body": "PayPal IPN payload",
+          "response": "Confirmation de traitement"
         }
       ]
     }

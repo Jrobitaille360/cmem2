@@ -106,11 +106,6 @@ CREATE TABLE users (
 	KEY idx_users_last_login (last_login)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT INTO `users` (`id`, `name`, `email`, `password_hash`, `role`, `profile_image`, `bio`, `phone`, `date_of_birth`, `location`, `email_verified`, `last_login`, `payment_status`, `license_expires_at`, `payment_plan`, `payment_date`, `created_at`, `deleted_at`, `updated_at`) VALUES
-(1, 'Super Administrator', 'jrobitaille04@pm.me', '$2y$10$Q90qTqVLPNXwrJe./2fne.CTF/TlAyPr5ae1pbNqHYqRJdolt0WNS', 'ADMINISTRATEUR', NULL, NULL, NULL, NULL, NULL, 1, '2025-10-28 16:16:28', 'pending', NULL, 'basic', NULL, '2025-10-27 15:37:01', NULL, '2025-10-28 16:16:28'),
-(2, 'Utilisateur Test', 'user@cmem2.com', '$2y$10$ySaVqxDEwZLH0hCtXPOltuER2D6exPPCqz2QSn3v/rxMFVXHlLgMS', 'UTILISATEUR', 'default.jpg', NULL, NULL, NULL, NULL, 1, '2025-10-28 20:07:33', 'pending', NULL, 'basic', NULL, '2025-10-27 19:56:04', NULL, '2025-10-28 20:07:33');
-
-
 -- Ajout de la contrainte de clé étrangère pour tag_owner maintenant que la table users existe
 ALTER TABLE tags ADD FOREIGN KEY (tag_owner) REFERENCES users(id) ON DELETE CASCADE;
 
@@ -617,6 +612,7 @@ ADD COLUMN `plan_limited` tinyint(1) NOT NULL DEFAULT '0' COMMENT 'API key limit
 ALTER TABLE `api_keys` 
 ADD CONSTRAINT `fk_api_keys_plan` FOREIGN KEY (`plan_id`) REFERENCES `plans` (`id`) ON DELETE SET NULL;
 
+
 -- 5. Insérer les plans par défaut
 INSERT INTO `plans` (`name`, `display_name`, `description`, `price`, `currency`, `duration_days`, `api_rate_limit`, `features`, `is_active`) VALUES
 ('free', 'Plan Gratuit', 'Plan gratuit avec limitations pour tester l\'API', 0.00, 'EUR', 30, 10, '{"scopes":["read"],"max_requests_per_day":1000,"expires_in_days":7,"email_support":false,"priority_support":false}', 1),
@@ -656,7 +652,13 @@ CREATE TABLE IF NOT EXISTS `plan_invitations` (
   CONSTRAINT `fk_plan_invitations_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+INSERT INTO `users` ( `name`, `email`, `password_hash`, `role`, `plan_id`, `plan_expires_at`, `plan_auto_renew`, `profile_image`, `bio`, `phone`, `date_of_birth`, `location`, `email_verified`, `last_login`, `payment_status`, `license_expires_at`, `payment_plan`, `payment_date`, `created_at`, `deleted_at`, `updated_at`) VALUES
+( 'Super Administrator', 'jrobitaille04@pm.me', '$2y$10$DpigB/HxAjN/IKOtkSOLz.4gJ2baJUMlUg2hibvSzKbadjm.xVM4S', 'ADMINISTRATEUR', 1, NULL, 0, NULL, NULL, NULL, NULL, NULL, 1, '2025-10-28 20:16:28', 'pending', NULL, 'basic', NULL, '2025-10-27 19:37:01', NULL, '2025-10-30 02:32:36'),
+( 'Utilisateur Test', 'user@cmem2.com', '$2y$10$ySaVqxDEwZLH0hCtXPOltuER2D6exPPCqz2QSn3v/rxMFVXHlLgMS', 'UTILISATEUR', 1, NULL, 0, 'default.jpg', NULL, NULL, NULL, NULL, 1, '2025-10-29 00:07:33', 'pending', NULL, 'basic', NULL, '2025-10-27 23:56:04', NULL, '2025-10-30 02:25:26');
 
+INSERT INTO `api_keys` ( `user_id`, `plan_id`, `plan_limited`, `name`, `key_prefix`, `key_hash`, `last_4`, `scopes`, `environment`, `rate_limit_per_minute`, `rate_limit_per_hour`, `total_requests`, `last_used_at`, `last_used_ip`, `expires_at`, `revoked_at`, `revoked_reason`, `metadata`, `notes`, `created_at`, `updated_at`, `deleted_at`) VALUES
+( 1, NULL, 0, 'Bootstrap API Key', 'ag_live', 'f9281a209030ab51f15c66e56ff6f55bb556fab82032919505ee3ea20fe589c4', 'b6d8', '[\"read\",\"write\"]', 'production', 100, 5000, 0, NULL, NULL, NULL, NULL, NULL, NULL, 'API key créée par le script de bootstrap', '2025-10-30 02:32:40', '2025-10-30 02:32:40', NULL),
+( 2, NULL, 0, 'Bootstrap API Key', 'ag_live', '36577224f257ec561c9f0f7330420f2c6996308e199bc115a24f91b9659f9f0c', 'eefc', '[\"read\",\"write\"]', 'production', 100, 5000, 0, NULL, NULL, NULL, NULL, NULL, NULL, 'API key créée par le script de bootstrap', '2025-10-30 02:32:44', '2025-10-30 02:32:44', NULL);
 
 END //
 
