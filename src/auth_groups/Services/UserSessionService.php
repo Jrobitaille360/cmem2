@@ -153,6 +153,32 @@ class UserSessionService
         }
     }
     
+    public static function getSessionByApiKey(int $userId): ?array {
+        try {
+            $pdo = \Database::getInstance()->getConnection();
+            
+            $stmt = $pdo->prepare("
+                SELECT * FROM user_sessions 
+                WHERE user_id = ? 
+                  AND is_active = 1 
+                  AND expires_at > NOW()
+                ORDER BY login_at DESC 
+                LIMIT 1
+            ");
+            $stmt->execute([$userId]);
+            $session = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            return $session ?: null;
+            
+        } catch (Exception $e) {
+            LogService::error("Erreur lors de la récupération de session", [
+                'user_id' => $userId,
+                'error' => $e->getMessage()
+            ]);
+            return null;
+        }
+    }
+
     /**
      * Vérifier si un utilisateur a une session active
      */

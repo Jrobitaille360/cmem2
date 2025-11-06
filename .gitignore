@@ -1,9 +1,9 @@
 # Fichiers de configuration sensibles
-config/auth_groups/shared/.env
 .env
 .env.auth_groups
 .env.cmem1
 .env.local
+.env.auth_groups.journauxdebord
 
 # Garder les fichiers d'exemple
 !.env*.example

@@ -482,6 +482,26 @@ class UserManagerController {
                 return false;
             }
             
+            // est-ce qu'une session existe déjà pour cette API key ?
+            $existingSession = UserSessionService::getSessionByApiKey($apiKeyData['id']);
+            if ($existingSession) {
+                LogService::info("Session existante trouvée pour l'API Key", [
+                    'api_key_id' => $apiKeyData['id'],
+                    'session_id' => $existingSession['id']
+                ]);
+                LoggingMiddleware::logExit(200);
+                Response::success("Session existante", [
+                    'session_id' => $existingSession['id'],
+                    'user' => [
+                        'id' => $existingSession['user_id'],
+                        'name' => $existingSession['user_name'],
+                        'email' => $existingSession['user_email'],
+                        'role' => $existingSession['user_role']
+                    ]
+                ]);
+                return true;
+            }
+
             // Créer une nouvelle session utilisateur dans user_sessions
             $sessionId = UserSessionService::createSession(
                 $userData['id'], 
