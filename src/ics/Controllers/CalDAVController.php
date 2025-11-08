@@ -128,10 +128,18 @@ class CalDAVController
         LoggingMiddleware::logEntry();
         
         try {
+            // Construire l'URL de base dynamiquement
+            $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+            $scriptName = dirname($_SERVER['SCRIPT_NAME'] ?? '');
+            $baseUrl = $scheme . '://' . $host . $scriptName;
+            
             $serviceInfo = [
-                'caldav_url' => BASE_URL . '/caldav/',
-                'caldav_principal' => BASE_URL . '/caldav/principals/' . $userId,
-                'caldav_version' => '1.0',
+                'service' => 'CalDAV Server',
+                'version' => '1.0',
+                'user_id' => $userId,
+                'caldav_url' => $baseUrl . '/caldav/',
+                'caldav_principal' => $baseUrl . '/caldav/principals/' . $userId,
                 'supported_features' => [
                     'calendar-access',
                     'calendar-schedule',
@@ -152,34 +160,34 @@ class CalDAVController
                     'UNLOCK',
                     'PROPPATCH'
                 ],
-                'authentication' => 'Bearer token required (JWT)',
+                'authentication' => [
+                    'methods' => ['API Key', 'Session'],
+                    'api_key_headers' => ['X-API-Key', 'Authorization: Bearer']
+                ],
                 'instructions' => [
                     'thunderbird' => [
-                        'url' => BASE_URL . '/caldav/',
-                        'username' => 'Use your email',
-                        'password' => 'Use your JWT token'
+                        'url' => $baseUrl . '/caldav/',
+                        'authentication' => 'Use X-API-Key header or Authorization: Bearer with your API key'
                     ],
                     'apple_calendar' => [
                         'account_type' => 'CalDAV',
-                        'server' => str_replace(['http://', 'https://'], '', BASE_URL) . '/caldav/',
-                        'username' => 'Use your email',
-                        'password' => 'Use your JWT token',
-                        'port' => parse_url(BASE_URL, PHP_URL_SCHEME) === 'https' ? 443 : 80
+                        'server' => str_replace(['http://', 'https://'], '', $baseUrl) . '/caldav/',
+                        'authentication' => 'API Key required',
+                        'port' => $scheme === 'https' ? 443 : 80
                     ],
                     'outlook' => [
                         'note' => 'Outlook ne supporte pas CalDAV nativement. Utilisez l\'export ICS ou un plugin tiers.'
                     ],
                     'android' => [
                         'app' => 'DAVx⁵ (recommandé)',
-                        'url' => BASE_URL . '/caldav/',
-                        'username' => 'Use your email',
-                        'password' => 'Use your JWT token'
+                        'url' => $baseUrl . '/caldav/',
+                        'authentication' => 'Use X-API-Key in custom headers'
                     ]
                 ],
                 'example_urls' => [
-                    'calendar_list' => BASE_URL . '/caldav/',
-                    'specific_calendar' => BASE_URL . '/caldav/{share_token}/',
-                    'specific_event' => BASE_URL . '/caldav/{share_token}/{event_uid}.ics'
+                    'calendar_list' => $baseUrl . '/caldav/',
+                    'specific_calendar' => $baseUrl . '/caldav/{share_token}/',
+                    'specific_event' => $baseUrl . '/caldav/{share_token}/{event_uid}.ics'
                 ]
             ];
             
@@ -204,6 +212,12 @@ class CalDAVController
         LoggingMiddleware::logEntry();
         
         try {
+            // Construire l'URL de base dynamiquement
+            $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+            $scriptName = dirname($_SERVER['SCRIPT_NAME'] ?? '');
+            $baseUrl = $scheme . '://' . $host . $scriptName;
+            
             // Récupérer les informations de l'utilisateur
             require_once __DIR__ . '/../../auth_groups/database.php';
             $stmt = \Database::getInstance()->getConnection()->prepare("
@@ -217,7 +231,7 @@ class CalDAVController
                 return;
             }
             
-            $domain = parse_url(BASE_URL, PHP_URL_HOST);
+            $domain = parse_url($baseUrl, PHP_URL_HOST);
             $uuid = strtoupper(bin2hex(random_bytes(16)));
             
             $config = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
@@ -232,11 +246,11 @@ class CalDAVController
             $config .= '            <key>CalDAVHostName</key>' . "\n";
             $config .= '            <string>' . $domain . '</string>' . "\n";
             $config .= '            <key>CalDAVPort</key>' . "\n";
-            $config .= '            <integer>' . (parse_url(BASE_URL, PHP_URL_SCHEME) === 'https' ? 443 : 80) . '</integer>' . "\n";
+            $config .= '            <integer>' . ($scheme === 'https' ? 443 : 80) . '</integer>' . "\n";
             $config .= '            <key>CalDAVPrincipalURL</key>' . "\n";
-            $config .= '            <string>' . BASE_URL . '/caldav/principals/' . $userId . '</string>' . "\n";
+            $config .= '            <string>' . $baseUrl . '/caldav/principals/' . $userId . '</string>' . "\n";
             $config .= '            <key>CalDAVUseSSL</key>' . "\n";
-            $config .= '            <' . (parse_url(BASE_URL, PHP_URL_SCHEME) === 'https' ? 'true' : 'false') . '/>' . "\n";
+            $config .= '            <' . ($scheme === 'https' ? 'true' : 'false') . '/>' . "\n";
             $config .= '            <key>CalDAVUsername</key>' . "\n";
             $config .= '            <string>' . htmlspecialchars($user['email']) . '</string>' . "\n";
             $config .= '            <key>PayloadDescription</key>' . "\n";

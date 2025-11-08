@@ -5,6 +5,11 @@
 .env.local
 .env.auth_groups.journauxdebord
 
+# Credentials Google Calendar
+src/ics/credentials.json
+src/ics/token.json
+src/ics/last_sync.txt
+
 # Garder les fichiers d'exemple
 !.env*.example
 

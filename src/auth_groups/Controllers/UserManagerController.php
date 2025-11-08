@@ -492,12 +492,7 @@ class UserManagerController {
                 LoggingMiddleware::logExit(200);
                 Response::success("Session existante", [
                     'session_id' => $existingSession['id'],
-                    'user' => [
-                        'id' => $existingSession['user_id'],
-                        'name' => $existingSession['user_name'],
-                        'email' => $existingSession['user_email'],
-                        'role' => $existingSession['user_role']
-                    ]
+                    'user_id' => $existingSession['user_id']
                 ]);
                 return true;
             }
