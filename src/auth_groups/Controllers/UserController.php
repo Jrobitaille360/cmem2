@@ -13,12 +13,14 @@ class UserController {
     private UserManagerController $userManagerController;
     private UserAvatarController $userAvatarController;
     private UserPasswordController $userPasswordController;
+    private UserAppController $userAppController;
 
     public function __construct() {
         $this->userListController = new UserListController();
         $this->userManagerController = new UserManagerController();
         $this->userAvatarController = new UserAvatarController();
         $this->userPasswordController = new UserPasswordController();
+        $this->userAppController = new UserAppController();
     }
 
     /**
@@ -108,6 +110,46 @@ class UserController {
      */
     public function resendVerificationEmail(){
         return $this->userManagerController->resendVerificationEmail();
+    }
+
+    /**
+     * Créer une configuration d'application
+     * POST /users/app/
+     */
+    public function createAppSetup($userId) {
+        return $this->userAppController->create($userId);
+    }
+
+    /**
+     * Récupérer toutes les configurations d'applications
+     * GET /users/app/
+     */
+    public function getAppSetups($userId) {
+        return $this->userAppController->getAll($userId);
+    }
+
+    /**
+     * Récupérer une configuration d'application spécifique
+     * GET /users/app/{app_id}
+     */
+    public function getAppSetup($userId, $appId) {
+        return $this->userAppController->getByAppId($userId, $appId);
+    }
+
+    /**
+     * Mettre à jour une configuration d'application
+     * PUT /users/app/{app_id}
+     */
+    public function updateAppSetup($userId, $appId) {
+        return $this->userAppController->updateByAppId($userId, $appId);
+    }
+
+    /**
+     * Supprimer une configuration d'application (soft delete)
+     * DELETE /users/app/{app_id}
+     */
+    public function deleteAppSetup($userId, $appId) {
+        return $this->userAppController->deleteByAppId($userId, $appId);
     }
      
 }

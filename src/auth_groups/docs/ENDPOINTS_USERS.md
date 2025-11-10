@@ -534,3 +534,215 @@
 - `500` : Erreur lors de la restauration
 
 ---
+
+## POST `/users/app/`
+
+**Description** : Créer une nouvelle configuration d'application
+
+**Authentification** : 🔒 Utilisateur
+
+**Données attendues** :
+
+```json
+{
+  "app_id": "my_app",
+  "json_data": {
+    "theme": "dark",
+    "language": "fr",
+    "notifications": true
+  }
+}
+```
+
+**Validation** :
+
+- `app_id` : requis, chaîne de caractères (max 255 caractères)
+- `json_data` : optionnel, objet JSON valide
+
+**Réponse succès (201)** :
+
+```json
+{
+  "success": true,
+  "message": "Configuration d'application créée",
+  "data": {
+    "id": 1,
+    "user_id": 1,
+    "app_id": "my_app",
+    "json_data": {
+      "theme": "dark",
+      "language": "fr",
+      "notifications": true
+    },
+    "created_at": "2025-11-09 20:00:00"
+  }
+}
+```
+
+**Réponses d'erreur** :
+
+- `400` : Données de validation invalides
+- `401` : Authentification requise
+- `409` : Une configuration existe déjà pour cette application
+- `500` : Erreur lors de la création
+
+---
+
+## GET `/users/app/`
+
+**Description** : Récupérer toutes les configurations d'applications de l'utilisateur
+
+**Authentification** : 🔒 Utilisateur
+
+**Réponse succès (200)** :
+
+```json
+{
+  "success": true,
+  "message": "Configurations d'applications récupérées",
+  "data": {
+    "configs": [
+      {
+        "id": 1,
+        "user_id": 1,
+        "app_id": "my_app",
+        "json_data": {
+          "theme": "dark",
+          "language": "fr"
+        },
+        "created_at": "2025-11-09 20:00:00",
+        "updated_at": "2025-11-09 20:05:00"
+      }
+    ],
+    "total": 1
+  }
+}
+```
+
+**Réponses d'erreur** :
+
+- `401` : Authentification requise
+- `500` : Erreur lors de la récupération
+
+---
+
+## GET `/users/app/{app_id}`
+
+**Description** : Récupérer une configuration d'application spécifique
+
+**Authentification** : 🔒 Utilisateur
+
+**Paramètres d'URL** :
+
+- `app_id` : ID de l'application (requis)
+
+**Réponse succès (200)** :
+
+```json
+{
+  "success": true,
+  "message": "Configuration d'application récupérée",
+  "data": {
+    "id": 1,
+    "user_id": 1,
+    "app_id": "my_app",
+    "json_data": {
+      "theme": "dark",
+      "language": "fr",
+      "notifications": true
+    },
+    "created_at": "2025-11-09 20:00:00",
+    "updated_at": "2025-11-09 20:05:00"
+  }
+}
+```
+
+**Réponses d'erreur** :
+
+- `401` : Authentification requise
+- `404` : Configuration d'application non trouvée
+- `500` : Erreur lors de la récupération
+
+---
+
+## PUT `/users/app/{app_id}`
+
+**Description** : Mettre à jour une configuration d'application
+
+**Authentification** : 🔒 Utilisateur
+
+**Paramètres d'URL** :
+
+- `app_id` : ID de l'application (requis)
+
+**Données attendues** :
+
+```json
+{
+  "json_data": {
+    "theme": "light",
+    "language": "en",
+    "notifications": false
+  }
+}
+```
+
+**Validation** :
+
+- `json_data` : optionnel, objet JSON valide
+
+**Réponse succès (200)** :
+
+```json
+{
+  "success": true,
+  "message": "Configuration d'application mise à jour",
+  "data": {
+    "id": 1,
+    "user_id": 1,
+    "app_id": "my_app",
+    "json_data": {
+      "theme": "light",
+      "language": "en",
+      "notifications": false
+    },
+    "updated_at": "2025-11-09 20:10:00"
+  }
+}
+```
+
+**Réponses d'erreur** :
+
+- `400` : Données de validation invalides
+- `401` : Authentification requise
+- `404` : Configuration d'application non trouvée
+- `500` : Erreur lors de la mise à jour
+
+---
+
+## DELETE `/users/app/{app_id}`
+
+**Description** : Supprimer une configuration d'application (soft delete)
+
+**Authentification** : 🔒 Utilisateur
+
+**Paramètres d'URL** :
+
+- `app_id` : ID de l'application (requis)
+
+**Réponse succès (200)** :
+
+```json
+{
+  "success": true,
+  "message": "Configuration d'application supprimée"
+}
+```
+
+**Réponses d'erreur** :
+
+- `401` : Authentification requise
+- `404` : Configuration d'application non trouvée
+- `500` : Erreur lors de la suppression
+
+---

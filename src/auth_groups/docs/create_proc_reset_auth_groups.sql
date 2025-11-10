@@ -35,6 +35,7 @@ DROP TABLE IF EXISTS email_verifications;
 DROP TABLE IF EXISTS password_resets;
 DROP TABLE IF EXISTS notifications;
 DROP TABLE IF EXISTS login_codes;
+DROP TABLE IF EXISTS user_app_setup;
 
 -- 3. SUPPRESSION DES TABLES LIÉES AUX SESSIONS ET API KEYS
 DROP TABLE IF EXISTS user_sessions;
@@ -104,6 +105,22 @@ CREATE TABLE users (
 	KEY idx_users_deleted_at (deleted_at),
 	KEY idx_users_created_at (created_at),
 	KEY idx_users_last_login (last_login)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ===== TABLE : Configuration des applications utilisateur =====
+CREATE TABLE user_app_setup (
+	id int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+	user_id int(11) NOT NULL,
+	app_id varchar(255) NOT NULL,
+	json_data JSON DEFAULT NULL,
+	created_at timestamp NOT NULL DEFAULT current_timestamp(),
+	deleted_at datetime DEFAULT NULL,
+	updated_at timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+	FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+	UNIQUE KEY unique_user_app (user_id, app_id),
+	KEY idx_user_app_setup_user_id (user_id),
+	KEY idx_user_app_setup_app_id (app_id),
+	KEY idx_user_app_setup_deleted_at (deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Ajout de la contrainte de clé étrangère pour tag_owner maintenant que la table users existe

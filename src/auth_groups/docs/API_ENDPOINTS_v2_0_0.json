@@ -274,6 +274,52 @@
           },
           "roles": ["ADMINISTRATEUR"],
           "response": "User object restauré"
+        },
+        {
+          "method": "POST",
+          "path": "/users/app/",
+          "description": "Créer une configuration d'application",
+          "body": {
+            "app_id": "string (required)",
+            "json_data": "object (optional, JSON)"
+          },
+          "response": "App setup object"
+        },
+        {
+          "method": "GET",
+          "path": "/users/app/",
+          "description": "Lister toutes les configurations d'applications de l'utilisateur",
+          "response": "Array of app setup objects"
+        },
+        {
+          "method": "GET",
+          "path": "/users/app/{app_id}",
+          "description": "Récupérer une configuration d'application spécifique",
+          "params": {
+            "app_id": "string (required)"
+          },
+          "response": "App setup object"
+        },
+        {
+          "method": "PUT",
+          "path": "/users/app/{app_id}",
+          "description": "Mettre à jour une configuration d'application",
+          "params": {
+            "app_id": "string (required)"
+          },
+          "body": {
+            "json_data": "object (optional, JSON)"
+          },
+          "response": "App setup object mis à jour"
+        },
+        {
+          "method": "DELETE",
+          "path": "/users/app/{app_id}",
+          "description": "Supprimer une configuration d'application (soft delete)",
+          "params": {
+            "app_id": "string (required)"
+          },
+          "response": "Message de confirmation"
         }
       ]
     },

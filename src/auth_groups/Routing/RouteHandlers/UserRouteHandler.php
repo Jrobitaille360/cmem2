@@ -96,6 +96,26 @@ class UserRouteHandler extends BaseRouteHandler
                 $this->validateIdAndCall($action, fn($targetId) => 
                     $this->controller->delete($targetId, $user['user_id'], $user['role'])),
 
+            // POST /users/app/
+            ($action === 'app' && $method === 'POST' && !$id) =>
+                $this->controller->createAppSetup($user['user_id']),
+
+            // GET /users/app/
+            ($action === 'app' && $method === 'GET' && !$id) =>
+                $this->controller->getAppSetups($user['user_id']),
+
+            // GET /users/app/{app_id}
+            (isset($segments[2]) && $segments[1] === 'app' && $method === 'GET') =>
+                $this->controller->getAppSetup($user['user_id'], $segments[2]),
+
+            // PUT /users/app/{app_id}
+            (isset($segments[2]) && $segments[1] === 'app' && $method === 'PUT') =>
+                $this->controller->updateAppSetup($user['user_id'], $segments[2]),
+
+            // DELETE /users/app/{app_id}
+            (isset($segments[2]) && $segments[1] === 'app' && $method === 'DELETE') =>
+                $this->controller->deleteAppSetup($user['user_id'], $segments[2]),
+
             default => Response::error('Route utilisateur non trouvée', null, 404)
         };
     }
