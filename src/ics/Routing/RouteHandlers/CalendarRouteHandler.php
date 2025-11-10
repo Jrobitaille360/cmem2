@@ -78,6 +78,10 @@ class CalendarRouteHandler extends BaseRouteHandler
             // DELETE /calendars/{id}/share - Supprimer un partage de calendrier
             ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'share' && $method === 'DELETE') => 
                 $this->controller->removeCalendarShare((int)$action, $user['user_id']),
+
+            // POST /calendars/import - Importer un fichier ICS
+            ($action === 'import' && $method === 'POST') =>
+                $this->controller->importIcsFile($user['user_id']),
                 
             default => Response::error('Endpoint non trouvé', 404)
         };

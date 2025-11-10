@@ -105,6 +105,45 @@ class CalendarController
             Response::error('Erreur lors de la récupération des calendriers', 500);
         }
     }
+
+    /**
+     * Récupère les événements d'un calendrier spécifique.
+     */
+    public function getCalendarEvents($calendarId, $userId): void
+    {
+        LoggingMiddleware::logEntry();
+
+        try {
+            $cal = new Calendar();
+            // Vérifier si l'utilisateur a accès au calendrier
+            $permission = $cal->getUserPermissionForCalendar($calendarId, $userId);
+
+            if (!$permission) {
+                LogService::warning("Accès non autorisé ou calendrier non trouvé", [
+                    'calendar_id' => $calendarId,
+                    'user_id' => $userId
+                ]);
+                LoggingMiddleware::logExit(404);
+                Response::error('Calendrier non trouvé ou accès non autorisé', 404);
+                return;
+            }
+
+            $eventModel = new CalendarEvent();
+            $events = $eventModel->getByCalendarId($calendarId);
+
+            LoggingMiddleware::logExit(200);
+            Response::success('Événements du calendrier récupérés avec succès', [
+                'events' => $events,
+                'count' => count($events)
+            ]);
+        } catch (\Exception $e) {
+            LogService::error("Erreur lors de la récupération des événements du calendrier", [
+                'exception' => $e->getMessage()
+            ]);
+            LoggingMiddleware::logExit(500);
+            Response::error('Erreur lors de la récupération des événements', 500);
+        }
+    }
     
     /**
      * Récupère un calendrier public partagé par token (accessible à tous avec le token)
@@ -522,175 +561,48 @@ class CalendarController
                 'deleted_at' => date('Y-m-d H:i:s')
             ]);
         } catch (\Exception $e) {
-            LogService::error("Erreur lors de la suppression du partage", [
-                'exception' => $e->getMessage(),
-                'calendar_id' => $calendarId,
-                'user_id' => $userId
+            LogService::error("Erreur lors de la suppression du partage du calendrier", [
+                'exception' => $e->getMessage()
             ]);
             LoggingMiddleware::logExit(500);
-            Response::error('Erreur lors de la suppression du partage', 500);
+            Response::error('Erreur lors de la suppression du partage du calendrier', 500);
+        }
+    }
+
+    /**
+     * Importe un calendrier complet depuis un fichier ICS.
+     */
+    public function importIcsFile($userId): void
+    {
+        LoggingMiddleware::logEntry();
+
+        if (!isset($_FILES['icsfile']) || $_FILES['icsfile']['error'] !== UPLOAD_ERR_OK) {
+            LogService::warning("Aucun fichier ICS n'a été envoyé ou une erreur s'est produite.", []);
+            LoggingMiddleware::logExit(400);
+            Response::error('Aucun fichier ICS n\'a été envoyé ou une erreur s\'est produite.', 400);
+            return;
+        }
+
+        $icsFilePath = $_FILES['icsfile']['tmp_name'];
+        $icsContent = file_get_contents($icsFilePath);
+
+        try {
+            $calendarModel = new Calendar();
+            $newCalendar = $calendarModel->createFromIcs($userId, $icsContent);
+
+            LoggingMiddleware::logExit(201);
+            Response::success("Calendrier importé avec succès.", $newCalendar, 201);
+        } catch (\Exception $e) {
+            LogService::error("Erreur lors de l'importation du fichier ICS", ['exception' => $e->getMessage()]);
+            LoggingMiddleware::logExit(500);
+            Response::error('Erreur lors de l\'importation du fichier ICS: ' . $e->getMessage(), 500);
         }
     }
     
-    public function createEvent($calendarId, $userId): void
-    {
-        LoggingMiddleware::logEntry();
-        $input = Response::getRequestParams();
-        $validator = new Validator();
-        $validation = $validator->validate($input, [
-            'title' => 'required|string',
-            'start_datetime' => 'required|date_or_datetime',
-            'end_datetime' => 'required|date_or_datetime',
-            'description' => 'optionnal|string',
-            'all_day' => 'optionnal|boolean',
-            'location' => 'optionnal|string',
-            'organizer_email' => 'optionnal|email',
-            'color' => 'optionnal|color',
-            'recurrence_rule' => 'optionnal|string',
-            'status' => 'optionnal|string|in:confirmed,tentative,cancelled',
-            'timezone' => 'optionnal|string|max:100'
-        ]);
-        if(!$validation['valid']) {
-            LogService::warning("Données d'événement invalides", [
-                'errors' => $validation['errors']
-            ]);
-            LoggingMiddleware::logExit(400);
-            Response::error('Données invalides', $validation['errors'], 400);
-            return;
-        }
-        
-        // Valider le timezone si fourni (bien que non utilisé actuellement - pour compatibilité future)
-        if (isset($input['timezone']) && !TimezoneHelper::isValidTimezone($input['timezone'])) {
-            LogService::warning("Timezone invalide lors de la création d'événement", [
-                'timezone' => $input['timezone']
-            ]);
-            LoggingMiddleware::logExit(400);
-            Response::error('Le timezone fourni est invalide', ['timezone' => 'Le timezone spécifié n\'est pas valide'], 400);
-            return;
-        }
-        
-        // Vérifier que les dates sont valides
-        if (strtotime($input['end_datetime']) < strtotime($input['start_datetime'])) {
-            LogService::warning("Dates d'événement invalides", [
-                'start_datetime' => $input['start_datetime'],
-                'end_datetime' => $input['end_datetime']
-            ]);
-            LoggingMiddleware::logExit(401);
-            Response::error('La date de fin doit être après la date de début', 401);
-            return;
-        }
-        // Vérifier validité de la récurence s'il y en a une
-        if (isset($input['recurrence_rule']) && !CalendarEvent::isValidRecurrenceRule($input['recurrence_rule'])) {
-            LogService::warning("Règle de récurrence invalide", [
-                'recurrence_rule' => $input['recurrence_rule']
-            ]);
-            LoggingMiddleware::logExit(400);
-            Response::error('Règle de récurrence invalide', 400);
-            return;
-        }
-        $cal = new Calendar();
-        // Vérifier l'accès en écriture au calendrier
-        if (!$cal->canUserWrite($calendarId, $userId)) {
-            LogService::warning("Tentative de création d'événement sans permission d'écriture", [
-                'calendar_id' => $calendarId,
-                'user_id' => $userId
-            ]);
-            LoggingMiddleware::logExit(403);
-            Response::error('Permission insuffisante pour créer un événement dans ce calendrier', 403);
-            return;
-        }
-            
-        try {
-            $event = new CalendarEvent();
-            $event->calendarId = $calendarId;
-            $event->title = $input['title'];
-            $event->startDatetime = $input['start_datetime'];
-            $event->endDatetime = $input['end_datetime'];
-            $event->allDay = $input['all_day'] ?? false;
-            $event->location = $input['location'] ?? null;
-            $event->organizerEmail = $input['organizer_email'] ?? null;
-            $event->attendees = $input['attendees'] ?? [];
-            $event->recurrenceRule = $input['recurrence_rule'] ?? null;
-            $event->status = $input['status'] ?? 'confirmed';
-
-            $event = $event->create();
-
-            LogService::info("Événement créé", [
-                'event_id' => $event['id'],
-                'calendar_id' => $calendarId,
-                'user_id' => $userId
-            ]);
-            LoggingMiddleware::logExit(200);
-            Response::success('Événement créé avec succès', $event, 201);
-        } catch (\Exception $e) {
-            LogService::error("Erreur lors de la création de l'événement", [
-                'exception' => $e->getMessage()
-            ]);
-            LoggingMiddleware::logExit(500);
-            Response::error('Erreur lors de la création de l\'événement', 500);
-        }
-    }
-
-    public function getCalendarEvents($calendarId, $userId): void
-    {
-        LoggingMiddleware::logEntry();         
-        $cal = new Calendar();
-        // Vérifier l'accès au calendrier (lecture ou plus)
-        $permission = $cal->getUserPermissionForCalendar($calendarId, $userId);
-        if (!$permission) {
-            logService::warning("Tentative d'accès aux événements d'un calendrier sans permission", [
-                'calendar_id' => $calendarId,
-                'user_id' => $userId
-            ]);
-            LoggingMiddleware::logExit(403);
-            Response::error('Accès refusé à ce calendrier', 403);
-            return;
-        }
-        
-        try {
-            $input = Response::getRequestParams();
-            $validator = new Validator();
-            $validation = $validator->validate($input, [
-                'start_datetime' => 'optionnal|date_or_datetime',
-                'end_datetime' => 'optionnal|date_or_datetime',
-                'page' => 'optionnal|integer|min:1',
-                'limit' => 'optionnal|integer|min:1|max:100'
-            ]);
-            $events = $cal->getEventsForCalendar($calendarId);
-            if (isset($input['start_datetime'])) {
-                $events = array_filter($events, function($event) use ($input) {
-                    return strtotime($event['start_datetime']) >= strtotime($input['start_datetime']);
-                });
-            }
-            if (isset($input['end_datetime'])) {
-                $events = array_filter($events, function($event) use ($input) {
-                    return strtotime($event['end_datetime']) <= strtotime($input['end_datetime']);
-                });
-            }
-            if (isset($input['page']) && isset($input['limit'])) {
-                $offset = ($input['page'] - 1) * $input['limit'];
-                $events = array_slice($events, $offset, $input['limit']);
-            }
-            logService::info("Événements du calendrier récupérés", [
-                'calendar_id' => $calendarId,
-                'user_id' => $userId,
-                'event_count' => count($events),
-                'access_level' => $permission['access_level']
-            ]);
-            LoggingMiddleware::logExit(200);
-            Response::success('Événements du calendrier récupérés avec succès', [
-                'events' => $events,
-                'count' => count($events)
-            ]);
-        } catch (\Exception $e) {
-            LogService::error("Erreur lors de la récupération des événements", [
-                'exception' => $e->getMessage()
-            ]);
-            LoggingMiddleware::logExit(500);
-            Response::error('Erreur lors de la récupération des événements', 500);
-        }       
-    }
-
+    /**
+     * Récupère le contenu d'un calendrier au format ICS via un token de partage.
+     * @param string $shareToken Le token de partage unique.
+     */
     public function getCalendarIcs($shareToken): void
     {
         LoggingMiddleware::logEntry();         
@@ -928,6 +840,105 @@ class CalendarController
             ]);
             LoggingMiddleware::logExit(500);
             Response::error('Erreur lors de la suppression définitive du calendrier', 500);
+        }
+    }
+
+    /**
+     * Crée un nouvel événement dans un calendrier
+     */
+    public function createEvent($calendarId, $userId): void
+    {
+        LoggingMiddleware::logEntry();
+        $input = Response::getRequestParams();
+
+        // Validation
+        $validator = new Validator();
+        $validation = $validator->validate($input, [
+            'title' => 'required|string',
+            'start_datetime' => 'required|date_or_datetime',
+            'end_datetime' => 'required|date_or_datetime',
+            'description' => 'optionnal|string',
+            'all_day' => 'optionnal|boolean',
+            'location' => 'optionnal|string',
+            'organizer_email' => 'optionnal|email',
+            'attendees' => 'optionnal|array',
+            'recurrence_rule' => 'optionnal|string',
+            'status' => 'optionnal|string|in:confirmed,tentative,cancelled',
+            'timezone' => 'optionnal|string|max:100'
+        ]);
+
+        if (!$validation['valid']) {
+            LogService::warning("Données de création d'événement invalides", [
+                'errors' => $validation['errors']
+            ]);
+            LoggingMiddleware::logExit(400);
+            Response::error('Données invalides', $validation['errors'], 400);
+            return;
+        }
+
+        // Valider le timezone si fourni
+        if (isset($input['timezone']) && !TimezoneHelper::isValidTimezone($input['timezone'])) {
+            LogService::warning("Timezone invalide lors de la création d'événement", [
+                'timezone' => $input['timezone']
+            ]);
+            LoggingMiddleware::logExit(400);
+            Response::error('Le timezone fourni est invalide', ['timezone' => 'Le timezone spécifié n\'est pas valide'], 400);
+            return;
+        }
+
+        // Vérifier que la date de fin est après la date de début
+        if (strtotime($input['end_datetime']) < strtotime($input['start_datetime'])) {
+            LogService::warning("Dates d'événement invalides", [
+                'start_datetime' => $input['start_datetime'],
+                'end_datetime' => $input['end_datetime']
+            ]);
+            LoggingMiddleware::logExit(400);
+            Response::error('La date de fin doit être après la date de début', 400);
+            return;
+        }
+
+        // Vérifier validité de la récurrence s'il y en a une
+        if (isset($input['recurrence_rule']) && !CalendarEvent::isValidRecurrenceRule($input['recurrence_rule'])) {
+            LogService::warning("Règle de récurrence invalide", [
+                'recurrence_rule' => $input['recurrence_rule']
+            ]);
+            LoggingMiddleware::logExit(400);
+            Response::error('Règle de récurrence invalide', 400);
+            return;
+        }
+
+        $cal = new Calendar();
+
+        // Vérifier l'accès en écriture au calendrier
+        if (!$cal->canUserWrite($calendarId, $userId)) {
+            LoggingMiddleware::logExit(403);
+            Response::error('Permission insuffisante pour ajouter un événement à ce calendrier', 403);
+            return;
+        }
+
+        try {
+            $event = new CalendarEvent();
+            $event->calendarId = $calendarId;
+            $event->title = $input['title'];
+            $event->startDatetime = $input['start_datetime'];
+            $event->endDatetime = $input['end_datetime'];
+            $event->description = $input['description'] ?? null;
+            $event->allDay = $input['all_day'] ?? false;
+            $event->location = $input['location'] ?? null;
+            $event->organizerEmail = $input['organizer_email'] ?? null;
+            $event->attendees = $input['attendees'] ?? null;
+            $event->recurrenceRule = $input['recurrence_rule'] ?? null;
+            $event->status = $input['status'] ?? 'confirmed';
+
+            $result = $event->create();
+            LoggingMiddleware::logExit(201);
+            Response::success('Événement créé avec succès', $result, 201);
+        } catch (\Exception $e) {
+            LogService::error("Erreur lors de la création de l'événement", [
+                'exception' => $e->getMessage()
+            ]);
+            LoggingMiddleware::logExit(500);
+            Response::error('Erreur lors de la création de l\'événement', 500);
         }
     }
 

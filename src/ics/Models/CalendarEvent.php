@@ -538,4 +538,109 @@ class CalendarEvent extends BaseModel
         return true;
     }
 
+    /**
+     * Importe des événements depuis un contenu de fichier ICS.
+     *
+     * @param int $calendarId L'ID du calendrier où importer les événements.
+     * @param string $icsContent Le contenu du fichier ICS.
+     * @return int Le nombre d'événements importés.
+     */
+    public function importEventsFromIcsContent(int $calendarId, string $icsContent): int
+    {
+        // J'utilise un simple parseur manuel car je ne peux pas ajouter de dépendances.
+        // Pour une solution de production, une bibliothèque comme `johngrogg/ics-parser` serait préférable.
+        $lines = explode("\n", str_replace("\r", "", $icsContent));
+        $eventsData = [];
+        $inEvent = false;
+        $currentEvent = [];
+
+        foreach ($lines as $line) {
+            if (strpos($line, 'BEGIN:VEVENT') !== false) {
+                $inEvent = true;
+                $currentEvent = [];
+                continue;
+            }
+
+            if (strpos($line, 'END:VEVENT') !== false) {
+                if ($inEvent) {
+                    $eventsData[] = $currentEvent;
+                    $inEvent = false;
+                }
+                continue;
+            }
+
+            if ($inEvent) {
+                if (preg_match('/^([^;:]+)(;[^:]*)?:(.*)$/', $line, $matches)) {
+                    $key = $matches[1];
+                    $params = $matches[2] ?? '';
+                    $value = $matches[3];
+                    
+                    // Stocker la valeur avec la clé de base
+                    $currentEvent[$key] = $value;
+                    
+                    // Stocker aussi avec la clé complète si des paramètres existent
+                    if ($params) {
+                        $currentEvent[$key . $params] = $value;
+                    }
+                }
+            }
+        }
+
+        $importedCount = 0;
+        foreach ($eventsData as $eventData) {
+            try {
+                $event = new self();
+                $event->calendarId = $calendarId;
+                $event->title = $eventData['SUMMARY'] ?? 'Sans titre';
+                $event->description = $eventData['DESCRIPTION'] ?? null;
+                $event->location = $eventData['LOCATION'] ?? null;
+                
+                // Détecter si c'est un événement "all-day"
+                $isAllDay = isset($eventData['DTSTART;VALUE=DATE']);
+                $event->allDay = $isAllDay;
+                
+                if ($isAllDay) {
+                    // Événement toute la journée
+                    $startDate = $eventData['DTSTART'];
+                    $event->startDatetime = date('Y-m-d 00:00:00', strtotime($startDate));
+                    
+                    // Si DTEND existe, l'utiliser (attention : exclusif dans iCal)
+                    if (isset($eventData['DTEND'])) {
+                        $endDate = $eventData['DTEND'];
+                        // La date de fin dans iCal est exclusive pour les événements all-day
+                        $event->endDatetime = date('Y-m-d 23:59:59', strtotime($endDate . ' -1 day'));
+                    } else {
+                        // Pas de DTEND : événement d'une seule journée
+                        $event->endDatetime = date('Y-m-d 23:59:59', strtotime($startDate));
+                    }
+                } else {
+                    // Événement avec heures précises
+                    $event->startDatetime = date('Y-m-d H:i:s', strtotime($eventData['DTSTART']));
+                    
+                    // Si DTEND n'existe pas, utiliser DTSTART comme fin
+                    if (isset($eventData['DTEND'])) {
+                        $event->endDatetime = date('Y-m-d H:i:s', strtotime($eventData['DTEND']));
+                    } else {
+                        $event->endDatetime = $event->startDatetime;
+                    }
+                }
+
+                $event->recurrenceRule = $eventData['RRULE'] ?? null;
+                $event->status = isset($eventData['STATUS']) ? strtolower($eventData['STATUS']) : 'confirmed';
+
+                $event->create();
+                $importedCount++;
+            } catch (\Exception $e) {
+                LogService::error("Erreur lors de l'importation d'un événement depuis ICS", [
+                    'calendar_id' => $calendarId,
+                    'event_data' => $eventData,
+                    'error' => $e->getMessage()
+                ]);
+                // On continue avec les autres événements
+            }
+        }
+
+        return $importedCount;
+    }
+
 }

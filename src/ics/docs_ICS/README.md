@@ -99,55 +99,85 @@ src/ics/
 
 ### Base de données
 
-#### Tables principales
+- **[`Proc_create_tables_ICS.sql`](./Proc_create_tables_ICS.sql)** - Script de création des tables initiales.
+- **[`Proc_add_caldav_support.sql`](./Proc_add_caldav_support.sql)** - Script de migration pour ajouter le support CalDAV.
 
-- **`calendars`** - Calendriers utilisateurs
-  - Colonnes CalDAV : `ctag`, `sync_token`
-- **`calendar_events`** - Événements
-  - Colonnes CalDAV : `etag`, `uid`, `sequence`, `last_modified`
-- **`calendar_shares`** - Partages de calendriers
+## 📚 API REST
 
-#### Tables de synchronisation CalDAV
+Voici un aperçu des principaux endpoints de l'API REST pour la gestion des calendriers.
 
-- **`caldav_sync_log`** - Journal des modifications pour sync-collection
-- **`caldav_locks`** - Verrous WebDAV pour prévenir les conflits
+### Importer un calendrier depuis un fichier ICS
 
-## 🔌 Endpoints API
+Crée un nouveau calendrier et importe tous ses événements depuis un fichier `.ics`.
 
-### API REST (JSON)
+- **Endpoint**: `POST /calendars/import`
+- **Authentification**: Requise (API Key ou JWT)
+- **Type de contenu**: `multipart/form-data`
 
-```text
-POST   /calendars                          # Créer un calendrier
-GET    /calendars                          # Liste des calendriers
-GET    /calendars/{id}                     # Détails d'un calendrier
-PUT    /calendars/{id}                     # Modifier un calendrier
-DELETE /calendars/{id}                     # Supprimer un calendrier
-POST   /calendars/{id}/events              # Créer un événement
-GET    /calendars/{id}/events              # Liste des événements
-PUT    /calendars/{id}/events/{event_id}   # Modifier un événement
-DELETE /calendars/{id}/events/{event_id}   # Supprimer un événement
-POST   /calendars/{id}/share               # Partager un calendrier
+#### Paramètres (form-data)
+
+| Paramètre | Type   | Obligatoire | Description                   |
+|-----------|--------|-------------|-------------------------------|
+| `icsfile` | `file` | **Oui**     | Le fichier `.ics` à importer. |
+
+#### Exemple de requête avec `curl`
+
+```bash
+curl -X POST "https://your-api-url/calendars/import" \
+     -H "Authorization: Bearer VOTRE_TOKEN_JWT" \
+     -F "icsfile=@/chemin/vers/mon_calendrier.ics"
 ```
 
-### End Point to Export public ICS
+#### Réponse en cas de succès (201 Created)
 
-```text
-GET /calendar/{token}.ics                  # Télécharger le calendrier au format ICS
+```json
+{
+    "status": "success",
+    "message": "Calendrier importé avec succès.",
+    "data": {
+        "id": 124,
+        "share_token": "a1b2c3d4...",
+        "ics_url": "https://your-api-url/calendar/a1b2c3d4....ics",
+        "ctag": "e5f6g7h8...",
+        "sync_token": "i9j0k1l2...",
+        "imported_events_count": 15
+    }
+}
 ```
 
-### CalDAV (synchronisation bidirectionnelle)
+### Calendriers
 
-```text
-Base URL: /caldav/
+- **`GET /calendars`**: Lister tous les calendriers de l'utilisateur.
+- **`POST /calendars`**: Créer un nouveau calendrier
+- **`GET /calendars/{id}`**: Obtenir les détails d'un calendrier
+- **`PUT /calendars/{id}`**: Mettre à jour un calendrier
+- **`DELETE /calendars/{id}`**: Supprimer un calendrier
 
-OPTIONS  /caldav/                          # Capacités du serveur
-PROPFIND /caldav/calendars/{user_id}/      # Découverte des calendriers
-PROPFIND /caldav/calendars/{user_id}/{cal_id}/  # Liste des événements
-REPORT   /caldav/calendars/{user_id}/{cal_id}/  # Requêtes avancées
-GET      /caldav/calendars/{user_id}/{cal_id}/{event_uid}.ics  # Récupérer événement
-PUT      /caldav/calendars/{user_id}/{cal_id}/{event_uid}.ics  # Créer/modifier événement
-DELETE   /caldav/calendars/{user_id}/{cal_id}/{event_uid}.ics  # Supprimer événement
-```
+### Événements
+
+- **`GET /calendars/{id}/events`**: Lister les événements d'un calendrier
+- **`POST /calendars/{id}/events`**: Créer un nouvel événement
+- **`GET /calendars/{id}/events/{event_id}`**: Obtenir les détails d'un événement
+- **`PUT /calendars/{id}/events/{event_id}`**: Mettre à jour un événement
+- **`DELETE /calendars/{id}/events/{event_id}`**: Supprimer un événement
+
+### Partage de calendriers
+
+- **`POST /calendars/{id}/share`**: Partager un calendrier
+
+### Exporter un calendrier au format ICS
+
+- **`GET /calendar/{token}.ics`**: Télécharger le calendrier au format ICS
+
+### Synchronisation CalDAV
+
+- **`OPTIONS /caldav/`**: Vérifier les capacités du serveur
+- **`PROPFIND /caldav/calendars/{user_id}/`**: Découverte des calendriers
+- **`PROPFIND /caldav/calendars/{user_id}/{cal_id}/`**: Liste des événements d'un calendrier
+- **`REPORT /caldav/calendars/{user_id}/{cal_id}/`**: Requêtes avancées sur les événements
+- **`GET /caldav/calendars/{user_id}/{cal_id}/{event_uid}.ics`**: Récupérer un événement au format ICS
+- **`PUT /caldav/calendars/{user_id}/{cal_id}/{event_uid}.ics`**: Créer ou modifier un événement
+- **`DELETE /caldav/calendars/{user_id}/{cal_id}/{event_uid}.ics`**: Supprimer un événement
 
 ## 🔐 Authentification
 

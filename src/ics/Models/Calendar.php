@@ -391,6 +391,19 @@ class Calendar extends BaseModel
     }
 
     /**
+     * Vérifie si un utilisateur est le propriétaire d'un calendrier.
+     */
+    public function isOwner($calendarId, $userId): bool
+    {
+        $stmt = $this->getDb()->prepare("
+            SELECT id FROM {$this->table} 
+            WHERE id = ? AND user_id = ? AND deleted_at IS NULL
+        ");
+        $stmt->execute([$calendarId, $userId]);
+        return $stmt->fetchColumn() !== false;
+    }
+
+    /**
      * Vérifie si un utilisateur peut écrire dans un calendrier
      */
     public function canUserWrite($calendarId, $userId): bool
@@ -495,4 +508,65 @@ class Calendar extends BaseModel
         return false;
     }
 
+    /**
+     * Crée un calendrier complet et ses événements à partir d'un contenu ICS.
+     *
+     * @param int $userId L'ID de l'utilisateur propriétaire.
+     * @param string $icsContent Le contenu du fichier ICS.
+     * @return array Les détails du calendrier créé.
+     */
+    public function createFromIcs(int $userId, string $icsContent): array
+    {
+        $this->getDb()->beginTransaction();
+
+        try {
+            // 1. Parser les informations du calendrier (VCALENDAR)
+            $calendarProperties = self::parseIcsCalendarProperties($icsContent);
+
+            // 2. Créer le calendrier dans la base de données
+            $this->userId = $userId;
+            $this->title = $calendarProperties['X-WR-CALNAME'] ?? 'Calendrier importé';
+            $this->description = $calendarProperties['X-WR-CALDESC'] ?? 'Importé depuis un fichier ICS';
+            $this->timezone = $calendarProperties['X-WR-TIMEZONE'] ?? 'America/Montreal';
+            $this->visibility = 'private';
+            $this->color = '#'.substr(md5($this->title), 0, 6); // Couleur pseudo-aléatoire
+
+            $newCalendar = $this->create();
+            $calendarId = $newCalendar['id'];
+
+            // 3. Parser et importer les événements (VEVENT)
+            $eventModel = new CalendarEvent();
+            $importedCount = $eventModel->importEventsFromIcsContent($calendarId, $icsContent);
+
+            $this->getDb()->commit();
+
+            $newCalendar['imported_events_count'] = $importedCount;
+            return $newCalendar;
+
+        } catch (\Exception $e) {
+            $this->getDb()->rollBack();
+            throw new \Exception("Échec de la création du calendrier depuis ICS: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Parse les propriétés principales d'un VCALENDAR depuis le contenu ICS.
+     */
+    private static function parseIcsCalendarProperties(string $icsContent): array
+    {
+        $properties = [];
+        $lines = explode("\n", str_replace("\r", "", $icsContent));
+
+        foreach ($lines as $line) {
+            if (strpos($line, 'BEGIN:VEVENT') !== false) {
+                // Arrêter de parser les propriétés du calendrier quand les événements commencent
+                break;
+            }
+
+            if (preg_match('/^(X-WR-CALNAME|X-WR-CALDESC|X-WR-TIMEZONE):(.*)$/', $line, $matches)) {
+                $properties[$matches[1]] = trim($matches[2]);
+            }
+        }
+        return $properties;
+    }
 }
