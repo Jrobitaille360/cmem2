@@ -102,8 +102,9 @@ class CalendarEvent extends BaseModel
 
     /**
      * Récupère tous les événements d'un calendrier
+     * Si startDate et endDate sont fournis, les événements récurrents sont expansés
      */
-    public function getByCalendarId($calendarId, $startDate = null, $endDate = null): array
+    public function getByCalendarId($calendarId, $startDate = null, $endDate = null, $expandRecurrence = true): array
     {
         $query = "SELECT * FROM calendar_events WHERE calendar_id = ? AND deleted_at IS NULL";
         $params = [$calendarId];
@@ -119,7 +120,14 @@ class CalendarEvent extends BaseModel
         $stmt = $this->getDb()->prepare($query);
         $stmt->execute($params);
         
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $events = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Expanser les événements récurrents si demandé et si on a une période
+        if ($expandRecurrence && $startDate && $endDate) {
+            $events = \ICS\Services\RecurrenceService::expandMultipleEvents($events, $startDate, $endDate);
+        }
+        
+        return $events;
     }
 
     /**

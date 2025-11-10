@@ -147,6 +147,7 @@ Les clients CalDAV (Apple, Android) **refusent HTTP** pour des raisons de sécur
 2. **Erreur de client** → Section troubleshooting dans `CALDAV_GUIDE.md`
 3. **Question technique** → Lire `CALDAV_README.md`
 4. **API CalDAV** → Exemples complets dans `CALDAV_GUIDE.md`
+5. **Événements récurrents** → Guide complet dans `RECURRENCE.md`
 
 ---
 
@@ -163,16 +164,19 @@ Les clients CalDAV (Apple, Android) **refusent HTTP** pour des raisons de sécur
 
 ## 📊 Statistiques du Projet
 
-- **11 fichiers créés** (code + docs + tests)
-- **~3000 lignes** de code et documentation
+- **12+ fichiers créés** (code + docs + tests)
+- **~3500 lignes** de code et documentation
 - **Temps d'installation :** 5-10 minutes
 - **Compatibilité :** iOS 14+, macOS 11+, Android 5+, Thunderbird 78+
+- **Support RRULE :** Récurrences quotidiennes, hebdomadaires, mensuelles, annuelles
+- **Bibliothèque :** simshaun/recurr v5.0 pour les récurrences
 
 ---
 
-**🚀 Votre calendrier iCal devient maintenant un calendrier natif synchronisé !**
+**🚀 Votre calendrier iCal devient maintenant un calendrier natif synchronisé avec support complet des récurrences !**
 
 ---
 
 **Créé le :** 22 octobre 2025  
+**Dernière mise à jour :** 9 novembre 2025  
 **Répertoire :** `src/ics/docs_ICS/`

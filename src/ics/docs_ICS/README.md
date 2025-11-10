@@ -7,9 +7,10 @@ Le module **ICS Calendar** est un système complet de gestion de calendriers pou
 - ✅ **Format iCalendar (RFC 5545)** - Compatible avec tous les clients calendrier
 - ✅ **Protocole CalDAV (RFC 4791)** - Synchronisation bidirectionnelle automatique
 - ✅ **Partage de calendriers** - Public (via token) et entre utilisateurs
-- ✅ **Événements récurrents** - Support complet des récurrences
+- ✅ **Événements récurrents (RRULE)** - Support complet des récurrences quotidiennes, hebdomadaires, mensuelles, annuelles
 - ✅ **Multi-timezone** - Gestion des fuseaux horaires
 - ✅ **Participants** - Gestion des participants et invitations
+- ✅ **Expansion automatique** - Les occurrences sont calculées côté serveur
 
 ## 🚀 Démarrage rapide
 
@@ -51,6 +52,14 @@ Le module **ICS Calendar** est un système complet de gestion de calendriers pou
   - Dépannage et optimisations
   - Références RFC
 
+- **[`RECURRENCE.md`](./RECURRENCE.md)** - Guide complet des récurrences (300+ lignes)
+  - Architecture du service de récurrence
+  - Règles RRULE (DAILY, WEEKLY, MONTHLY, YEARLY)
+  - API RecurrenceService (expandRecurrence, getOccurrences, etc.)
+  - Exemples de règles de récurrence (COUNT, UNTIL, INTERVAL, BYDAY, etc.)
+  - Endpoints pour gérer les occurrences
+  - Tests et validation
+
 ### Fichiers de migration
 
 - **[`Proc_add_caldav_support.sql`](./Proc_add_caldav_support.sql)** - Procédure SQL d'installation
@@ -82,7 +91,8 @@ src/ics/
 │   ├── Calendar.php                # Modèle calendrier
 │   └── CalendarEvent.php           # Modèle événement
 ├── Services/
-│   └── CalDAVServer.php            # Serveur CalDAV complet
+│   ├── CalDAVServer.php            # Serveur CalDAV complet
+│   └── RecurrenceService.php       # Service de gestion des récurrences (RRULE)
 ├── Routing/
 │   └── RouteHandlers/
 │       ├── CalendarRouteHandler.php    # Routes REST
@@ -92,6 +102,7 @@ src/ics/
     ├── README.md                   # Ce fichier
     ├── CALDAV_GUIDE.md             # Guide technique
     ├── CALDAV_QUICKSTART.md        # Démarrage rapide
+    ├── RECURRENCE.md               # Guide des récurrences
     ├── Proc_add_caldav_support.sql # Migration SQL
     ├── Proc_create_tables_ICS.sql  # Création tables initiales
     └── test_caldav.php             # Script de test
@@ -334,7 +345,41 @@ curl -X POST http://localhost/cmem2_API/users/login \
 
 Pour plus de dépannage, voir [`CALDAV_GUIDE.md`](./CALDAV_GUIDE.md#dépannage).
 
-## 📚 Références
+## � Événements récurrents
+
+Le module supporte les règles de récurrence iCalendar (RRULE) :
+
+```bash
+# Créer un événement récurrent quotidien
+curl -X POST http://localhost/cmem2_API/calendars/1/events \
+  -H "Authorization: Bearer {token}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Réunion quotidienne",
+    "start_datetime": "2025-11-09 09:00:00",
+    "end_datetime": "2025-11-09 09:30:00",
+    "recurrence_rule": "FREQ=DAILY;COUNT=10"
+  }'
+
+# Obtenir les occurrences d'un événement récurrent
+curl -X GET "http://localhost/cmem2_API/calendars/1/events/123/occurrences?limit=30" \
+  -H "Authorization: Bearer {token}"
+
+# Les événements avec récurrence sont automatiquement expansés lors de la récupération
+curl -X GET "http://localhost/cmem2_API/calendars/1/events?start_date=2025-11-01&end_date=2025-11-30" \
+  -H "Authorization: Bearer {token}"
+```
+
+Exemples de règles RRULE :
+
+- `FREQ=DAILY;COUNT=10` - Quotidien pendant 10 jours
+- `FREQ=WEEKLY;BYDAY=MO,WE,FR` - Lun, Mer, Ven (infini)
+- `FREQ=MONTHLY;BYMONTHDAY=1` - Le 1er de chaque mois
+- `FREQ=YEARLY;BYMONTH=12;BYMONTHDAY=25` - Chaque 25 décembre
+
+Voir [`RECURRENCE.md`](./RECURRENCE.md) pour la documentation complète.
+
+## �📚 Références
 
 - **RFC 5545** - iCalendar format
 - **RFC 4791** - CalDAV protocol
@@ -351,6 +396,6 @@ Pour toute question ou problème :
 
 ---
 
-**Version** : 1.0.0  
-**Dernière mise à jour** : Octobre 2025  
+**Version** : 1.1.0  
+**Dernière mise à jour** : Novembre 2025  
 **Auteur** : CMEM Team

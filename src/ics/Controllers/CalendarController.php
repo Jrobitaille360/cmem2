@@ -1219,4 +1219,82 @@ class CalendarController
         }
     }
 
+    /**
+     * Obtient toutes les occurrences d'un événement récurrent
+     */
+    public function getEventOccurrences($eventId, $calendarId, $userId): void
+    {
+        LoggingMiddleware::logEntry();
+        
+        $cal = new Calendar();
+        
+        // Vérifier l'accès en lecture au calendrier (utiliser canUserWrite car il n'y a pas de canUserRead)
+        if (!$cal->canUserWrite($calendarId, $userId)) {
+            LoggingMiddleware::logExit(403);
+            Response::error('Permission insuffisante pour accéder à ce calendrier', 403);
+            return;
+        }
+        
+        $event = new CalendarEvent();
+        $existingEvent = $event->findById($eventId);
+        
+        // Vérifier que l'événement existe et appartient au calendrier
+        if (!$existingEvent || $existingEvent['calendar_id'] != $calendarId) {
+            LogService::warning("Événement non trouvé ou non associé au calendrier", [
+                'event_id' => $eventId,
+                'calendar_id' => $calendarId
+            ]);
+            LoggingMiddleware::logExit(404);
+            Response::error('Événement non trouvé', 404);
+            return;
+        }
+        
+        // Vérifier si l'événement a une règle de récurrence
+        if (empty($existingEvent['recurrence_rule'])) {
+            LoggingMiddleware::logExit(200);
+            Response::success('Cet événement n\'est pas récurrent', [
+                'is_recurring' => false,
+                'occurrences' => []
+            ]);
+            return;
+        }
+        
+        // Récupérer les paramètres de période
+        $startDate = $_GET['start_date'] ?? null;
+        $endDate = $_GET['end_date'] ?? null;
+        $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 100;
+        
+        try {
+            // Générer les occurrences
+            $occurrences = \ICS\Services\RecurrenceService::getOccurrences(
+                $existingEvent,
+                $startDate,
+                $endDate,
+                $limit
+            );
+            
+            LogService::info("Occurrences d'événement récurrent récupérées", [
+                'event_id' => $eventId,
+                'calendar_id' => $calendarId,
+                'count' => count($occurrences)
+            ]);
+            
+            LoggingMiddleware::logExit(200);
+            Response::success('Occurrences récupérées avec succès', [
+                'is_recurring' => true,
+                'parent_event' => $existingEvent,
+                'occurrences' => $occurrences,
+                'count' => count($occurrences)
+            ]);
+        } catch (\Exception $e) {
+            LogService::error("Erreur lors de la récupération des occurrences", [
+                'exception' => $e->getMessage(),
+                'event_id' => $eventId
+            ]);
+            LoggingMiddleware::logExit(500);
+            Response::error('Erreur lors de la récupération des occurrences', 500);
+        }
+    }
+
 }
+
