@@ -851,7 +851,7 @@ class CalendarController
         LoggingMiddleware::logEntry();
         $input = Response::getRequestParams();
 
-        // Validation
+        // Validation des champs de base
         $validator = new Validator();
         $validation = $validator->validate($input, [
             'title' => 'required|string',
@@ -864,7 +864,6 @@ class CalendarController
             'attendees' => 'optionnal|array',
             'recurrence_rule' => 'optionnal|string',
             'status' => 'optionnal|string|in:confirmed,tentative,cancelled',
-            'timezone' => 'optionnal|string|max:100'
         ]);
 
         if (!$validation['valid']) {
@@ -876,13 +875,14 @@ class CalendarController
             return;
         }
 
-        // Valider le timezone si fourni
-        if (isset($input['timezone']) && !TimezoneHelper::isValidTimezone($input['timezone'])) {
-            LogService::warning("Timezone invalide lors de la création d'événement", [
-                'timezone' => $input['timezone']
+        // Validation des nouveaux champs
+        $eventValidation = \ICS\Utils\EventValidator::validateEventFields($input);
+        if (!$eventValidation['valid']) {
+            LogService::warning("Validation des nouveaux champs échouée", [
+                'errors' => $eventValidation['errors']
             ]);
             LoggingMiddleware::logExit(400);
-            Response::error('Le timezone fourni est invalide', ['timezone' => 'Le timezone spécifié n\'est pas valide'], 400);
+            Response::error('Données invalides', $eventValidation['errors'], 400);
             return;
         }
 
@@ -929,6 +929,12 @@ class CalendarController
             $event->attendees = $input['attendees'] ?? null;
             $event->recurrenceRule = $input['recurrence_rule'] ?? null;
             $event->status = $input['status'] ?? 'confirmed';
+            
+            // Nouveaux champs
+            $event->timezone = $eventValidation['data']['timezone'] ?? 'America/Montreal';
+            $event->meetingLink = $eventValidation['data']['meeting_link'] ?? null;
+            $event->notifications = $eventValidation['data']['notifications'] ?? null;
+            $event->color = $eventValidation['data']['color'] ?? null;
 
             $result = $event->create();
             LoggingMiddleware::logExit(201);
@@ -950,7 +956,7 @@ class CalendarController
         LoggingMiddleware::logEntry();
         $input = Response::getRequestParams();
         
-        // Validation
+        // Validation des champs de base
         $validator = new Validator();
         $validation = $validator->validate($input, [
             'title' => 'optionnal|string',
@@ -963,7 +969,6 @@ class CalendarController
             'color' => 'optionnal|color',
             'recurrence_rule' => 'optionnal|string',
             'status' => 'optionnal|string|in:confirmed,tentative,cancelled',
-            'timezone' => 'optionnal|string|max:100'
         ]);
         
         if (!$validation['valid']) {
@@ -975,13 +980,14 @@ class CalendarController
             return;
         }
         
-        // Valider le timezone si fourni (bien que non utilisé actuellement - pour compatibilité future)
-        if (isset($input['timezone']) && !TimezoneHelper::isValidTimezone($input['timezone'])) {
-            LogService::warning("Timezone invalide lors de la mise à jour d'événement", [
-                'timezone' => $input['timezone']
+        // Validation des nouveaux champs
+        $eventValidation = \ICS\Utils\EventValidator::validateEventFields($input);
+        if (!$eventValidation['valid']) {
+            LogService::warning("Validation des nouveaux champs échouée", [
+                'errors' => $eventValidation['errors']
             ]);
             LoggingMiddleware::logExit(400);
-            Response::error('Le timezone fourni est invalide', ['timezone' => 'Le timezone spécifié n\'est pas valide'], 400);
+            Response::error('Données invalides', $eventValidation['errors'], 400);
             return;
         }
         
@@ -1075,6 +1081,24 @@ class CalendarController
             if (isset($input['status'])) {
                 $event->status = $input['status'];
                 $updatedFields[] = 'status';
+            }
+            
+            // Nouveaux champs
+            if (isset($eventValidation['data']['timezone'])) {
+                $event->timezone = $eventValidation['data']['timezone'];
+                $updatedFields[] = 'timezone';
+            }
+            if (isset($eventValidation['data']['meeting_link'])) {
+                $event->meetingLink = $eventValidation['data']['meeting_link'];
+                $updatedFields[] = 'meeting_link';
+            }
+            if (isset($eventValidation['data']['notifications'])) {
+                $event->notifications = $eventValidation['data']['notifications'];
+                $updatedFields[] = 'notifications';
+            }
+            if (isset($eventValidation['data']['color'])) {
+                $event->color = $eventValidation['data']['color'];
+                $updatedFields[] = 'color';
             }
             
             // Appeler la méthode update() qui n'accepte pas de paramètres

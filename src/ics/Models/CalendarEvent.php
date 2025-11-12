@@ -22,6 +22,10 @@ class CalendarEvent extends BaseModel
     public $attendees;
     public $recurrenceRule;
     public $status;
+    public $timezone;
+    public $meetingLink;
+    public $notifications;
+    public $color;
     public $createdAt;
     public $updatedAt;
 
@@ -38,13 +42,20 @@ class CalendarEvent extends BaseModel
         try {
             $query = "INSERT INTO calendar_events (
                     calendar_id, title, description, start_datetime, end_datetime,
-                    all_day, location, organizer_email, attendees, recurrence_rule, status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    all_day, location, organizer_email, attendees, recurrence_rule, status,
+                    timezone, meeting_link, notifications, color
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ";
 
             $stmt = $this->getDb()->prepare($query);
 
             // Préparer les données
+            $notificationsJson = null;
+            if (isset($this->notifications)) {
+                $notificationsJson = is_string($this->notifications) 
+                    ? $this->notifications 
+                    : json_encode($this->notifications);
+            }
 
             $stmt->execute([
                 $this->calendarId,
@@ -57,7 +68,11 @@ class CalendarEvent extends BaseModel
                 $this->organizerEmail ?? null,
                 $this->attendees ? json_encode($this->attendees) : null,
                 $this->recurrenceRule ?? null,
-                $this->status ?? 'confirmed'
+                $this->status ?? 'confirmed',
+                $this->timezone ?? 'America/Montreal',
+                $this->meetingLink ?? null,
+                $notificationsJson,
+                $this->color ?? null
             ]);
 
             $eventId = $this->getDb()->lastInsertId();
@@ -75,7 +90,11 @@ class CalendarEvent extends BaseModel
                 'start_datetime' => $this->startDatetime,
                 'end_datetime' => $this->endDatetime,
                 'all_day' => $this->allDay ? 1 : 0,
-                'status' => $this->status ?? 'confirmed'
+                'status' => $this->status ?? 'confirmed',
+                'timezone' => $this->timezone ?? 'America/Montreal',
+                'meeting_link' => $this->meetingLink ?? null,
+                'notifications' => $this->notifications ?? null,
+                'color' => $this->color ?? null
             ];
             
         } catch (\Exception $e) {
@@ -185,7 +204,31 @@ class CalendarEvent extends BaseModel
             if(isset($this->status)) {
                 $fields[] = "status = ?";
                 $values[] = $this->status;
-            }          
+            }
+            
+            if(isset($this->timezone)) {
+                $fields[] = "timezone = ?";
+                $values[] = $this->timezone;
+            }
+            
+            if(isset($this->meetingLink)) {
+                $fields[] = "meeting_link = ?";
+                $values[] = $this->meetingLink;
+            }
+            
+            if(isset($this->notifications)) {
+                $fields[] = "notifications = ?";
+                $notificationsJson = is_string($this->notifications) 
+                    ? $this->notifications 
+                    : json_encode($this->notifications);
+                $values[] = $notificationsJson;
+            }
+            
+            if(isset($this->color)) {
+                $fields[] = "color = ?";
+                $values[] = $this->color;
+            }
+                      
             if (empty($fields)) {
                 return false;
             }
