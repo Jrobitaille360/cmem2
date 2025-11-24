@@ -1,0 +1,261 @@
+{
+  "api": {
+    "name": "ICS Calendar API",
+    "version": "1.0.0",
+    "description": "Module de gestion des calendriers ICS/iCalendar avec support CalDAV RFC 5545 et synchronisation bidirectionnelle",
+    "generated": "2025-11-23",
+    "base_url": "/calendars",
+    "authentication": {
+      "types": ["JWT", "API_KEY"],
+      "jwt_header": "Authorization: Bearer {token}",
+      "api_key_header": "X-API-Key: {key}",
+      "description": "Authentification requise pour la plupart des endpoints, sauf téléchargement ICS public"
+    }
+  },
+  "endpoints": {
+    "public": {
+      "description": "Endpoints accessibles sans authentification",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/calendar/{token}.ics",
+          "description": "Télécharger un fichier ICS public via token de partage",
+          "auth_required": false,
+          "parameters": {
+            "token": "string (required) - Token de partage du calendrier"
+          },
+          "response": "Fichier ICS au format iCalendar"
+        },
+        {
+          "method": "OPTIONS",
+          "path": "/caldav/",
+          "description": "Discovery CalDAV (OPTIONS request)",
+          "auth_required": false,
+          "response": "Headers CalDAV supportés"
+        }
+      ]
+    },
+    "authenticated": {
+      "description": "Endpoints nécessitant une authentification",
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/calendars",
+          "description": "Créer un nouveau calendrier",
+          "auth_required": true,
+          "body": {
+            "title": "string (required) - Titre du calendrier",
+            "description": "string (optional) - Description",
+            "visibility": "string (optional, default: private) - 'public' ou 'private'",
+            "max_members": "integer (optional, default: 1000) - Nombre maximum de membres",
+            "color": "string (optional) - Couleur en nom ou hex (#RRGGBB)",
+            "timezone": "string (optional, default: America/Montreal) - Timezone valide"
+          },
+          "response": "Objet calendrier créé avec ID"
+        },
+        {
+          "method": "GET",
+          "path": "/calendars",
+          "description": "Récupérer tous les calendriers de l'utilisateur",
+          "auth_required": true,
+          "response": "Liste des calendriers avec métadonnées"
+        },
+        {
+          "method": "PUT",
+          "path": "/calendars/{id}",
+          "description": "Mettre à jour un calendrier",
+          "auth_required": true,
+          "parameters": {
+            "id": "integer (required) - ID du calendrier"
+          },
+          "body": {
+            "title": "string (optional) - Nouveau titre",
+            "description": "string (optional) - Nouvelle description",
+            "visibility": "string (optional) - Nouvelle visibilité",
+            "max_members": "integer (optional) - Nouveau max membres",
+            "color": "string (optional) - Nouvelle couleur",
+            "timezone": "string (optional) - Nouveau timezone"
+          },
+          "response": "Calendrier mis à jour"
+        },
+        {
+          "method": "DELETE",
+          "path": "/calendars/{id}",
+          "description": "Supprimer un calendrier (soft delete)",
+          "auth_required": true,
+          "parameters": {
+            "id": "integer (required) - ID du calendrier"
+          },
+          "response": "Confirmation de suppression"
+        },
+        {
+          "method": "DELETE",
+          "path": "/calendars/{id}/hard",
+          "description": "Supprimer définitivement un calendrier",
+          "auth_required": true,
+          "parameters": {
+            "id": "integer (required) - ID du calendrier"
+          },
+          "response": "Confirmation de suppression définitive"
+        },
+        {
+          "method": "GET",
+          "path": "/calendars/{id}/ics",
+          "description": "Télécharger le fichier ICS d'un calendrier (authentifié)",
+          "auth_required": true,
+          "parameters": {
+            "id": "integer (required) - ID du calendrier"
+          },
+          "response": "Fichier ICS au format iCalendar"
+        },
+        {
+          "method": "POST",
+          "path": "/calendars/{id}/events",
+          "description": "Créer un événement dans un calendrier",
+          "auth_required": true,
+          "parameters": {
+            "id": "integer (required) - ID du calendrier"
+          },
+          "body": {
+            "title": "string (required) - Titre de l'événement",
+            "description": "string (optional) - Description",
+            "start_date": "string (required) - Date/heure de début (ISO 8601)",
+            "end_date": "string (required) - Date/heure de fin (ISO 8601)",
+            "location": "string (optional) - Lieu",
+            "recurrence": "object (optional) - Règles de récurrence",
+            "reminders": "array (optional) - Rappels",
+            "attendees": "array (optional) - Participants"
+          },
+          "response": "Événement créé avec ID"
+        },
+        {
+          "method": "GET",
+          "path": "/calendars/{id}/events",
+          "description": "Récupérer les événements d'un calendrier",
+          "auth_required": true,
+          "parameters": {
+            "id": "integer (required) - ID du calendrier"
+          },
+          "response": "Liste des événements avec détails"
+        },
+        {
+          "method": "PUT",
+          "path": "/calendars/{id}/events/{eventId}",
+          "description": "Mettre à jour un événement",
+          "auth_required": true,
+          "parameters": {
+            "id": "integer (required) - ID du calendrier",
+            "eventId": "integer (required) - ID de l'événement"
+          },
+          "body": "Objet événement avec champs à mettre à jour",
+          "response": "Événement mis à jour"
+        },
+        {
+          "method": "DELETE",
+          "path": "/calendars/{id}/events/{eventId}",
+          "description": "Supprimer un événement (soft delete)",
+          "auth_required": true,
+          "parameters": {
+            "id": "integer (required) - ID du calendrier",
+            "eventId": "integer (required) - ID de l'événement"
+          },
+          "response": "Confirmation de suppression"
+        },
+        {
+          "method": "DELETE",
+          "path": "/calendars/{id}/events/{eventId}/hard",
+          "description": "Supprimer définitivement un événement",
+          "auth_required": true,
+          "parameters": {
+            "id": "integer (required) - ID du calendrier",
+            "eventId": "integer (required) - ID de l'événement"
+          },
+          "response": "Confirmation de suppression définitive"
+        },
+        {
+          "method": "GET",
+          "path": "/calendars/{id}/events/{eventId}/occurrences",
+          "description": "Obtenir les occurrences d'un événement récurrent",
+          "auth_required": true,
+          "parameters": {
+            "id": "integer (required) - ID du calendrier",
+            "eventId": "integer (required) - ID de l'événement récurrent"
+          },
+          "response": "Liste des occurrences avec dates"
+        },
+        {
+          "method": "POST",
+          "path": "/calendars/{id}/share",
+          "description": "Partager un calendrier avec un token public",
+          "auth_required": true,
+          "parameters": {
+            "id": "integer (required) - ID du calendrier"
+          },
+          "body": {
+            "email": "string (optional) - Email du destinataire",
+            "message": "string (optional) - Message personnalisé"
+          },
+          "response": "Token de partage généré"
+        },
+        {
+          "method": "DELETE",
+          "path": "/calendars/{id}/share",
+          "description": "Supprimer le partage d'un calendrier",
+          "auth_required": true,
+          "parameters": {
+            "id": "integer (required) - ID du calendrier"
+          },
+          "response": "Confirmation de suppression du partage"
+        },
+        {
+          "method": "POST",
+          "path": "/calendars/import",
+          "description": "Importer un fichier ICS",
+          "auth_required": true,
+          "body": {
+            "ics_file": "file (required) - Fichier ICS à importer",
+            "calendar_title": "string (optional) - Titre du nouveau calendrier"
+          },
+          "response": "Calendrier créé avec événements importés"
+        }
+      ]
+    },
+    "caldav": {
+      "description": "Endpoints CalDAV pour synchronisation calendrier",
+      "routes": [
+        {
+          "method": "PROPFIND",
+          "path": "/caldav/",
+          "description": "Discovery des ressources CalDAV",
+          "auth_required": true,
+          "response": "XML CalDAV avec ressources disponibles"
+        },
+        {
+          "method": "GET",
+          "path": "/caldav/service-info",
+          "description": "Informations sur le service CalDAV",
+          "auth_required": true,
+          "response": "Informations JSON sur le service"
+        },
+        {
+          "method": "GET",
+          "path": "/caldav/mobile-config",
+          "description": "Configuration mobile pour CalDAV",
+          "auth_required": true,
+          "response": "Fichier de configuration mobile"
+        },
+        {
+          "method": "GET/PUT/DELETE",
+          "path": "/caldav/calendars/{user_id}/{calendar_id}/",
+          "description": "Opérations CalDAV sur les calendriers",
+          "auth_required": true,
+          "parameters": {
+            "user_id": "integer (required) - ID utilisateur",
+            "calendar_id": "integer (required) - ID calendrier"
+          },
+          "response": "Réponse CalDAV selon la méthode"
+        }
+      ]
+    }
+  }
+}

@@ -54,7 +54,11 @@ class CalendarRouteHandler extends BaseRouteHandler
             // POST /calendars/{id}/events - Créer un événement
             ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && $method === 'POST') => 
                 $this->controller->createEvent((int)$action, $user['user_id']),
-                
+            
+            // GET /calendars/{id}/events/{eventId}/occurrences - Obtenir les occurrences d'un événement récurrent
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && isset($segments[3]) && ctype_digit($segments[3]) && isset($segments[4]) && $segments[4] === 'occurrences' && $method === 'GET') => 
+                $this->controller->getEventOccurrences((int)$segments[3], (int)$action, $user['user_id']),
+
             // GET /calendars/{id}/events - Lister les événements d'un calendrier
             ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && $method === 'GET') => 
                 $this->controller->getCalendarEvents((int)$action, $user['user_id']),
@@ -71,9 +75,7 @@ class CalendarRouteHandler extends BaseRouteHandler
             ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && isset($segments[3]) && ctype_digit($segments[3]) && isset($segments[4]) && $segments[4] === 'hard' && $method === 'DELETE') => 
                 $this->controller->hardDeleteEvent((int)$segments[3], (int)$action, $user['user_id']),
                 
-            // GET /calendars/{id}/events/{eventId}/occurrences - Obtenir les occurrences d'un événement récurrent
-            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && isset($segments[3]) && ctype_digit($segments[3]) && isset($segments[4]) && $segments[4] === 'occurrences' && $method === 'GET') => 
-                $this->controller->getEventOccurrences((int)$segments[3], (int)$action, $user['user_id']),
+
                 
             // POST /calendars/{id}/share - Partager un calendrier
             ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'share' && $method === 'POST') => 

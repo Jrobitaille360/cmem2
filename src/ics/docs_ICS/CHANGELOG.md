@@ -1,6 +1,59 @@
 # 📝 Changelog - Module ICS Calendar
 
-## [1.1.0] - 2025-11-09
+## [1.2.0] - 2025-11-23
+
+### ✨ Nouveautés
+
+#### Nouveaux champs d'événement pour améliorer l'intégration frontend
+
+Ajout de 4 nouveaux champs aux événements du calendrier :
+
+- **timezone** : Fuseau horaire de l'événement (VARCHAR(100), défaut 'America/Montreal')
+- **meeting_link** : Lien de réunion virtuelle (Zoom, Teams, Google Meet, etc.) (TEXT)
+- **notifications** : Liste des notifications configurées (JSON)
+- **color** : Couleur personnalisée de l'événement (VARCHAR(7), format hex #RRGGBB)
+
+### 🔧 Modifications techniques
+
+#### Base de données
+- **Nouveau script** : `Proc_add_new_event_fields.sql` - Migration pour ajouter les nouveaux champs
+- **Mis à jour** : `Proc_create_tables_ICS.sql` - Définition de table incluant les nouveaux champs
+
+#### Modèle
+- **Mis à jour** : `Models/CalendarEvent.php`
+  - Propriétés publiques ajoutées : `$timezone`, `$meetingLink`, `$notifications`, `$color`
+  - Méthodes `create()` et `update()` modifiées pour gérer les nouveaux champs
+  - Gestion JSON pour le champ `notifications`
+
+#### Validation
+- **Nouveau fichier** : `Utils/EventValidator.php` - Classe utilitaire complète
+  - `validateTimezone()` - Validation des fuseaux horaires
+  - `validateMeetingLink()` - Validation des URLs de réunion
+  - `validateColor()` - Validation des codes couleur hex
+  - `validateNotifications()` - Validation et décodage JSON des notifications
+  - `validateEventFields()` - Validation complète de tous les champs
+
+**Fuseaux horaires supportés** :
+- America/Montreal, America/Toronto, America/New_York
+- America/Chicago, America/Denver, America/Los_Angeles, America/Vancouver
+- Europe/Paris, Europe/London, Europe/Berlin
+- UTC
+
+#### Contrôleur
+- **Mis à jour** : `Controllers/CalendarController.php`
+  - Méthode `createEvent()` : Support des nouveaux champs avec validation
+  - Méthode `updateEvent()` : Mise à jour des nouveaux champs
+
+### 📚 Documentation
+- **Mis à jour** : `API_ENDPOINTS_v1_0_0.json` - Documentation des nouveaux champs dans l'API
+- **Mis à jour** : `README.md` - Section nouveaux champs d'événement
+
+### 🧪 Tests
+- Tests manuels validés pour création et mise à jour d'événements avec nouveaux champs
+- Validation des fuseaux horaires et couleurs
+- Tests d'import/export ICS avec nouveaux champs
+
+---
 
 ### ✨ Nouveautés
 

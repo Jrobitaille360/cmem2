@@ -38,7 +38,8 @@ BEGIN
         ADD COLUMN sequence INT DEFAULT 0 COMMENT 'Numéro de séquence pour les mises à jour',
         ADD COLUMN last_modified TIMESTAMP NULL COMMENT 'Dernière modification pour CalDAV',
         ADD INDEX idx_etag (etag),
-        ADD INDEX idx_uid (uid);
+        ADD INDEX idx_uid (uid)
+        ;
         
         -- Initialiser les données pour les événements existants
         UPDATE calendar_events 
