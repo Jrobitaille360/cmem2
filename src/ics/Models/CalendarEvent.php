@@ -83,7 +83,7 @@ class CalendarEvent extends BaseModel
                 'title' => $this->title
             ]); 
             
-            return [
+            $result = [
                 'id' => $eventId,
                 'calendar_id' => $this->calendarId,
                 'title' => $this->title,
@@ -94,8 +94,16 @@ class CalendarEvent extends BaseModel
                 'timezone' => $this->timezone ?? 'America/Montreal',
                 'meeting_link' => $this->meetingLink ?? null,
                 'notifications' => $this->notifications ?? null,
-                'color' => $this->color ?? null
+                'color' => $this->color ?? null,
+                'recurrence_rule' => $this->recurrenceRule ?? null
             ];
+            
+            // Générer les occurrences si c'est un événement récurrent
+            if (!empty($this->recurrenceRule)) {
+                \ICS\Services\RecurrenceService::generateOccurrences($result);
+            }
+            
+            return $result;
             
         } catch (\Exception $e) {
             LogService::error("Erreur lors de la création de l'événement", [
@@ -120,33 +128,128 @@ class CalendarEvent extends BaseModel
     }
 
     /**
-     * Récupère tous les événements d'un calendrier
-     * Si startDate et endDate sont fournis, les événements récurrents sont expansés
+     * Récupère tous les événements d'un calendrier avec leurs occurrences
+     * Utilise la table event_occurrences pour les événements récurrents (performant)
      */
-    public function getByCalendarId($calendarId, $startDate = null, $endDate = null, $expandRecurrence = true): array
+    public function getByCalendarId($calendarId, $startDatePeriod = null, $endDatePeriode = null, $expandRecurrence = true, $lastUpdateAfter = null, $limit = 100): array
     {
         $query = "SELECT * FROM calendar_events WHERE calendar_id = ? AND deleted_at IS NULL";
         $params = [$calendarId];
         
-        if ($startDate && $endDate) {
-            $query .= " AND (start_datetime <= ? AND end_datetime >= ?)";
-            $params[] = $endDate;
-            $params[] = $startDate;
+        if ($lastUpdateAfter) {
+            $query .= " AND updated_at >= ?";
+            $params[] = $lastUpdateAfter;
         }
         
         $query .= " ORDER BY start_datetime ASC";
-
+        
         $stmt = $this->getDb()->prepare($query);
         $stmt->execute($params);
-        
         $events = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        // Expanser les événements récurrents si demandé et si on a une période
-        if ($expandRecurrence && $startDate && $endDate) {
-            $events = \ICS\Services\RecurrenceService::expandMultipleEvents($events, $startDate, $endDate);
+        if (empty($events)) {
+            return [];
         }
+
+        // Séparer les événements récurrents et non-récurrents
+        $recurringEvents = [];
+        $nonRecurringEvents = [];
         
-        return $events;
+        foreach ($events as $event) {
+            if (!empty($event['recurrence_rule'])) {
+                $recurringEvents[] = $event;
+            } else {
+                // Pour les événements non-récurrents, gérer les événements multi-jours
+                if ($event['start_datetime'] !== $event['end_datetime']) {
+                    $dayOccurrences = \ICS\Services\RecurrenceService::expandOneDay($event, $startDatePeriod, $endDatePeriode, $limit);
+                    $nonRecurringEvents = array_merge($nonRecurringEvents, $dayOccurrences);
+                } else {
+                    $nonRecurringEvents[] = $event;
+                }
+            }
+        }
+
+        $allEvents = $nonRecurringEvents;
+
+        // Utiliser les occurrences pré-calculées pour les événements récurrents
+        if ($expandRecurrence && !empty($recurringEvents)) {
+            $occurrences = \ICS\Models\EventOccurrence::getByCalendarId($calendarId, $startDatePeriod, $endDatePeriode);
+            
+            // Fusionner les occurrences avec les données des événements parents
+            $eventById = [];
+            foreach ($recurringEvents as $event) {
+                $eventById[$event['id']] = $event;
+            }
+            
+            foreach ($occurrences as $occurrence) {
+                if (isset($eventById[$occurrence['event_id']])) {
+                    $parentEvent = $eventById[$occurrence['event_id']];
+                    
+                    // Créer l'événement expandé avec les données de l'occurrence
+                    $expandedEvent = $parentEvent;
+                    
+                    // Utiliser les dates modifiées si disponibles, sinon les dates de l'occurrence
+                    $expandedEvent['start_datetime'] = $occurrence['modified_start_datetime'] ?? $occurrence['start_datetime'];
+                    $expandedEvent['end_datetime'] = $occurrence['modified_end_datetime'] ?? $occurrence['end_datetime'];
+                    
+                    // Appliquer les modifications si présentes
+                    if ($occurrence['is_modified']) {
+                        if ($occurrence['modified_title']) {
+                            $expandedEvent['title'] = $occurrence['modified_title'];
+                        }
+                        if ($occurrence['modified_description']) {
+                            $expandedEvent['description'] = $occurrence['modified_description'];
+                        }
+                        if ($occurrence['modified_location']) {
+                            $expandedEvent['location'] = $occurrence['modified_location'];
+                        }
+                    }
+                    
+                    // Ajouter les métadonnées d'occurrence
+                    $expandedEvent['occurrence_id'] = $occurrence['id'];
+                    $expandedEvent['occurrence_date'] = $occurrence['occurrence_date'];
+                    $expandedEvent['recurrence_index'] = $occurrence['recurrence_index'];
+                    $expandedEvent['is_recurring'] = true;
+                    $expandedEvent['parent_event_id'] = $occurrence['event_id'];
+                    $expandedEvent['is_occurrence_modified'] = (bool)$occurrence['is_modified'];
+                    $expandedEvent['is_occurrence_cancelled'] = (bool)$occurrence['is_cancelled'];
+                    
+                    $allEvents[] = $expandedEvent;
+                }
+            }
+        }
+
+        // Filtrer par période si spécifié
+        if ($startDatePeriod || $endDatePeriode) {
+            $startDate = $startDatePeriod ? new \DateTime($startDatePeriod) : null;
+            $endDate = $endDatePeriode ? new \DateTime($endDatePeriode) : null;
+            
+            foreach ($allEvents as $key => $event) {
+                $eventStart = new \DateTime($event['start_datetime']);
+                $eventEnd = new \DateTime($event['end_datetime']);
+                
+                if ($startDate && $eventEnd < $startDate) {
+                    unset($allEvents[$key]);
+                    continue;
+                }
+                if ($endDate && $eventStart > $endDate) {
+                    unset($allEvents[$key]);
+                    continue;
+                }
+            }
+        }
+
+        // Trier par date de début
+        usort($allEvents, function($a, $b) {
+            return strcmp($a['start_datetime'], $b['start_datetime']);
+        });
+
+        // Limiter le nombre de résultats
+        if (count($allEvents) > $limit) {
+            $allEvents = array_slice($allEvents, 0, $limit);
+        }
+
+        return $allEvents;
     }
 
     /**
@@ -245,6 +348,14 @@ class CalendarEvent extends BaseModel
                 'event_id' => $this->id
             ]);
             
+            // Régénérer les occurrences si l'événement est récurrent ou si la règle a été modifiée
+            if (isset($this->recurrenceRule)) {
+                $event = $this->getById($this->id);
+                if ($event && !empty($event['recurrence_rule'])) {
+                    \ICS\Services\RecurrenceService::generateOccurrences($event);
+                }
+            }
+            
             return $result;
             
         } catch (\Exception $e) {
@@ -260,6 +371,7 @@ class CalendarEvent extends BaseModel
     /**
      * Récupère les événements à venir pour un utilisateur
      */
+   //TODO REVOIR ENTIÈREMENT CETTE FONCTION POUR GÉRER MIEUX LA RÉCURRENCE
     public function getUpcomingEvents($userId, $limit = 10): array
     {
         $query = "

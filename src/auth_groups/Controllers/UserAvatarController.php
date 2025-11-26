@@ -5,7 +5,6 @@ namespace AuthGroups\Controllers;
 use AuthGroups\Models\User;
 use AuthGroups\Services\EmailService;
 use AuthGroups\Utils\Response;
-use AuthGroups\Utils\Validator;
 use AuthGroups\Utils\FileValidator;
 use AuthGroups\Utils\Database;
 use Firebase\JWT\JWT;

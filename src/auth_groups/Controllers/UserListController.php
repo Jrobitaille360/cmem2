@@ -37,8 +37,7 @@ class UserListController {
                 'admin_role' => $currentUserRole
             ]);
             $input = Response::getRequestParams();
-            $validator = new Validator();
-            $validate = $validator->validate($input, [
+            $validate = Validator::validate($input, [
                 'email' => 'optional|email',
                 'page' => 'optional|integer|min:1',
                 'limit' => 'optional|integer|min:1|max:100'

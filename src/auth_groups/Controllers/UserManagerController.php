@@ -29,8 +29,7 @@ class UserManagerController {
             LoggingMiddleware::logEntry();         
             $input = Response::getRequestParams();            
             // Validation selon la documentation API
-            $validator = new Validator();
-            $validation = $validator->validate($input, [
+            $validation = Validator::validate($input, [
                 'name' => 'required|string|min:2|max:255',
                 'email' => 'required|email|max:255',
                 'password' => 'required|string|min:6',  // Changé de min:8 à min:6
@@ -275,8 +274,7 @@ class UserManagerController {
     public function delete($userId, $currentUserId, $currentUserRole) {
         try {
             LoggingMiddleware::logEntry();
-            $input = Response::getRequestParams();      
-            $validator = new Validator();
+            $input = Response::getRequestParams();
             // Vérifier l'authentification
             if ($currentUserRole !== 'ADMINISTRATEUR' && $userId !== $currentUserId) {
                 LogService::warning("Tentative de suppression non autorisée", [
@@ -289,11 +287,11 @@ class UserManagerController {
                 return false;
             }
             if($currentUserId==$userId){
-                $validation=$validator->validate($input, [
+                $validation=Validator::validate($input, [
                     'password' => 'required|string'
                 ]);
             } else{
-                $validation=$validator->validate($input, [
+                $validation=Validator::validate($input, [
                     "force_delete" => 'optional|boolean'
                 ]);
             }
@@ -418,8 +416,7 @@ class UserManagerController {
             $input = Response::getRequestParams();
             
             // Validation des identifiants
-            $validator = new Validator();
-            $validation = $validator->validate($input, [
+            $validation = Validator::validate($input, [
                 'email' => 'required|email',
                 'password' => 'required|string'
             ]);
@@ -606,8 +603,7 @@ class UserManagerController {
         try {
             LoggingMiddleware::logEntry();
             $input = Response::getRequestParams();
-            $validator = new Validator();
-            $validation = $validator->validate($input, [
+            $validation = Validator::validate($input, [
                 'name' => 'string|max:100',
                 'email' => 'email|max:100',
                 'bio' => 'nullable|string|max:500',
@@ -694,8 +690,7 @@ class UserManagerController {
         try {  
             LoggingMiddleware::logEntry();
             $input = Response::getRequestParams();      
-            $validator = new Validator();
-            $validation = $validator->validate(
+            $validation = Validator::validate(
                 $input,
                 [
                     'token' => 'required|string'
@@ -857,8 +852,7 @@ class UserManagerController {
             LoggingMiddleware::logEntry();
             $input = Response::getRequestParams();
             
-            $validator = new Validator();
-            $validation = $validator->validate($input, [
+            $validation = Validator::validate($input, [
                 'email' => 'required|email'
             ]);
             

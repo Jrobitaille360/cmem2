@@ -11,7 +11,6 @@ use AuthGroups\Utils\ColorName;
 use AuthGroups\Middleware\LoggingMiddleware;
 use AuthGroups\Services\LogService;
 use AuthGroups\Services\EmailService;
-use PHPUnit\TextUI\XmlConfiguration\Logging\Logging;
 
 class CalendarController
 {
@@ -24,8 +23,7 @@ class CalendarController
         $input = Response::getRequestParams();
     
         // Validation
-        $validator = new Validator();
-        $validation = $validator->validate($input, [
+        $validation = Validator::validate($input, [
                 'title' => 'required|string|max:100',
                 'description' => 'optionnal|string|max:1000',
                 'visibility' => 'optionnal|string|in:public,private',
@@ -112,6 +110,27 @@ class CalendarController
     public function getCalendarEvents($calendarId, $userId): void
     {
         LoggingMiddleware::logEntry();
+        $input = Response::getRequestParams();
+    
+        // Validation
+        $validation = Validator::validate($input, [
+                'start' => 'optional|date_or_datetime',
+                'end' => 'optional|date_or_datetime',
+                'last_update_after' => 'optional|datetime',
+            ]);
+
+        if (!$validation['valid']) {
+            LogService::warning("Données de création invalides", [
+                'errors' => $validation['errors']
+            ]);
+            LoggingMiddleware::logExit(400);
+            Response::error('Données invalides', $validation['errors'], 400);
+            return;
+        }
+
+        $start_datetime = $input['start'] ?? null;
+        $end_datetime = $input['end'] ?? null;
+        $last_update_after = $input['last_update_after'] ?? null;
 
         try {
             $cal = new Calendar();
@@ -129,7 +148,7 @@ class CalendarController
             }
 
             $eventModel = new CalendarEvent();
-            $events = $eventModel->getByCalendarId($calendarId);
+            $events = $eventModel->getByCalendarId($calendarId, $start_datetime, $end_datetime, true,$last_update_after);
 
             LoggingMiddleware::logExit(200);
             Response::success('Événements du calendrier récupérés avec succès', [
@@ -263,8 +282,7 @@ class CalendarController
     {
         LoggingMiddleware::logEntry();  
         $input = Response::getRequestParams();
-        $validator = new Validator();
-        $validation = $validator->validate($input, [
+        $validation = Validator::validate($input, [
             'user_id' => 'optional|integer',
             'email' => 'optional|email',
             'permission' => 'optional|string|in:read,write'
@@ -343,8 +361,7 @@ class CalendarController
     {
         LoggingMiddleware::logEntry();
         $input = Response::getRequestParams();
-        $validator = new Validator();
-        $validation = $validator->validate($input, [
+        $validation = Validator::validate($input, [
             'email' => 'required|email',
             'permission' => 'optional|string|in:read,write',
             'message' => 'optional|string|max:500'
@@ -483,8 +500,7 @@ class CalendarController
     {
         LoggingMiddleware::logEntry();
         $input = Response::getRequestParams();
-        $validator = new Validator();
-        $validation = $validator->validate($input, [
+        $validation = Validator::validate($input, [
             'user_id' => 'optional|integer',
             'email' => 'optional|email'
         ]);
@@ -646,8 +662,7 @@ class CalendarController
         $input = Response::getRequestParams();
         
         // Validation
-        $validator = new Validator();
-        $validation = $validator->validate($input, [
+        $validation = Validator::validate($input, [
             'title' => 'optionnal|string|max:100',
             'description' => 'optionnal|string|max:1000',
             'visibility' => 'optionnal|string|in:public,private',
@@ -846,14 +861,15 @@ class CalendarController
     /**
      * Crée un nouvel événement dans un calendrier
      */
+
+    // TODO AJOUTER LA TABLE DES RÉCURENCES
     public function createEvent($calendarId, $userId): void
     {
         LoggingMiddleware::logEntry();
         $input = Response::getRequestParams();
 
         // Validation des champs de base
-        $validator = new Validator();
-        $validation = $validator->validate($input, [
+        $validation = Validator::validate($input, [
             'title' => 'required|string',
             'start_datetime' => 'required|date_or_datetime',
             'end_datetime' => 'required|date_or_datetime',
@@ -951,14 +967,14 @@ class CalendarController
     /**
      * Met à jour un événement existant
      */
+    // TODO AJOUTER LA TABLE DES RÉCURENCES
     public function updateEvent($eventId, $calendarId, $userId): void
     {
         LoggingMiddleware::logEntry();
         $input = Response::getRequestParams();
         
         // Validation des champs de base
-        $validator = new Validator();
-        $validation = $validator->validate($input, [
+        $validation = Validator::validate($input, [
             'title' => 'optionnal|string',
             'start_datetime' => 'optionnal|date_or_datetime',
             'end_datetime' => 'optionnal|date_or_datetime',
@@ -1244,7 +1260,7 @@ class CalendarController
     }
 
     /**
-     * Obtient toutes les occurrences d'un événement récurrent
+     * Obtient toutes les occurrences (un jour) d'un événement depuis la table pré-calculée
      */
     public function getEventOccurrences($eventId, $calendarId, $userId): void
     {
@@ -1271,33 +1287,17 @@ class CalendarController
             LoggingMiddleware::logExit(404);
             Response::error('Événement non trouvé', 404);
             return;
-        }
-        
-        // Vérifier si l'événement a une règle de récurrence
-        if (empty($existingEvent['recurrence_rule'])) {
-            LoggingMiddleware::logExit(200);
-            Response::success('Cet événement n\'est pas récurrent', [
-                'is_recurring' => false,
-                'occurrences' => []
-            ]);
-            return;
-        }
+        } 
         
         // Récupérer les paramètres de période
         $startDate = $_GET['start_date'] ?? null;
         $endDate = $_GET['end_date'] ?? null;
-        $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 100;
         
         try {
-            // Générer les occurrences
-            $occurrences = \ICS\Services\RecurrenceService::getOccurrences(
-                $existingEvent,
-                $startDate,
-                $endDate,
-                $limit
-            );
+            // Utiliser les occurrences pré-calculées de la table event_occurrences
+            $occurrences = \ICS\Models\EventOccurrence::getByEventId($eventId, $startDate, $endDate);
             
-            LogService::info("Occurrences d'événement récurrent récupérées", [
+            LogService::info("Occurrences d'événement récupérées depuis table pré-calculée", [
                 'event_id' => $eventId,
                 'calendar_id' => $calendarId,
                 'count' => count($occurrences)
@@ -1305,15 +1305,70 @@ class CalendarController
             
             LoggingMiddleware::logExit(200);
             Response::success('Occurrences récupérées avec succès', [
-                'is_recurring' => true,
-                'parent_event' => $existingEvent,
                 'occurrences' => $occurrences,
                 'count' => count($occurrences)
             ]);
         } catch (\Exception $e) {
             LogService::error("Erreur lors de la récupération des occurrences", [
-                'exception' => $e->getMessage(),
-                'event_id' => $eventId
+                'exception' => $e->getMessage()
+            ]);
+            LoggingMiddleware::logExit(500);
+            Response::error('Erreur lors de la récupération des occurrences', 500);
+        }
+    }
+
+    /**
+     * Obtient toutes les occurrences d'un calendrier depuis la table pré-calculée
+    */
+    public function getEventsOccurrences($calendarId, $userId): void
+    {
+        LoggingMiddleware::logEntry();
+        
+        $input = Response::getRequestParams();
+        $validation = Validator::validate($input, [
+            'start_date' => 'optional|date',
+            'end_date' => 'optional|date'
+        ]);
+
+        if ($validation !== true) {
+            LogService::warning("Paramètres de récupération des occurrences invalides", [
+                'errors' => $validation['errors']
+            ]);
+            LoggingMiddleware::logExit(400);
+            Response::error('Paramètres invalides', $validation['errors'], 400);
+            return;
+        }
+
+        $cal = new Calendar();
+        
+        // Vérifier l'accès en lecture au calendrier (utiliser canUserWrite car il n'y a pas de canUserRead)
+        if (!$cal->canUserWrite($calendarId, $userId)) {
+            LoggingMiddleware::logExit(403);
+            Response::error('Permission insuffisante pour accéder à ce calendrier', 403);
+            return;
+        }
+
+        // Récupérer les paramètres de période
+        $startDate = $_GET['start_date'] ?? null;
+        $endDate = $_GET['end_date'] ?? null;
+        
+        try {
+            // Utiliser les occurrences pré-calculées de la table event_occurrences
+            $occurrences = \ICS\Models\EventOccurrence::getByCalendarId($calendarId, $startDate, $endDate);
+            
+            LogService::info("Occurrences du calendrier récupérées depuis table pré-calculée", [
+                'calendar_id' => $calendarId,
+                'count' => count($occurrences)
+            ]);
+            
+            LoggingMiddleware::logExit(200);
+            Response::success('Occurrences récupérées avec succès', [
+                'occurrences' => $occurrences,
+                'count' => count($occurrences)
+            ]);
+        } catch (\Exception $e) {
+            LogService::error("Erreur lors de la récupération des occurrences", [
+                'exception' => $e->getMessage()
             ]);
             LoggingMiddleware::logExit(500);
             Response::error('Erreur lors de la récupération des occurrences', 500);

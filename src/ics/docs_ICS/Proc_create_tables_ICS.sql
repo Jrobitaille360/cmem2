@@ -53,6 +53,34 @@ CREATE TABLE calendar_events (
     INDEX idx_event_dates (start_datetime, end_datetime)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Table pour les occurrences d'événements (fenêtre glissante: -6 mois à +1 an)
+CREATE TABLE event_occurrences (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    event_id INT NOT NULL,
+    calendar_id INT NOT NULL,
+    occurrence_date DATE NOT NULL,
+    start_datetime DATETIME NOT NULL,
+    end_datetime DATETIME NOT NULL,
+    recurrence_index INT NOT NULL DEFAULT 0,
+    is_modified BOOLEAN DEFAULT FALSE,
+    is_cancelled BOOLEAN DEFAULT FALSE,
+    modified_title VARCHAR(255),
+    modified_description TEXT,
+    modified_location VARCHAR(255),
+    modified_start_datetime DATETIME,
+    modified_end_datetime DATETIME,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (event_id) REFERENCES calendar_events(id) ON DELETE CASCADE,
+    FOREIGN KEY (calendar_id) REFERENCES calendars(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_event_occurrence (event_id, occurrence_date, recurrence_index),
+    INDEX idx_event_occurrences (event_id),
+    INDEX idx_calendar_occurrences (calendar_id),
+    INDEX idx_occurrence_dates (occurrence_date),
+    INDEX idx_date_range (start_datetime, end_datetime),
+    INDEX idx_calendar_dates (calendar_id, start_datetime, end_datetime)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Table pour les partages de calendriers
 CREATE TABLE calendar_shares (
     id INT AUTO_INCREMENT PRIMARY KEY,

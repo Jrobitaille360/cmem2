@@ -52,15 +52,19 @@ class CalendarRouteHandler extends BaseRouteHandler
                 $this->controller->getCalendarIcsByIdAndUserId((int)$action, $user['user_id']),
                 
             // POST /calendars/{id}/events - Créer un événement
-            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && $method === 'POST') => 
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && !isset($segments[3]) && $method === 'POST') => 
                 $this->controller->createEvent((int)$action, $user['user_id']),
-            
-            // GET /calendars/{id}/events/{eventId}/occurrences - Obtenir les occurrences d'un événement récurrent
+
+            // GET /calendars/{id}/events/{eventId}/occurrences - Obtenir les occurrences d'un événement récurrent spécifique
             ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && isset($segments[3]) && ctype_digit($segments[3]) && isset($segments[4]) && $segments[4] === 'occurrences' && $method === 'GET') => 
                 $this->controller->getEventOccurrences((int)$segments[3], (int)$action, $user['user_id']),
 
+            // GET /calendars/{id}/events/occurrences - Obtenir toutes les occurrences du calendrier entre deux dates
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && isset($segments[3]) && $segments[3] === 'occurrences' && !isset($segments[4]) && $method === 'GET') => 
+                $this->controller->getEventsOccurrences((int)$action, $user['user_id']),
+
             // GET /calendars/{id}/events - Lister les événements d'un calendrier
-            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && $method === 'GET') => 
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && !isset($segments[3]) && $method === 'GET') => 
                 $this->controller->getCalendarEvents((int)$action, $user['user_id']),
                 
             // PUT /calendars/{id}/events/{eventId} - Mettre à jour un événement

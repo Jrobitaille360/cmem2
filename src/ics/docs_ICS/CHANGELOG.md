@@ -16,16 +16,19 @@ Ajout de 4 nouveaux champs aux événements du calendrier :
 ### 🔧 Modifications techniques
 
 #### Base de données
+
 - **Nouveau script** : `Proc_add_new_event_fields.sql` - Migration pour ajouter les nouveaux champs
 - **Mis à jour** : `Proc_create_tables_ICS.sql` - Définition de table incluant les nouveaux champs
 
 #### Modèle
+
 - **Mis à jour** : `Models/CalendarEvent.php`
   - Propriétés publiques ajoutées : `$timezone`, `$meetingLink`, `$notifications`, `$color`
   - Méthodes `create()` et `update()` modifiées pour gérer les nouveaux champs
   - Gestion JSON pour le champ `notifications`
 
 #### Validation
+
 - **Nouveau fichier** : `Utils/EventValidator.php` - Classe utilitaire complète
   - `validateTimezone()` - Validation des fuseaux horaires
   - `validateMeetingLink()` - Validation des URLs de réunion
@@ -34,28 +37,32 @@ Ajout de 4 nouveaux champs aux événements du calendrier :
   - `validateEventFields()` - Validation complète de tous les champs
 
 **Fuseaux horaires supportés** :
+
 - America/Montreal, America/Toronto, America/New_York
 - America/Chicago, America/Denver, America/Los_Angeles, America/Vancouver
 - Europe/Paris, Europe/London, Europe/Berlin
 - UTC
 
 #### Contrôleur
+
 - **Mis à jour** : `Controllers/CalendarController.php`
   - Méthode `createEvent()` : Support des nouveaux champs avec validation
   - Méthode `updateEvent()` : Mise à jour des nouveaux champs
 
 ### 📚 Documentation
+
 - **Mis à jour** : `API_ENDPOINTS_v1_0_0.json` - Documentation des nouveaux champs dans l'API
 - **Mis à jour** : `README.md` - Section nouveaux champs d'événement
 
 ### 🧪 Tests
+
 - Tests manuels validés pour création et mise à jour d'événements avec nouveaux champs
 - Validation des fuseaux horaires et couleurs
 - Tests d'import/export ICS avec nouveaux champs
 
 ---
 
-### ✨ Nouveautés
+### ✨ Nouveautés 1
 
 #### Support complet des événements récurrents (RRULE)
 
@@ -82,7 +89,7 @@ Ajout de 4 nouveaux champs aux événements du calendrier :
   - Validation stricte selon RFC 5545
   - Support des récurrences infinies (sans COUNT ni UNTIL)
 
-### 📚 Documentation
+### 📚 Documentation 1
 
 - **RECURRENCE.md** : Guide complet (300+ lignes)
   - Architecture du service
@@ -100,7 +107,7 @@ Ajout de 4 nouveaux champs aux événements du calendrier :
   - Ajout de la référence au guide des récurrences
   - Mise à jour du nombre de fichiers et lignes de code
 
-### 🧪 Tests
+### 🧪 Tests 1
 
 - **test_recurrence_events.php** : Script de test complet
   - Test des récurrences quotidiennes (DAILY)

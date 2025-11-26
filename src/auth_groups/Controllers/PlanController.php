@@ -73,8 +73,7 @@ class PlanController
             $input = Response::getRequestParams();
             
             // Validation
-            $validator = new Validator();
-            $validation = $validator->validate($input, [
+            $validation = Validator::validate($input, [
                 'token' => 'required|string',
                 'plan' => 'required|string|in:bronze,argent,platine'
             ]);

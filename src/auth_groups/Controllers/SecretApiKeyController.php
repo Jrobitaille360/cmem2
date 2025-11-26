@@ -39,8 +39,7 @@ class SecretApiKeyController
             }
 
             // Validation des données d'entrée
-            $validator = new Validator();
-            $validation = $validator->validate($input, [
+            $validation = Validator::validate($input, [
                 'admin_secret' => 'required|string',
                 'user_id' => 'required|integer',
                 'name' => 'required|string|min:3|max:100',
@@ -278,8 +277,7 @@ class SecretApiKeyController
             }
 
             // Validation des données d'entrée
-            $validator = new Validator();
-            $validation = $validator->validate($input, [
+            $validation = Validator::validate($input, [
                 'admin_secret' => 'required|string',
                 'reason' => 'optional|string|max:255'
             ]);
@@ -349,8 +347,7 @@ class SecretApiKeyController
         try {
             $input = Response::getRequestParams();
             // Validation des données d'entrée
-            $validator = new Validator();
-            $validation = $validator->validate($input, [
+            $validation = Validator::validate($input, [
                 'admin_secret' => 'required|string'
             ]);
 

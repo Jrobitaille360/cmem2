@@ -146,8 +146,7 @@ class GroupMemberController
             LoggingMiddleware::logEntry();
             
             $input = Response::getRequestParams();
-            $validator = new Validator();
-            $validation = $validator->validate($input, [
+            $validation = Validator::validate($input, [
                 'role' => 'required|string|in:admin,moderator,member'
             ]);
 
@@ -240,8 +239,7 @@ class GroupMemberController
             LoggingMiddleware::logEntry();
             
             $input = Response::getRequestParams();
-            $validator = new Validator();
-            $validation = $validator->validate($input, [
+            $validation = Validator::validate($input, [
                 'role' => 'string|in:admin,moderator,member'
             ]);
 

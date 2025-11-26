@@ -22,8 +22,7 @@ class UserPasswordController {
         // Logique pour demander un changement de mot de passe
         LoggingMiddleware::logEntry();
         $input = Response::getRequestParams();
-        $validator = new Validator();
-        $validation = $validator->validate(
+        $validation = Validator::validate(
             $input,
             ['email' => 'required|email']
         );
@@ -65,8 +64,7 @@ class UserPasswordController {
         try {  
             LoggingMiddleware::logEntry();
             $input = Response::getRequestParams();      
-            $validator = new Validator();
-            $validation = $validator->validate(
+            $validation = Validator::validate(
                 $input,
                 [
                     'new_password' => 'required|string|min:6',
@@ -139,16 +137,15 @@ class UserPasswordController {
                 return false;
             }
             // Vérifier l'authentification
-            $validator = new Validator();
             if ( $userId !== $currentUserId) {
-                $validation = $validator->validate(
+                $validation = Validator::validate(
                 $input,
                 [
                     'new_password' => 'required|string|min:6',
                 ]
                 );
             } else {
-                $validation = $validator->validate(
+                $validation = Validator::validate(
                     $input,
                     [
                         'current_password' => 'required|string',

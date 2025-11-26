@@ -26,8 +26,7 @@ class UserAppController
             $input = Response::getRequestParams();
 
             // Validation
-            $validator = new Validator();
-            $validation = $validator->validate($input, [
+            $validation = Validator::validate($input, [
                 'app_id' => 'required|string|max:255',
                 'json_data' => 'nullable|json'
             ]);
@@ -191,8 +190,7 @@ class UserAppController
             $input = Response::getRequestParams();
 
             // Validation
-            $validator = new Validator();
-            $validation = $validator->validate($input, [
+            $validation = Validator::validate($input, [
                 'json_data' => 'nullable|json'
             ]);
 

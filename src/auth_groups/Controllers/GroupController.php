@@ -5,7 +5,7 @@ namespace AuthGroups\Controllers;
 use AuthGroups\Models\Group;
 use AuthGroups\Models\User;
 use AuthGroups\Utils\Response;
-use AuthGroups\Utils\Validator;
+//use AuthGroups\Utils\Validator;
 use AuthGroups\Services\LogService;
 use AuthGroups\Services\AuthService;
 use AuthGroups\Services\UserService;

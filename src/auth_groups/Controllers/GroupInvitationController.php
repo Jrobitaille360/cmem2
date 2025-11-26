@@ -16,29 +16,11 @@ class GroupInvitationController
     /**
      * Inviter un utilisateur à rejoindre un groupe
      */
-    public function inviteUser(int $groupId, ?int $currentUserId = null, ?string $currentUserRole = null): bool {
+    public function inviteUser(int $groupId, int $currentUserId , string $currentUserRole): bool {
         try {
-            // Si les paramètres d'utilisateur ne sont pas fournis, utiliser l'authentification depuis les headers
-            if ($currentUserId === null || $currentUserRole === null) {
-                $token = AuthService::extractTokenFromHeader();
-                if (!$token) {
-                    Response::error('Token d\'authentification requis', null, 401);
-                    return false;
-                }
-
-                $userData = AuthService::validateToken($token);
-                if (!$userData) {
-                    Response::error('Token invalide', null, 401);
-                    return false;
-                }
-                
-                $currentUserId = $userData['user_id'];
-                $currentUserRole = $userData['role'];
-            }
 
             $input = json_decode(file_get_contents('php://input'), true);
-            $validator = new Validator();
-            $validation =$validator->validate($input,[
+            $validation =Validator::validate($input,[
                 'email' => 'required|email'
             ]);
             if (!$validation['valid']) {
@@ -107,11 +89,24 @@ class GroupInvitationController
     /**
      * Rejoindre un groupe via un token d'invitation
      */
+    // TODO : valider car email semble suffisant et dédoubler avec joinByCode
     public function joinGroup(): bool {
         try {
-            $email = $_GET['email'] ?? null;
-            $role = $_GET['role'] ?? null;
-            $code = $_GET['code'] ?? null;
+            $input = json_decode(file_get_contents('php://input'), true);
+            $validation =Validator::validate($input,[
+                'email' => 'optional|email',
+                'role' => 'optional|in:member,moderator,admin',
+                'code'=> 'optional|string|max:255'
+            ]);
+            if (!$validation['valid']) {
+                Response::error('email invalide ou requis',$validation['errors'],  400);
+                return false;
+            }
+
+            $email = $input['email'] ?? null;
+            $role = $input['role'] ?? null;
+            $code = $input['code'] ?? null;
+
             if (!$email || !$role || !$code) {
                 Response::error('Paramètres manquants (email, role, code)', null, 400);
                 return false;
@@ -204,8 +199,7 @@ class GroupInvitationController
             $input = Response::getRequestParams();
             
             // Validation des paramètres
-            $validator = new Validator();
-            $validation = $validator->validate($input, [
+            $validation = Validator::validate($input, [
                 "code" => "required|string|max:255",
                 "email" => "required|email",
                 "role" => "required|in:member,moderator,admin"

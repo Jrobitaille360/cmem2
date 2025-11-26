@@ -147,8 +147,7 @@ class GroupListController
             LoggingMiddleware::logEntry();
             
             $input = Response::getRequestParams();
-            $validator = new Validator();
-            $validation = $validator->validate($input, [
+            $validation = Validator::validate($input, [
                 'q' => 'required|string|min:1',
                 'visibility' => 'optionnal|string|in:public,private,all'
             ]);

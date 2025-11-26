@@ -214,8 +214,7 @@ class TagController {
             $input = Response::getRequestParams();
             
             // Validation
-            $validator = new Validator();
-            $validation = $validator->validate($input, [
+            $validation = Validator::validate($input, [
                 'name' => 'required|string|min:1|max:100',
                 'table_associate' => 'required|in:groups,files,all',
                 'color' => 'color'
@@ -323,8 +322,7 @@ class TagController {
             $input = Response::getRequestParams();
             
             // Validation
-            $validator = new Validator();
-            $validation = $validator->validate($input, [
+            $validation = Validator::validate($input, [
                 'name' => 'string|min:1|max:100',
                 'table_associate' => 'in:groups,files,all',
                 'color' => 'color'
@@ -518,8 +516,7 @@ class TagController {
             $input = Response::getRequestParams();
             
             // Validation
-            $validator = new Validator();
-            $validation = $validator->validate($input, [
+            $validation = Validator::validate($input, [
                 'name' => 'required|string|min:1|max:100',
                 'table_associate' => 'in:groups,files,all',
                 'color' => 'color'
@@ -650,8 +647,7 @@ class TagController {
             $input = Response::getRequestParams();
             
             // Validation
-            $validator = new Validator();
-            $validation = $validator->validate($input, [
+            $validation = Validator::validate($input, [
                 'table_associate' => 'required|in:groups,files'
             ]);
             

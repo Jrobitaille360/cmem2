@@ -21,8 +21,7 @@ class GroupManagerController
             LoggingMiddleware::logEntry();
             
             $input = Response::getRequestParams();
-            $validator = new Validator();
-            $validation = $validator->validate($input, [
+            $validation = Validator::validate($input, [
                 'name' => 'required|string|max:100',
                 'description' => 'optionnal|string|max:1000',
                 'visibility' => 'optionnal|string|in:public,private',
@@ -103,8 +102,7 @@ class GroupManagerController
             }
 
             $input = Response::getRequestParams();
-            $validator = new Validator();
-            $validation = $validator->validate($input, [
+            $validation = Validator::validate($input, [
                 'name' => 'optionnal|string|max:100',
                 'description' => 'optionnal|string|max:1000',
                 'visibility' => 'optionnal|string|in:public,private',
@@ -178,8 +176,7 @@ class GroupManagerController
                 return false;
             }
             $input = Response::getRequestParams();
-            $validator = new Validator();
-            $validation = $validator->validate($input, [
+            $validation = Validator::validate($input, [
                 'force_delete' => 'optionnal|boolean'
             ]);
             if (!$validation['valid']) {

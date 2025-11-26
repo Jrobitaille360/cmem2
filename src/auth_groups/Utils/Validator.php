@@ -6,33 +6,33 @@ use AuthGroups\Utils\ColorName;
 
 class Validator {
     
-    private $errors = [];
+    public static  $errors = [];
     
     /**
      * Valider des données selon des règles
      */
-    public function validate($data, $rules): array {
-        $this->errors = [];
+    public static  function validate($data, $rules): array {
+        self::$errors = [];
         
         foreach ($rules as $field => $ruleString) {
             $fieldRules = explode('|', $ruleString);
             $value = $data[$field] ?? null;
             
             foreach ($fieldRules as $rule) {
-                $this->applyRule($field, $value, $rule, $data);
+                self::applyRule($field, $value, $rule, $data);
             }
         }
         
         return [
-            'valid' => empty($this->errors),
-            'errors' => $this->errors
+            'valid' => empty(self::$errors),
+            'errors' => self::$errors
         ];
     }
     
     /**
      * Appliquer une règle de validation
      */
-    private function applyRule($field, $value, $rule, $allData) {
+        private static  function applyRule($field, $value, $rule, $allData) {
         $parts = explode(':', $rule, 2);
         $ruleName = $parts[0];
         $parameter = $parts[1] ?? null;
@@ -40,19 +40,19 @@ class Validator {
         switch ($ruleName) {
             case 'required':
                 if (empty($value) && $value !== '0' && $value !== 0) {
-                    $this->addError($field, "Le champ {$field} est requis");
+                    self::addError($field, "Le champ {$field} est requis");
                 }
                 break;
                 
             case 'string':
                 if ($value !== null && !is_string($value)) {
-                    $this->addError($field, "Le champ {$field} doit être une chaîne de caractères");
+                    self::addError($field, "Le champ {$field} doit être une chaîne de caractères");
                 }
                 break;
                 
             case 'email':
                 if ($value !== null && !filter_var($value, FILTER_VALIDATE_EMAIL)) {
-                    $this->addError($field, "Le champ {$field} doit être un email valide");
+                    self::addError($field, "Le champ {$field} doit être un email valide");
                 }
                 break;
                 
@@ -60,7 +60,7 @@ class Validator {
                 if ($value !== null) {
                     $length = is_string($value) ? strlen($value) : $value;
                     if ($length < (int)$parameter) {
-                        $this->addError($field, "Le champ {$field} doit avoir au minimum {$parameter} caractères");
+                        self::addError($field, "Le champ {$field} doit avoir au minimum {$parameter} caractères");
                     }
                 }
                 break;
@@ -69,48 +69,48 @@ class Validator {
                 if ($value !== null) {
                     $length = is_string($value) ? strlen($value) : $value;
                     if ($length > (int)$parameter) {
-                        $this->addError($field, "Le champ {$field} doit avoir au maximum {$parameter} caractères");
+                        self::addError($field, "Le champ {$field} doit avoir au maximum {$parameter} caractères");
                     }
                 }
                 break;
                 
             case 'integer':
                 if ($value !== null && !filter_var($value, FILTER_VALIDATE_INT)) {
-                    $this->addError($field, "Le champ {$field} doit être un entier");
+                    self::addError($field, "Le champ {$field} doit être un entier");
                 }
                 break;
                 
             case 'numeric':
                 if ($value !== null && !is_numeric($value)) {
-                    $this->addError($field, "Le champ {$field} doit être numérique");
+                    self::addError($field, "Le champ {$field} doit être numérique");
                 }
                 break;
                 
             case 'boolean':
                 if ($value !== null && !is_bool($value) && !in_array($value, [0, 1, '0', '1', 'true', 'false'])) {
-                    $this->addError($field, "Le champ {$field} doit être un booléen");
+                    self::addError($field, "Le champ {$field} doit être un booléen");
                 }
                 break;
                 
             case 'date':
-                if ($value !== null && !$this->isValidDate($value)) {
-                    $this->addError($field, "Le champ {$field} doit être une date valide (YYYY-MM-DD)");
+                if ($value !== null && !self::isValidDate($value)) {
+                    self::addError($field, "Le champ {$field} doit être une date valide (YYYY-MM-DD)");
                 }
                 break;
                 
             case 'datetime':
-                if ($value !== null && !$this->isValidDateTime($value)) {
-                    $this->addError($field, "Le champ {$field} doit être une date/heure valide (YYYY-MM-DD HH:MM:SS)");
+                if ($value !== null && !self::isValidDateTime($value)) {
+                    self::addError($field, "Le champ {$field} doit être une date/heure valide (YYYY-MM-DD HH:MM:SS)");
                 }
                 break;
             case 'date_or_datetime':
-                if ($value !== null && !$this->isValidDate($value) && !$this->isValidDateTime($value)) {
-                    $this->addError($field, "Le champ {$field} doit être une date ou une date/heure valide");
+                if ($value !== null && !self::isValidDate($value) && !self::isValidDateTime($value)) {
+                    self::addError($field, "Le champ {$field} doit être une date ou une date/heure valide");
                 }
                 break;    
             case 'url':
                 if ($value !== null && !filter_var($value, FILTER_VALIDATE_URL)) {
-                    $this->addError($field, "Le champ {$field} doit être une URL valide");
+                    self::addError($field, "Le champ {$field} doit être une URL valide");
                 }
                 break;
                 
@@ -118,7 +118,7 @@ class Validator {
                 if ($value !== null) {
                     $allowedValues = explode(',', $parameter);
                     if (!in_array($value, $allowedValues)) {
-                        $this->addError($field, "Le champ {$field} doit être l'une des valeurs suivantes: " . implode(', ', $allowedValues));
+                        self::addError($field, "Le champ {$field} doit être l'une des valeurs suivantes: " . implode(', ', $allowedValues));
                     }
                 }
                 break;
@@ -131,43 +131,43 @@ class Validator {
             case 'confirmed':
                 $confirmField = $field . '_confirmation';
                 if ($value !== ($allData[$confirmField] ?? null)) {
-                    $this->addError($field, "Le champ {$field} et sa confirmation ne correspondent pas");
+                    self::addError($field, "Le champ {$field} et sa confirmation ne correspondent pas");
                 }
                 break;
                 
             case 'array':
                 if ($value !== null && !is_array($value)) {
-                    $this->addError($field, "Le champ {$field} doit être un tableau");
+                    self::addError($field, "Le champ {$field} doit être un tableau");
                 }
                 break;
                 
             case 'json':
                 if ($value !== null && json_decode($value) === null && json_last_error() !== JSON_ERROR_NONE) {
-                    $this->addError($field, "Le champ {$field} doit être un JSON valide");
+                    self::addError($field, "Le champ {$field} doit être un JSON valide");
                 }
                 break;
                 
             case 'alpha':
                 if ($value !== null && !ctype_alpha($value)) {
-                    $this->addError($field, "Le champ {$field} ne doit contenir que des lettres");
+                    self::addError($field, "Le champ {$field} ne doit contenir que des lettres");
                 }
                 break;
                 
             case 'alpha_num':
                 if ($value !== null && !ctype_alnum($value)) {
-                    $this->addError($field, "Le champ {$field} ne doit contenir que des lettres et des chiffres");
+                    self::addError($field, "Le champ {$field} ne doit contenir que des lettres et des chiffres");
                 }
                 break;
                 
             case 'regex':
                 if ($value !== null && !preg_match($parameter, $value)) {
-                    $this->addError($field, "Le champ {$field} ne correspond pas au format requis");
+                    self::addError($field, "Le champ {$field} ne correspond pas au format requis");
                 }
                 break;
                 
             case 'file':
                 if ($value !== null && !is_uploaded_file($value['tmp_name'] ?? '')) {
-                    $this->addError($field, "Le champ {$field} doit être un fichier valide");
+                    self::addError($field, "Le champ {$field} doit être un fichier valide");
                 }
                 break;
                 
@@ -176,31 +176,31 @@ class Validator {
                     $allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
                     $mimeType = $value['type'] ?? '';
                     if (!in_array($mimeType, $allowedMimes)) {
-                        $this->addError($field, "Le champ {$field} doit être une image valide (JPEG, PNG, GIF, WebP)");
+                        self::addError($field, "Le champ {$field} doit être une image valide (JPEG, PNG, GIF, WebP)");
                     }
                 }
                 break;
                 
             case 'max_size':
                 if ($value !== null && isset($value['size'])) {
-                    $maxSize = $this->parseSize($parameter);
+                    $maxSize = self::parseSize($parameter);
                     if ($value['size'] > $maxSize) {
-                        $this->addError($field, "Le fichier {$field} ne doit pas dépasser " . $this->formatSize($maxSize));
+                        self::addError($field, "Le fichier {$field} ne doit pas dépasser " . self::formatSize($maxSize));
                     }
                 }
                 break;
                 
             case 'color':
                 // Valide une couleur (hex, nom, RGB, HSL, etc.)
-                if ($value !== null && !$this->validateColor($value)) {
-                    $this->addError($field, "Le champ {$field} doit être une couleur valide (ex: #RRGGBB, RED, rgb(255,0,0), hsl(120,50%,50%))");
+                if ($value !== null && !self::validateColor($value)) {
+                    self::addError($field, "Le champ {$field} doit être une couleur valide (ex: #RRGGBB, RED, rgb(255,0,0), hsl(120,50%,50%))");
                 }
                 break;
                 
             case 'hex_color':
                 // Valide uniquement le format hexadécimal
-                if ($value !== null && !$this->validateHexColor($value)) {
-                    $this->addError($field, "Le champ {$field} doit être une couleur hexadécimale valide (#RRGGBB)");
+                if ($value !== null && !self::validateHexColor($value)) {
+                    self::addError($field, "Le champ {$field} doit être une couleur hexadécimale valide (#RRGGBB)");
                 }
                 break;
         }
@@ -209,18 +209,18 @@ class Validator {
     /**
      * Ajouter une erreur
      */
-    private function addError($field, $message) {
-        if (!isset($this->errors[$field])) {
-            $this->errors[$field] = [];
+    private static function addError($field, $message) {
+        if (!isset(self::$errors[$field])) {
+            self::$errors[$field] = [];
         }
-        $this->errors[$field][] = $message;
+        self::$errors[$field][] = $message;
     }
     
     /**
      * Vérifier si une date est valide
      * Accepte plusieurs formats: Y-m-d, d/m/Y, m/d/Y, Y/m/d, d-m-Y, m-d-Y
      */
-    private function isValidDate($date) {
+    public static function isValidDate($date) {
         $formats = ['Y-m-d', 'd/m/Y', 'm/d/Y', 'Y/m/d', 'd-m-Y', 'm-d-Y'];
         
         foreach ($formats as $format) {
@@ -232,12 +232,12 @@ class Validator {
         
         return false;
     }
-    
+
     /**
      * Vérifier si une date/heure est valide
      * Accepte plusieurs formats avec ou sans secondes, avec différents séparateurs
      */
-    private function isValidDateTime($datetime) {
+    public static function isValidDateTime($datetime) {
         $formats = [
             'Y-m-d H:i:s',
             'Y-m-d H:i',
@@ -273,7 +273,7 @@ class Validator {
     /**
      * Convertir une taille en octets
      */
-    private function parseSize($size) {
+    public static  function parseSize($size) {
         $units = ['B' => 1, 'KB' => 1024, 'MB' => 1048576, 'GB' => 1073741824];
         
         if (is_numeric($size)) {
@@ -292,7 +292,7 @@ class Validator {
     /**
      * Formater une taille en unité lisible
      */
-    private function formatSize($bytes) {
+    public static  function formatSize($bytes) {
         $units = ['B', 'KB', 'MB', 'GB'];
         $factor = floor((strlen($bytes) - 1) / 3);
         return sprintf("%.2f %s", $bytes / pow(1024, $factor), $units[$factor]);
@@ -301,7 +301,7 @@ class Validator {
     /**
      * Valider les types de médias autorisés
      */
-    public function validateMediaType($mediaType) {
+    public static  function validateMediaType($mediaType) {
         $allowedTypes = ['text', 'audio', 'video', 'image', 'gpx', 'summary', 'event', 'todo', 'document'];
         return in_array($mediaType, $allowedTypes);
     }
@@ -309,7 +309,7 @@ class Validator {
     /**
      * Valider les niveaux de visibilité
      */
-    public function validateVisibility($visibility) {
+    public static  function validateVisibility($visibility) {
         $allowedVisibilities = ['private', 'shared', 'public'];
         return in_array($visibility, $allowedVisibilities);
     }
@@ -317,7 +317,7 @@ class Validator {
     /**
      * Valider les rôles d'utilisateur
      */
-    public function validateUserRole($role) {
+    public static  function validateUserRole($role) {
         $allowedRoles = ['ADMINISTRATEUR', 'UTILISATEUR'];
         return in_array($role, $allowedRoles);
     }
@@ -325,7 +325,7 @@ class Validator {
     /**
      * Valider les rôles de groupe
      */
-    public function validateGroupRole($role) {
+    public static  function validateGroupRole($role) {
         $allowedRoles = ['admin', 'moderator', 'member'];
         return in_array($role, $allowedRoles);
     }
@@ -333,7 +333,7 @@ class Validator {
     /**
      * Nettoyer et valider les coordonnées GPS
      */
-    public function validateCoordinates($latitude, $longitude) {
+    public static  function validateCoordinates($latitude, $longitude) {
         $lat = filter_var($latitude, FILTER_VALIDATE_FLOAT);
         $lon = filter_var($longitude, FILTER_VALIDATE_FLOAT);
         
@@ -347,7 +347,7 @@ class Validator {
     /**
      * Valider une couleur (tous formats supportés par ColorName)
      */
-    public function validateColor($color) {
+    public static  function validateColor($color) {
         if (empty($color)) {
             return false;
         }
@@ -367,7 +367,7 @@ class Validator {
     /**
      * Valider une couleur hexadécimale
      */
-    public function validateHexColor($color) {
+    public static  function validateHexColor($color) {
         // Méthode mise à jour pour utiliser ColorName
         if (empty($color)) {
             return false;
