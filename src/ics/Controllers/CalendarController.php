@@ -77,7 +77,7 @@ class CalendarController
                 'exception' => $e->getMessage()
             ]);
             LoggingMiddleware::logExit(500);
-            Response::error('Erreur lors de la création du calendrier', 500);
+            Response::error('Erreur lors de la création du calendrier', null, 500);
         }
     }
     
@@ -100,7 +100,7 @@ class CalendarController
                 'exception' => $e->getMessage()
             ]);
             LoggingMiddleware::logExit(500);
-            Response::error('Erreur lors de la récupération des calendriers', 500);
+            Response::error('Erreur lors de la récupération des calendriers', null, 500);
         }
     }
 
@@ -143,7 +143,7 @@ class CalendarController
                     'user_id' => $userId
                 ]);
                 LoggingMiddleware::logExit(404);
-                Response::error('Calendrier non trouvé ou accès non autorisé', 404);
+                Response::error('Calendrier non trouvé ou accès non autorisé', null, 404);
                 return;
             }
 
@@ -160,7 +160,7 @@ class CalendarController
                 'exception' => $e->getMessage()
             ]);
             LoggingMiddleware::logExit(500);
-            Response::error('Erreur lors de la récupération des événements', 500);
+            Response::error('Erreur lors de la récupération des événements', null, 500);
         }
     }
     
@@ -179,7 +179,7 @@ class CalendarController
                     'share_token' => $shareToken
                 ]);
                 LoggingMiddleware::logExit(404);
-                Response::error('Calendrier non trouvé', 404);
+                Response::error('Calendrier non trouvé', null, 404);
                 return;
             }
             
@@ -198,7 +198,7 @@ class CalendarController
                 'exception' => $e->getMessage()
             ]);
             LoggingMiddleware::logExit(500);
-            Response::error('Erreur lors de la génération du fichier ICS', 500);
+            Response::error('Erreur lors de la génération du fichier ICS', null, 500);
         }
     }
 
@@ -217,7 +217,7 @@ class CalendarController
                     'share_token' => $shareToken,
                     'user_id' => $userId
                 ]);
-                Response::error('Calendrier non trouvé', 404);
+                Response::error('Calendrier non trouvé', null, 404);
                 return;
             }
             
@@ -231,7 +231,7 @@ class CalendarController
             LogService::error("Erreur lors de la génération du fichier ICS", [
                 'exception' => $e->getMessage()
             ]);
-            Response::error('Erreur lors de la génération du fichier ICS', 500);
+            Response::error('Erreur lors de la génération du fichier ICS', null, 500);
         }
     }
 
@@ -252,7 +252,7 @@ class CalendarController
                     'user_id' => $userId
                 ]);
                 LoggingMiddleware::logExit(404);
-                Response::error('Calendrier non trouvé', 404);
+                Response::error('Calendrier non trouvé', null, 404);
                 return;
             }
             
@@ -271,7 +271,7 @@ class CalendarController
                 'exception' => $e->getMessage()
             ]);
             LoggingMiddleware::logExit(500);
-            Response::error('Erreur lors de la génération du fichier ICS', 500);
+            Response::error('Erreur lors de la génération du fichier ICS', null, 500);
         }
     }
 
@@ -300,7 +300,7 @@ class CalendarController
         // Vérifier qu'au moins user_id ou email est fourni
         if (!isset($input['user_id']) && !isset($input['email'])) {
             LoggingMiddleware::logExit(400);
-            Response::error('Vous devez fournir soit user_id soit email', 400);
+            Response::error('Vous devez fournir soit user_id soit email', null, 400);
             return;
         }
         
@@ -314,7 +314,7 @@ class CalendarController
                 'user_id' => $userId
             ]);
             LoggingMiddleware::logExit(403);
-            Response::error('Permission insuffisante pour partager ce calendrier', 403);
+            Response::error('Permission insuffisante pour partager ce calendrier', null, 403);
             return;
         }
         
@@ -350,7 +350,7 @@ class CalendarController
                 'exception' => $e->getMessage()
             ]);
             LoggingMiddleware::logExit(500);
-            Response::error('Erreur lors du partage du calendrier', 500);
+            Response::error('Erreur lors du partage du calendrier', null, 500);
         }
     }
     
@@ -387,7 +387,7 @@ class CalendarController
                 'user_id' => $userId
             ]);
             LoggingMiddleware::logExit(403);
-            Response::error('Accès refusé à ce calendrier', 403);
+            Response::error('Accès refusé à ce calendrier', null, 403);
             return;
         }
         
@@ -480,7 +480,7 @@ class CalendarController
                     'recipient' => $recipientEmail
                 ]);
                 LoggingMiddleware::logExit(500);
-                Response::error('Erreur lors de l\'envoi de l\'email', 500);
+                Response::error('Erreur lors de l\'envoi de l\'email', null, 500);
             }
         } catch (\Exception $e) {
             LogService::error("Erreur lors de l'envoi du token par email", [
@@ -489,7 +489,7 @@ class CalendarController
                 'user_id' => $userId
             ]);
             LoggingMiddleware::logExit(500);
-            Response::error('Erreur lors de l\'envoi de l\'email', 500);
+            Response::error('Erreur lors de l\'envoi de l\'email', null, 500);
         }
     }
     
@@ -517,7 +517,7 @@ class CalendarController
         // Vérifier qu'au moins user_id ou email est fourni
         if (!isset($input['user_id']) && !isset($input['email'])) {
             LoggingMiddleware::logExit(400);
-            Response::error('Vous devez fournir soit user_id soit email', 400);
+            Response::error('Vous devez fournir soit user_id soit email', null, 400);
             return;
         }
 
@@ -535,7 +535,7 @@ class CalendarController
                 'target_email' => $targetEmail
             ]);
             LoggingMiddleware::logExit(403);
-            Response::error('Permission insuffisante pour supprimer ce partage', 403);
+            Response::error('Permission insuffisante pour supprimer ce partage', null, 403);
             return;
         }
 
@@ -548,7 +548,7 @@ class CalendarController
                 'target_email' => $targetEmail
             ]);
             LoggingMiddleware::logExit(404);
-            Response::error('Partage non trouvé', 404);
+            Response::error('Partage non trouvé', null, 404);
             return;
         }
 
@@ -581,7 +581,7 @@ class CalendarController
                 'exception' => $e->getMessage()
             ]);
             LoggingMiddleware::logExit(500);
-            Response::error('Erreur lors de la suppression du partage du calendrier', 500);
+            Response::error('Erreur lors de la suppression du partage du calendrier', null, 500);
         }
     }
 
@@ -595,7 +595,7 @@ class CalendarController
         if (!isset($_FILES['icsfile']) || $_FILES['icsfile']['error'] !== UPLOAD_ERR_OK) {
             LogService::warning("Aucun fichier ICS n'a été envoyé ou une erreur s'est produite.", []);
             LoggingMiddleware::logExit(400);
-            Response::error('Aucun fichier ICS n\'a été envoyé ou une erreur s\'est produite.', 400);
+            Response::error('Aucun fichier ICS n\'a été envoyé ou une erreur s\'est produite.', null, 400);
             return;
         }
 
@@ -611,7 +611,7 @@ class CalendarController
         } catch (\Exception $e) {
             LogService::error("Erreur lors de l'importation du fichier ICS", ['exception' => $e->getMessage()]);
             LoggingMiddleware::logExit(500);
-            Response::error('Erreur lors de l\'importation du fichier ICS: ' . $e->getMessage(), 500);
+            Response::error('Erreur lors de l\'importation du fichier ICS: ' . $e->getMessage(), null, 500);
         }
     }
     
@@ -631,7 +631,7 @@ class CalendarController
                     'share_token' => $shareToken
                 ]);
                 LoggingMiddleware::logExit(404);
-                Response::error('Calendrier non trouvé', 404);
+                Response::error('Calendrier non trouvé', null, 404);
                 return;
             }
             
@@ -648,7 +648,7 @@ class CalendarController
                 'exception' => $e->getMessage()
             ]);
             LoggingMiddleware::logExit(500);
-            Response::error('Erreur lors de la génération du fichier ICS', 500);
+            Response::error('Erreur lors de la génération du fichier ICS', null, 500);
         }
     }
 
@@ -699,7 +699,7 @@ class CalendarController
                 'user_id' => $userId
             ]);
             LoggingMiddleware::logExit(403);
-            Response::error('Permission insuffisante pour modifier ce calendrier', 403);
+            Response::error('Permission insuffisante pour modifier ce calendrier', null, 403);
             return;
         }
         
@@ -757,7 +757,7 @@ class CalendarController
                 'exception' => $e->getMessage()
             ]);
             LoggingMiddleware::logExit(500);
-            Response::error('Erreur lors de la mise à jour du calendrier', 500);
+            Response::error('Erreur lors de la mise à jour du calendrier', null, 500);
         }
     }
 
@@ -777,7 +777,7 @@ class CalendarController
                 'user_id' => $userId
             ]);
             LoggingMiddleware::logExit(403);
-            Response::error('Permission insuffisante pour supprimer ce calendrier', 403);
+            Response::error('Permission insuffisante pour supprimer ce calendrier', null, 403);
             return;
         }
         
@@ -806,7 +806,7 @@ class CalendarController
                 'exception' => $e->getMessage()
             ]);
             LoggingMiddleware::logExit(500);
-            Response::error('Erreur lors de la suppression du calendrier', 500);
+            Response::error('Erreur lors de la suppression du calendrier', null, 500);
         }
     }
 
@@ -826,7 +826,7 @@ class CalendarController
                 'user_id' => $userId
             ]);
             LoggingMiddleware::logExit(403);
-            Response::error('Permission insuffisante pour supprimer définitivement ce calendrier', 403);
+            Response::error('Permission insuffisante pour supprimer définitivement ce calendrier', null, 403);
             return;
         }
         
@@ -854,7 +854,7 @@ class CalendarController
                 'exception' => $e->getMessage()
             ]);
             LoggingMiddleware::logExit(500);
-            Response::error('Erreur lors de la suppression définitive du calendrier', 500);
+            Response::error('Erreur lors de la suppression définitive du calendrier', null, 500);
         }
     }
 
@@ -909,7 +909,7 @@ class CalendarController
                 'end_datetime' => $input['end_datetime']
             ]);
             LoggingMiddleware::logExit(400);
-            Response::error('La date de fin doit être après la date de début', 400);
+            Response::error('La date de fin doit être après la date de début', null, 400);
             return;
         }
 
@@ -919,7 +919,7 @@ class CalendarController
                 'recurrence_rule' => $input['recurrence_rule']
             ]);
             LoggingMiddleware::logExit(400);
-            Response::error('Règle de récurrence invalide', 400);
+            Response::error('Règle de récurrence invalide', null, 400);
             return;
         }
 
@@ -928,7 +928,7 @@ class CalendarController
         // Vérifier l'accès en écriture au calendrier
         if (!$cal->canUserWrite($calendarId, $userId)) {
             LoggingMiddleware::logExit(403);
-            Response::error('Permission insuffisante pour ajouter un événement à ce calendrier', 403);
+            Response::error('Permission insuffisante pour ajouter un événement à ce calendrier', null, 403);
             return;
         }
 
@@ -960,7 +960,7 @@ class CalendarController
                 'exception' => $e->getMessage()
             ]);
             LoggingMiddleware::logExit(500);
-            Response::error('Erreur lors de la création de l\'événement', 500);
+            Response::error('Erreur lors de la création de l\'événement', null, 500);
         }
     }
 
@@ -1015,7 +1015,7 @@ class CalendarController
                     'end_datetime' => $input['end_datetime']
                 ]);
                 LoggingMiddleware::logExit(401);
-                Response::error('La date de fin doit être après la date de début', 401);
+                Response::error('La date de fin doit être après la date de début', null, 401);
                 return;
             }
         }
@@ -1026,7 +1026,7 @@ class CalendarController
                 'recurrence_rule' => $input['recurrence_rule']
             ]);
             LoggingMiddleware::logExit(400);
-            Response::error('Règle de récurrence invalide', 400);
+            Response::error('Règle de récurrence invalide', null, 400);
             return;
         }
         
@@ -1035,7 +1035,7 @@ class CalendarController
         // Vérifier l'accès en écriture au calendrier  
         if (!$cal->canUserWrite($calendarId, $userId)) {
             LoggingMiddleware::logExit(403);
-            Response::error('Permission insuffisante pour modifier les événements de ce calendrier', 403);
+            Response::error('Permission insuffisante pour modifier les événements de ce calendrier', null, 403);
             return;
         }
         
@@ -1051,7 +1051,7 @@ class CalendarController
                 'calendar_id' => $calendarId
             ]);
             LoggingMiddleware::logExit(404);
-            Response::error('Événement non trouvé', 404);
+            Response::error('Événement non trouvé', null, 404);
             return;
         }
         
@@ -1140,7 +1140,7 @@ class CalendarController
                 'exception' => $e->getMessage()
             ]);
             LoggingMiddleware::logExit(500);
-            Response::error('Erreur lors de la mise à jour de l\'événement', 500);
+            Response::error('Erreur lors de la mise à jour de l\'événement', null, 500);
         }
     }
 
@@ -1156,7 +1156,7 @@ class CalendarController
         // Vérifier l'accès en écriture au calendrier
         if (!$cal->canUserWrite($calendarId, $userId)) {
             LoggingMiddleware::logExit(403);
-            Response::error('Permission insuffisante pour supprimer les événements de ce calendrier', 403);
+            Response::error('Permission insuffisante pour supprimer les événements de ce calendrier', null, 403);
             return;
         }
         
@@ -1170,7 +1170,7 @@ class CalendarController
                 'calendar_id' => $calendarId
             ]);
             LoggingMiddleware::logExit(404);
-            Response::error('Événement non trouvé', 404);
+            Response::error('Événement non trouvé', null, 404);
             return;
         }
         
@@ -1198,7 +1198,7 @@ class CalendarController
                 'exception' => $e->getMessage()
             ]);
             LoggingMiddleware::logExit(500);
-            Response::error('Erreur lors de la suppression de l\'événement', 500);
+            Response::error('Erreur lors de la suppression de l\'événement', null, 500);
         }
     }
 
@@ -1214,7 +1214,7 @@ class CalendarController
         // Vérifier l'accès en écriture au calendrier
         if (!$cal->canUserWrite($calendarId, $userId)) {
             LoggingMiddleware::logExit(403);
-            Response::error('Permission insuffisante pour supprimer définitivement les événements de ce calendrier', 403);
+            Response::error('Permission insuffisante pour supprimer définitivement les événements de ce calendrier', null, 403);
             return;
         }
         
@@ -1228,7 +1228,7 @@ class CalendarController
                 'calendar_id' => $calendarId
             ]);
             LoggingMiddleware::logExit(404);
-            Response::error('Événement non trouvé', 404);
+            Response::error('Événement non trouvé', null, 404);
             return;
         }
         
@@ -1255,7 +1255,7 @@ class CalendarController
                 'exception' => $e->getMessage()
             ]);
             LoggingMiddleware::logExit(500);
-            Response::error('Erreur lors de la suppression définitive de l\'événement', 500);
+            Response::error('Erreur lors de la suppression définitive de l\'événement', null, 500);
         }
     }
 
@@ -1271,7 +1271,7 @@ class CalendarController
         // Vérifier l'accès en lecture au calendrier (utiliser canUserWrite car il n'y a pas de canUserRead)
         if (!$cal->canUserWrite($calendarId, $userId)) {
             LoggingMiddleware::logExit(403);
-            Response::error('Permission insuffisante pour accéder à ce calendrier', 403);
+            Response::error('Permission insuffisante pour accéder à ce calendrier', null, 403);
             return;
         }
         
@@ -1285,7 +1285,7 @@ class CalendarController
                 'calendar_id' => $calendarId
             ]);
             LoggingMiddleware::logExit(404);
-            Response::error('Événement non trouvé', 404);
+            Response::error('Événement non trouvé', null, 404);
             return;
         } 
         
@@ -1313,7 +1313,7 @@ class CalendarController
                 'exception' => $e->getMessage()
             ]);
             LoggingMiddleware::logExit(500);
-            Response::error('Erreur lors de la récupération des occurrences', 500);
+            Response::error('Erreur lors de la récupération des occurrences', null, 500);
         }
     }
 
@@ -1324,27 +1324,12 @@ class CalendarController
     {
         LoggingMiddleware::logEntry();
         
-        $input = Response::getRequestParams();
-        $validation = Validator::validate($input, [
-            'start_date' => 'optional|date',
-            'end_date' => 'optional|date'
-        ]);
-
-        if ($validation !== true) {
-            LogService::warning("Paramètres de récupération des occurrences invalides", [
-                'errors' => $validation['errors']
-            ]);
-            LoggingMiddleware::logExit(400);
-            Response::error('Paramètres invalides', $validation['errors'], 400);
-            return;
-        }
-
         $cal = new Calendar();
         
         // Vérifier l'accès en lecture au calendrier (utiliser canUserWrite car il n'y a pas de canUserRead)
         if (!$cal->canUserWrite($calendarId, $userId)) {
             LoggingMiddleware::logExit(403);
-            Response::error('Permission insuffisante pour accéder à ce calendrier', 403);
+            Response::error('Permission insuffisante pour accéder à ce calendrier', null, 403);
             return;
         }
 
@@ -1371,7 +1356,7 @@ class CalendarController
                 'exception' => $e->getMessage()
             ]);
             LoggingMiddleware::logExit(500);
-            Response::error('Erreur lors de la récupération des occurrences', 500);
+            Response::error('Erreur lors de la récupération des occurrences', null, 500);
         }
     }
 

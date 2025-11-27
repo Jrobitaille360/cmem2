@@ -16,6 +16,7 @@
 
 // Charger l'autoloader
 require_once __DIR__ . '/../../vendor/autoload.php';
+require_once __DIR__ . '/../auth_groups/loader.php';
 require_once __DIR__ . '/autoloader.php';
 
 use ICS\Services\OccurrenceMaintenanceService;
@@ -23,9 +24,9 @@ use ICS\Services\OccurrenceMaintenanceService;
 // Parse command line arguments
 $options = getopt('', ['cleanup-only', 'stats', 'check']);
 
-echo "========================================\n";
-echo "Maintenance des Occurrences d'Événements\n";
-echo "========================================\n\n";
+$timezone = date_default_timezone_get();
+$date = date('Y-m-d H:i:s')." (".$timezone.")\n";
+echo $date;
 
 try {
     // Vérification seulement
@@ -53,33 +54,33 @@ try {
             exit(1);
         }
         
-        echo "Total d'occurrences           : " . $stats['total_occurrences'] . "\n";
-        echo "Dans la fenêtre glissante     : " . $stats['in_window'] . "\n";
-        echo "Hors de la fenêtre            : " . $stats['out_of_window'] . "\n";
-        echo "Occurrences modifiées         : " . $stats['modified_occurrences'] . "\n";
-        echo "Occurrences annulées          : " . $stats['cancelled_occurrences'] . "\n";
-        echo "Événements récurrents         : " . $stats['recurring_events'] . "\n";
-        echo "Fenêtre : " . $stats['window_start'] . " → " . $stats['window_end'] . "\n";
+        echo "✓ Total d'occurrences           : " . $stats['total_occurrences'] . "\n";
+        echo "✓ Dans la fenêtre glissante     : " . $stats['in_window'] . "\n";
+        echo "✓ Hors de la fenêtre            : " . $stats['out_of_window'] . "\n";
+        echo "✓ Occurrences modifiées         : " . $stats['modified_occurrences'] . "\n";
+        echo "✓ Occurrences annulées          : " . $stats['cancelled_occurrences'] . "\n";
+        echo "✓ Événements récurrents         : " . $stats['recurring_events'] . "\n";
+        echo "✓ Fenêtre : " . $stats['window_start'] . " → " . $stats['window_end'] . "\n";
         exit(0);
     }
     
     // Nettoyage seulement
     if (isset($options['cleanup-only'])) {
-        echo "Nettoyage des occurrences périmées...\n";
+        //echo "Nettoyage des occurrences périmées...\n";
         $count = OccurrenceMaintenanceService::cleanupOnly();
         echo "✓ " . $count . " occurrence(s) supprimée(s)\n";
         exit(0);
     }
     
     // Maintenance complète (par défaut)
-    echo "Démarrage de la maintenance complète...\n\n";
+    // echo "Démarrage de la maintenance complète...\n\n";
     
-    echo "Étape 1/2 : Nettoyage des occurrences périmées...\n";
+    // echo "Étape 1/2 : Nettoyage des occurrences périmées...\n";
     $stats = OccurrenceMaintenanceService::performMaintenance();
     
     echo "✓ " . $stats['cleaned_count'] . " occurrence(s) périmée(s) supprimée(s)\n";
     
-    echo "\nÉtape 2/2 : Régénération des occurrences...\n";
+    //echo "\nÉtape 2/2 : Régénération des occurrences...\n";
     echo "✓ " . $stats['regenerated_events'] . " événement(s) récurrent(s) traité(s)\n";
     
     if (!empty($stats['errors'])) {
@@ -90,14 +91,14 @@ try {
         exit(1);
     }
     
-    echo "\n✓ Maintenance terminée avec succès\n";
+    // echo "\n✓ Maintenance terminée avec succès\n";
     
     // Afficher les statistiques finales
-    echo "\nStatistiques finales :\n";
-    echo "----------------------\n";
+    //echo "\nStatistiques finales :\n";
+    //echo "----------------------\n";
     $finalStats = OccurrenceMaintenanceService::getStatistics();
-    echo "Total d'occurrences : " . $finalStats['total_occurrences'] . "\n";
-    echo "Événements récurrents : " . $finalStats['recurring_events'] . "\n";
+    echo "✓ Total d'occurrences : " . $finalStats['total_occurrences'] . "\n";
+    echo "✓ Événements récurrents : " . $finalStats['recurring_events'] . "\n";
     
     exit(0);
     

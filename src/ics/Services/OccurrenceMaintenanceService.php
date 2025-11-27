@@ -5,6 +5,9 @@ namespace ICS\Services;
 use ICS\Models\EventOccurrence;
 use AuthGroups\Services\LogService;
 
+// Charger la configuration ICS
+require_once __DIR__ . '/../config/ics_config.php';
+
 /**
  * Service pour la maintenance des occurrences d'événements
  * Gère le nettoyage de la fenêtre glissante (-6 mois à +1 an)
