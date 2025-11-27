@@ -30,7 +30,7 @@ API REST moderne pour la gestion d'authentification, de groupes et de fichiers a
 
 AuthGroups API est une solution complète pour gérer :
 
-- **Authentification** : Système JWT avec gestion des sessions
+- **Authentification** : Système ApiKey avec gestion des sessions
 - **Utilisateurs** : Inscription, connexion, profils, avatars
 - **Groupes** : Création, gestion des membres, invitations
 - **Fichiers** : Upload, stockage, gestion avec validation
@@ -42,7 +42,7 @@ AuthGroups API est une solution complète pour gérer :
 
 ### Gestion des utilisateurs
 
-- 🔐 Inscription et authentification JWT
+- 🔐 Inscription et authentification APiKey
 - 👤 Profils utilisateurs personnalisables
 - 🖼️ Upload d'avatars
 - 🔑 Réinitialisation de mot de passe
@@ -84,7 +84,6 @@ AuthGroups API est une solution complète pour gérer :
 
 - **PHP 8.x** - Langage principal
 - **MySQL/MariaDB** - Base de données
-- **JWT** - Authentification (firebase/php-jwt)
 - **PHPMailer** - Envoi d'emails
 - **Composer** - Gestion des dépendances
 - **PHPUnit** - Tests unitaires
@@ -134,10 +133,6 @@ DB_NAME=cmem2_db
 DB_USER=your_user
 DB_PASS=your_password
 
-# JWT
-JWT_SECRET=your-secret-key-here-minimum-32-characters
-JWT_EXPIRATION=86400
-
 # Emails
 MAIL_HOST=smtp.example.com
 MAIL_PORT=587
@@ -177,8 +172,6 @@ Le fichier `.env.auth_groups` à la racine contient toutes les variables d'envir
 | `DB_NAME` | Nom de la base de données | cmem2_db |
 | `DB_USER` | Utilisateur de la base | - |
 | `DB_PASS` | Mot de passe de la base | - |
-| `JWT_SECRET` | Clé secrète JWT (min 32 caractères) | - |
-| `JWT_EXPIRATION` | Durée de validité JWT (secondes) | 86400 |
 | `ADMIN_SECRET_KEY` | **🔑 Clé secrète pour gestion API keys (OBLIGATOIRE)** | - |
 | `MAIL_HOST` | Serveur SMTP | - |
 | `MAIL_PORT` | Port SMTP | 587 |
@@ -237,8 +230,7 @@ L'API utilise une architecture modulaire avec séparation des responsabilités :
 
 1. **API Keys obligatoires** : Tous les logins (`/users/login`) nécessitent maintenant une API key valide
 2. **Gestion centralisée** : Les API keys ne peuvent être gérées que via `/secret-admin/api-keys/*`
-3. **Endpoints dépréciés** : Les anciens endpoints `/api-keys/*` retournent HTTP 410 Gone
-4. **Script bootstrap** : Utilisez `bootstrap_create_first_api_key.php` pour créer votre première API key
+3. **Script bootstrap** : Utilisez `bootstrap_create_first_api_key.php` pour créer votre première API key
 
 📖 **Guide de migration** : Voir [MIGRATION_v1.3.0.md](src/auth_groups/docs/MIGRATION_v1.3.0.md)
 
@@ -256,9 +248,9 @@ L'API utilise une architecture modulaire avec séparation des responsabilités :
 |---------|----------|-------------|------|
 | POST | `/users/register` | Inscription | **API Key** |
 | POST | `/users/login` | Connexion | **API Key** ⚠️ |
-| GET | `/users/me` | Profil actuel | JWT + API Key |
-| PUT | `/users/me` | Modifier profil | JWT + API Key |
-| DELETE | `/users/me` | Supprimer compte | JWT + API Key |
+| GET | `/users/me` | Profil actuel |  API Key |
+| PUT | `/users/me` | Modifier profil |  API Key |
+| DELETE | `/users/me` | Supprimer compte | API Key |
 | POST | `/users/avatar` | Upload avatar | Oui |
 | GET | `/users/{id}` | Détails utilisateur | Oui |
 
@@ -319,34 +311,16 @@ L'API utilise une architecture modulaire avec séparation des responsabilités :
 
 ### API Keys
 
-**⚠️ DÉPRÉCIÉS** - Anciens endpoints (retournent HTTP 410 Gone) :
-
-| ~~Méthode~~ | ~~Endpoint~~ | ~~Description~~ | ~~Auth~~ |
-|---------|----------|-------------|------|
-| ~~POST~~ | ~~`/api-keys`~~ | ~~Créer une clé~~ | ~~JWT~~ |
-| ~~GET~~ | ~~`/api-keys`~~ | ~~Lister les clés~~ | ~~JWT~~ |
-| ~~GET~~ | ~~`/api-keys/{id}`~~ | ~~Détails d'une clé~~ | ~~JWT~~ |
-| ~~DELETE~~ | ~~`/api-keys/{id}`~~ | ~~Révoquer une clé~~ | ~~JWT~~ |
-| ~~PUT~~ | ~~`/api-keys/{id}/regenerate`~~ | ~~Régénérer une clé~~ | ~~JWT~~ |
-
 **✅ NOUVEAUX** - Endpoints sécurisés (secret-admin uniquement) :
 
 | Méthode | Endpoint | Description | Auth |
 |---------|----------|-------------|------|
-| POST | `/secret-admin/api-keys` | Créer une clé | JWT Admin + Secret |
-| GET | `/secret-admin/api-keys` | Lister les clés | JWT Admin + Secret |
-| GET | `/secret-admin/api-keys/{id}` | Détails d'une clé | JWT Admin + Secret |
-| DELETE | `/secret-admin/api-keys/{id}` | Révoquer une clé | JWT Admin + Secret |
-| PUT | `/secret-admin/api-keys/{id}/regenerate` | Régénérer une clé | JWT Admin + Secret |
-| PUT | `/secret-admin/api-keys/{id}` | Modifier une clé | JWT Admin + Secret |
-
-| Méthode | Endpoint | Description | Auth |
-|---------|----------|-------------|------|
-| POST | `/api-keys` | Créer une clé API | JWT |
-| GET | `/api-keys` | Liste des clés | JWT |
-| GET | `/api-keys/{id}` | Détails d'une clé | JWT |
-| DELETE | `/api-keys/{id}` | Révoquer une clé | JWT |
-| POST | `/api-keys/{id}/regenerate` | Régénérer une clé | JWT |
+| POST | `/secret-admin/api-keys` | Créer une clé | APIKey Admin + Secret |
+| GET | `/secret-admin/api-keys` | Lister les clés | APIKey Admin + Secret |
+| GET | `/secret-admin/api-keys/{id}` | Détails d'une clé | APIKey Admin + Secret |
+| DELETE | `/secret-admin/api-keys/{id}` | Révoquer une clé | APIKey Admin + Secret |
+| PUT | `/secret-admin/api-keys/{id}/regenerate` | Régénérer une clé | APIKey Admin + Secret |
+| PUT | `/secret-admin/api-keys/{id}` | Modifier une clé | APIKey Admin + Secret |
 
 ### Analytics et statistiques
 
@@ -359,57 +333,7 @@ Voir la [documentation complète](src/auth_groups/docs/README.md) pour plus de d
 
 ## 🔐 Authentification
 
-L'API supporte deux méthodes d'authentification :
-
-### 1. JWT (JSON Web Tokens)
-
-Pour les applications web et mobiles avec utilisateurs.
-
-#### Obtenir un token
-
-```http
-POST /users/login
-Content-Type: application/json
-
-{
-  "email": "user@example.com",
-  "password": "password123"
-}
-```
-
-Réponse :
-
-```json
-{
-  "success": true,
-  "data": {
-    "token": "eyJ0eXAiOiJKV1QiLCJhbGc...",
-    "user": {
-      "user_id": 1,
-      "name": "John Doe",
-      "email": "user@example.com",
-      "role": "UTILISATEUR"
-    }
-  }
-}
-```
-
-#### Utiliser le token
-
-Incluez le token dans l'en-tête `Authorization` :
-
-```http
-GET /users/me
-Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGc...
-```
-
-#### Durée de validité
-
-- Token valide pendant 24h par défaut
-- Configurable via `JWT_EXPIRATION`
-- Stockage des sessions actives en base de données
-
-### 2. API Keys (Obligatoires pour tous les logins)
+### API Keys (Obligatoires pour tous les logins)
 
 ⚠️ **Depuis v1.3.0** : Une API key valide est **obligatoire** pour tous les logins et appels API.
 
@@ -429,11 +353,10 @@ Ce script créera une API key administrative que vous pourrez utiliser pour vous
 
 ```http
 POST /secret-admin/api-keys
-Authorization: Bearer <jwt_admin_token>
-X-Admin-Secret: <ADMIN_SECRET_KEY>
+X-API-Key: ag_live_a1b2c3d4e5f6...
 Content-Type: application/json
-
 {
+  "admin_secret": <ADMIN_SECRET_KEY>
   "name": "Production Key",
   "scopes": ["read", "write"],
   "expires_in_days": 365
@@ -448,7 +371,6 @@ Content-Type: application/json
 POST /users/login
 X-API-Key: ag_live_a1b2c3d4e5f6...
 Content-Type: application/json
-
 {
   "email": "user@example.com",
   "password": "password123"

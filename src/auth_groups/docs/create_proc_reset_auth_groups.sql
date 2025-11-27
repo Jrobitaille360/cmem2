@@ -511,7 +511,6 @@ FROM api_keys
 GROUP BY user_id;
 
 -- Table simplifiée pour le suivi des sessions utilisateurs
--- Remplace le système JWT complexe par un tracking simple avec API Keys
 
 CREATE TABLE IF NOT EXISTS `user_sessions` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -858,3 +857,19 @@ BEGIN
     SELECT ROW_COUNT() as cleaned_sessions;
 END //
 DELIMITER ;
+
+
+-- =========================================================== TRIGGERS =====
+
+DELIMITER $$
+
+-- Trigger pour ajouter automatiquement le créateur d'un groupe comme admin
+CREATE OR REPLACE TRIGGER add_group_creator_as_admin AFTER INSERT ON groups FOR EACH ROW 
+BEGIN
+    INSERT INTO group_members (group_id, user_id, invited_by, role, joined_at)
+    VALUES (NEW.id, NEW.owner_id, NEW.owner_id, 'admin', NOW());
+END$$
+
+DELIMITER ;
+
+call ResetAuthenticationGroups;

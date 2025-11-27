@@ -1,7 +1,6 @@
 <?php
 /**
  * Middleware d'authentification par API Key
- * Alternative au JWT pour les intégrations machine-to-machine
  */
 
 namespace AuthGroups\Middleware;
@@ -120,7 +119,7 @@ class ApiKeyAuthMiddleware
     }
     
     /**
-     * Vérifier si la requête utilise une API key (vs JWT)
+     * Vérifier si la requête utilise une API key 
      */
     public static function hasApiKey(): bool
     {

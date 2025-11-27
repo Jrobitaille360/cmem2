@@ -6,8 +6,7 @@
     "generated": "2025-11-02",
     "base_url": "/",
     "authentication": {
-      "types": ["JWT", "API_KEY"],
-      "jwt_header": "Authorization: Bearer {token}",
+      "types": ["API_KEY"],
       "api_key_header": "X-API-Key: {key}",
       "security_update": "TOUS les logins nécessitent maintenant une API key valide",
       "api_key_management": "Gestion des API keys UNIQUEMENT via secret-admin avec authentification renforcée"
@@ -65,7 +64,6 @@
                 }
               },
               "authentication": {
-                "jwt": "Authorization: Bearer {token}",
                 "api_key": "X-API-Key: {key}"
               },
               "documentation": "Voir /src/auth_groups/docs/ pour la documentation complète"
@@ -89,7 +87,7 @@
             "email": "string (required, email format)",
             "password": "string (required, min 6 characters)"
           },
-          "response": "User object avec token JWT"
+          "response": "User object avec email de vérification envoyé"
         },
         {
           "method": "POST",
@@ -103,7 +101,7 @@
             "email": "string (required)",
             "password": "string (required)"
           },
-          "response": "User object avec token JWT",
+          "response": "User object",
           "security_note": "Toutes les tentatives de connexion sans API key seront rejetées avec HTTP 401"
         },
         {

@@ -1,7 +1,6 @@
 <?php
 /**
  * Modèle pour la gestion des clés API
- * Permet l'authentification alternative au JWT
  */
 
 namespace AuthGroups\Models;

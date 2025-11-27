@@ -201,11 +201,6 @@ if (LOG_ENABLED && !file_exists(LOG_DIR)) {
  * Module: auth_groups
  */
 
-// Configuration JWT
-define('JWT_SECRET', $_ENV['JWT_SECRET'] ?? 'Zjz1vB^D4xkEWss7TV9zXC3^r$uPfFaQz5A!xxG$^CKnX*3S!bEh4b3*3UcK2*s1');
-define('JWT_ALGORITHM', $_ENV['JWT_ALGORITHM'] ?? 'HS256');
-define('JWT_EXPIRATION', (int)($_ENV['JWT_EXPIRATION'] ?? 86400)); // 24 heures par défaut
-
 // Configuration de l'authentification
 define('AUTH_AUTO_LOGOUT_BEFORE_LOGIN', filter_var($_ENV['AUTH_AUTO_LOGOUT_BEFORE_LOGIN'] ?? 'true', FILTER_VALIDATE_BOOLEAN));
 define('AUTH_AUTO_LOGOUT_LOG_LEVEL', $_ENV['AUTH_AUTO_LOGOUT_LOG_LEVEL'] ?? 'info');

@@ -238,7 +238,6 @@ class PublicRouteHandler extends BaseRouteHandler
                     'environments' => 'development, staging, production'
                 ],
                 'session' => [
-                    'after_login' => 'Token JWT retourné après POST /users/login',
                     'usage' => 'Stocker et inclure dans les requêtes suivantes'
                 ]
             ],

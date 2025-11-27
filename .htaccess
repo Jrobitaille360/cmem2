@@ -3,7 +3,7 @@
 # Activer la réécriture d'URL
 RewriteEngine On
 
-# Transmettre le header Authorization à PHP (nécessaire pour JWT)
+# Transmettre le header Authorization à PHP (nécessaire pour APIKey)
 RewriteCond %{HTTP:Authorization} .
 RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 

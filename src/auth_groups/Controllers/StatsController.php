@@ -279,8 +279,8 @@ class StatsController
                 return;
             }
 
-            $stats = ValidTokenService::getOnlineUsersStats();
-            $activeSessions = ValidTokenService::getActiveSessions();
+            $stats = OnlineUsersController::getOnlineUsersStats();
+            $activeSessions = OnlineUsersController::getActiveSessions2();
 
             $response = [
                 'summary' => $stats,

@@ -10,12 +10,10 @@ use AuthGroups\Routing\RouteHandlers\{
     FileRouteHandler,
     StatsRouteHandler,
     SecretAdminRouteHandler,
-    ApiKeyRouteHandler,
     PlanRouteHandler
 };
 use AuthGroups\Services\{AuthService, LogService};
 use AuthGroups\Utils\Response;
-use AuthGroups\Middleware\LoggingMiddleware;
 use Exception;
 
 class Router 
@@ -175,32 +173,4 @@ class Router
         ];
     }
     
-    /* // getRouteHandler n'est plus utilisé
-    
-    private function showAPIInfo(): void {
-        $info = [
-            'name' => 'AuthGroups API',
-            'version' => '1.1.0',
-            'description' => 'API REST pour la gestion d\'authentification et de groupes',
-            'architecture' => 'Architecture modulaire avec gestionnaires de routes séparés',
-            'performance' => 'Optimisée avec chargement sélectif des composants',
-            'modules' => [
-                'users' => 'Gestion des utilisateurs et authentification',
-                'groups' => 'Gestion des groupes et invitations',
-                'tags' => 'Système de tags et catégorisation',
-                'files' => 'Upload et gestion de fichiers',
-                'stats' => 'Statistiques et analytics'
-            ],
-            'improvements' => [
-                'Architecture modulaire implementée',
-                'Séparation claire des responsabilités',
-                'Maintenabilité optimisée',
-                'Performance améliorée',
-                'Tests unitaires facilitéss',
-                'Gestionnaires de routes spécialisés'
-            ]
-        ];
-        LoggingMiddleware::logExit(200);
-        Response::success('API_info', $info);
-    } */
 }

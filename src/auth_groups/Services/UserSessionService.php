@@ -8,7 +8,6 @@ use PDOException;
 
 /**
  * Service simplifié pour gérer les sessions utilisateurs avec API Keys
- * Remplace ValidTokenService et la complexité JWT
  */
 class UserSessionService 
 {

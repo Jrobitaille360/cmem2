@@ -12,7 +12,7 @@ use Exception;
  * Contrôleur pour la gestion des API Keys via le système secret admin
  * 
  * SÉCURITÉ RENFORCÉE : Toutes les opérations nécessitent :
- * 1. Token JWT valide avec rôle ADMINISTRATEUR
+ * 1. Token API Keys valide avec rôle ADMINISTRATEUR
  * 2. Clé secrète admin (ADMIN_SECRET_KEY)
  * 
  * Ce contrôleur gère maintenant TOUTES les opérations sur les API keys :

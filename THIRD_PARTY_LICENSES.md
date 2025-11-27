@@ -4,14 +4,6 @@ Ce fichier liste toutes les dépendances externes et leurs licences respectives 
 
 ## Dépendances de Production
 
-### Firebase JWT
-
-- **Package** : `firebase/php-jwt` v6.11.1
-- **Licence** : BSD-3-Clause
-- **Copyright** : Copyright (c) 2011, Neuman Vong
-- **Usage** : Authentification JWT
-- **Compatibilité** : ✅ Compatible avec MIT
-
 ### PHPMailer
 
 - **Package** : `phpmailer/phpmailer` v6.12.0
@@ -59,7 +51,7 @@ Toutes les dépendances Sebastian (code coverage, assertions, etc.) :
 ✅ **Toutes les dépendances sont compatibles** avec la licence MIT du projet principal :
 
 - **MIT License** (2 packages) : Doctrine Instantiator, MyClabs Deep-Copy
-- **BSD-3-Clause** (28 packages) : Firebase JWT, PHPUnit, Sebastian, Nikic, Phar-IO, Theseer
+- **BSD-3-Clause** (28 packages) : PHPUnit, Sebastian, Nikic, Phar-IO, Theseer
 - **LGPL-2.1-only** (1 package) : PHPMailer (utilisé en tant que bibliothèque, conforme)
 
 ⚠️ **Important** : Les fichiers uploadés par les utilisateurs dans `uploads/` restent sous les droits d'auteur de leurs propriétaires respectifs.

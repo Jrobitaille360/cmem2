@@ -7,7 +7,6 @@ use AuthGroups\Services\EmailService;
 use AuthGroups\Utils\Response;
 use AuthGroups\Utils\Validator;
 use AuthGroups\Utils\Database;
-use Firebase\JWT\JWT;
 use AuthGroups\Services\LogService;
 use AuthGroups\Middleware\LoggingMiddleware;
 use Exception;

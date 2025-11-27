@@ -494,7 +494,7 @@ class EventOccurrence extends BaseModel
                 WHERE calendar_id = ? AND is_recurring = 1 AND deleted_at IS NULL
             ");
             $stmt->execute([$calendarId]);
-            $recurringEvents = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            $recurringEvents = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             if (empty($recurringEvents)) {
                 return [];

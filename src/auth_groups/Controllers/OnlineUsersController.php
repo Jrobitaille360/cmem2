@@ -2,7 +2,6 @@
 
 namespace AuthGroups\Controllers;
 
-use AuthGroups\Services\ValidTokenService;
 use AuthGroups\Utils\Response;
 use AuthGroups\Services\LogService;
 use AuthGroups\Middleware\LoggingMiddleware;
@@ -32,7 +31,7 @@ class OnlineUsersController {
                 return false;
             }
 
-            $stats = ValidTokenService::getOnlineUsersStats();
+            $stats = self::getOnlineUsersStats();
 
             LogService::info("Statistiques d'utilisateurs en ligne récupérées", [
                 'users_online' => $stats['users_online']
@@ -67,7 +66,7 @@ class OnlineUsersController {
                 $userId = $currentUserId;
             }
 
-            $sessions = ValidTokenService::getActiveSessions($userId);
+            $sessions = $this->getActiveSessions2($userId);
 
             LogService::info("Sessions actives récupérées", [
                 'user_id' => $userId,
@@ -123,89 +122,71 @@ class OnlineUsersController {
     }
 
     /**
-     * Nettoyer les tokens expirés manuellement
-     * POST /admin/cleanup-tokens
+     * Obtenir les statistiques d'utilisateurs en ligne
      */
-    public function cleanupExpiredTokens($currentUserRole) {
+    public static function getOnlineUsersStats(): array {
         try {
-            LoggingMiddleware::logEntry();
-
-            // Seuls les admins peuvent déclencher le nettoyage
-            if ($currentUserRole !== 'ADMINISTRATEUR') {
-                LogService::warning("Accès refusé au nettoyage des tokens", [
-                    'role' => $currentUserRole
-                ]);
-                LoggingMiddleware::logExit(403);
-                Response::error('Accès refusé', null, 403);
-                return false;
+            $pdo = \Database::getInstance()->getConnection();
+            
+            $stmt = $pdo->query("SELECT * FROM v_online_users_stats");
+            $stats = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if (!$stats) {
+                return [
+                    'users_online' => 0,
+                    'total_sessions' => 0,
+                    'avg_session_duration_minutes' => 0,
+                    'active_last_5min' => 0,
+                    'active_last_30min' => 0
+                ];
             }
-
-            $deletedCount = ValidTokenService::cleanupExpiredTokens();
-
-            LogService::info("Nettoyage des tokens expirés déclenché manuellement", [
-                'deleted_count' => $deletedCount
-            ]);
-
-            LoggingMiddleware::logExit(200);
-            Response::success('Nettoyage effectué', [
-                'tokens_removed' => $deletedCount
-            ]);
-            return true;
-
+            
+            return $stats;
+            
         } catch (Exception $e) {
-            LogService::error("Erreur lors du nettoyage des tokens", [
+            LogService::error("Erreur lors de la récupération des statistiques", [
                 'error' => $e->getMessage()
             ]);
-            LoggingMiddleware::logExit(500);
-            Response::error('Erreur serveur lors du nettoyage', null, 500);
-            return false;
+            return [
+                'users_online' => 0,
+                'total_sessions' => 0,
+                'avg_session_duration_minutes' => 0,
+                'active_last_5min' => 0,
+                'active_last_30min' => 0
+            ];
         }
     }
-
+    
     /**
-     * Déconnecter tous les appareils d'un utilisateur
-     * POST /users/{userId}/logout-all
+     * Obtenir les sessions actives avec détails
      */
-    public function logoutAllDevices($userId, $currentUserId, $currentUserRole) {
+    public static function getActiveSessions2(?int $userId = null): array {
         try {
-            LoggingMiddleware::logEntry();
-
-            // Un utilisateur peut déconnecter tous ses appareils
-            // Un admin peut déconnecter tous les appareils de n'importe qui
-            if ($currentUserRole !== 'ADMINISTRATEUR' && $userId != $currentUserId) {
-                LogService::warning("Accès refusé pour déconnecter tous les appareils", [
-                    'target_user_id' => $userId,
-                    'current_user_id' => $currentUserId,
-                    'role' => $currentUserRole
-                ]);
-                LoggingMiddleware::logExit(403);
-                Response::error('Accès refusé', null, 403);
-                return false;
+            $pdo = \Database::getInstance()->getConnection();
+            
+            $sql = "SELECT * FROM v_active_sessions";
+            $params = [];
+            
+            if ($userId !== null) {
+                $sql .= " WHERE user_id = ?";
+                $params[] = $userId;
             }
-
-            $tokensRemoved = ValidTokenService::removeAllUserTokens($userId);
-
-            LogService::info("Déconnexion de tous les appareils", [
-                'target_user_id' => $userId,
-                'current_user_id' => $currentUserId,
-                'tokens_removed' => $tokensRemoved
-            ]);
-
-            LoggingMiddleware::logExit(200);
-            Response::success('Tous les appareils déconnectés', [
-                'tokens_removed' => $tokensRemoved
-            ]);
-            return true;
-
+            
+            $sql .= " ORDER BY last_used_at DESC";
+            
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            
         } catch (Exception $e) {
-            LogService::error("Erreur lors de la déconnexion de tous les appareils", [
-                'target_user_id' => $userId,
-                'current_user_id' => $currentUserId,
+            LogService::error("Erreur lors de la récupération des sessions actives", [
+                'user_id' => $userId,
                 'error' => $e->getMessage()
             ]);
-            LoggingMiddleware::logExit(500);
-            Response::error('Erreur serveur lors de la déconnexion', null, 500);
-            return false;
+            return [];
         }
     }
+    
+    
 }

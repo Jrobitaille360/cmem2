@@ -31,16 +31,7 @@ function validateConfiguration(): array {
     if (!defined('APP_ENV')) $errors[] = 'APP_ENV non défini';
     if (!defined('BASE_URL')) $errors[] = 'BASE_URL non défini';
     if (!defined('LOG_DIR')) $errors[] = 'LOG_DIR non défini';
-    
-    // Validation du module auth_groups
-    if (!defined('JWT_SECRET')) {
-        $errors[] = 'JWT_SECRET non défini';
-    } elseif (strlen(JWT_SECRET) < 32 || JWT_SECRET === 'your-secret-key-change-this-in-production') {
-        $errors[] = 'JWT_SECRET doit être une clé sécurisée d\'au moins 32 caractères (changez la valeur par défaut)';
-    }
-    if (!defined('JWT_EXPIRATION')) $errors[] = 'JWT_EXPIRATION non défini';
-    
-    
+  
     // Validation des répertoires critiques
     if (!is_dir(UPLOAD_DIR)) $errors[] = 'Répertoire UPLOAD_DIR inaccessible: ' . UPLOAD_DIR;
     if (!is_dir(LOG_DIR)) $errors[] = 'Répertoire LOG_DIR inaccessible: ' . LOG_DIR;
