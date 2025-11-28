@@ -31,11 +31,12 @@ class RecurrenceService
             // Définir la fenêtre glissante: -6 mois à +1 an
             $now = new \DateTime();
             $startDateTime = clone $now;
-            $startDateTime->modify('-6 months')->setTime(0, 0, 0);
+
+            $startDateTime->modify('-' . ICS_OCCURRENCES_WINDOW_PAST_MONTHS . ' months')->setTime(0, 0, 0);
             $startDate = $startDateTime->format('Y-m-d H:i:s');
-            
+ 
             $endDateTime = clone $now;
-            $endDateTime->modify('+1 year')->setTime(23, 59, 59);
+            $endDateTime->modify('+' . ICS_OCCURRENCES_WINDOW_FUTURE_MONTHS . ' months')->setTime(23, 59, 59);
             $endDate = $endDateTime->format('Y-m-d H:i:s');
 
             // Supprimer les anciennes occurrences
@@ -232,12 +233,12 @@ class RecurrenceService
         // Définir les dates par défaut si non fournies
         if (!$startDate) {
             $start = new \DateTime();
-            $start->modify('-6 months');
+            $start->modify('-' . ICS_OCCURRENCES_WINDOW_PAST_MONTHS . ' months');
             $startDate = $start->format('Y-m-d H:i:s');
         }
         if (!$endDate) {
             $end = new \DateTime();
-            $end->modify('+1 year');
+            $end->modify('+' . ICS_OCCURRENCES_WINDOW_FUTURE_MONTHS . ' months');
             $endDate = $end->format('Y-m-d H:i:s');
         }
 
@@ -365,19 +366,6 @@ class RecurrenceService
         return $allOccurrences;
     }
     
-    /**
-     * Vérifie si un événement a des occurrences dans une période donnée
-     * 
-     * @param array $event L'événement
-     * @param string $startDate Date de début de la période
-     * @param string $endDate Date de fin de la période
-     * @return bool
-     */
-    public static function hasOccurrencesInPeriod(array $event, string $startDate, string $endDate): bool
-    {
-        $occurrences = self::expandRecurrence($event, $startDate, $endDate, 1);
-        return count($occurrences) > 0;
-    }
     
     /**
      * Compte le nombre total d'occurrences d'un événement récurrent

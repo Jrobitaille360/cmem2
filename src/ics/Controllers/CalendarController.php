@@ -861,8 +861,6 @@ class CalendarController
     /**
      * Crée un nouvel événement dans un calendrier
      */
-
-    // TODO AJOUTER LA TABLE DES RÉCURENCES
     public function createEvent($calendarId, $userId): void
     {
         LoggingMiddleware::logEntry();
