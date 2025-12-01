@@ -14,7 +14,8 @@ require_once __DIR__ . '/../config/ics_config.php';
 
 /**
  * Modèle pour gérer les occurrences d'événements
- * Maintient une fenêtre glissante de -6 mois à +1 an
+ * Stocke toutes les occurrences jusqu'à 2099-12-31
+ * Génération à la volée pour les dates post-2099
  */
 class EventOccurrence extends BaseModel
 {
@@ -88,9 +89,9 @@ class EventOccurrence extends BaseModel
     }
 
     /**
-     * Insère plusieurs occurrences en batch
+     * Insère plusieurs occurrences en batch (ou les met à jour si elles existent)
      */
-    public static function createBatch(array $occurrences): bool
+    public static function createUpdateBatch(array $occurrences): bool
     {
         if (empty($occurrences)) {
             return true;
@@ -115,18 +116,22 @@ class EventOccurrence extends BaseModel
             $query = "INSERT INTO event_occurrences (
                     event_id, calendar_id, occurrence_date, start_datetime, end_datetime, recurrence_index
                 ) VALUES " . implode(', ', $values) . "
-                ON DUPLICATE KEY UPDATE id = id";
+                ON DUPLICATE KEY UPDATE 
+                    start_datetime = VALUES(start_datetime),
+                    end_datetime = VALUES(end_datetime),
+                    recurrence_index = VALUES(recurrence_index),
+                    updated_at = CURRENT_TIMESTAMP";
 
             $stmt = $db->prepare($query);
             $stmt->execute($params);
 
-            LogService::info("Occurrences créées en batch", [
+            LogService::info("Occurrences créées/mises à jour en batch", [
                 'count' => count($occurrences)
             ]);
 
             return true;
         } catch (\Exception $e) {
-            LogService::error("Erreur lors de la création d'occurrences en batch", [
+            LogService::error("Erreur lors de la création/mise à jour d'occurrences en batch", [
                 'error' => $e->getMessage()
             ]);
             return false;
@@ -135,45 +140,44 @@ class EventOccurrence extends BaseModel
 
     /**
      * Récupère les occurrences d'un événement dans une période
+     * Génère à la volée si date demandée > 2099-12-31
      */
-    public static function getByEventId(int $eventId, ?string $startDate = null, ?string $endDate = null, bool $generateOnDemand = true): array
+    public static function getByEventId(int $eventId, ?string $startDate = null, ?string $endDate = null): array
     {
         try {
             $db = (new static())->getDb();
             
-            $query = "SELECT * FROM event_occurrences 
-                      WHERE event_id = ? AND is_cancelled = 0";
+            // Vérifier si on demande des dates au-delà de 2099-12-31
+            if ($endDate && $endDate > ICS_OCCURRENCES_MAX_DATE . ' 23:59:59') {
+                // Générer à la volée pour cette plage
+                return self::generateOccurrencesOnDemand($eventId, $startDate, $endDate);
+            }
+            
+            $query = "SELECT eo.*, 
+                      ce.title, ce.description, ce.location, ce.all_day, ce.color, 
+                      ce.status, ce.timezone, ce.organizer_email, ce.attendees, 
+                      ce.meeting_link, ce.notifications, ce.recurrence_rule
+                      FROM event_occurrences eo
+                      LEFT JOIN calendar_events ce ON eo.event_id = ce.id
+                      WHERE eo.event_id = ? AND eo.is_cancelled = 0";
             $params = [$eventId];
 
             if ($startDate) {
-                $query .= " AND end_datetime >= ?";
+                $query .= " AND eo.end_datetime >= ?";
                 $params[] = $startDate;
             }
 
             if ($endDate) {
-                $query .= " AND start_datetime <= ?";
+                $query .= " AND eo.start_datetime <= ?";
                 $params[] = $endDate;
             }
 
-            $query .= " ORDER BY start_datetime ASC";
+            $query .= " ORDER BY eo.start_datetime ASC";
 
             $stmt = $db->prepare($query);
             $stmt->execute($params);
 
-            $occurrences = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-            // Si aucune occurrence trouvée et génération à la demande activée,
-            // vérifier si la plage demandée est hors de la fenêtre glissante
-            if (empty($occurrences) && $generateOnDemand && ($startDate || $endDate)) {
-                $generated = self::generateOccurrencesForEvent($eventId, $startDate, $endDate);
-                if (!empty($generated)) {
-                    // Ré-exécuter la requête pour récupérer les occurrences générées
-                    $stmt->execute($params);
-                    $occurrences = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                }
-            }
-
-            return $occurrences;
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (\Exception $e) {
             LogService::error("Erreur lors de la récupération des occurrences", [
                 'event_id' => $eventId,
@@ -196,21 +200,26 @@ class EventOccurrence extends BaseModel
             $db = (new static())->getDb();
             
             $placeholders = implode(',', array_fill(0, count($eventIds), '?'));
-            $query = "SELECT * FROM event_occurrences 
-                      WHERE event_id IN ($placeholders) AND is_cancelled = 0";
+            $query = "SELECT eo.*, 
+                      ce.title, ce.description, ce.location, ce.all_day, ce.color, 
+                      ce.status, ce.timezone, ce.organizer_email, ce.attendees, 
+                      ce.meeting_link, ce.notifications, ce.recurrence_rule
+                      FROM event_occurrences eo
+                      LEFT JOIN calendar_events ce ON eo.event_id = ce.id
+                      WHERE eo.event_id IN ($placeholders) AND eo.is_cancelled = 0";
             $params = $eventIds;
 
             if ($startDate) {
-                $query .= " AND end_datetime >= ?";
+                $query .= " AND eo.end_datetime >= ?";
                 $params[] = $startDate;
             }
 
             if ($endDate) {
-                $query .= " AND start_datetime <= ?";
+                $query .= " AND eo.start_datetime <= ?";
                 $params[] = $endDate;
             }
 
-            $query .= " ORDER BY start_datetime ASC";
+            $query .= " ORDER BY eo.start_datetime ASC";
 
             $stmt = $db->prepare($query);
             $stmt->execute($params);
@@ -226,45 +235,44 @@ class EventOccurrence extends BaseModel
 
     /**
      * Récupère les occurrences d'un calendrier dans une période
+     * Génère à la volée si date demandée > 2099-12-31
      */
-    public static function getByCalendarId(int $calendarId, ?string $startDate = null, ?string $endDate = null, bool $generateOnDemand = true): array
+    public static function getByCalendarId(int $calendarId, ?string $startDate = null, ?string $endDate = null): array
     {
         try {
             $db = (new static())->getDb();
 
-            $query = "SELECT * FROM event_occurrences
-                      WHERE calendar_id = ? AND is_cancelled = 0";
+            // Vérifier si on demande des dates au-delà de 2099-12-31
+            if ($endDate && $endDate > ICS_OCCURRENCES_MAX_DATE . ' 23:59:59') {
+                // Générer à la volée pour cette plage
+                return self::generateOccurrencesOnDemandForCalendar($calendarId, $startDate, $endDate);
+            }
+
+            $query = "SELECT eo.*, 
+                      ce.title, ce.description, ce.location, ce.all_day, ce.color, 
+                      ce.status, ce.timezone, ce.organizer_email, ce.attendees, 
+                      ce.meeting_link, ce.notifications, ce.recurrence_rule
+                      FROM event_occurrences eo
+                      LEFT JOIN calendar_events ce ON eo.event_id = ce.id
+                      WHERE eo.calendar_id = ? AND eo.is_cancelled = 0";
             $params = [$calendarId];
 
             if ($startDate) {
-                $query .= " AND end_datetime >= ?";
+                $query .= " AND eo.end_datetime >= ?";
                 $params[] = $startDate;
             }
 
             if ($endDate) {
-                $query .= " AND start_datetime <= ?";
+                $query .= " AND eo.start_datetime <= ?";
                 $params[] = $endDate;
             }
 
-            $query .= " ORDER BY start_datetime ASC";
+            $query .= " ORDER BY eo.start_datetime ASC";
 
             $stmt = $db->prepare($query);
             $stmt->execute($params);
 
-            $occurrences = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-            // Si aucune occurrence trouvée et génération à la demande activée,
-            // vérifier si la plage demandée est hors de la fenêtre glissante
-            if (empty($occurrences) && $generateOnDemand && ($startDate || $endDate)) {
-                $generated = self::generateOccurrencesForRange($calendarId, $startDate, $endDate);
-                if (!empty($generated)) {
-                    // Ré-exécuter la requête pour récupérer les occurrences générées
-                    $stmt->execute($params);
-                    $occurrences = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                }
-            }
-
-            return $occurrences;
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (\Exception $e) {
             LogService::error("Erreur lors de la récupération des occurrences par calendrier", [
                 'calendar_id' => $calendarId,
@@ -299,34 +307,88 @@ class EventOccurrence extends BaseModel
     }
 
     /**
-     * Nettoie les occurrences en dehors de la fenêtre (-6 mois à +1 an)
+     * Génère les occurrences à la volée pour un événement (dates post-2099)
+     * Ne stocke PAS en base, retourne directement les occurrences calculées
      */
-    public static function cleanupOutdated(): int
+    private static function generateOccurrencesOnDemand(int $eventId, ?string $startDate, ?string $endDate): array
     {
         try {
             $db = (new static())->getDb();
-            
-            $sixMonthsAgo = date('Y-m-d', strtotime('-6 months'));
-            $oneYearAhead = date('Y-m-d', strtotime('+1 year'));
-            
-            $stmt = $db->prepare("DELETE FROM event_occurrences 
-                                 WHERE occurrence_date < ? OR occurrence_date > ?");
-            $stmt->execute([$sixMonthsAgo, $oneYearAhead]);
-            
-            $deletedCount = $stmt->rowCount();
+            $stmt = $db->prepare("SELECT * FROM calendar_events WHERE id = ? AND deleted_at IS NULL");
+            $stmt->execute([$eventId]);
+            $event = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if ($deletedCount > 0) {
-                LogService::info("Occurrences périmées nettoyées", [
-                    'count' => $deletedCount
+            if (!$event || empty($event['recurrence_rule'])) {
+                return [];
+            }
+
+            // Utiliser RecurrenceService pour calculer
+            require_once __DIR__ . '/../Services/RecurrenceService.php';
+            $occurrences = \ICS\Services\RecurrenceService::expandRecurrence(
+                $event,
+                $startDate,
+                $endDate
+            );
+
+            // Transformer en format compatible avec les occurrences stockées
+            $result = [];
+            foreach ($occurrences as $occ) {
+                $result[] = array_merge($occ, [
+                    'event_id' => $eventId,
+                    'calendar_id' => $event['calendar_id'],
+                    'occurrence_date' => substr($occ['start_datetime'], 0, 10),
+                    'is_on_demand' => true // Marqueur pour indiquer que c'est généré à la volée
                 ]);
             }
 
-            return $deletedCount;
+            return $result;
         } catch (\Exception $e) {
-            LogService::error("Erreur lors du nettoyage des occurrences", [
+            LogService::error("Erreur lors de la génération à la volée", [
+                'event_id' => $eventId,
                 'error' => $e->getMessage()
             ]);
-            return 0;
+            return [];
+        }
+    }
+
+    /**
+     * Génère les occurrences à la volée pour un calendrier (dates post-2099)
+     * Ne stocke PAS en base, retourne directement les occurrences calculées
+     */
+    private static function generateOccurrencesOnDemandForCalendar(int $calendarId, ?string $startDate, ?string $endDate): array
+    {
+        try {
+            $db = (new static())->getDb();
+            $stmt = $db->prepare(
+                "SELECT * FROM calendar_events 
+                 WHERE calendar_id = ? AND recurrence_rule IS NOT NULL 
+                 AND recurrence_rule != '' AND deleted_at IS NULL"
+            );
+            $stmt->execute([$calendarId]);
+            $events = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $allOccurrences = [];
+            foreach ($events as $event) {
+                $eventOccurrences = self::generateOccurrencesOnDemand(
+                    $event['id'],
+                    $startDate,
+                    $endDate
+                );
+                $allOccurrences = array_merge($allOccurrences, $eventOccurrences);
+            }
+
+            // Trier par date de début
+            usort($allOccurrences, function($a, $b) {
+                return strcmp($a['start_datetime'], $b['start_datetime']);
+            });
+
+            return $allOccurrences;
+        } catch (\Exception $e) {
+            LogService::error("Erreur lors de la génération à la volée pour calendrier", [
+                'calendar_id' => $calendarId,
+                'error' => $e->getMessage()
+            ]);
+            return [];
         }
     }
 
@@ -470,320 +532,5 @@ class EventOccurrence extends BaseModel
             ]);
             return false;
         }
-    }
-
-    /**
-     * Génère les occurrences à la demande pour une plage spécifique
-     * Utilisé quand l'utilisateur demande des occurrences hors de la fenêtre glissante
-     */
-    public static function generateOccurrencesForRange(int $calendarId, ?string $startDate = null, ?string $endDate = null): array
-    {
-        try {
-            $db = (new static())->getDb();
-
-            // Vérifier si la plage demandée est vraiment hors fenêtre
-            $windowLimits = self::getSlidingWindowLimits();
-            $requestedStart = $startDate ? new \DateTime($startDate) : null;
-            $requestedEnd = $endDate ? new \DateTime($endDate) : null;
-
-            // Si la plage demandée chevauche la fenêtre glissante, ne rien faire
-            $overlapsWindow = false;
-            if ($requestedStart && $requestedEnd) {
-                $overlapsWindow = $requestedStart <= $windowLimits['end'] && $requestedEnd >= $windowLimits['start'];
-            } elseif ($requestedStart) {
-                $overlapsWindow = $requestedStart <= $windowLimits['end'];
-            } elseif ($requestedEnd) {
-                $overlapsWindow = $requestedEnd >= $windowLimits['start'];
-            }
-
-            if ($overlapsWindow) {
-                return []; // Laisser la logique normale gérer
-            }
-
-            // Récupérer tous les événements récurrents du calendrier
-            $stmt = $db->prepare("
-                SELECT id, calendar_id, title, start_datetime, end_datetime, rrule, is_recurring
-                FROM calendar_events
-                WHERE calendar_id = ? AND is_recurring = 1 AND deleted_at IS NULL
-            ");
-            $stmt->execute([$calendarId]);
-            $recurringEvents = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-            if (empty($recurringEvents)) {
-                return [];
-            }
-
-            // Générer les occurrences pour chaque événement
-            $generatedCount = 0;
-            require_once __DIR__ . '/../Services/RecurrenceService.php';
-            $recurrenceService = new \ICS\Services\RecurrenceService();
-
-            foreach ($recurringEvents as $event) {
-                try {
-                    // Calculer la plage pour cet événement (max 1 an pour éviter les abus)
-                    $eventStart = $requestedStart ?: new \DateTime($event['start_datetime']);
-                    $eventEnd = $requestedEnd ?: (clone $eventStart)->modify('+1 year');
-
-                    // Limiter à la plage maximale configurée pour éviter les générations trop importantes
-                    $rangeDuration = $eventStart->diff($eventEnd);
-                    if ($rangeDuration->days > ICS_OCCURRENCES_MAX_RANGE_DAYS) {
-                        $eventEnd = clone $eventStart;
-                        $eventEnd->modify('+' . ICS_OCCURRENCES_MAX_RANGE_DAYS . ' days');
-                    }
-
-                    // Générer les occurrences directement pour cette plage
-                    $occurrences = self::calculateOccurrencesForEvent(
-                        $event,
-                        $eventStart->format('Y-m-d H:i:s'),
-                        $eventEnd->format('Y-m-d H:i:s')
-                    );
-
-                    if (!empty($occurrences)) {
-                        // Insérer les occurrences générées
-                        self::insertOccurrencesBatch($event['id'], $calendarId, $occurrences);
-                        $generatedCount += count($occurrences);
-                    }
-
-                } catch (\Exception $e) {
-                    LogService::warning("Erreur lors de la génération pour l'événement hors fenêtre", [
-                        'event_id' => $event['id'],
-                        'error' => $e->getMessage()
-                    ]);
-                }
-            }
-
-            LogService::info("Occurrences générées à la demande hors fenêtre", [
-                'calendar_id' => $calendarId,
-                'generated_count' => $generatedCount,
-                'start_date' => $startDate,
-                'end_date' => $endDate
-            ]);
-
-            return ['generated_count' => $generatedCount];
-
-        } catch (\Exception $e) {
-            LogService::error("Erreur lors de la génération d'occurrences hors fenêtre", [
-                'calendar_id' => $calendarId,
-                'error' => $e->getMessage()
-            ]);
-            return [];
-        }
-    }
-
-    /**
-     * Génère les occurrences à la demande pour un événement spécifique
-     * Utilisé quand l'utilisateur demande des occurrences hors de la fenêtre glissante
-     */
-    public static function generateOccurrencesForEvent(int $eventId, ?string $startDate = null, ?string $endDate = null): array
-    {
-        try {
-            $db = (new static())->getDb();
-
-            // Récupérer l'événement
-            $stmt = $db->prepare("
-                SELECT id, calendar_id, title, start_datetime, end_datetime, recurrence_rule as rrule, recurrence_rule
-                FROM calendar_events
-                WHERE id = ? AND recurrence_rule IS NOT NULL AND deleted_at IS NULL
-            ");
-            $stmt->execute([$eventId]);
-            $event = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            if (!$event) {
-                return [];
-            }
-
-            // Vérifier si la plage demandée est vraiment hors fenêtre
-            $windowLimits = self::getSlidingWindowLimits();
-            $requestedStart = $startDate ? new \DateTime($startDate) : null;
-            $requestedEnd = $endDate ? new \DateTime($endDate) : null;
-
-            // Si la plage demandée chevauche la fenêtre glissante, ne rien faire
-            // TODO pourquoi ne pas générer quand même ? 
-            $overlapsWindow = false;
-            if ($requestedStart && $requestedEnd) {
-                $overlapsWindow = $requestedStart <= $windowLimits['end'] && $requestedEnd >= $windowLimits['start'];
-            } elseif ($requestedStart) {
-                $overlapsWindow = $requestedStart <= $windowLimits['end'];
-            } elseif ($requestedEnd) {
-                $overlapsWindow = $requestedEnd >= $windowLimits['start'];
-            }
-
-            if ($overlapsWindow) {
-                return []; // Laisser la logique normale gérer
-            }
-
-            // Calculer la plage pour cet événement (max selon config pour éviter les abus)
-            $eventStart = $requestedStart ?: new \DateTime($event['start_datetime']);
-            $eventEnd = $requestedEnd ?: (clone $eventStart)->modify('+1 year');
-
-            // Limiter à la plage maximale configurée pour éviter les générations trop importantes
-            $rangeDuration = $eventStart->diff($eventEnd);
-            if ($rangeDuration->days > ICS_OCCURRENCES_MAX_RANGE_DAYS) {
-                $eventEnd = clone $eventStart;
-                $eventEnd->modify('+' . ICS_OCCURRENCES_MAX_RANGE_DAYS . ' days');
-            }
-
-            // Générer les occurrences directement pour cette plage
-            $occurrences = self::calculateOccurrencesForEvent(
-                $event,
-                $eventStart->format('Y-m-d H:i:s'),
-                $eventEnd->format('Y-m-d H:i:s')
-            );
-
-            if (!empty($occurrences)) {
-                // Insérer les occurrences générées
-                self::insertOccurrencesBatch($event['id'], $event['calendar_id'], $occurrences);
-
-                LogService::info("Occurrences générées à la demande pour événement hors fenêtre", [
-                    'event_id' => $eventId,
-                    'generated_count' => count($occurrences),
-                    'start_date' => $startDate,
-                    'end_date' => $endDate
-                ]);
-
-                return ['generated_count' => count($occurrences)];
-            }
-
-            return [];
-
-        } catch (\Exception $e) {
-            LogService::error("Erreur lors de la génération d'occurrences pour événement hors fenêtre", [
-                'event_id' => $eventId,
-                'error' => $e->getMessage()
-            ]);
-            return [];
-        }
-    }
-
-    /**
-     * Calcule les limites de la fenêtre glissante
-     */
-    public static function getSlidingWindowLimits(): array
-    {
-        $now = new \DateTime();
-
-        $startDate = clone $now;
-        $startDate->modify('-' . ICS_OCCURRENCES_WINDOW_PAST_MONTHS . ' months');
-        $startDate->setTime(0, 0, 0);
-
-        $endDate = clone $now;
-        $endDate->modify('+' . ICS_OCCURRENCES_WINDOW_FUTURE_MONTHS . ' months');
-        $endDate->setTime(23, 59, 59);
-
-        return [
-            'start' => $startDate,
-            'end' => $endDate
-        ];
-    }
-
-    /**
-     * Calcule les occurrences pour un événement dans une plage donnée
-     * Version simplifiée basée sur RecurrenceService::calculateOccurrences
-     */
-    private static function calculateOccurrencesForEvent(array $event, string $startDate, string $endDate): array
-    {
-        if (empty($event['rrule'])) {
-            return [];
-        }
-
-        try {
-            // Charger les dépendances nécessaires
-            require_once __DIR__ . '/../../../vendor/autoload.php';
-
-            $rrule = 'RRULE:' . $event['rrule'];
-            $startDateTime = new \DateTime($event['start_datetime']);
-            $endDateTime = new \DateTime($event['end_datetime']);
-
-            // Calculer la durée de l'événement
-            $duration = $startDateTime->diff($endDateTime);
-
-            // Créer la règle de récurrence
-            $rule = new Rule($rrule, $startDateTime);
-
-            // Configurer le transformateur
-            $config = new ArrayTransformerConfig();
-            $config->enableLastDayOfMonthFix();
-
-            $transformer = new ArrayTransformer();
-            $transformer->setConfig($config);
-
-            // Générer les occurrences
-            $occurrences = $transformer->transform($rule);
-
-            $periodStart = new \DateTime($startDate);
-            $periodEnd = new \DateTime($endDate);
-
-            $expandedEvents = [];
-            $occurrenceIndex = 0;
-
-            foreach ($occurrences as $occurrence) {
-                // $occurrence est un objet Recurr\Recurrence, obtenir la date de début
-                $occurrenceStart = $occurrence->getStart();
-
-                if ($occurrenceStart instanceof \DateTimeImmutable) {
-                    $occurrenceStart = \DateTime::createFromImmutable($occurrenceStart);
-                }
-
-                // S'assurer que $occurrenceStart est un objet DateTime
-                if (!$occurrenceStart instanceof \DateTime) {
-                    continue; // Passer cette occurrence si ce n'est pas un DateTime
-                }
-
-                $occurrenceEnd = clone $occurrenceStart;
-                $occurrenceEnd->add($duration);
-
-                // Vérifier si l'occurrence est dans la période demandée
-                if ($occurrenceEnd >= $periodStart && $occurrenceStart <= $periodEnd) {
-                    $expandedEvents[] = [
-                        'date' => $occurrenceStart->format('Y-m-d'),
-                        'start' => $occurrenceStart->format('Y-m-d H:i:s'),
-                        'end' => $occurrenceEnd->format('Y-m-d H:i:s'),
-                        'recurrence_index' => $occurrenceIndex
-                    ];
-
-                    $occurrenceIndex++;
-                    if ($occurrenceIndex >= ICS_OCCURRENCES_MAX_PER_GENERATION) { // Limite de sécurité
-                        break;
-                    }
-                }
-            }
-
-            return $expandedEvents;
-
-        } catch (\Exception $e) {
-            LogService::warning("Erreur lors du calcul des occurrences pour un événement", [
-                'event_id' => $event['id'],
-                'error' => $e->getMessage()
-            ]);
-            return [];
-        }
-    }
-
-    /**
-     * Insère les occurrences en batch pour de meilleures performances
-     */
-    private static function insertOccurrencesBatch(int $eventId, int $calendarId, array $occurrences): void
-    {
-        if (empty($occurrences)) {
-            return;
-        }
-
-        $db = (new static())->getDb();
-        $values = [];
-        $params = [];
-
-        foreach ($occurrences as $occurrence) {
-            $values[] = "(?, ?, ?, ?, ?, ?)";
-            $params[] = $eventId;
-            $params[] = $calendarId;
-            $params[] = $occurrence['date'];
-            $params[] = $occurrence['start'];
-            $params[] = $occurrence['end'];
-            $params[] = $occurrence['recurrence_index'] ?? 0; // Ajouter recurrence_index
-        }
-
-        $sql = "INSERT INTO event_occurrences (event_id, calendar_id, occurrence_date, start_datetime, end_datetime, recurrence_index) VALUES " . implode(', ', $values);
-        $stmt = $db->prepare($sql);
-        $stmt->execute($params);
     }
 }

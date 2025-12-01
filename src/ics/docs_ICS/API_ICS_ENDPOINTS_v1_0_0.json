@@ -142,9 +142,7 @@
       "base_path": "/calendars/{id}/events",
       "auth_required": true,
       "routes": [
-        {
-          "method": "POST",
-          "path": "/calendars/{id}/events",
+        { "method": "POST", "path": "/calendars/{id}/events",
           "description": "Créer un événement dans un calendrier",
           "params": {
             "id": "integer (required) - ID du calendrier"
@@ -164,9 +162,7 @@
           },
           "response": "Événement créé avec ID"
         },
-        {
-          "method": "GET",
-          "path": "/calendars/{id}/events",
+        { "method": "GET", "path": "/calendars/{id}/events",
           "description": "Récupérer les événements d'un calendrier",
           "params": {
             "id": "integer (required) - ID du calendrier"
@@ -216,9 +212,7 @@
           },
           "response": "Confirmation de suppression définitive"
         },
-        {
-          "method": "GET",
-          "path": "/calendars/{id}/events/{eventId}/occurrences",
+        { "method": "GET", "path": "/calendars/{id}/events/{eventId}/occurrences",
           "description": "Obtenir les occurrences d'un événement récurrent",
           "params": {
             "id": "integer (required) - ID du calendrier",
@@ -226,9 +220,7 @@
           },
           "response": "Liste des occurrences avec dates"
         },
-        {
-          "method": "GET",
-          "path": "/calendars/{id}/events/occurrences",
+        { "method": "GET", "path": "/calendars/{id}/events/occurrences",
           "description": "Obtenir toutes les occurrences du calendrier entre deux dates",
           "params": {
             "id": "integer (required) - ID du calendrier"

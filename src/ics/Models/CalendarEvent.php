@@ -100,7 +100,7 @@ class CalendarEvent extends BaseModel
             
             // Générer les occurrences si c'est un événement récurrent
             if (!empty($this->recurrenceRule)) {
-                \ICS\Services\RecurrenceService::generateOccurrences($result);
+                \ICS\Services\RecurrenceService::generateAllOccurrences($result);
             }
             
             return $result;
@@ -348,12 +348,10 @@ class CalendarEvent extends BaseModel
                 'event_id' => $this->id
             ]);
             
-            // Régénérer les occurrences si l'événement est récurrent ou si la règle a été modifiée
-            if (isset($this->recurrenceRule)) {
-                $event = $this->getById($this->id);
-                if ($event && !empty($event['recurrence_rule'])) {
-                    \ICS\Services\RecurrenceService::generateOccurrences($event);
-                }
+            // Régénérer les occurrences si l'événement est récurrent et que des champs affectant les occurrences ont été modifiés
+            $event = $this->getById($this->id);
+            if ($event && (!empty($event['recurrence_rule']) || isset($this->recurrenceRule) || isset($this->startDatetime) || isset($this->endDatetime))) {
+                \ICS\Services\RecurrenceService::generateAllOccurrences($event);
             }
             
             return $result;

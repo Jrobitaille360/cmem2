@@ -11,39 +11,35 @@ use Recurr\Transformer\ArrayTransformerConfig;
 /**
  * Service pour gérer les événements récurrents
  * Utilise la bibliothèque simshaun/recurr pour parser et calculer les occurrences RRULE
- * Maintient une table d'occurrences pré-calculées avec fenêtre glissante (-6 mois à +1 an)
+ * Maintient une table d'occurrences pré-calculées jusqu'en 2099-12-31
+ * La table des occurrences est mise à jour via des triggers SQL lors de l'insertion/mise à jour/suppression des événements
  */
 class RecurrenceService
 {
     /**
-     * Génère et sauvegarde les occurrences d'un événement dans la fenêtre glissante
+     * Génère et sauvegarde toutes les occurrences d'un événement jusqu'en 2099-12-31
+     * Pour les événements sans date de fin (RRULE sans UNTIL/COUNT), utilise 2099-12-31 comme limite
      * 
      * @param array $event L'événement récurrent
      * @return int Nombre d'occurrences générées
      */
-    public static function generateOccurrences(array $event): int
+    public static function generateAllOccurrences(array $event): int
     {
         if (empty($event['recurrence_rule'])) {
             return 0;
         }
 
         try {
-            // Définir la fenêtre glissante: -6 mois à +1 an
-            $now = new \DateTime();
-            $startDateTime = clone $now;
+            // Définir la date de début et la date limite (2099-12-31)
+            $startDate = $event['start_datetime'];
+            $maxDate = ICS_OCCURRENCES_MAX_DATE . ' 23:59:59';
 
-            $startDateTime->modify('-' . ICS_OCCURRENCES_WINDOW_PAST_MONTHS . ' months')->setTime(0, 0, 0);
-            $startDate = $startDateTime->format('Y-m-d H:i:s');
- 
-            $endDateTime = clone $now;
-            $endDateTime->modify('+' . ICS_OCCURRENCES_WINDOW_FUTURE_MONTHS . ' months')->setTime(23, 59, 59);
-            $endDate = $endDateTime->format('Y-m-d H:i:s');
-
-            // Supprimer les anciennes occurrences
+            // Supprimer les anciennes occurrences de cet événement
             EventOccurrence::deleteByEventId($event['id']);
 
-            // Générer les nouvelles occurrences
-            $occurrences = self::calculateOccurrences($event, $startDate, $endDate, 1000);
+            // Générer toutes les occurrences jusqu'à la date limite (2099-12-31)
+            // Plus de limite artificielle - génère toutes les occurrences définies par la RRULE
+            $occurrences = self::calculateOccurrences($event, $startDate, $maxDate);
 
             if (empty($occurrences)) {
                 return 0;
@@ -63,7 +59,7 @@ class RecurrenceService
             }
 
             // Insérer en batch
-            EventOccurrence::createBatch($occurrenceData);
+            EventOccurrence::createUpdateBatch($occurrenceData);
 
             LogService::info("Occurrences générées pour événement récurrent", [
                 'event_id' => $event['id'],
@@ -102,7 +98,7 @@ class RecurrenceService
             ];
 
             foreach ($events as $event) {
-                $count = self::generateOccurrences($event);
+                $count = self::generateAllOccurrences($event);
                 if ($count > 0) {
                     $stats['success']++;
                 } else {
@@ -124,14 +120,14 @@ class RecurrenceService
     /**
      * Calcule les occurrences d'un événement récurrent (sans sauvegarder)
      * Utilisé pour la génération initiale et les calculs à la volée
+     * Pour les événements sans UNTIL/COUNT, génère jusqu'à endDate (2099-12-31 par défaut)
      * 
      * @param array $event L'événement avec sa règle de récurrence
      * @param string $startDate Date de début de la période (Y-m-d H:i:s)
      * @param string $endDate Date de fin de la période (Y-m-d H:i:s)
-     * @param int $maxOccurrences Nombre maximum d'occurrences à retourner
      * @return array Tableau d'occurrences d'événements
      */
-    private static function calculateOccurrences(array $event, string $startDate, string $endDate, int $maxOccurrences = 1000): array
+    private static function calculateOccurrences(array $event, string $startDate, string $endDate): array
     {
         if (empty($event['recurrence_rule'])) {
             return [];
@@ -151,6 +147,10 @@ class RecurrenceService
             // Configurer le transformateur
             $config = new ArrayTransformerConfig();
             $config->enableLastDayOfMonthFix();
+            // Augmenter la limite virtuelle pour permettre la génération de grandes séries
+            // Par défaut la bibliothèque limite à 732 occurrences (~2 ans)
+            // On met une limite haute pour couvrir jusqu'à 2099
+            $config->setVirtualLimit(100000);
             
             $transformer = new ArrayTransformer();
             $transformer->setConfig($config);
@@ -186,10 +186,6 @@ class RecurrenceService
                     $expandedEvent['parent_event_id'] = $event['id'];
                     
                     $expandedEvents[] = $expandedEvent;
-                    
-                    if (count($expandedEvents) >= $maxOccurrences) {
-                        break;
-                    }
                 }
                 
                 $occurrenceIndex++;
@@ -213,10 +209,9 @@ class RecurrenceService
      * @param array $event L'événement avec sa règle de récurrence
      * @param string|null $startDate Date de début de la période (Y-m-d H:i:s)
      * @param string|null $endDate Date de fin de la période (Y-m-d H:i:s)
-     * @param int $maxOccurrences Nombre maximum d'occurrences à retourner
      * @return array Tableau d'occurrences d'événements
      */
-    public static function expandRecurrence(array $event, ?string $startDate = null, ?string $endDate = null, int $maxOccurrences = 100): array
+    public static function expandRecurrence(array $event, ?string $startDate = null, ?string $endDate = null): array
     {
         // Si pas de règle de récurrence, retourner l'événement original s'il est dans la période
         if (empty($event['recurrence_rule'])) {
@@ -232,17 +227,13 @@ class RecurrenceService
 
         // Définir les dates par défaut si non fournies
         if (!$startDate) {
-            $start = new \DateTime();
-            $start->modify('-' . ICS_OCCURRENCES_WINDOW_PAST_MONTHS . ' months');
-            $startDate = $start->format('Y-m-d H:i:s');
+            $startDate = date('Y-m-d H:i:s');
         }
         if (!$endDate) {
-            $end = new \DateTime();
-            $end->modify('+' . ICS_OCCURRENCES_WINDOW_FUTURE_MONTHS . ' months');
-            $endDate = $end->format('Y-m-d H:i:s');
+            $endDate = date('Y-m-d H:i:s', strtotime('+2 years'));
         }
 
-        return self::calculateOccurrences($event, $startDate, $endDate, $maxOccurrences);
+        return self::calculateOccurrences($event, $startDate, $endDate);
     }
     
     /**
@@ -251,15 +242,14 @@ class RecurrenceService
      * @param array $events Tableau d'événements
      * @param string $startDate Date de début de la période
      * @param string $endDate Date de fin de la période
-     * @param int $maxOccurrences Nombre max d'occurrences par événement
      * @return array Tableau d'occurrences triées par date de début
      */
-    public static function expandMultipleEvents(array $events, ?string $startDate = null, ?string $endDate = null, int $maxOccurrences = 100): array
+    public static function expandMultipleEvents(array $events, ?string $startDate = null, ?string $endDate = null): array
     {
         $allOccurrences = [];
         
         foreach ($events as $event) {
-            $occurrences = self::expandRecurrence($event, $startDate, $endDate, $maxOccurrences);
+            $occurrences = self::expandRecurrence($event, $startDate, $endDate);
             $allOccurrences = array_merge($allOccurrences, $occurrences);
         }
         
@@ -267,10 +257,7 @@ class RecurrenceService
         usort($allOccurrences, function($a, $b) {
             return strcmp($a['start_datetime'], $b['start_datetime']);
         });
-        // strip to maxOccurrences
-        if (count($allOccurrences) > $maxOccurrences) {
-            return array_slice($allOccurrences, 0, $maxOccurrences);
-        }
+        
         return $allOccurrences;
     }
     
@@ -280,10 +267,9 @@ class RecurrenceService
      * @param array $event L'événement récurrent
      * @param string|null $startDate Date de début (optionnelle)
      * @param string|null $endDate Date de fin (optionnelle)
-     * @param int $limit Nombre maximum d'occurrences à retourner
      * @return array
      */
-    public static function getOccurrences(array $event, ?string $startDate = null, ?string $endDate = null, int $limit = 100): array
+    public static function getOccurrences(array $event, ?string $startDate = null, ?string $endDate = null): array
     {
         if (empty($event['recurrence_rule'])) {
             return [];
@@ -298,20 +284,17 @@ class RecurrenceService
             $endDate = date('Y-m-d H:i:s', strtotime('+2 years'));
         }
         
-        return self::expandRecurrence($event, $startDate, $endDate, $limit);
+        return self::expandRecurrence($event, $startDate, $endDate);
     }
 
-    public static function expandOneDay($event, ?string $startDatePeriod = null, ?string $endDatePeriod = null, int $maxOccurrences = 100): array
+    public static function expandOneDay($event, ?string $startDatePeriod = null, ?string $endDatePeriod = null): array
     {
         if ($event['start_datetime'] === $event['end_datetime']) {
                 return [$event];
         }
-        // Par défaut, récupérer les occurrences pour les 2 prochaines années
+
         if (!$startDatePeriod) {
-            //date_default_timezone_set('America/Toronto');
-            $date = new \DateTime();
-            $date->modify('-1 month');
-            $startDatePeriod = $date->format('Y-m-d H:i:s');
+            $startDatePeriod = date('Y-m-d H:i:s');
         }
         
         if (!$endDatePeriod) {
@@ -331,9 +314,6 @@ class RecurrenceService
                 continue;
             }
             $occurences[] = $occurrence;
-            if (count($occurences) >= $maxOccurrences) {
-                break;
-            }
         }
         if ($event['is_all_day']) {
             return $occurences;            
@@ -349,19 +329,15 @@ class RecurrenceService
      * @param array $event L'événement récurrent
      * @param string|null $startDate Date de début (optionnelle)
      * @param string|null $endDate Date de fin (optionnelle)
-     * @param int $limit Nombre maximum d'occurrences à retourner
      * @return array
      */
-    public static function getOneDayOccurrences(array $event, ?string $startDate = null, ?string $endDate = null, int $limit = 100): array
+    public static function getOneDayOccurrences(array $event, ?string $startDate = null, ?string $endDate = null): array
     {
-        $events = self::getOccurrences($event, $startDate, $endDate, $limit);
+        $events = self::getOccurrences($event, $startDate, $endDate);
         $allOccurrences = [];
         foreach ($events as $event) {
-            $occurrences = self::expandOneDay($event, $startDate, $endDate, $limit);
+            $occurrences = self::expandOneDay($event, $startDate, $endDate);
             $allOccurrences = array_merge($allOccurrences, $occurrences);
-        }
-        if (count($allOccurrences) > $limit) {
-            return array_slice($allOccurrences, 0, $limit);
         }
         return $allOccurrences;
     }
@@ -372,10 +348,9 @@ class RecurrenceService
      * Attention: peut être infini si la règle n'a pas de COUNT ou UNTIL
      * 
      * @param array $event L'événement récurrent
-     * @param int $maxToCheck Nombre maximum d'occurrences à vérifier
      * @return int|string Nombre d'occurrences ou 'infinite'
      */
-    public static function countOccurrences(array $event, int $maxToCheck = 1000): int|string
+    public static function countOccurrences(array $event): int|string
     {
         if (empty($event['recurrence_rule'])) {
             return 1; // L'événement lui-même
@@ -388,13 +363,9 @@ class RecurrenceService
         }
         
         try {
-            // Calculer les occurrences sur une très longue période
-            $farFuture = date('Y-m-d H:i:s', strtotime('+50 years'));
-            $occurrences = self::expandRecurrence($event, $event['start_datetime'], $farFuture, $maxToCheck);
-            
-            if (count($occurrences) >= $maxToCheck) {
-                return 'infinite'; // Probablement infini
-            }
+            // Calculer les occurrences jusqu'à la date limite
+            $farFuture = ICS_OCCURRENCES_MAX_DATE . ' 23:59:59';
+            $occurrences = self::expandRecurrence($event, $event['start_datetime'], $farFuture);
             
             return count($occurrences);
             

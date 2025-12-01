@@ -77,13 +77,8 @@ define('ICS_ENABLE_CALDAV', $_ENV['ICS_ENABLE_CALDAV'] ?? false);
 // CONFIGURATION DES OCCURRENCES D'ÉVÉNEMENTS RÉCURRENTS
 // ============================================================================
 
-// Fenêtre glissante pour le pré-calcul des occurrences
-define('ICS_OCCURRENCES_WINDOW_PAST_MONTHS', $_ENV['ICS_OCCURRENCES_WINDOW_PAST_MONTHS'] ?? 6);     // Mois dans le passé
-define('ICS_OCCURRENCES_WINDOW_FUTURE_MONTHS', $_ENV['ICS_OCCURRENCES_WINDOW_FUTURE_MONTHS'] ?? 12); // Mois dans le futur (1 an)
-
-// Génération à la demande (hors fenêtre glissante)
-define('ICS_OCCURRENCES_MAX_RANGE_DAYS', $_ENV['ICS_OCCURRENCES_MAX_RANGE_DAYS'] ?? 365);         // Jours maximum pour génération à la demande
-define('ICS_OCCURRENCES_MAX_PER_GENERATION', $_ENV['ICS_OCCURRENCES_MAX_PER_GENERATION'] ?? 1000); // Occurrences max par génération
+// Date limite pour les événements sans fin (2099-12-31)
+define('ICS_OCCURRENCES_MAX_DATE', $_ENV['ICS_OCCURRENCES_MAX_DATE'] ?? '2099-12-31');
 
 // Maintenance automatique
 define('ICS_OCCURRENCES_MAINTENANCE_HOUR', $_ENV['ICS_OCCURRENCES_MAINTENANCE_HOUR'] ?? 3);        // Heure d'exécution du cron (0-23)
@@ -92,11 +87,6 @@ define('ICS_OCCURRENCES_MAINTENANCE_TIMEOUT', $_ENV['ICS_OCCURRENCES_MAINTENANCE
 // Seuils d'alerte
 define('ICS_OCCURRENCES_ALERT_DELETED_THRESHOLD', $_ENV['ICS_OCCURRENCES_ALERT_DELETED_THRESHOLD'] ?? 1000); // Alert si > 1000 occurrences supprimées
 define('ICS_OCCURRENCES_ALERT_GENERATED_THRESHOLD', $_ENV['ICS_OCCURRENCES_ALERT_GENERATED_THRESHOLD'] ?? 5000); // Alert si > 5000 occurrences générées
-
-// Seuils de maintenance (pour OccurrenceMaintenanceService)
-define('ICS_OCCURRENCES_MAINTENANCE_THRESHOLD_DAYS', $_ENV['ICS_OCCURRENCES_MAINTENANCE_THRESHOLD_DAYS'] ?? 30); // Jours avant expiration pour déclencher maintenance
-define('ICS_OCCURRENCES_MAINTENANCE_CLEANUP_DAYS', $_ENV['ICS_OCCURRENCES_MAINTENANCE_CLEANUP_DAYS'] ?? 90);     // Jours de données anciennes à nettoyer
-define('ICS_OCCURRENCES_MAINTENANCE_ALERT_THRESHOLD', $_ENV['ICS_OCCURRENCES_MAINTENANCE_ALERT_THRESHOLD'] ?? 1000); // Seuil d'alerte pour les opérations de maintenance
 
 // ============================================================================
 // CONFIGURATION AVANCÉE
