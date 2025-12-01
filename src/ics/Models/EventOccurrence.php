@@ -235,6 +235,7 @@ class EventOccurrence extends BaseModel
 
     /**
      * Récupère les occurrences d'un calendrier dans une période
+     * Inclut aussi les événements non récurrents transformés en occurrences
      * Génère à la volée si date demandée > 2099-12-31
      */
     public static function getByCalendarId(int $calendarId, ?string $startDate = null, ?string $endDate = null): array
@@ -272,7 +273,110 @@ class EventOccurrence extends BaseModel
             $stmt = $db->prepare($query);
             $stmt->execute($params);
 
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $occurrences = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Ajouter les événements non récurrents comme "occurrences"
+            $nonRecurringQuery = "SELECT * FROM calendar_events 
+                                 WHERE calendar_id = ? AND (recurrence_rule IS NULL OR recurrence_rule = '') 
+                                 AND deleted_at IS NULL";
+            $nonRecurringParams = [$calendarId];
+
+            if ($startDate) {
+                $nonRecurringQuery .= " AND end_datetime >= ?";
+                $nonRecurringParams[] = $startDate;
+            }
+
+            if ($endDate) {
+                $nonRecurringQuery .= " AND start_datetime <= ?";
+                $nonRecurringParams[] = $endDate;
+            }
+
+            $nonRecurringQuery .= " ORDER BY start_datetime ASC";
+
+            $stmt2 = $db->prepare($nonRecurringQuery);
+            $stmt2->execute($nonRecurringParams);
+
+            $nonRecurringEvents = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+
+            // Transformer les événements non récurrents en format occurrence
+            // Pour les événements multi-jours, les développer en occurrences journalières
+            foreach ($nonRecurringEvents as $event) {
+                if ($event['start_datetime'] !== $event['end_datetime']) {
+                    // Événement multi-jours : développer en occurrences journalières
+                    $dayOccurrences = \ICS\Services\RecurrenceService::expandOneDay($event, $startDate, $endDate);
+                    foreach ($dayOccurrences as $dayOcc) {
+                        $occurrences[] = [
+                            'id' => null, // Pas d'ID d'occurrence pour les événements non récurrents
+                            'event_id' => $event['id'],
+                            'calendar_id' => $event['calendar_id'],
+                            'occurrence_date' => substr($dayOcc['start_datetime'], 0, 10),
+                            'start_datetime' => $dayOcc['start_datetime'],
+                            'end_datetime' => $dayOcc['end_datetime'],
+                            'recurrence_index' => null,
+                            'is_modified' => false,
+                            'is_cancelled' => false,
+                            'modified_title' => null,
+                            'modified_description' => null,
+                            'modified_location' => null,
+                            'modified_start_datetime' => null,
+                            'modified_end_datetime' => null,
+                            'title' => $event['title'],
+                            'description' => $event['description'],
+                            'location' => $event['location'],
+                            'all_day' => $event['all_day'],
+                            'color' => $event['color'],
+                            'status' => $event['status'],
+                            'timezone' => $event['timezone'],
+                            'organizer_email' => $event['organizer_email'],
+                            'attendees' => $event['attendees'],
+                            'meeting_link' => $event['meeting_link'],
+                            'notifications' => $event['notifications'],
+                            'recurrence_rule' => $event['recurrence_rule'],
+                            'is_recurring' => false,
+                            'parent_event_id' => $event['id']
+                        ];
+                    }
+                } else {
+                    // Événement d'une seule journée
+                    $occurrences[] = [
+                        'id' => null, // Pas d'ID d'occurrence pour les événements non récurrents
+                        'event_id' => $event['id'],
+                        'calendar_id' => $event['calendar_id'],
+                        'occurrence_date' => substr($event['start_datetime'], 0, 10),
+                        'start_datetime' => $event['start_datetime'],
+                        'end_datetime' => $event['end_datetime'],
+                        'recurrence_index' => null,
+                        'is_modified' => false,
+                        'is_cancelled' => false,
+                        'modified_title' => null,
+                        'modified_description' => null,
+                        'modified_location' => null,
+                        'modified_start_datetime' => null,
+                        'modified_end_datetime' => null,
+                        'title' => $event['title'],
+                        'description' => $event['description'],
+                        'location' => $event['location'],
+                        'all_day' => $event['all_day'],
+                        'color' => $event['color'],
+                        'status' => $event['status'],
+                        'timezone' => $event['timezone'],
+                        'organizer_email' => $event['organizer_email'],
+                        'attendees' => $event['attendees'],
+                        'meeting_link' => $event['meeting_link'],
+                        'notifications' => $event['notifications'],
+                        'recurrence_rule' => $event['recurrence_rule'],
+                        'is_recurring' => false,
+                        'parent_event_id' => $event['id']
+                    ];
+                }
+            }
+
+            // Retrier par date de début
+            usort($occurrences, function($a, $b) {
+                return strcmp($a['start_datetime'], $b['start_datetime']);
+            });
+
+            return $occurrences;
         } catch (\Exception $e) {
             LogService::error("Erreur lors de la récupération des occurrences par calendrier", [
                 'calendar_id' => $calendarId,
@@ -365,16 +469,112 @@ class EventOccurrence extends BaseModel
                  AND recurrence_rule != '' AND deleted_at IS NULL"
             );
             $stmt->execute([$calendarId]);
-            $events = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $recurringEvents = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             $allOccurrences = [];
-            foreach ($events as $event) {
+            foreach ($recurringEvents as $event) {
                 $eventOccurrences = self::generateOccurrencesOnDemand(
                     $event['id'],
                     $startDate,
                     $endDate
                 );
                 $allOccurrences = array_merge($allOccurrences, $eventOccurrences);
+            }
+
+            // Ajouter les événements non récurrents filtrés par période
+            $nonRecurringQuery = "SELECT * FROM calendar_events 
+                                 WHERE calendar_id = ? AND (recurrence_rule IS NULL OR recurrence_rule = '') 
+                                 AND deleted_at IS NULL";
+            $nonRecurringParams = [$calendarId];
+
+            if ($startDate) {
+                $nonRecurringQuery .= " AND end_datetime >= ?";
+                $nonRecurringParams[] = $startDate;
+            }
+
+            if ($endDate) {
+                $nonRecurringQuery .= " AND start_datetime <= ?";
+                $nonRecurringParams[] = $endDate;
+            }
+
+            $stmt2 = $db->prepare($nonRecurringQuery);
+            $stmt2->execute($nonRecurringParams);
+
+            $nonRecurringEvents = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+
+            // Transformer les événements non récurrents en format occurrence
+            // Pour les événements multi-jours, les développer en occurrences journalières
+            foreach ($nonRecurringEvents as $event) {
+                if ($event['start_datetime'] !== $event['end_datetime']) {
+                    // Événement multi-jours : développer en occurrences journalières
+                    $dayOccurrences = \ICS\Services\RecurrenceService::expandOneDay($event, $startDate, $endDate);
+                    foreach ($dayOccurrences as $dayOcc) {
+                        $allOccurrences[] = [
+                            'id' => null,
+                            'event_id' => $event['id'],
+                            'calendar_id' => $event['calendar_id'],
+                            'occurrence_date' => substr($dayOcc['start_datetime'], 0, 10),
+                            'start_datetime' => $dayOcc['start_datetime'],
+                            'end_datetime' => $dayOcc['end_datetime'],
+                            'recurrence_index' => null,
+                            'is_modified' => false,
+                            'is_cancelled' => false,
+                            'modified_title' => null,
+                            'modified_description' => null,
+                            'modified_location' => null,
+                            'modified_start_datetime' => null,
+                            'modified_end_datetime' => null,
+                            'title' => $event['title'],
+                            'description' => $event['description'],
+                            'location' => $event['location'],
+                            'all_day' => $event['all_day'],
+                            'color' => $event['color'],
+                            'status' => $event['status'],
+                            'timezone' => $event['timezone'],
+                            'organizer_email' => $event['organizer_email'],
+                            'attendees' => $event['attendees'],
+                            'meeting_link' => $event['meeting_link'],
+                            'notifications' => $event['notifications'],
+                            'recurrence_rule' => $event['recurrence_rule'],
+                            'is_recurring' => false,
+                            'parent_event_id' => $event['id'],
+                            'is_on_demand' => true
+                        ];
+                    }
+                } else {
+                    // Événement d'une seule journée
+                    $allOccurrences[] = [
+                        'id' => null,
+                        'event_id' => $event['id'],
+                        'calendar_id' => $event['calendar_id'],
+                        'occurrence_date' => substr($event['start_datetime'], 0, 10),
+                        'start_datetime' => $event['start_datetime'],
+                        'end_datetime' => $event['end_datetime'],
+                        'recurrence_index' => null,
+                        'is_modified' => false,
+                        'is_cancelled' => false,
+                        'modified_title' => null,
+                        'modified_description' => null,
+                        'modified_location' => null,
+                        'modified_start_datetime' => null,
+                        'modified_end_datetime' => null,
+                        'title' => $event['title'],
+                        'description' => $event['description'],
+                        'location' => $event['location'],
+                        'all_day' => $event['all_day'],
+                        'color' => $event['color'],
+                        'status' => $event['status'],
+                        'timezone' => $event['timezone'],
+                        'organizer_email' => $event['organizer_email'],
+                        'attendees' => $event['attendees'],
+                        'meeting_link' => $event['meeting_link'],
+                        'notifications' => $event['notifications'],
+                        'recurrence_rule' => $event['recurrence_rule'],
+                        'is_recurring' => false,
+                        'parent_event_id' => $event['id'],
+                        'is_on_demand' => true
+                    ];
+                }
             }
 
             // Trier par date de début

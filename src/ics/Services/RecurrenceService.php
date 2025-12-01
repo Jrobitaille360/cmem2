@@ -150,7 +150,7 @@ class RecurrenceService
             // Augmenter la limite virtuelle pour permettre la génération de grandes séries
             // Par défaut la bibliothèque limite à 732 occurrences (~2 ans)
             // On met une limite haute pour couvrir jusqu'à 2099
-            $config->setVirtualLimit(100000);
+            $config->setVirtualLimit(10000);
             
             $transformer = new ArrayTransformer();
             $transformer->setConfig($config);
@@ -167,12 +167,29 @@ class RecurrenceService
             foreach ($occurrences as $occurrence) {
                 $occurrenceStart = $occurrence->getStart();
                 
+                // Vérifier que getStart() retourne bien un objet DateTime
+                if (!$occurrenceStart || !($occurrenceStart instanceof \DateTimeInterface)) {
+                    LogService::warning("Occurrence invalide détectée lors du calcul des occurrences", [
+                        'event_id' => $event['id'] ?? 'unknown',
+                        'occurrence' => $occurrence
+                    ]);
+                    continue; // Ignorer cette occurrence invalide
+                }
+                
                 if ($occurrenceStart instanceof \DateTimeImmutable) {
                     $occurrenceEnd = $occurrenceStart->add($duration);
                 } else {
                     // Clone pour DateTime mutable et créer une vraie instance DateTime
-                    $clonedStart = \DateTime::createFromFormat('Y-m-d H:i:s', $occurrenceStart->format('Y-m-d H:i:s'));
-                    $occurrenceEnd = $clonedStart->add($duration);
+                    try {
+                        $dateString = $occurrenceStart->format('Y-m-d H:i:s');
+                        $clonedStart = \DateTime::createFromFormat('Y-m-d H:i:s', $dateString);
+                        if ($clonedStart === false) {
+                            continue; // Format de date invalide, ignorer cette occurrence
+                        }
+                        $occurrenceEnd = $clonedStart->add($duration);
+                    } catch (\Exception $e) {
+                        continue; // Erreur lors du traitement de la date, ignorer cette occurrence
+                    }
                 }
                 
                 // Vérifier si l'occurrence est dans la période
@@ -287,7 +304,7 @@ class RecurrenceService
         return self::expandRecurrence($event, $startDate, $endDate);
     }
 
-    public static function expandOneDay($event, ?string $startDatePeriod = null, ?string $endDatePeriod = null): array
+    public static function expandOneDay($event, ?string $startDatePeriod = null, ?string $endDatePeriod = null, int $limit = 100): array
     {
         if ($event['start_datetime'] === $event['end_datetime']) {
                 return [$event];
@@ -314,8 +331,11 @@ class RecurrenceService
                 continue;
             }
             $occurences[] = $occurrence;
+            if (count($occurences) >= $limit) {
+                break;
+            }
         }
-        if ($event['is_all_day']) {
+        if ($event['all_day']) {
             return $occurences;            
         }
         $occurences[0]['start_datetime'] = $event['start_datetime'];

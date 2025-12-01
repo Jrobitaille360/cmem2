@@ -46,8 +46,8 @@ class SecretApiKeyController
                 'scopes' => 'optional|array',
                 'environment' => 'optional|string|in:production,test',
                 'expires_in_days' => 'optional|integer|min:1|max:3650',
-                'rate_limit_per_minute' => 'optional|integer|min:1|max:10000',
-                'rate_limit_per_hour' => 'optional|integer|min:1|max:100000',
+                'rate_limit_per_minute' => 'optional|integer|min:1|max:1000',
+                'rate_limit_per_hour' => 'optional|integer|min:1|max:10000',
                 'notes' => 'optional|string|max:500'
             ]);
 

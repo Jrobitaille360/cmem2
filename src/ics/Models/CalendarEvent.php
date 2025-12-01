@@ -160,7 +160,7 @@ class CalendarEvent extends BaseModel
                 $recurringEvents[] = $event;
             } else {
                 // Pour les événements non-récurrents, gérer les événements multi-jours
-                if ($event['start_datetime'] !== $event['end_datetime']) {
+                if (date('Y-m-d', strtotime($event['start_datetime'])) !== date('Y-m-d', strtotime($event['end_datetime']))) {
                     $dayOccurrences = \ICS\Services\RecurrenceService::expandOneDay($event, $startDatePeriod, $endDatePeriode, $limit);
                     $nonRecurringEvents = array_merge($nonRecurringEvents, $dayOccurrences);
                 } else {
