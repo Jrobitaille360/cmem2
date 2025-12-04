@@ -19,7 +19,8 @@ class RecurrenceService
     /**
      * Génère et sauvegarde toutes les occurrences d'un événement jusqu'en 2099-12-31
      * Pour les événements sans date de fin (RRULE sans UNTIL/COUNT), utilise 2099-12-31 comme limite
-     * 
+     * Préserve les modifications apportées aux occurrences individuelles (annulations, modifications)
+     *
      * @param array $event L'événement récurrent
      * @return int Nombre d'occurrences générées
      */
@@ -34,11 +35,25 @@ class RecurrenceService
             $startDate = $event['start_datetime'];
             $maxDate = ICS_OCCURRENCES_MAX_DATE . ' 23:59:59';
 
-            // Supprimer les anciennes occurrences de cet événement
-            EventOccurrence::deleteByEventId($event['id']);
+            // Récupérer les occurrences existantes qui ont été modifiées ou annulées
+            $db = EventOccurrence::getDbConnection();
+            $stmt = $db->prepare("SELECT * FROM event_occurrences 
+                                 WHERE event_id = ? AND (is_modified = 1 OR is_cancelled = 1)");
+            $stmt->execute([$event['id']]);
+            $existingExceptions = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+            // Créer un index des exceptions par date d'occurrence
+            $exceptionsByDate = [];
+            foreach ($existingExceptions as $exception) {
+                $exceptionsByDate[$exception['occurrence_date']] = $exception;
+            }
+
+            // Supprimer seulement les occurrences non modifiées (pas d'exceptions)
+            $stmt = $db->prepare("DELETE FROM event_occurrences 
+                                 WHERE event_id = ? AND is_modified = 0 AND is_cancelled = 0");
+            $stmt->execute([$event['id']]);
 
             // Générer toutes les occurrences jusqu'à la date limite (2099-12-31)
-            // Plus de limite artificielle - génère toutes les occurrences définies par la RRULE
             $occurrences = self::calculateOccurrences($event, $startDate, $maxDate);
 
             if (empty($occurrences)) {
@@ -48,22 +63,46 @@ class RecurrenceService
             // Préparer les données pour l'insertion batch
             $occurrenceData = [];
             foreach ($occurrences as $occ) {
-                $occurrenceData[] = [
-                    'event_id' => $event['id'],
-                    'calendar_id' => $event['calendar_id'],
-                    'occurrence_date' => substr($occ['start_datetime'], 0, 10),
-                    'start_datetime' => $occ['start_datetime'],
-                    'end_datetime' => $occ['end_datetime'],
-                    'recurrence_index' => $occ['recurrence_index']
-                ];
+                $occurrenceDate = substr($occ['start_datetime'], 0, 10);
+
+                // Vérifier si cette occurrence a été modifiée ou annulée
+                if (isset($exceptionsByDate[$occurrenceDate])) {
+                    $exception = $exceptionsByDate[$occurrenceDate];
+
+                    // Restaurer l'occurrence avec ses modifications
+                    $occurrenceData[] = [
+                        'event_id' => $event['id'],
+                        'calendar_id' => $event['calendar_id'],
+                        'occurrence_date' => $occurrenceDate,
+                        'start_datetime' => $exception['modified_start_datetime'] ?? $occ['start_datetime'],
+                        'end_datetime' => $exception['modified_end_datetime'] ?? $occ['end_datetime'],
+                        'recurrence_index' => $occ['recurrence_index'],
+                        'is_modified' => $exception['is_modified'],
+                        'is_cancelled' => $exception['is_cancelled'],
+                        'modified_title' => $exception['modified_title'],
+                        'modified_description' => $exception['modified_description'],
+                        'modified_location' => $exception['modified_location']
+                    ];
+                } else {
+                    // Nouvelle occurrence normale
+                    $occurrenceData[] = [
+                        'event_id' => $event['id'],
+                        'calendar_id' => $event['calendar_id'],
+                        'occurrence_date' => $occurrenceDate,
+                        'start_datetime' => $occ['start_datetime'],
+                        'end_datetime' => $occ['end_datetime'],
+                        'recurrence_index' => $occ['recurrence_index']
+                    ];
+                }
             }
 
-            // Insérer en batch
+            // Insérer en batch (mettra à jour les occurrences existantes si nécessaire)
             EventOccurrence::createUpdateBatch($occurrenceData);
 
-            LogService::info("Occurrences générées pour événement récurrent", [
+            LogService::info("Occurrences régénérées avec préservation des exceptions", [
                 'event_id' => $event['id'],
-                'count' => count($occurrenceData)
+                'total_generated' => count($occurrenceData),
+                'exceptions_preserved' => count($existingExceptions)
             ]);
 
             return count($occurrenceData);
@@ -111,6 +150,61 @@ class RecurrenceService
             return $stats;
         } catch (\Exception $e) {
             LogService::error("Erreur lors de la régénération globale", [
+                'error' => $e->getMessage()
+            ]);
+            return ['error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Régénère les occurrences seulement pour les événements modifiés depuis une date
+     * Optimisation pour la maintenance incrémentale
+     * 
+     * @param string $since Date depuis laquelle vérifier les modifications (Y-m-d H:i:s)
+     * @return array Statistiques de la régénération
+     */
+    public static function regenerateModifiedOccurrences(string $since): array
+    {
+        try {
+            $db = EventOccurrence::getDbConnection();
+            
+            // Récupérer uniquement les événements modifiés depuis la date donnée
+            $stmt = $db->prepare("SELECT * FROM calendar_events 
+                                 WHERE recurrence_rule IS NOT NULL 
+                                 AND recurrence_rule != '' 
+                                 AND deleted_at IS NULL
+                                 AND updated_at >= ?");
+            $stmt->execute([$since]);
+            $events = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+            $stats = [
+                'total' => count($events),
+                'success' => 0,
+                'failed' => 0,
+                'skipped' => 0,
+                'since' => $since
+            ];
+
+            if (empty($events)) {
+                LogService::info("Aucun événement modifié depuis la dernière maintenance", $stats);
+                return $stats;
+            }
+
+            foreach ($events as $event) {
+                $count = self::generateAllOccurrences($event);
+                if ($count > 0) {
+                    $stats['success']++;
+                } else {
+                    $stats['failed']++;
+                }
+            }
+
+            LogService::info("Régénération incrémentale des occurrences terminée", $stats);
+
+            return $stats;
+        } catch (\Exception $e) {
+            LogService::error("Erreur lors de la régénération incrémentale", [
+                'since' => $since,
                 'error' => $e->getMessage()
             ]);
             return ['error' => $e->getMessage()];

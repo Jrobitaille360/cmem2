@@ -221,7 +221,7 @@
           "response": "Liste des occurrences avec dates"
         },
         { "method": "GET", "path": "/calendars/{id}/events/occurrences",
-          "description": "Obtenir toutes les occurrences du calendrier entre deux dates",
+          "description": "Obtenir toutes les occurrences (récursives ou non) du calendrier entre deux dates",
           "params": {
             "id": "integer (required) - ID du calendrier"
           },
@@ -230,6 +230,39 @@
             "end_date": "string (optional) - Date de fin (YYYY-MM-DD)"
           },
           "response": "Liste des occurrences avec dates"
+        },
+        {
+          "method": "DELETE",
+          "path": "/calendars/{id}/events/{eventId}/occurrences",
+          "description": "Supprimer/annuler une occurrence d'événement récurrent",
+          "params": {
+            "id": "integer (required) - ID du calendrier",
+            "eventId": "integer (required) - ID de l'événement récurrent"
+          },
+          "query_params": {
+            "occurrence_date": "string (required) - Date de l'occurrence à annuler (YYYY-MM-DD)"
+          },
+          "response": "Confirmation d'annulation de l'occurrence"
+        },
+        {
+          "method": "PUT",
+          "path": "/calendars/{id}/events/{eventId}/occurrences",
+          "description": "Modifier une occurrence d'événement récurrent",
+          "params": {
+            "id": "integer (required) - ID du calendrier",
+            "eventId": "integer (required) - ID de l'événement récurrent"
+          },
+          "query_params": {
+            "occurrence_date": "string (required) - Date de l'occurrence à modifier (YYYY-MM-DD)"
+          },
+          "body": {
+            "title": "string (optional) - Nouveau titre de l'occurrence",
+            "description": "string (optional) - Nouvelle description",
+            "location": "string (optional) - Nouveau lieu",
+            "start_datetime": "string (optional) - Nouvelle date/heure de début",
+            "end_datetime": "string (optional) - Nouvelle date/heure de fin"
+          },
+          "response": "Occurrence modifiée avec succès"
         }
       ]
     },

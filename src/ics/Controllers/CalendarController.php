@@ -1181,15 +1181,20 @@ class CalendarController
                 throw new \Exception("Échec du soft delete");
             }
             
+            // Annuler toutes les occurrences de l'événement
+            $cancelledCount = \ICS\Models\EventOccurrence::cancelAllForEvent($eventId);
+            
             LogService::info("Événement supprimé (soft delete)", [
                 'event_id' => $eventId,
                 'calendar_id' => $calendarId,
-                'user_id' => $userId
+                'user_id' => $userId,
+                'cancelled_occurrences' => $cancelledCount
             ]);
             LoggingMiddleware::logExit(200);
             Response::success('Événement supprimé avec succès', [
                 'event_id' => $eventId,
-                'deleted_at' => date('Y-m-d H:i:s')
+                'deleted_at' => date('Y-m-d H:i:s'),
+                'cancelled_occurrences' => $cancelledCount
             ]);
         } catch (\Exception $e) {
             LogService::error("Erreur lors de la suppression de l'événement", [
@@ -1312,6 +1317,298 @@ class CalendarController
             ]);
             LoggingMiddleware::logExit(500);
             Response::error('Erreur lors de la récupération des occurrences', null, 500);
+        }
+    }
+
+    /**
+     * Supprime (annule) une occurrence spécifique d'un événement récurrent
+     */
+    public function deleteEventOccurrence($calendarId, $eventId, $userId): void
+    {
+        LoggingMiddleware::logEntry();
+        
+        $input = Response::getRequestParams();
+        $validation = Validator::validate($input, [
+            'occurrence_date' => 'required|date_or_datetime',
+            'scope' => 'optional|string|in:only_this,all_future,all',
+        ]);
+        if (!$validation['valid']) {
+            LogService::warning("Données de suppression d'occurrence invalides", [
+                'errors' => $validation['errors']
+            ]);
+            LoggingMiddleware::logExit(400);
+            Response::error('Données invalides', $validation['errors'], 400);
+            return;
+        }
+
+        $occurrenceDate = $input['occurrence_date'] ?? null;
+                
+        $cal = new Calendar();
+        
+        // Vérifier l'accès en écriture au calendrier
+        if (!$cal->canUserWrite($calendarId, $userId)) {
+            LoggingMiddleware::logExit(403);
+            Response::error('Permission insuffisante pour modifier les événements de ce calendrier', null, 403);
+            return;
+        }
+        
+        $event = new CalendarEvent();
+        $existingEvent = $event->findById($eventId);
+        
+        // Vérifier que l'événement existe et appartient au calendrier
+        if (!$existingEvent || $existingEvent['calendar_id'] != $calendarId) {
+            LogService::warning("Événement non trouvé ou non associé au calendrier", [
+                'event_id' => $eventId,
+                'calendar_id' => $calendarId
+            ]);
+            LoggingMiddleware::logExit(404);
+            Response::error('Événement non trouvé', null, 404);
+            return;
+        }
+        
+        // Vérifier que c'est un événement récurrent
+        if (empty($existingEvent['recurrence_rule'])) {
+            LogService::warning("Tentative d'annulation d'occurrence pour un événement non récurrent", [
+                'event_id' => $eventId
+            ]);
+            LoggingMiddleware::logExit(400);
+            Response::error('Cette opération n\'est possible que pour les événements récurrents', null, 400);
+            return;
+        }
+        
+        try {
+            $scope = $input['scope'] ?? 'only_this';
+            
+            if ($scope === 'all') {
+                // Supprimer l'événement entier (soft delete)
+                $eventModel = new CalendarEvent();
+                $eventModel->id = $eventId;
+                $result = $eventModel->softDelete();
+                
+                if (!$result) {
+                    throw new \Exception("Échec de la suppression de l'événement");
+                }
+                
+                // Annuler toutes les occurrences de l'événement
+                $cancelledCount = \ICS\Models\EventOccurrence::cancelAllForEvent($eventId);
+                
+                LogService::info("Événement supprimé (soft delete) via annulation de toutes les occurrences", [
+                    'event_id' => $eventId,
+                    'calendar_id' => $calendarId,
+                    'user_id' => $userId,
+                    'cancelled_occurrences' => $cancelledCount
+                ]);
+                
+                LoggingMiddleware::logExit(200);
+                Response::success('Événement supprimé avec succès (toutes les occurrences annulées)', [
+                    'event_id' => $eventId,
+                    'scope' => $scope,
+                    'deleted_at' => date('Y-m-d H:i:s'),
+                    'cancelled_occurrences' => $cancelledCount
+                ]);
+                return;
+            }
+            
+            $cancelledCount = 0;
+            
+            if ($scope === 'only_this') {
+                // Annuler seulement cette occurrence
+                $occurrence = \ICS\Models\EventOccurrence::findByEventIdAndDate($eventId, $occurrenceDate);
+                if (!$occurrence) {
+                    LogService::warning("Occurrence non trouvée", [
+                        'event_id' => $eventId,
+                        'occurrence_date' => $occurrenceDate
+                    ]);
+                    LoggingMiddleware::logExit(404);
+                    Response::error('Occurrence non trouvée', null, 404);
+                    return;
+                }
+                
+                $occModel = new \ICS\Models\EventOccurrence();
+                $occModel->id = $occurrence['id'];
+                $occModel->eventId = $eventId;
+                $result = $occModel->cancel();
+                
+                if (!$result) {
+                    throw new \Exception("Échec de l'annulation de l'occurrence");
+                }
+                $cancelledCount = 1;
+            } elseif ($scope === 'all_future') {
+                // Annuler toutes les occurrences à partir de cette date
+                $cancelledCount = \ICS\Models\EventOccurrence::cancelFromDate($eventId, $occurrenceDate);
+                
+                if ($cancelledCount == 0) {
+                    LogService::warning("Aucune occurrence future trouvée", [
+                        'event_id' => $eventId,
+                        'occurrence_date' => $occurrenceDate
+                    ]);
+                    LoggingMiddleware::logExit(404);
+                    Response::error('Aucune occurrence future trouvée', null, 404);
+                    return;
+                }
+            } else {
+                LoggingMiddleware::logExit(400);
+                Response::error('Scope invalide', null, 400);
+                return;
+            }
+            
+            $scopeLabel = [
+                'only_this' => 'cette occurrence',
+                'all_future' => 'toutes les occurrences futures',
+                'all' => 'toutes les occurrences'
+            ][$scope];
+            
+            LogService::info("Occurrences annulées", [
+                'event_id' => $eventId,
+                'scope' => $scope,
+                'occurrence_date' => $occurrenceDate,
+                'cancelled_count' => $cancelledCount,
+                'user_id' => $userId
+            ]);
+            
+            LoggingMiddleware::logExit(200);
+            Response::success("Occurrences annulées avec succès ($scopeLabel)", [
+                'event_id' => $eventId,
+                'scope' => $scope,
+                'occurrence_date' => $occurrenceDate,
+                'cancelled_count' => $cancelledCount,
+                'cancelled_at' => date('Y-m-d H:i:s')
+            ]);
+        } catch (\Exception $e) {
+            LogService::error("Erreur lors de l'annulation des occurrences", [
+                'exception' => $e->getMessage()
+            ]);
+            LoggingMiddleware::logExit(500);
+            Response::error('Erreur lors de l\'annulation des occurrences', null, 500);
+        }
+    }
+
+    /**
+     * Modifie une occurrence spécifique d'un événement récurrent
+     */
+    public function updateEventOccurrence($calendarId, $eventId, $userId): void
+    {
+        LoggingMiddleware::logEntry();
+        
+        $input = Response::getRequestParams();
+        $validation = Validator::validate($input, [
+            'occurrence_date' => 'required|date_or_datetime',
+            'title' => 'optionnal|string',
+            'description' => 'optionnal|string',
+            'location' => 'optionnal|string',
+            'start_datetime' => 'optionnal|date_or_datetime',
+            'end_datetime' => 'optionnal|date_or_datetime',
+        ]);
+
+        if (!$validation['valid']) {
+            LogService::warning("Données de modification d'occurrence invalides", [
+                'errors' => $validation['errors']
+            ]);
+            LoggingMiddleware::logExit(400);
+            Response::error('Données invalides', $validation['errors'], 400);
+            return;
+        }
+
+        $occurrenceDate = $input['occurrence_date'] ?? null;
+      
+        // Vérifier que des modifications sont fournies
+        $modifications = array_intersect_key($input, array_flip(['title', 'description', 'location', 'start_datetime', 'end_datetime']));
+        if (empty($modifications)) {
+            LoggingMiddleware::logExit(400);
+            Response::error('Aucune modification fournie', null, 400);
+            return;
+        }
+        
+        // Vérifier les dates si fournies
+        if (isset($input['start_datetime']) && isset($input['end_datetime'])) {
+            if (strtotime($input['end_datetime']) < strtotime($input['start_datetime'])) {
+                LogService::warning("Dates d'occurrence invalides", [
+                    'start_datetime' => $input['start_datetime'],
+                    'end_datetime' => $input['end_datetime']
+                ]);
+                LoggingMiddleware::logExit(400);
+                Response::error('La date de fin doit être après la date de début', null, 400);
+                return;
+            }
+        }
+        
+        $cal = new Calendar();
+        
+        // Vérifier l'accès en écriture au calendrier
+        if (!$cal->canUserWrite($calendarId, $userId)) {
+            LoggingMiddleware::logExit(403);
+            Response::error('Permission insuffisante pour modifier les événements de ce calendrier', null, 403);
+            return;
+        }
+        
+        $event = new CalendarEvent();
+        $existingEvent = $event->findById($eventId);
+        
+        // Vérifier que l'événement existe et appartient au calendrier
+        if (!$existingEvent || $existingEvent['calendar_id'] != $calendarId) {
+            LogService::warning("Événement non trouvé ou non associé au calendrier", [
+                'event_id' => $eventId,
+                'calendar_id' => $calendarId
+            ]);
+            LoggingMiddleware::logExit(404);
+            Response::error('Événement non trouvé', null, 404);
+            return;
+        }
+        
+        // Vérifier que c'est un événement récurrent
+        if (empty($existingEvent['recurrence_rule'])) {
+            LogService::warning("Tentative de modification d'occurrence pour un événement non récurrent", [
+                'event_id' => $eventId
+            ]);
+            LoggingMiddleware::logExit(400);
+            Response::error('Cette opération n\'est possible que pour les événements récurrents', null, 400);
+            return;
+        }
+        
+        try {
+            // Trouver l'occurrence
+            $occurrence = \ICS\Models\EventOccurrence::findByEventIdAndDate($eventId, $occurrenceDate);
+            
+            if (!$occurrence) {
+                LogService::warning("Occurrence non trouvée", [
+                    'event_id' => $eventId,
+                    'occurrence_date' => $occurrenceDate
+                ]);
+                LoggingMiddleware::logExit(404);
+                Response::error('Occurrence non trouvée', null, 404);
+                return;
+            }
+            
+            // Modifier l'occurrence
+            $occModel = new \ICS\Models\EventOccurrence();
+            $occModel->id = $occurrence['id'];
+            $occModel->eventId = $eventId;
+            $result = $occModel->modify($modifications);
+            
+            if (!$result) {
+                throw new \Exception("Échec de la modification de l'occurrence");
+            }
+            
+            LogService::info("Occurrence modifiée", [
+                'event_id' => $eventId,
+                'occurrence_id' => $occurrence['id'],
+                'occurrence_date' => $occurrenceDate,
+                'modifications' => $modifications,
+                'user_id' => $userId
+            ]);
+            LoggingMiddleware::logExit(200);
+            Response::success('Occurrence modifiée avec succès', [
+                'event_id' => $eventId,
+                'occurrence_date' => $occurrenceDate,
+                'modifications' => $modifications,
+                'updated_at' => date('Y-m-d H:i:s')
+            ]);
+        } catch (\Exception $e) {
+            LogService::error("Erreur lors de la modification de l'occurrence", [
+                'exception' => $e->getMessage()
+            ]);
+            LoggingMiddleware::logExit(500);
+            Response::error('Erreur lors de la modification de l\'occurrence', null, 500);
         }
     }
 

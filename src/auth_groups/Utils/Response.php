@@ -131,36 +131,30 @@ class Response {
         if (in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'])) {
             // Si des fichiers sont transférés, utiliser $_POST
             if (!empty($_FILES)) {
-                return $_POST;
+                return array_merge($_GET, $_POST);
             }
 
-            // Sinon, récupérer depuis le body JSON avec validation stricte
+            // Récupérer depuis le body JSON avec validation stricte
             $jsonContent = file_get_contents('php://input');
             
-            // Si pas de contenu, retourner tableau vide
-            if (empty($jsonContent) || trim($jsonContent) === '') {
-                return [];
+            $input = [];
+            if (!empty($jsonContent) && trim($jsonContent) !== '') {
+                // Décoder et vérifier les erreurs JSON
+                $decoded = json_decode($jsonContent, true);
+                
+                // Si erreur JSON, logger et utiliser tableau vide
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    LogService::warning("JSON malformé détecté", [
+                        'json_error' => json_last_error_msg(),
+                        'raw_content' => substr($jsonContent, 0, 200) // Premiers 200 caractères pour debug
+                    ]);
+                } else {
+                    $input = $decoded ?? [];
+                }
             }
             
-            // Décoder et vérifier les erreurs JSON
-            $input = json_decode($jsonContent, true);
-            
-            // Si erreur JSON, lever une exception ou retourner une erreur
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                // Option 1: Lever une exception (plus strict)
-                // throw new \InvalidArgumentException("JSON malformé: " . json_last_error_msg());
-                
-                // Option 2: Logger l'erreur et retourner tableau vide (comportement actuel amélioré)
-                LogService::warning("JSON malformé détecté", [
-                    'json_error' => json_last_error_msg(),
-                    'raw_content' => substr($jsonContent, 0, 200) // Premiers 200 caractères pour debug
-                ]);
-                
-                // Retourner tableau vide maintient la compatibilité
-                return [];
-            }
-            
-            return $input ?? [];
+            // Fusionner les paramètres de requête GET avec ceux du body
+            return array_merge($_GET, $input);
         } else {
             // Pour GET et autres, essayer d'abord $_GET, puis parser l'URL complète si $_GET est vide
             $params = $_GET;

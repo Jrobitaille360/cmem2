@@ -15,28 +15,49 @@ require_once __DIR__ . '/../config/ics_config.php';
 class OccurrenceMaintenanceService
 {
     /**
-     * Régénère toutes les occurrences pour tous les événements récurrents
+     * Régénère les occurrences pour les événements récurrents modifiés depuis la dernière maintenance
+     * Ou tous les événements si c'est la première exécution ou si forceAll = true
      * 
+     * @param bool $forceAll Force la régénération de tous les événements
      * @return array Statistiques de la maintenance
      */
-    public static function performMaintenance(): array
+    public static function performMaintenance(bool $forceAll = false): array
     {
         $stats = [
             'regenerated_events' => 0,
-            'errors' => []
+            'skipped_events' => 0,
+            'errors' => [],
+            'mode' => $forceAll ? 'full' : 'incremental'
         ];
 
         try {
-            // Régénérer les occurrences pour tous les événements récurrents
-            $regenerateStats = RecurrenceService::regenerateAllOccurrences();
+            // Récupérer la date de la dernière maintenance
+            $lastMaintenance = self::getLastMaintenanceDate();
+            
+            if ($forceAll || !$lastMaintenance) {
+                // Régénération complète
+                $stats['last_maintenance'] = $lastMaintenance ?? 'never';
+                $regenerateStats = RecurrenceService::regenerateAllOccurrences();
+            } else {
+                // Régénération incrémentale (seulement les événements modifiés)
+                $stats['last_maintenance'] = $lastMaintenance;
+                $regenerateStats = RecurrenceService::regenerateModifiedOccurrences($lastMaintenance);
+            }
             
             if (isset($regenerateStats['success'])) {
                 $stats['regenerated_events'] = $regenerateStats['success'];
             }
             
+            if (isset($regenerateStats['skipped'])) {
+                $stats['skipped_events'] = $regenerateStats['skipped'];
+            }
+            
             if (isset($regenerateStats['error'])) {
                 $stats['errors'][] = $regenerateStats['error'];
             }
+            
+            // Enregistrer la date de cette maintenance
+            self::setLastMaintenanceDate();
             
             LogService::info("Maintenance des occurrences terminée", $stats);
             
@@ -98,5 +119,61 @@ class OccurrenceMaintenanceService
                 'error' => $e->getMessage()
             ];
         }
+    }
+
+    /**
+     * Récupère la date de la dernière maintenance
+     * 
+     * @return string|null Date au format Y-m-d H:i:s ou null si jamais exécuté
+     */
+    private static function getLastMaintenanceDate(): ?string
+    {
+        $cacheFile = ICS_OCCURRENCES_LAST_MAINTENANCE_FILE;
+        
+        if (!file_exists($cacheFile)) {
+            return null;
+        }
+        
+        $content = @file_get_contents($cacheFile);
+        if ($content === false) {
+            return null;
+        }
+        
+        $date = trim($content);
+        // Valider le format de date
+        $dt = \DateTime::createFromFormat('Y-m-d H:i:s', $date);
+        if ($dt && $dt->format('Y-m-d H:i:s') === $date) {
+            return $date;
+        }
+        
+        return null;
+    }
+
+    /**
+     * Enregistre la date actuelle comme dernière maintenance
+     * 
+     * @return bool Succès de l'enregistrement
+     */
+    private static function setLastMaintenanceDate(): bool
+    {
+        $cacheFile = ICS_OCCURRENCES_LAST_MAINTENANCE_FILE;
+        $cacheDir = dirname($cacheFile);
+        
+        // Créer le répertoire si nécessaire
+        if (!is_dir($cacheDir)) {
+            @mkdir($cacheDir, 0755, true);
+        }
+        
+        $now = date('Y-m-d H:i:s');
+        $result = @file_put_contents($cacheFile, $now);
+        
+        if ($result === false) {
+            LogService::warning("Impossible d'enregistrer la date de maintenance", [
+                'file' => $cacheFile
+            ]);
+            return false;
+        }
+        
+        return true;
     }
 }

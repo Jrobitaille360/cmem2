@@ -83,6 +83,7 @@ define('ICS_OCCURRENCES_MAX_DATE', $_ENV['ICS_OCCURRENCES_MAX_DATE'] ?? '2099-12
 // Maintenance automatique
 define('ICS_OCCURRENCES_MAINTENANCE_HOUR', $_ENV['ICS_OCCURRENCES_MAINTENANCE_HOUR'] ?? 3);        // Heure d'exécution du cron (0-23)
 define('ICS_OCCURRENCES_MAINTENANCE_TIMEOUT', $_ENV['ICS_OCCURRENCES_MAINTENANCE_TIMEOUT'] ?? 300); // Timeout en secondes (5 min)
+define('ICS_OCCURRENCES_LAST_MAINTENANCE_FILE', __DIR__ . '/../../../uploads/cache/.last_occurrence_maintenance'); // Fichier de cache pour la dernière maintenance
 
 // Seuils d'alerte
 define('ICS_OCCURRENCES_ALERT_DELETED_THRESHOLD', $_ENV['ICS_OCCURRENCES_ALERT_DELETED_THRESHOLD'] ?? 1000); // Alert si > 1000 occurrences supprimées

@@ -59,6 +59,14 @@ class CalendarRouteHandler extends BaseRouteHandler
             ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && isset($segments[3]) && ctype_digit($segments[3]) && isset($segments[4]) && $segments[4] === 'occurrences' && $method === 'GET') => 
                 $this->controller->getEventOccurrences((int)$segments[3], (int)$action, $user['user_id']),
 
+            // DELETE /calendars/{id}/events/{eventId}/occurrences - Supprimer/annuler une occurrence
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && isset($segments[3]) && ctype_digit($segments[3]) && isset($segments[4]) && $segments[4] === 'occurrences' && $method === 'DELETE') => 
+                $this->controller->deleteEventOccurrence((int)$action, (int)$segments[3], $user['user_id']),
+
+            // PUT /calendars/{id}/events/{eventId}/occurrences - Modifier une occurrence
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && isset($segments[3]) && ctype_digit($segments[3]) && isset($segments[4]) && $segments[4] === 'occurrences' && $method === 'PUT') => 
+                $this->controller->updateEventOccurrence((int)$action, (int)$segments[3], $user['user_id']),
+
             // GET /calendars/{id}/events/occurrences - Obtenir toutes les occurrences du calendrier entre deux dates
             ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && isset($segments[3]) && $segments[3] === 'occurrences' && !isset($segments[4]) && $method === 'GET') => 
                 $this->controller->getEventsOccurrences((int)$action, $user['user_id']),

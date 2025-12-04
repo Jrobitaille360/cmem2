@@ -858,6 +858,7 @@ BEGIN
 END //
 DELIMITER ;
 
+call ResetAuthenticationGroups;
 
 -- =========================================================== TRIGGERS =====
 
@@ -871,5 +872,3 @@ BEGIN
 END$$
 
 DELIMITER ;
-
-call ResetAuthenticationGroups;

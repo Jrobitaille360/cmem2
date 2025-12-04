@@ -323,3 +323,7 @@ define('ENABLE_TAG_AUTOCOMPLETE', filter_var($_ENV['ENABLE_TAG_AUTOCOMPLETE'] ??
 define('TRACK_TAG_USAGE', filter_var($_ENV['TRACK_TAG_USAGE'] ?? 'true', FILTER_VALIDATE_BOOLEAN));
 define('TAG_TRENDING_PERIOD_DAYS', (int)($_ENV['TAG_TRENDING_PERIOD_DAYS'] ?? 30));
 define('MAX_TRENDING_TAGS', (int)($_ENV['MAX_TRENDING_TAGS'] ?? 20));
+
+// Configuration de la pagination
+define('DEFAULT_PAGE_SIZE', (int)($_ENV['DEFAULT_PAGE_SIZE'] ?? 20));
+define('MAX_PAGE_SIZE', (int)($_ENV['MAX_PAGE_SIZE'] ?? 100));

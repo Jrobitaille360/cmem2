@@ -90,6 +90,8 @@ class EventOccurrence extends BaseModel
 
     /**
      * Insère plusieurs occurrences en batch (ou les met à jour si elles existent)
+     * Gère aussi les modifications d'occurrences (exceptions)
+     * Divise les insertions en chunks pour éviter de dépasser max_allowed_packet
      */
     public static function createUpdateBatch(array $occurrences): bool
     {
@@ -100,42 +102,122 @@ class EventOccurrence extends BaseModel
         try {
             $db = (new static())->getDb();
             
-            $values = [];
-            $params = [];
-            
-            foreach ($occurrences as $occ) {
-                $values[] = "(?, ?, ?, ?, ?, ?)";
-                $params[] = $occ['event_id'];
-                $params[] = $occ['calendar_id'];
-                $params[] = $occ['occurrence_date'];
-                $params[] = $occ['start_datetime'];
-                $params[] = $occ['end_datetime'];
-                $params[] = $occ['recurrence_index'];
-            }
-            
-            $query = "INSERT INTO event_occurrences (
-                    event_id, calendar_id, occurrence_date, start_datetime, end_datetime, recurrence_index
-                ) VALUES " . implode(', ', $values) . "
-                ON DUPLICATE KEY UPDATE 
-                    start_datetime = VALUES(start_datetime),
-                    end_datetime = VALUES(end_datetime),
-                    recurrence_index = VALUES(recurrence_index),
-                    updated_at = CURRENT_TIMESTAMP";
+            // Diviser en chunks de 100 occurrences
+            $chunkSize = 100;
+            $chunks = array_chunk($occurrences, $chunkSize);
+            $totalProcessed = 0;
 
-            $stmt = $db->prepare($query);
-            $stmt->execute($params);
+            foreach ($chunks as $chunkIndex => $chunk) {
+                // Vérifier et rétablir la connexion MySQL avant chaque chunk
+                // pour éviter "MySQL server has gone away" dû à un timeout de connexion
+                try {
+                    $db->query("SELECT 1");
+                } catch (\PDOException $e) {
+                    // Reconnexion si la connexion est perdue
+                    LogService::warning("Reconnexion MySQL détectée", [
+                        'chunk' => $chunkIndex + 1,
+                        'error' => $e->getMessage()
+                    ]);
+                    $db = (new static())->getDb();
+                }
+
+                $values = [];
+                $params = [];
+
+                foreach ($chunk as $occ) {
+                    $values[] = "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                    $params[] = $occ['event_id'];
+                    $params[] = $occ['calendar_id'];
+                    $params[] = $occ['occurrence_date'];
+                    $params[] = $occ['start_datetime'];
+                    $params[] = $occ['end_datetime'];
+                    $params[] = $occ['recurrence_index'] ?? null;
+                    $params[] = isset($occ['is_modified']) ? ($occ['is_modified'] ? 1 : 0) : 0;
+                    $params[] = isset($occ['is_cancelled']) ? ($occ['is_cancelled'] ? 1 : 0) : 0;
+                    $params[] = $occ['modified_title'] ?? null;
+                    $params[] = $occ['modified_description'] ?? null;
+                    $params[] = $occ['modified_location'] ?? null;
+                    $params[] = $occ['modified_start_datetime'] ?? null;
+                    $params[] = $occ['modified_end_datetime'] ?? null;
+                }
+
+                $query = "INSERT INTO event_occurrences (
+                        event_id, calendar_id, occurrence_date, start_datetime, end_datetime, recurrence_index,
+                        is_modified, is_cancelled, modified_title, modified_description, modified_location,
+                        modified_start_datetime, modified_end_datetime
+                    ) VALUES " . implode(', ', $values) . "
+                    ON DUPLICATE KEY UPDATE
+                        start_datetime = VALUES(start_datetime),
+                        end_datetime = VALUES(end_datetime),
+                        recurrence_index = VALUES(recurrence_index),
+                        is_modified = VALUES(is_modified),
+                        is_cancelled = VALUES(is_cancelled),
+                        modified_title = VALUES(modified_title),
+                        modified_description = VALUES(modified_description),
+                        modified_location = VALUES(modified_location),
+                        modified_start_datetime = VALUES(modified_start_datetime),
+                        modified_end_datetime = VALUES(modified_end_datetime),
+                        updated_at = CURRENT_TIMESTAMP";
+
+                $stmt = $db->prepare($query);
+                $stmt->execute($params);
+                
+                $totalProcessed += count($chunk);
+                
+                // Log la progression pour les gros volumes
+                if (count($chunks) > 1) {
+                    LogService::debug("Chunk traité", [
+                        'chunk' => $chunkIndex + 1,
+                        'total_chunks' => count($chunks),
+                        'processed' => $totalProcessed,
+                        'total' => count($occurrences)
+                    ]);
+                }
+            }
 
             LogService::info("Occurrences créées/mises à jour en batch", [
-                'count' => count($occurrences)
+                'count' => count($occurrences),
+                'chunks' => count($chunks)
             ]);
 
             return true;
         } catch (\Exception $e) {
             LogService::error("Erreur lors de la création/mise à jour d'occurrences en batch", [
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
             return false;
         }
+    }
+
+    /**
+     * Applique les modifications d'une occurrence aux données de l'événement
+     */
+    private static function applyModifications(array $occurrence): array
+    {
+        // Si l'occurrence n'est pas modifiée, retourner telle quelle
+        if (empty($occurrence['is_modified'])) {
+            return $occurrence;
+        }
+
+        // Appliquer les modifications aux champs principaux
+        if (!empty($occurrence['modified_title'])) {
+            $occurrence['title'] = $occurrence['modified_title'];
+        }
+        if (!empty($occurrence['modified_description'])) {
+            $occurrence['description'] = $occurrence['modified_description'];
+        }
+        if (!empty($occurrence['modified_location'])) {
+            $occurrence['location'] = $occurrence['modified_location'];
+        }
+        if (!empty($occurrence['modified_start_datetime'])) {
+            $occurrence['start_datetime'] = $occurrence['modified_start_datetime'];
+        }
+        if (!empty($occurrence['modified_end_datetime'])) {
+            $occurrence['end_datetime'] = $occurrence['modified_end_datetime'];
+        }
+
+        return $occurrence;
     }
 
     /**
@@ -177,7 +259,14 @@ class EventOccurrence extends BaseModel
             $stmt = $db->prepare($query);
             $stmt->execute($params);
 
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $occurrences = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Appliquer les modifications à chaque occurrence
+            foreach ($occurrences as &$occurrence) {
+                $occurrence = self::applyModifications($occurrence);
+            }
+
+            return $occurrences;
         } catch (\Exception $e) {
             LogService::error("Erreur lors de la récupération des occurrences", [
                 'event_id' => $eventId,
@@ -224,7 +313,14 @@ class EventOccurrence extends BaseModel
             $stmt = $db->prepare($query);
             $stmt->execute($params);
 
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $occurrences = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Appliquer les modifications à chaque occurrence
+            foreach ($occurrences as &$occurrence) {
+                $occurrence = self::applyModifications($occurrence);
+            }
+
+            return $occurrences;
         } catch (\Exception $e) {
             LogService::error("Erreur lors de la récupération des occurrences multiples", [
                 'error' => $e->getMessage()
@@ -274,6 +370,11 @@ class EventOccurrence extends BaseModel
             $stmt->execute($params);
 
             $occurrences = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Appliquer les modifications aux occurrences récurrentes
+            foreach ($occurrences as &$occurrence) {
+                $occurrence = self::applyModifications($occurrence);
+            }
 
             // Ajouter les événements non récurrents comme "occurrences"
             $nonRecurringQuery = "SELECT * FROM calendar_events 
@@ -593,6 +694,27 @@ class EventOccurrence extends BaseModel
     }
 
     /**
+     * Trouve une occurrence par event_id et occurrence_date
+     */
+    public static function findByEventIdAndDate(int $eventId, string $occurrenceDate): ?array
+    {
+        try {
+            $db = (new static())->getDb();
+            $stmt = $db->prepare("SELECT * FROM event_occurrences WHERE event_id = ? AND occurrence_date = ?");
+            $stmt->execute([$eventId, $occurrenceDate]);
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $result ?: null;
+        } catch (\Exception $e) {
+            LogService::error("Erreur lors de la recherche d'occurrence", [
+                'event_id' => $eventId,
+                'occurrence_date' => $occurrenceDate,
+                'error' => $e->getMessage()
+            ]);
+            return null;
+        }
+    }
+
+    /**
      * Annule une occurrence spécifique
      */
     public function cancel(): bool
@@ -731,6 +853,68 @@ class EventOccurrence extends BaseModel
                 'error' => $e->getMessage()
             ]);
             return false;
+        }
+    }
+
+    /**
+     * Annule toutes les occurrences d'un événement à partir d'une date donnée
+     */
+    public static function cancelFromDate(int $eventId, string $fromDate): int
+    {
+        try {
+            $db = (new static())->getDb();
+            $stmt = $db->prepare(
+                "UPDATE event_occurrences SET is_cancelled = 1, updated_at = CURRENT_TIMESTAMP 
+                 WHERE event_id = ? AND occurrence_date >= ? AND is_cancelled = 0"
+            );
+            $stmt->execute([$eventId, $fromDate]);
+
+            $affectedRows = $stmt->rowCount();
+
+            LogService::info("Occurrences annulées à partir d'une date", [
+                'event_id' => $eventId,
+                'from_date' => $fromDate,
+                'cancelled_count' => $affectedRows
+            ]);
+
+            return $affectedRows;
+        } catch (\Exception $e) {
+            LogService::error("Erreur lors de l'annulation des occurrences futures", [
+                'event_id' => $eventId,
+                'from_date' => $fromDate,
+                'error' => $e->getMessage()
+            ]);
+            return 0;
+        }
+    }
+
+    /**
+     * Annule toutes les occurrences d'un événement
+     */
+    public static function cancelAllForEvent(int $eventId): int
+    {
+        try {
+            $db = (new static())->getDb();
+            $stmt = $db->prepare(
+                "UPDATE event_occurrences SET is_cancelled = 1, updated_at = CURRENT_TIMESTAMP 
+                 WHERE event_id = ? AND is_cancelled = 0"
+            );
+            $stmt->execute([$eventId]);
+
+            $affectedRows = $stmt->rowCount();
+
+            LogService::info("Toutes les occurrences annulées pour un événement", [
+                'event_id' => $eventId,
+                'cancelled_count' => $affectedRows
+            ]);
+
+            return $affectedRows;
+        } catch (\Exception $e) {
+            LogService::error("Erreur lors de l'annulation de toutes les occurrences", [
+                'event_id' => $eventId,
+                'error' => $e->getMessage()
+            ]);
+            return 0;
         }
     }
 }
