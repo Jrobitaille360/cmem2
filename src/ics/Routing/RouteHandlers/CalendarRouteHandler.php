@@ -71,12 +71,17 @@ class CalendarRouteHandler extends BaseRouteHandler
             ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && isset($segments[3]) && $segments[3] === 'occurrences' && !isset($segments[4]) && $method === 'GET') => 
                 $this->controller->getEventsOccurrences((int)$action, $user['user_id']),
 
+            // GET /calendars/{id}/events/{eventId} - get a unique event
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && isset($segments[3]) && ctype_digit($segments[3]) && !isset($segments[4]) && $method === 'GET') => 
+                $this->controller->getEvent((int)$segments[3], (int)$action, $user['user_id']),
+
+
             // GET /calendars/{id}/events - Lister les événements d'un calendrier
             ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && !isset($segments[3]) && $method === 'GET') => 
                 $this->controller->getCalendarEvents((int)$action, $user['user_id']),
                 
             // PUT /calendars/{id}/events/{eventId} - Mettre à jour un événement
-            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && isset($segments[3]) && ctype_digit($segments[3]) && $method === 'PUT') => 
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && isset($segments[3]) && ctype_digit($segments[3]) && !isset($segments[4]) && $method === 'PUT') => 
                 $this->controller->updateEvent((int)$segments[3], (int)$action, $user['user_id']),
                 
             // DELETE /calendars/{id}/events/{eventId} - Supprimer un événement (soft delete)

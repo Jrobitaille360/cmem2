@@ -415,8 +415,18 @@ class RecurrenceService
 
         $startDateTime = new \DateTime($event['start_datetime']);
         $endDateTime = new \DateTime($event['end_datetime']);
+        
+        // Extraire uniquement les dates (sans les heures)
+        $startDate = $startDateTime->format('Y-m-d');
+        $endDate = $endDateTime->format('Y-m-d');
+        
+        // Si l'événement commence et finit le même jour, retourner l'événement original
+        if ($startDate === $endDate) {
+            return [$event];
+        }
+        
         $interval = new \DateInterval('P1D');
-        $period = new \DatePeriod($startDateTime, $interval, $endDateTime->modify('+1 day'));
+        $period = new \DatePeriod($startDateTime, $interval, $endDateTime);
         foreach ($period as $date) {
             $occurrence = $event;
             $occurrence['start_datetime'] = $date->format('Y-m-d 00:00:00');

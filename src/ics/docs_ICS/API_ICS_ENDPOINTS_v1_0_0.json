@@ -170,6 +170,16 @@
           "response": "Liste des événements avec détails"
         },
         {
+          "method": "GET",
+          "path": "/calendars/{id}/events/{eventId}",
+          "description": "Récupérer un événement spécifique",
+          "params": {
+            "id": "integer (required) - ID du calendrier",
+            "eventId": "integer (required) - ID de l'événement"
+          },
+          "response": "Détails de l'événement"
+        },
+        {
           "method": "PUT",
           "path": "/calendars/{id}/events/{eventId}",
           "description": "Mettre à jour un événement",
@@ -240,7 +250,8 @@
             "eventId": "integer (required) - ID de l'événement récurrent"
           },
           "query_params": {
-            "occurrence_date": "string (required) - Date de l'occurrence à annuler (YYYY-MM-DD)"
+            "occurrence_date": "string (required) - Date de l'occurrence à annuler (YYYY-MM-DD)",
+            "scope": "optional|string|in:only_this,all_future,all - Portée de l'annulation"
           },
           "response": "Confirmation d'annulation de l'occurrence"
         },

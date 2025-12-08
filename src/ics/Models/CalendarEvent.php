@@ -283,7 +283,7 @@ class CalendarEvent extends BaseModel
 
             if(isset($this->allDay)) {
                 $fields[] = "all_day = ?";
-                $values[] = (bool)$this->allDay;
+                $values[] = (int)$this->allDay;
             }
 
             if(isset($this->location)) {

@@ -164,6 +164,52 @@ class CalendarController
         }
     }
     
+public function getEvent($eventId, $calendarId, $userId): void
+    {
+        LoggingMiddleware::logEntry();
+
+        try {
+            $cal = new Calendar();
+            // Vérifier si l'utilisateur a accès au calendrier
+            $permission = $cal->getUserPermissionForCalendar($calendarId, $userId);
+
+            if (!$permission) {
+                LogService::warning("Accès non autorisé ou calendrier non trouvé", [
+                    'calendar_id' => $calendarId,
+                    'user_id' => $userId
+                ]);
+                LoggingMiddleware::logExit(404);
+                Response::error('Calendrier non trouvé ou accès non autorisé', null, 404);
+                return;
+            }
+
+            $eventModel = new CalendarEvent();
+
+            $event = $eventModel->getById($eventId);
+            
+            if(!$event || $event['calendar_id'] != $calendarId) {
+                LogService::warning("Événement non trouvé dans le calendrier", [
+                    'event_id' => $eventId,
+                    'calendar_id' => $calendarId
+                ]);
+                LoggingMiddleware::logExit(404);
+                Response::error('Événement non trouvé dans ce calendrier', null, 404);
+                return;
+            }
+
+            LoggingMiddleware::logExit(200);
+            Response::success('Événement du calendrier récupéré avec succès', [
+                'event' => $event,
+            ]);
+        } catch (\Exception $e) {
+            LogService::error("Erreur lors de la récupération de l'événement du calendrier", [
+                'exception' => $e->getMessage()
+            ]);
+            LoggingMiddleware::logExit(500);
+            Response::error('Erreur lors de la récupération de l\'événement', null, 500);
+        }
+    }
+
     /**
      * Récupère un calendrier public partagé par token (accessible à tous avec le token)
      */
@@ -1115,6 +1161,11 @@ class CalendarController
                 $updatedFields[] = 'color';
             }
             
+            LogService::info("Champs à mettre à jour", [
+                'updated_fields' => $updatedFields,
+                'event_id' => $event->id
+            ]);
+            
             // Appeler la méthode update() qui n'accepte pas de paramètres
             $result = $event->update();
             
@@ -1135,7 +1186,8 @@ class CalendarController
             Response::success('Événement mis à jour avec succès', $updatedEvent);
         } catch (\Exception $e) {
             LogService::error("Erreur lors de la mise à jour de l'événement", [
-                'exception' => $e->getMessage()
+                'exception' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
             LoggingMiddleware::logExit(500);
             Response::error('Erreur lors de la mise à jour de l\'événement', null, 500);
