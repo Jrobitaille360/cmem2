@@ -71,7 +71,7 @@ spl_autoload_register(function ($className) {
 // Inclure les fichiers de configuration du module
 // Les constantes de base sont maintenant disponibles via loader.php
 $configFiles = [
-    __DIR__ . '/config/ics_Config.php'
+    __DIR__ . '/config/ics_config.php'
 ];
 
 foreach ($configFiles as $configFile) {
