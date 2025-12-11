@@ -376,6 +376,34 @@ class EventOccurrence extends BaseModel
                 $occurrence = self::applyModifications($occurrence);
             }
 
+            // Pour les occurrences récurrentes multi-jours, les développer en occurrences journalières
+            $expandedOccurrences = [];
+            foreach ($occurrences as $occurrence) {
+                if (date('Y-m-d', strtotime($occurrence['start_datetime'])) !== date('Y-m-d', strtotime($occurrence['end_datetime']))) {
+                    // Événement multi-jours : développer en occurrences journalières
+                    $eventLike = [
+                        'start_datetime' => $occurrence['start_datetime'],
+                        'end_datetime' => $occurrence['end_datetime'],
+                        'all_day' => $occurrence['all_day'] ?? false
+                    ];
+                    $dayOccurrences = \ICS\Services\RecurrenceService::expandOneDay($eventLike, $startDate, $endDate);
+                    foreach ($dayOccurrences as $dayOcc) {
+                        $expandedOccurrences[] = array_merge($occurrence, [
+                            'start_datetime' => $dayOcc['start_datetime'],
+                            'end_datetime' => $dayOcc['end_datetime'],
+                            'occurrence_date' => substr($dayOcc['start_datetime'], 0, 10),
+                            'is_multi_day' => true
+                        ]);
+                    }
+                } else {
+                    // Occurrence d'une seule journée
+                    $expandedOccurrences[] = array_merge($occurrence, [
+                        'is_multi_day' => false
+                    ]);
+                }
+            }
+            $occurrences = $expandedOccurrences;
+
             // Ajouter les événements non récurrents comme "occurrences"
             $nonRecurringQuery = "SELECT * FROM calendar_events 
                                  WHERE calendar_id = ? AND (recurrence_rule IS NULL OR recurrence_rule = '') 
@@ -434,7 +462,8 @@ class EventOccurrence extends BaseModel
                             'notifications' => $event['notifications'],
                             'recurrence_rule' => $event['recurrence_rule'],
                             'is_recurring' => false,
-                            'parent_event_id' => $event['id']
+                            'parent_event_id' => $event['id'],
+                            'is_multi_day' => true
                         ];
                     }
                 } else {
@@ -467,7 +496,8 @@ class EventOccurrence extends BaseModel
                         'notifications' => $event['notifications'],
                         'recurrence_rule' => $event['recurrence_rule'],
                         'is_recurring' => false,
-                        'parent_event_id' => $event['id']
+                        'parent_event_id' => $event['id'],
+                        'is_multi_day' => false
                     ];
                 }
             }
@@ -639,7 +669,8 @@ class EventOccurrence extends BaseModel
                             'recurrence_rule' => $event['recurrence_rule'],
                             'is_recurring' => false,
                             'parent_event_id' => $event['id'],
-                            'is_on_demand' => true
+                            'is_on_demand' => true,
+                            'is_multi_day' => true
                         ];
                     }
                 } else {
@@ -673,7 +704,8 @@ class EventOccurrence extends BaseModel
                         'recurrence_rule' => $event['recurrence_rule'],
                         'is_recurring' => false,
                         'parent_event_id' => $event['id'],
-                        'is_on_demand' => true
+                        'is_on_demand' => true,
+                        'is_multi_day' => false
                     ];
                 }
             }
