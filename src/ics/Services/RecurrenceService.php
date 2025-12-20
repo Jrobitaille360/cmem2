@@ -56,6 +56,14 @@ class RecurrenceService
             // Générer toutes les occurrences jusqu'à la date limite (2099-12-31)
             $occurrences = self::calculateOccurrences($event, $startDate, $maxDate);
 
+            LogService::info("Occurrences générées pour événement récurrent", [
+                'event_id' => $event['id'],
+                'count' => count($occurrences),
+                'recurrence_rule' => $event['recurrence_rule'],
+                'start_date' => $startDate,
+                'max_date' => $maxDate
+            ]);
+
             if (empty($occurrences)) {
                 return 0;
             }

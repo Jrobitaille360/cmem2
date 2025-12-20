@@ -1011,7 +1011,6 @@ public function getEvent($eventId, $calendarId, $userId): void
     /**
      * Met à jour un événement existant
      */
-    // TODO AJOUTER LA TABLE DES RÉCURENCES
     public function updateEvent($eventId, $calendarId, $userId): void
     {
         LoggingMiddleware::logEntry();
@@ -1550,6 +1549,7 @@ public function getEvent($eventId, $calendarId, $userId): void
             'location' => 'optionnal|string',
             'start_datetime' => 'optionnal|date_or_datetime',
             'end_datetime' => 'optionnal|date_or_datetime',
+            'scope' => 'optionnal|string|in:only_this,all_future,all'
         ]);
 
         if (!$validation['valid']) {
@@ -1618,7 +1618,75 @@ public function getEvent($eventId, $calendarId, $userId): void
         }
         
         try {
-            // Trouver l'occurrence
+            $scope = $input['scope'] ?? 'only_this';
+            $modifiedCount = 0;
+            
+            if ($scope === 'all') {
+                // Modifier toutes les occurrences de l'événement
+                $modifiedCount = \ICS\Models\EventOccurrence::modifyAll($eventId, $modifications);
+                
+                if ($modifiedCount == 0) {
+                    LogService::warning("Aucune occurrence trouvée pour modification", [
+                        'event_id' => $eventId
+                    ]);
+                    LoggingMiddleware::logExit(404);
+                    Response::error('Aucune occurrence trouvée', null, 404);
+                    return;
+                }
+                
+                LogService::info("Toutes les occurrences modifiées", [
+                    'event_id' => $eventId,
+                    'modified_count' => $modifiedCount,
+                    'modifications' => $modifications,
+                    'user_id' => $userId
+                ]);
+                
+                LoggingMiddleware::logExit(200);
+                Response::success('Toutes les occurrences modifiées avec succès', [
+                    'event_id' => $eventId,
+                    'scope' => $scope,
+                    'modified_count' => $modifiedCount,
+                    'modifications' => $modifications,
+                    'updated_at' => date('Y-m-d H:i:s')
+                ]);
+                return;
+            }
+            
+            if ($scope === 'all_future') {
+                // Modifier toutes les occurrences à partir de cette date
+                $modifiedCount = \ICS\Models\EventOccurrence::modifyFromDate($eventId, $occurrenceDate, $modifications);
+                
+                if ($modifiedCount == 0) {
+                    LogService::warning("Aucune occurrence future trouvée pour modification", [
+                        'event_id' => $eventId,
+                        'occurrence_date' => $occurrenceDate
+                    ]);
+                    LoggingMiddleware::logExit(404);
+                    Response::error('Aucune occurrence future trouvée', null, 404);
+                    return;
+                }
+                
+                LogService::info("Occurrences futures modifiées", [
+                    'event_id' => $eventId,
+                    'from_date' => $occurrenceDate,
+                    'modified_count' => $modifiedCount,
+                    'modifications' => $modifications,
+                    'user_id' => $userId
+                ]);
+                
+                LoggingMiddleware::logExit(200);
+                Response::success('Occurrences futures modifiées avec succès', [
+                    'event_id' => $eventId,
+                    'scope' => $scope,
+                    'occurrence_date' => $occurrenceDate,
+                    'modified_count' => $modifiedCount,
+                    'modifications' => $modifications,
+                    'updated_at' => date('Y-m-d H:i:s')
+                ]);
+                return;
+            }
+            
+            // Scope 'only_this' - modifier seulement cette occurrence
             $occurrence = \ICS\Models\EventOccurrence::findByEventIdAndDate($eventId, $occurrenceDate);
             
             if (!$occurrence) {
@@ -1641,6 +1709,8 @@ public function getEvent($eventId, $calendarId, $userId): void
                 throw new \Exception("Échec de la modification de l'occurrence");
             }
             
+            $modifiedCount = 1;
+            
             LogService::info("Occurrence modifiée", [
                 'event_id' => $eventId,
                 'occurrence_id' => $occurrence['id'],
@@ -1651,7 +1721,9 @@ public function getEvent($eventId, $calendarId, $userId): void
             LoggingMiddleware::logExit(200);
             Response::success('Occurrence modifiée avec succès', [
                 'event_id' => $eventId,
+                'scope' => $scope,
                 'occurrence_date' => $occurrenceDate,
+                'modified_count' => $modifiedCount,
                 'modifications' => $modifications,
                 'updated_at' => date('Y-m-d H:i:s')
             ]);

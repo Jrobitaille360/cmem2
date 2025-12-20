@@ -271,7 +271,8 @@
             "description": "string (optional) - Nouvelle description",
             "location": "string (optional) - Nouveau lieu",
             "start_datetime": "string (optional) - Nouvelle date/heure de début",
-            "end_datetime": "string (optional) - Nouvelle date/heure de fin"
+            "end_datetime": "string (optional) - Nouvelle date/heure de fin",
+            "scope": "optional|string|in:only_this,all_future,all - Portée de la modification"
           },
           "response": "Occurrence modifiée avec succès"
         }
