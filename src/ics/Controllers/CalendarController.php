@@ -1550,7 +1550,7 @@ class CalendarController
         
         $input = Response::getRequestParams();
         $validation = Validator::validate($input, [
-            'Ocurrence_id' => 'required|integer',
+            'Occurrence_id' => 'required|integer',
             'title' => 'optionnal|string',
             'description' => 'optionnal|string',
             'location' => 'optionnal|string',
