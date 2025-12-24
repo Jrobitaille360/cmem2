@@ -10,16 +10,19 @@ use Recurr\Transformer\ArrayTransformerConfig;
 
 /**
  * Service pour gérer les événements récurrents
- * Utilise la bibliothèque simshaun/recurr pour parser et calculer les occurrences RRULE
- * Maintient une table d'occurrences pré-calculées jusqu'en 2099-12-31
- * La table des occurrences est mise à jour via des triggers SQL lors de l'insertion/mise à jour/suppression des événements
+ * 
+ * Utilise la bibliothèque simshaun/recurr pour parser et calculer les occurrences RRULE.
+ * Maintient une table d'occurrences pré-calculées jusqu'en 2099-12-31.
+ * La table des occurrences est mise à jour via une tâche CRON 
+ * qui régénère périodiquement les occurrences.
  */
 class RecurrenceService
 {
     /**
-     * Génère et sauvegarde toutes les occurrences d'un événement jusqu'en 2099-12-31
-     * Pour les événements sans date de fin (RRULE sans UNTIL/COUNT), utilise 2099-12-31 comme limite
-     * Préserve les modifications apportées aux occurrences individuelles (annulations, modifications)
+     * Génère et sauvegarde toutes les occurrences d'un événement jusqu'en 2099-12-31.
+     * 
+     * Pour les événements sans date de fin (RRULE sans UNTIL/COUNT), utilise 2099-12-31 comme limite.
+     * Préserve les modifications apportées aux occurrences individuelles (annulations, modifications).
      *
      * @param array $event L'événement récurrent
      * @return int Nombre d'occurrences générées
@@ -69,40 +72,32 @@ class RecurrenceService
             }
 
             // Préparer les données pour l'insertion batch
-            $occurrenceData = [];
-            foreach ($occurrences as $occ) {
+            $occurrenceData = array_map(function($occ) use ($event, $exceptionsByDate) {
                 $occurrenceDate = substr($occ['start_datetime'], 0, 10);
-
-                // Vérifier si cette occurrence a été modifiée ou annulée
-                if (isset($exceptionsByDate[$occurrenceDate])) {
-                    $exception = $exceptionsByDate[$occurrenceDate];
-
-                    // Restaurer l'occurrence avec ses modifications
-                    $occurrenceData[] = [
-                        'event_id' => $event['id'],
-                        'calendar_id' => $event['calendar_id'],
-                        'occurrence_date' => $occurrenceDate,
-                        'start_datetime' => $exception['modified_start_datetime'] ?? $occ['start_datetime'],
-                        'end_datetime' => $exception['modified_end_datetime'] ?? $occ['end_datetime'],
-                        'recurrence_index' => $occ['recurrence_index'],
+                $exception = $exceptionsByDate[$occurrenceDate] ?? null;
+                
+                $data = [
+                    'event_id' => $event['id'],
+                    'calendar_id' => $event['calendar_id'],
+                    'occurrence_date' => $occurrenceDate,
+                    'start_datetime' => $exception['modified_start_datetime'] ?? $occ['start_datetime'],
+                    'end_datetime' => $exception['modified_end_datetime'] ?? $occ['end_datetime'],
+                    'recurrence_index' => $occ['recurrence_index']
+                ];
+                
+                // Ajouter les données d'exception si elles existent
+                if ($exception) {
+                    $data += [
                         'is_modified' => $exception['is_modified'],
                         'is_cancelled' => $exception['is_cancelled'],
                         'modified_title' => $exception['modified_title'],
                         'modified_description' => $exception['modified_description'],
                         'modified_location' => $exception['modified_location']
                     ];
-                } else {
-                    // Nouvelle occurrence normale
-                    $occurrenceData[] = [
-                        'event_id' => $event['id'],
-                        'calendar_id' => $event['calendar_id'],
-                        'occurrence_date' => $occurrenceDate,
-                        'start_datetime' => $occ['start_datetime'],
-                        'end_datetime' => $occ['end_datetime'],
-                        'recurrence_index' => $occ['recurrence_index']
-                    ];
                 }
-            }
+                
+                return $data;
+            }, $occurrences);
 
             // Insérer en batch (mettra à jour les occurrences existantes si nécessaire)
             EventOccurrence::createUpdateBatch($occurrenceData);
@@ -124,18 +119,54 @@ class RecurrenceService
     }
 
     /**
-     * Régénère les occurrences pour tous les événements récurrents
-     * À utiliser lors de la maintenance ou migration
+     * Régénère les occurrences pour tous les événements récurrents.
+     * 
+     * À utiliser lors de la maintenance ou migration.
+     * 
+     * @return array Statistiques de la régénération
      */
     public static function regenerateAllOccurrences(): array
+    {
+        return self::regenerateOccurrencesWithFilter();
+    }
+
+    /**
+     * Régénère les occurrences seulement pour les événements modifiés depuis une date.
+     * 
+     * Optimisation pour la maintenance incrémentale.
+     * 
+     * @param string $since Date depuis laquelle vérifier les modifications (Y-m-d H:i:s)
+     * @return array Statistiques de la régénération
+     */
+    public static function regenerateModifiedOccurrences(string $since): array
+    {
+        return self::regenerateOccurrencesWithFilter($since);
+    }
+    
+    /**
+     * Régénère les occurrences avec un filtre optionnel sur la date de modification.
+     * 
+     * @param string|null $since Date optionnelle pour filtrer les événements modifiés
+     * @return array Statistiques de la régénération
+     */
+    private static function regenerateOccurrencesWithFilter(?string $since = null): array
     {
         try {
             $db = EventOccurrence::getDbConnection();
             
-            $stmt = $db->query("SELECT * FROM calendar_events 
-                               WHERE recurrence_rule IS NOT NULL 
-                               AND recurrence_rule != '' 
-                               AND deleted_at IS NULL");
+            $query = "SELECT * FROM calendar_events 
+                     WHERE recurrence_rule IS NOT NULL 
+                     AND recurrence_rule != '' 
+                     AND deleted_at IS NULL";
+            
+            if ($since) {
+                $query .= " AND updated_at >= ?";
+                $stmt = $db->prepare($query);
+                $stmt->execute([$since]);
+            } else {
+                $stmt = $db->query($query);
+            }
+            
             $events = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
             $stats = [
@@ -143,86 +174,43 @@ class RecurrenceService
                 'success' => 0,
                 'failed' => 0
             ];
-
-            foreach ($events as $event) {
-                $count = self::generateAllOccurrences($event);
-                if ($count > 0) {
-                    $stats['success']++;
-                } else {
-                    $stats['failed']++;
-                }
+            
+            if ($since) {
+                $stats['since'] = $since;
             }
 
-            LogService::info("Régénération globale des occurrences terminée", $stats);
-
-            return $stats;
-        } catch (\Exception $e) {
-            LogService::error("Erreur lors de la régénération globale", [
-                'error' => $e->getMessage()
-            ]);
-            return ['error' => $e->getMessage()];
-        }
-    }
-
-    /**
-     * Régénère les occurrences seulement pour les événements modifiés depuis une date
-     * Optimisation pour la maintenance incrémentale
-     * 
-     * @param string $since Date depuis laquelle vérifier les modifications (Y-m-d H:i:s)
-     * @return array Statistiques de la régénération
-     */
-    public static function regenerateModifiedOccurrences(string $since): array
-    {
-        try {
-            $db = EventOccurrence::getDbConnection();
-            
-            // Récupérer uniquement les événements modifiés depuis la date donnée
-            $stmt = $db->prepare("SELECT * FROM calendar_events 
-                                 WHERE recurrence_rule IS NOT NULL 
-                                 AND recurrence_rule != '' 
-                                 AND deleted_at IS NULL
-                                 AND updated_at >= ?");
-            $stmt->execute([$since]);
-            $events = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-
-            $stats = [
-                'total' => count($events),
-                'success' => 0,
-                'failed' => 0,
-                'skipped' => 0,
-                'since' => $since
-            ];
-
             if (empty($events)) {
-                LogService::info("Aucun événement modifié depuis la dernière maintenance", $stats);
+                $message = $since ? "Aucun événement modifié depuis la dernière maintenance" : "Aucun événement récurrent trouvé";
+                LogService::info($message, $stats);
                 return $stats;
             }
 
             foreach ($events as $event) {
-                $count = self::generateAllOccurrences($event);
-                if ($count > 0) {
-                    $stats['success']++;
-                } else {
-                    $stats['failed']++;
-                }
+                $stats[self::generateAllOccurrences($event) > 0 ? 'success' : 'failed']++;
             }
 
-            LogService::info("Régénération incrémentale des occurrences terminée", $stats);
+            $logMessage = $since ? "Régénération incrémentale des occurrences terminée" : "Régénération globale des occurrences terminée";
+            LogService::info($logMessage, $stats);
 
             return $stats;
         } catch (\Exception $e) {
-            LogService::error("Erreur lors de la régénération incrémentale", [
-                'since' => $since,
-                'error' => $e->getMessage()
-            ]);
+            $context = ['error' => $e->getMessage()];
+            if ($since) {
+                $context['since'] = $since;
+            }
+            
+            $logMessage = $since ? "Erreur lors de la régénération incrémentale" : "Erreur lors de la régénération globale";
+            LogService::error($logMessage, $context);
+            
             return ['error' => $e->getMessage()];
         }
     }
 
     /**
-     * Calcule les occurrences d'un événement récurrent (sans sauvegarder)
-     * Utilisé pour la génération initiale et les calculs à la volée
-     * Pour les événements sans UNTIL/COUNT, génère jusqu'à endDate (2099-12-31 par défaut)
+     * Calcule les occurrences d'un événement récurrent (sans sauvegarder).
+     * 
+     * Utilisé pour la génération initiale et les calculs à la volée.
+     * Pour les événements sans UNTIL/COUNT, génère jusqu'à endDate (2099-12-31 par défaut).
      * 
      * @param array $event L'événement avec sa règle de récurrence
      * @param string $startDate Date de début de la période (Y-m-d H:i:s)
@@ -249,8 +237,9 @@ class RecurrenceService
             // Configurer le transformateur
             $config = new ArrayTransformerConfig();
             $config->enableLastDayOfMonthFix();
+            
             // Augmenter la limite virtuelle pour permettre la génération de grandes séries
-            // Par défaut la bibliothèque limite à 732 occurrences (~2 ans)
+            // Par défaut, la bibliothèque limite à 732 occurrences (~2 ans)
             // On met une limite haute pour couvrir jusqu'à 2099
             $config->setVirtualLimit(10000);
             
@@ -270,41 +259,33 @@ class RecurrenceService
                 $occurrenceStart = $occurrence->getStart();
                 
                 // Vérifier que getStart() retourne bien un objet DateTime
-                if (!$occurrenceStart || !($occurrenceStart instanceof \DateTimeInterface)) {
-                    LogService::warning("Occurrence invalide détectée lors du calcul des occurrences", [
-                        'event_id' => $event['id'] ?? 'unknown',
-                        'occurrence' => $occurrence
+                if (!$occurrenceStart instanceof \DateTimeInterface) {
+                    LogService::warning("Occurrence invalide détectée", [
+                        'event_id' => $event['id'] ?? 'unknown'
                     ]);
-                    continue; // Ignorer cette occurrence invalide
+                    continue;
                 }
                 
-                if ($occurrenceStart instanceof \DateTimeImmutable) {
-                    $occurrenceEnd = $occurrenceStart->add($duration);
-                } else {
-                    // Clone pour DateTime mutable et créer une vraie instance DateTime
-                    try {
-                        $dateString = $occurrenceStart->format('Y-m-d H:i:s');
-                        $clonedStart = \DateTime::createFromFormat('Y-m-d H:i:s', $dateString);
-                        if ($clonedStart === false) {
-                            continue; // Format de date invalide, ignorer cette occurrence
-                        }
-                        $occurrenceEnd = $clonedStart->add($duration);
-                    } catch (\Exception $e) {
-                        continue; // Erreur lors du traitement de la date, ignorer cette occurrence
-                    }
+                // Calculer la date de fin en fonction du type de DateTime
+                try {
+                    /** @var \DateTime|\DateTimeImmutable $occurrenceStart */
+                    $occurrenceEnd = $occurrenceStart instanceof \DateTimeImmutable 
+                        ? $occurrenceStart->add($duration)
+                        : (clone $occurrenceStart)->add($duration);
+                } catch (\Exception $e) {
+                    continue;
                 }
                 
                 // Vérifier si l'occurrence est dans la période
                 if ($occurrenceEnd >= $periodStart && $occurrenceStart <= $periodEnd) {
-                    $expandedEvent = $event;
-                    $expandedEvent['start_datetime'] = $occurrenceStart->format('Y-m-d H:i:s');
-                    $expandedEvent['end_datetime'] = $occurrenceEnd->format('Y-m-d H:i:s');
-                    $expandedEvent['occurrence_id'] = $event['id'] . '_' . $occurrenceStart->format('Ymd\THis');
-                    $expandedEvent['is_recurring'] = true;
-                    $expandedEvent['recurrence_index'] = $occurrenceIndex;
-                    $expandedEvent['parent_event_id'] = $event['id'];
-                    
-                    $expandedEvents[] = $expandedEvent;
+                    $expandedEvents[] = array_merge($event, [
+                        'start_datetime' => $occurrenceStart->format('Y-m-d H:i:s'),
+                        'end_datetime' => $occurrenceEnd->format('Y-m-d H:i:s'),
+                        'occurrence_id' => $event['id'] . '_' . $occurrenceStart->format('Ymd\THis'),
+                        'is_recurring' => true,
+                        'recurrence_index' => $occurrenceIndex,
+                        'parent_event_id' => $event['id']
+                    ]);
                 }
                 
                 $occurrenceIndex++;
@@ -322,8 +303,9 @@ class RecurrenceService
     }
 
     /**
-     * Expanse un événement récurrent en ses occurrences pour une période donnée
-     * (méthode publique qui utilise calculateOccurrences en interne)
+     * Expanse un événement récurrent en ses occurrences pour une période donnée.
+     * 
+     * Méthode publique qui utilise calculateOccurrences en interne.
      * 
      * @param array $event L'événement avec sa règle de récurrence
      * @param string|null $startDate Date de début de la période (Y-m-d H:i:s)
@@ -334,150 +316,130 @@ class RecurrenceService
     {
         // Si pas de règle de récurrence, retourner l'événement original s'il est dans la période
         if (empty($event['recurrence_rule'])) {
-            if ($startDate && $endDate) {
-                if ($event['start_datetime'] <= $endDate && $event['end_datetime'] >= $startDate) {
-                    return [$event];
-                }
-            } else {
+            if (!$startDate || !$endDate || 
+                ($event['start_datetime'] <= $endDate && $event['end_datetime'] >= $startDate)) {
                 return [$event];
             }
             return [];
         }
 
         // Définir les dates par défaut si non fournies
-        if (!$startDate) {
-            $startDate = date('Y-m-d H:i:s');
-        }
-        if (!$endDate) {
-            $endDate = date('Y-m-d H:i:s', strtotime('+2 years'));
-        }
+        $startDate = $startDate ?? date('Y-m-d H:i:s');
+        $endDate = $endDate ?? date('Y-m-d H:i:s', strtotime('+2 years'));
 
         return self::calculateOccurrences($event, $startDate, $endDate);
     }
     
     /**
-     * Expanse plusieurs événements récurrents
+     * Expanse plusieurs événements récurrents.
      * 
      * @param array $events Tableau d'événements
-     * @param string $startDate Date de début de la période
-     * @param string $endDate Date de fin de la période
+     * @param string|null $startDate Date de début de la période
+     * @param string|null $endDate Date de fin de la période
      * @return array Tableau d'occurrences triées par date de début
      */
     public static function expandMultipleEvents(array $events, ?string $startDate = null, ?string $endDate = null): array
     {
-        $allOccurrences = [];
+        $allOccurrences = array_reduce(
+            $events,
+            fn($carry, $event) => array_merge($carry, self::expandRecurrence($event, $startDate, $endDate)),
+            []
+        );
         
-        foreach ($events as $event) {
-            $occurrences = self::expandRecurrence($event, $startDate, $endDate);
-            $allOccurrences = array_merge($allOccurrences, $occurrences);
-        }
-        
-        // Trier par date de début
-        usort($allOccurrences, function($a, $b) {
-            return strcmp($a['start_datetime'], $b['start_datetime']);
-        });
+        usort($allOccurrences, fn($a, $b) => strcmp($a['start_datetime'], $b['start_datetime']));
         
         return $allOccurrences;
     }
     
     /**
-     * Obtient les occurrences d'un événement récurrent dans une période donnée
+     * Obtient les occurrences d'un événement récurrent dans une période donnée.
      * 
      * @param array $event L'événement récurrent
      * @param string|null $startDate Date de début (optionnelle)
      * @param string|null $endDate Date de fin (optionnelle)
-     * @return array
+     * @return array Tableau d'occurrences
      */
     public static function getOccurrences(array $event, ?string $startDate = null, ?string $endDate = null): array
     {
-        if (empty($event['recurrence_rule'])) {
-            return [];
-        }
-        
-        // Par défaut, récupérer les occurrences pour les 2 prochaines années
-        if (!$startDate) {
-            $startDate = date('Y-m-d H:i:s');
-        }
-        
-        if (!$endDate) {
-            $endDate = date('Y-m-d H:i:s', strtotime('+2 years'));
-        }
-        
-        return self::expandRecurrence($event, $startDate, $endDate);
+        return empty($event['recurrence_rule']) ? [] : self::expandRecurrence($event, $startDate, $endDate);
     }
 
-    public static function expandOneDay($event, ?string $startDatePeriod = null, ?string $endDatePeriod = null, int $limit = 100): array
+    /**
+     * Expanse un événement qui s'étend sur plusieurs jours en occurrences d'une journée.
+     * 
+     * @param array $event L'événement à expanser
+     * @param string|null $startDatePeriod Date de début de la période (optionnelle)
+     * @param string|null $endDatePeriod Date de fin de la période (optionnelle)
+     * @param int $limit Limite du nombre d'occurrences (par défaut 100)
+     * @return array Tableau d'occurrences d'une journée
+     */
+    public static function expandOneDay(array $event, ?string $startDatePeriod = null, ?string $endDatePeriod = null, int $limit = 100): array
     {
-        if ($event['start_datetime'] === $event['end_datetime']) {
-                return [$event];
-        }
-
-        if (!$startDatePeriod) {
-            $startDatePeriod = date('Y-m-d H:i:s');
-        }
-        
-        if (!$endDatePeriod) {
-            $endDatePeriod = date('Y-m-d H:i:s', strtotime('+2 years'));
-        }
-        $occurences = [];
-
         $startDateTime = new \DateTime($event['start_datetime']);
         $endDateTime = new \DateTime($event['end_datetime']);
         
-        // Extraire uniquement les dates (sans les heures)
-        $startDate = $startDateTime->format('Y-m-d');
-        $endDate = $endDateTime->format('Y-m-d');
-        
         // Si l'événement commence et finit le même jour, retourner l'événement original
-        if ($startDate === $endDate) {
+        if ($startDateTime->format('Y-m-d') === $endDateTime->format('Y-m-d')) {
             return [$event];
         }
+
+        $startDatePeriod = $startDatePeriod ?? date('Y-m-d H:i:s', strtotime('-2 years'));
+        $endDatePeriod = $endDatePeriod ?? date('Y-m-d H:i:s', strtotime('+2 years'));
         
-        $interval = new \DateInterval('P1D');
-        $period = new \DatePeriod($startDateTime, $interval, $endDateTime);
+        $period = new \DatePeriod($startDateTime, new \DateInterval('P1D'), $endDateTime);
+        $occurences = [];
+        
         foreach ($period as $date) {
-            $occurrence = $event;
-            $occurrence['start_datetime'] = $date->format('Y-m-d 00:00:00');
-            $occurrence['end_datetime'] = $date->format('Y-m-d 23:59:59');
-            if ( $occurrence['end_datetime'] < $startDatePeriod || $occurrence['start_datetime'] > $endDatePeriod) {
+            $startDt = $date->format('Y-m-d 00:00:00');
+            $endDt = $date->format('Y-m-d 23:59:59');
+            
+            // Filtrer par période
+            if ($endDt < $startDatePeriod || $startDt > $endDatePeriod) {
                 continue;
             }
+            
+            $occurrence = $event;
+            $occurrence['start_datetime'] = $startDt;
+            $occurrence['end_datetime'] = $endDt;
             $occurences[] = $occurrence;
+            
             if (count($occurences) >= $limit) {
                 break;
             }
         }
-        if ($event['all_day']) {
-            return $occurences;            
+        
+        // Pour les événements non all-day, conserver les heures d'origine
+        if (!empty($occurences) && !$event['all_day']) {
+            $occurences[0]['start_datetime'] = $event['start_datetime'];
+            $occurences[count($occurences) - 1]['end_datetime'] = $event['end_datetime'];
         }
-        $occurences[0]['start_datetime'] = $event['start_datetime'];
-        $occurences[count($occurences) - 1]['end_datetime'] = $event['end_datetime'];
+        
         return $occurences;
     }
 
     /**
-     * Obtient les occurrences d'un événement récurrent d'une journée dans une période donnée
+     * Obtient les occurrences d'un événement récurrent expansées par jour dans une période donnée.
      * 
      * @param array $event L'événement récurrent
      * @param string|null $startDate Date de début (optionnelle)
      * @param string|null $endDate Date de fin (optionnelle)
-     * @return array
+     * @return array Tableau d'occurrences expansées par jour
      */
     public static function getOneDayOccurrences(array $event, ?string $startDate = null, ?string $endDate = null): array
     {
         $events = self::getOccurrences($event, $startDate, $endDate);
-        $allOccurrences = [];
-        foreach ($events as $event) {
-            $occurrences = self::expandOneDay($event, $startDate, $endDate);
-            $allOccurrences = array_merge($allOccurrences, $occurrences);
-        }
-        return $allOccurrences;
+        
+        return array_reduce(
+            $events,
+            fn($carry, $evt) => array_merge($carry, self::expandOneDay($evt, $startDate, $endDate)),
+            []
+        );
     }
-    
-    
+
     /**
-     * Compte le nombre total d'occurrences d'un événement récurrent
-     * Attention: peut être infini si la règle n'a pas de COUNT ou UNTIL
+     * Compte le nombre total d'occurrences d'un événement récurrent.
+     * 
+     * Attention: peut être infini si la règle n'a pas de COUNT ou UNTIL.
      * 
      * @param array $event L'événement récurrent
      * @return int|string Nombre d'occurrences ou 'infinite'
@@ -485,22 +447,20 @@ class RecurrenceService
     public static function countOccurrences(array $event): int|string
     {
         if (empty($event['recurrence_rule'])) {
-            return 1; // L'événement lui-même
+            return 1;
         }
         
-        // Vérifier si la règle a un COUNT ou UNTIL (limite)
         $rule = strtoupper($event['recurrence_rule']);
         if (!str_contains($rule, 'COUNT=') && !str_contains($rule, 'UNTIL=')) {
             return 'infinite';
         }
         
         try {
-            // Calculer les occurrences jusqu'à la date limite
-            $farFuture = ICS_OCCURRENCES_MAX_DATE . ' 23:59:59';
-            $occurrences = self::expandRecurrence($event, $event['start_datetime'], $farFuture);
-            
-            return count($occurrences);
-            
+            return count(self::expandRecurrence(
+                $event,
+                $event['start_datetime'],
+                ICS_OCCURRENCES_MAX_DATE . ' 23:59:59'
+            ));
         } catch (\Exception $e) {
             return 1;
         }

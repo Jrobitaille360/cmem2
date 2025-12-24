@@ -5,6 +5,7 @@ namespace ICS\Models;
 use AuthGroups\Models\BaseModel;
 use AuthGroups\Services\LogService;
 use PDO;
+use SebastianBergmann\CodeCoverage\Filter;
 
 class CalendarEvent extends BaseModel
 {
@@ -117,7 +118,7 @@ class CalendarEvent extends BaseModel
     /**
      * Récupère un événement par son ID
      */
-    public function getById($eventId): ?array
+    public function getEventById($eventId): ?array
     {      
         $query = "SELECT * FROM calendar_events WHERE id = ? AND deleted_at IS NULL";
         $stmt = $this->getDb()->prepare($query);
@@ -125,13 +126,15 @@ class CalendarEvent extends BaseModel
         
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         return $result ?: null;
-    }
+    }  
 
     /**
-     * Récupère tous les événements d'un calendrier avec leurs occurrences
+     * Récupère tous les événements d'un calendrier
+     * si $expandRecurrence est true, les événements récurrents sont développés en occurrences.
+     * si $expandMultiJour est true, les événements multi-jours sont développés en occurrences journalières.
      * Utilise la table event_occurrences pour les événements récurrents (performant)
      */
-    public function getByCalendarId($calendarId, $startDatePeriod = null, $endDatePeriode = null, $expandRecurrence = true, $lastUpdateAfter = null, $limit = 100): array
+    public function getByCalendarId($calendarId, $startDatePeriod = null, $endDatePeriode = null, $expandRecurrence = true, $lastUpdateAfter = null, $expandMultiJour = true, $limit = 100): array
     {
         $query = "SELECT * FROM calendar_events WHERE calendar_id = ? AND deleted_at IS NULL";
         $params = [$calendarId];
@@ -150,27 +153,35 @@ class CalendarEvent extends BaseModel
         if (empty($events)) {
             return [];
         }
-
-        // Séparer les événements récurrents et non-récurrents
-        $recurringEvents = [];
-        $nonRecurringEvents = [];
-        
-        foreach ($events as $event) {
-            if (!empty($event['recurrence_rule'])) {
-                $recurringEvents[] = $event;
-            } else {
-                // Pour les événements non-récurrents, gérer les événements multi-jours
-                if (date('Y-m-d', strtotime($event['start_datetime'])) !== date('Y-m-d', strtotime($event['end_datetime']))) {
+        $expandedEvents = [];
+        // traiter les évenements multi-jours
+        if( $expandMultiJour=="true" || $expandMultiJour===true )   {
+            foreach ($events as $event) {
+                if( date('Y-m-d', strtotime($event['start_datetime'])) !== date('Y-m-d', strtotime($event['end_datetime']))) {
                     $dayOccurrences = \ICS\Services\RecurrenceService::expandOneDay($event, $startDatePeriod, $endDatePeriode, $limit);
-                    $nonRecurringEvents = array_merge($nonRecurringEvents, $dayOccurrences);
-                } else {
-                    $nonRecurringEvents[] = $event;
+                    $expandedEvents = array_merge($expandedEvents, $dayOccurrences);
                 }
             }
+        } else {
+            $expandedEvents = $events;
         }
 
-        $allEvents = $nonRecurringEvents;
+        if( !$expandRecurrence || $expandRecurrence !== "true" ) {
+            return $expandedEvents;
+        } 
 
+        // Séparer les événements récurrents et non-récurrents
+        $recurringEvents = array_filter($expandedEvents, function($event) {
+            return !empty($event['recurrence_rule']);
+        });
+        
+   
+        $nonRecurringEvents = array_filter($expandedEvents,  function($event) {
+            return empty($event['recurrence_rule']);
+        });
+
+        $allEvents = $nonRecurringEvents;
+        // ICI 
         // Utiliser les occurrences pré-calculées pour les événements récurrents
         if ($expandRecurrence && !empty($recurringEvents)) {
             $occurrences = \ICS\Models\EventOccurrence::getByCalendarId($calendarId, $startDatePeriod, $endDatePeriode);
@@ -349,7 +360,7 @@ class CalendarEvent extends BaseModel
             ]);
             
             // Régénérer les occurrences si l'événement est récurrent et que des champs affectant les occurrences ont été modifiés
-            $event = $this->getById($this->id);
+            $event = $this->getEventById($this->id);
             if ($event && (!empty($event['recurrence_rule']) || isset($this->recurrenceRule) || isset($this->startDatetime) || isset($this->endDatetime))) {
                 \ICS\Services\RecurrenceService::generateAllOccurrences($event);
             }

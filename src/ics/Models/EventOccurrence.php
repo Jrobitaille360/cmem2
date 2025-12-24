@@ -334,7 +334,7 @@ class EventOccurrence extends BaseModel
      * Inclut aussi les événements non récurrents transformés en occurrences
      * Génère à la volée si date demandée > 2099-12-31
      */
-    public static function getByCalendarId(int $calendarId, ?string $startDate = null, ?string $endDate = null): array
+    public static function getByCalendarId(int $calendarId, ?string $startDate = null, ?string $endDate = null, $expand_multi_jour = true): array
     {
         try {
             $db = (new static())->getDb();
@@ -393,32 +393,35 @@ class EventOccurrence extends BaseModel
             }
 
             // Pour les occurrences récurrentes multi-jours, les développer en occurrences journalières
-            $expandedOccurrences = [];
-            foreach ($occurrences as $occ) {
-                if (date('Y-m-d', strtotime($occ['start_datetime'])) !== date('Y-m-d', strtotime($occ['end_datetime']))) {
-                    // Événement multi-jours : développer en occurrences journalières
-                    $eventLike = [
-                        'start_datetime' => $occ['start_datetime'],
-                        'end_datetime' => $occ['end_datetime'],
-                        'all_day' => $occ['all_day'] ?? false
-                    ];
-                    $dayOccurrences = \ICS\Services\RecurrenceService::expandOneDay($eventLike, $startDate, $endDate);
-                    foreach ($dayOccurrences as $dayOcc) {
+            if ($expand_multi_jour === true || $expand_multi_jour === "true")
+            {            
+                $expandedOccurrences = [];
+                foreach ($occurrences as $occ) {
+                    if (date('Y-m-d', strtotime($occ['start_datetime'])) !== date('Y-m-d', strtotime($occ['end_datetime']))) {
+                        // Événement multi-jours : développer en occurrences journalières
+                        $eventLike = [
+                            'start_datetime' => $occ['start_datetime'],
+                            'end_datetime' => $occ['end_datetime'],
+                            'all_day' => $occ['all_day'] ?? false
+                        ];
+                        $dayOccurrences = \ICS\Services\RecurrenceService::expandOneDay($eventLike, $startDate, $endDate);
+                        foreach ($dayOccurrences as $dayOcc) {
+                            $expandedOccurrences[] = array_merge($occ, [
+                                'start_datetime' => $dayOcc['start_datetime'],
+                                'end_datetime' => $dayOcc['end_datetime'],
+                                'occurrence_date' => substr($dayOcc['start_datetime'], 0, 10),
+                                'is_multi_day' => true
+                            ]);
+                        }
+                    } else {
+                        // Occurrence d'une seule journée
                         $expandedOccurrences[] = array_merge($occ, [
-                            'start_datetime' => $dayOcc['start_datetime'],
-                            'end_datetime' => $dayOcc['end_datetime'],
-                            'occurrence_date' => substr($dayOcc['start_datetime'], 0, 10),
-                            'is_multi_day' => true
+                            'is_multi_day' => false
                         ]);
                     }
-                } else {
-                    // Occurrence d'une seule journée
-                    $expandedOccurrences[] = array_merge($occ, [
-                        'is_multi_day' => false
-                    ]);
                 }
+                $occurrences = $expandedOccurrences;
             }
-            $occurrences = $expandedOccurrences;
 
             // Supprimer les doublons par event_id et occurrence_date
             $uniqueOccurrences = [];
@@ -457,7 +460,8 @@ class EventOccurrence extends BaseModel
             // Pour les événements multi-jours, les développer en occurrences journalières
             foreach ($nonRecurringEvents as $event) {
                 $isMultiDay = date('Y-m-d', strtotime($event['start_datetime'])) !== date('Y-m-d', strtotime($event['end_datetime']));
-                if ($event['start_datetime'] !== $event['end_datetime']) {
+                
+                if ($isMultiDay && ($expand_multi_jour || $expand_multi_jour === "true") ) {
                     // Événement multi-jours : développer en occurrences journalières
                     $dayOccurrences = \ICS\Services\RecurrenceService::expandOneDay($event, $startDate, $endDate);
                     foreach ($dayOccurrences as $dayOcc) {
@@ -758,18 +762,18 @@ class EventOccurrence extends BaseModel
     /**
      * Trouve une occurrence par event_id et occurrence_date
      */
-    public static function findByEventIdAndDate(int $eventId, string $occurrenceDate): ?array
+    public static function findByEventIdAndDate(int $eventId, string $occurrenceId): ?array
     {
         try {
             $db = (new static())->getDb();
-            $stmt = $db->prepare("SELECT * FROM event_occurrences WHERE event_id = ? AND occurrence_date = ?");
-            $stmt->execute([$eventId, $occurrenceDate]);
+            $stmt = $db->prepare("SELECT * FROM event_occurrences WHERE event_id = ? AND id = ?");
+            $stmt->execute([$eventId, $occurrenceId]);
             $result = $stmt->fetch(PDO::FETCH_ASSOC);
             return $result ?: null;
         } catch (\Exception $e) {
             LogService::error("Erreur lors de la recherche d'occurrence", [
                 'event_id' => $eventId,
-                'occurrence_date' => $occurrenceDate,
+                'occurrence_id' => $occurrenceId,
                 'error' => $e->getMessage()
             ]);
             return null;
@@ -953,7 +957,7 @@ class EventOccurrence extends BaseModel
     /**
      * Modifie toutes les occurrences d'un événement à partir d'une date donnée
      */
-    public static function modifyFromDate(int $eventId, string $fromDate, array $modifications): int
+    public static function modifyFromDate(int $eventId, string $fromId, array $modifications): int
     {
         try {
             $db = (new static())->getDb();
@@ -984,10 +988,10 @@ class EventOccurrence extends BaseModel
 
             $fields[] = 'updated_at = CURRENT_TIMESTAMP';
             $params[] = $eventId;
-            $params[] = $fromDate;
+            $params[] = $fromId;
 
             $query = "UPDATE event_occurrences SET " . implode(', ', $fields) . 
-                     " WHERE event_id = ? AND occurrence_date >= ? AND is_cancelled = 0";
+                     " WHERE event_id = ? AND id >= ? AND is_cancelled = 0";
             
             $stmt = $db->prepare($query);
             $stmt->execute($params);
@@ -996,7 +1000,7 @@ class EventOccurrence extends BaseModel
 
             LogService::info("Occurrences modifiées à partir d'une date", [
                 'event_id' => $eventId,
-                'from_date' => $fromDate,
+                'from_id' => $fromId,
                 'modified_count' => $affectedRows,
                 'modifications' => array_keys($modifications)
             ]);
@@ -1005,7 +1009,7 @@ class EventOccurrence extends BaseModel
         } catch (\Exception $e) {
             LogService::error("Erreur lors de la modification des occurrences futures", [
                 'event_id' => $eventId,
-                'from_date' => $fromDate,
+                'from_id' => $fromId,
                 'error' => $e->getMessage()
             ]);
             return 0;

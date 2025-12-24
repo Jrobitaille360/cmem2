@@ -106,6 +106,8 @@ class CalendarController
 
     /**
      * Récupère les événements d'un calendrier spécifique.
+     * SI expand_multi_jour est true, les événements multi-jours sont développés en occurrences journalières.
+     * si expand_recurrence est true, les événements récurrents sont développés en occurrences.
      */
     public function getCalendarEvents($calendarId, $userId): void
     {
@@ -117,6 +119,9 @@ class CalendarController
                 'start' => 'optional|date_or_datetime',
                 'end' => 'optional|date_or_datetime',
                 'last_update_after' => 'optional|datetime',
+                'limit' => 'optional|integer|min:1',
+                'expand_multi_jour' => 'optional|boolean',
+                'expand_recurrence' => 'optional|boolean',
             ]);
 
         if (!$validation['valid']) {
@@ -131,7 +136,9 @@ class CalendarController
         $start_datetime = $input['start'] ?? null;
         $end_datetime = $input['end'] ?? null;
         $last_update_after = $input['last_update_after'] ?? null;
-
+        $expand_multi_jour = $input['expand_multi_jour'] ?? true;
+        $expand_recurrence = $input['expand_recurrence'] ?? true;
+        $limit = $input['limit'] ?? 10000;
         try {
             $cal = new Calendar();
             // Vérifier si l'utilisateur a accès au calendrier
@@ -148,7 +155,7 @@ class CalendarController
             }
 
             $eventModel = new CalendarEvent();
-            $events = $eventModel->getByCalendarId($calendarId, $start_datetime, $end_datetime, true,$last_update_after);
+            $events = $eventModel->getByCalendarId($calendarId, $start_datetime, $end_datetime, expandRecurrence: $expand_recurrence, lastUpdateAfter: $last_update_after, expandMultiJour:$expand_multi_jour, limit: $limit);
 
             LoggingMiddleware::logExit(200);
             Response::success('Événements du calendrier récupérés avec succès', [
@@ -164,7 +171,7 @@ class CalendarController
         }
     }
     
-public function getEvent($eventId, $calendarId, $userId): void
+    public function getEvent($eventId, $calendarId, $userId): void
     {
         LoggingMiddleware::logEntry();
 
@@ -185,7 +192,7 @@ public function getEvent($eventId, $calendarId, $userId): void
 
             $eventModel = new CalendarEvent();
 
-            $event = $eventModel->getById($eventId);
+            $event = $eventModel->getEventById($eventId);
             
             if(!$event || $event['calendar_id'] != $calendarId) {
                 LogService::warning("Événement non trouvé dans le calendrier", [
@@ -1543,7 +1550,7 @@ public function getEvent($eventId, $calendarId, $userId): void
         
         $input = Response::getRequestParams();
         $validation = Validator::validate($input, [
-            'occurrence_date' => 'required|date_or_datetime',
+            'Ocurrence_id' => 'required|integer',
             'title' => 'optionnal|string',
             'description' => 'optionnal|string',
             'location' => 'optionnal|string',
@@ -1561,7 +1568,7 @@ public function getEvent($eventId, $calendarId, $userId): void
             return;
         }
 
-        $occurrenceDate = $input['occurrence_date'] ?? null;
+        $occurrenceId = $input['occurrence_id'] ?? null;
       
         // Vérifier que des modifications sont fournies
         $modifications = array_intersect_key($input, array_flip(['title', 'description', 'location', 'start_datetime', 'end_datetime']));
@@ -1654,12 +1661,12 @@ public function getEvent($eventId, $calendarId, $userId): void
             
             if ($scope === 'all_future') {
                 // Modifier toutes les occurrences à partir de cette date
-                $modifiedCount = \ICS\Models\EventOccurrence::modifyFromDate($eventId, $occurrenceDate, $modifications);
+                $modifiedCount = \ICS\Models\EventOccurrence::modifyFromDate($eventId, $occurrenceId, $modifications);
                 
                 if ($modifiedCount == 0) {
                     LogService::warning("Aucune occurrence future trouvée pour modification", [
                         'event_id' => $eventId,
-                        'occurrence_date' => $occurrenceDate
+                        'occurrence_id' => $occurrenceId
                     ]);
                     LoggingMiddleware::logExit(404);
                     Response::error('Aucune occurrence future trouvée', null, 404);
@@ -1668,7 +1675,7 @@ public function getEvent($eventId, $calendarId, $userId): void
                 
                 LogService::info("Occurrences futures modifiées", [
                     'event_id' => $eventId,
-                    'from_date' => $occurrenceDate,
+                    'from_id' => $occurrenceId,
                     'modified_count' => $modifiedCount,
                     'modifications' => $modifications,
                     'user_id' => $userId
@@ -1678,7 +1685,7 @@ public function getEvent($eventId, $calendarId, $userId): void
                 Response::success('Occurrences futures modifiées avec succès', [
                     'event_id' => $eventId,
                     'scope' => $scope,
-                    'occurrence_date' => $occurrenceDate,
+                    'occurrence_id' => $occurrenceId,
                     'modified_count' => $modifiedCount,
                     'modifications' => $modifications,
                     'updated_at' => date('Y-m-d H:i:s')
@@ -1687,12 +1694,12 @@ public function getEvent($eventId, $calendarId, $userId): void
             }
             
             // Scope 'only_this' - modifier seulement cette occurrence
-            $occurrence = \ICS\Models\EventOccurrence::findByEventIdAndDate($eventId, $occurrenceDate);
+            $occurrence = \ICS\Models\EventOccurrence::findByEventIdAndDate($eventId, $occurrenceId);
             
             if (!$occurrence) {
                 LogService::warning("Occurrence non trouvée", [
                     'event_id' => $eventId,
-                    'occurrence_date' => $occurrenceDate
+                    'occurrence_id' => $occurrenceId
                 ]);
                 LoggingMiddleware::logExit(404);
                 Response::error('Occurrence non trouvée', null, 404);
@@ -1714,7 +1721,6 @@ public function getEvent($eventId, $calendarId, $userId): void
             LogService::info("Occurrence modifiée", [
                 'event_id' => $eventId,
                 'occurrence_id' => $occurrence['id'],
-                'occurrence_date' => $occurrenceDate,
                 'modifications' => $modifications,
                 'user_id' => $userId
             ]);
@@ -1722,7 +1728,7 @@ public function getEvent($eventId, $calendarId, $userId): void
             Response::success('Occurrence modifiée avec succès', [
                 'event_id' => $eventId,
                 'scope' => $scope,
-                'occurrence_date' => $occurrenceDate,
+                'occurrence_id' => $occurrenceId,
                 'modified_count' => $modifiedCount,
                 'modifications' => $modifications,
                 'updated_at' => date('Y-m-d H:i:s')
@@ -1752,13 +1758,29 @@ public function getEvent($eventId, $calendarId, $userId): void
             return;
         }
 
+        $input = Response::getRequestParams();
+        $validation = Validator::validate($input, [
+            'start_date' => 'optionnal|date_or_datetime',
+            'end_date' => 'optionnal|date_or_datetime',
+            'expand_multi_jour' => 'optionnal|boolean',
+        ]);
+
+        if (!$validation['valid']) {
+            LogService::warning("Paramètres de récupération des occurrences invalides", [
+                'errors' => $validation['errors']
+            ]);
+            LoggingMiddleware::logExit(400);
+            Response::error('Données invalides', $validation['errors'], 400);
+            return;
+        }
         // Récupérer les paramètres de période
-        $startDate = $_GET['start_date'] ?? null;
-        $endDate = $_GET['end_date'] ?? null;
+        $startDate = $input['start_date'] ?? null;
+        $endDate = $input['end_date'] ?? null;
+        $expand_multi_jour = $input['expand_multi_jour'] ?? true;
         
         try {
             // Utiliser les occurrences pré-calculées de la table event_occurrences
-            $occurrences = \ICS\Models\EventOccurrence::getByCalendarId($calendarId, $startDate, $endDate);
+            $occurrences = \ICS\Models\EventOccurrence::getByCalendarId($calendarId, $startDate, $endDate, $expand_multi_jour);
             
             LogService::info("Occurrences du calendrier récupérées depuis table pré-calculée", [
                 'calendar_id' => $calendarId,

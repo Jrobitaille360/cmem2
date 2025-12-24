@@ -167,6 +167,13 @@
           "params": {
             "id": "integer (required) - ID du calendrier"
           },
+          "body": {
+            "start": "string (optional) - Filtrer par date/heure de début (YYYY-MM-DD ou ISO 8601)",
+            "end": "string (optional) - Filtrer par date/heure de fin (YYYY-MM-DD ou ISO 8601)",
+            "last_update_after": "string (optional) - Récupérer les événements mis à jour après cette date/heure (ISO 8601)",
+            "limit": "integer (optional) - Nombre maximum d'événements à retourner (par défaut 100)",
+            "expand_multi_jour": "boolean (optional) - Si true(default), les événements multi-jours sont retournés avec chaque jour comme occurrence distincte"
+          },
           "response": "Liste des événements avec détails"
         },
         {
