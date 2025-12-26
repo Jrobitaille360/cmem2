@@ -1589,6 +1589,7 @@ class CalendarController
                 Response::error('La date de fin doit être après la date de début', null, 400);
                 return;
             }
+            $modifications['occurrence_date'] = date('Y-m-d', strtotime($input['start_datetime']));
         }
         
         $cal = new Calendar();

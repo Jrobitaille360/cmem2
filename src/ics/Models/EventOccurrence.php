@@ -899,7 +899,10 @@ class EventOccurrence extends BaseModel
                 $fields[] = 'modified_end_datetime = ?';
                 $params[] = $modifications['end_datetime'];
             }
-
+            if (isset($modifications['occurrence_date'])) {
+                $fields[] = 'occurrence_date = ?';
+                $params[] = $modifications['occurrence_date'];
+            }
             $fields[] = 'updated_at = CURRENT_TIMESTAMP';
             $params[] = $this->id;
 

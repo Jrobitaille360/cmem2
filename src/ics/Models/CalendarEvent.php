@@ -161,6 +161,9 @@ class CalendarEvent extends BaseModel
                     $dayOccurrences = \ICS\Services\RecurrenceService::expandOneDay($event, $startDatePeriod, $endDatePeriode, $limit);
                     $expandedEvents = array_merge($expandedEvents, $dayOccurrences);
                 }
+                else {
+                    $expandedEvents[] = $event;
+                }
             }
         } else {
             $expandedEvents = $events;
