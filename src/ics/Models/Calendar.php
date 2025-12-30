@@ -330,10 +330,6 @@ class Calendar extends BaseModel
             $eventIcs .= "LOCATION:" . TimezoneHelper::escapeIcsText($event['location']) . "\r\n";
         }
         
-        if (!empty($event['organizer_email'])) {
-            $eventIcs .= "ORGANIZER:mailto:" . $event['organizer_email'] . "\r\n";
-        }
-        
         // Participants
         if (!empty($event['attendees'])) {
             $attendees = json_decode($event['attendees'], true);
@@ -536,7 +532,7 @@ class Calendar extends BaseModel
 
             // 3. Parser et importer les événements (VEVENT)
             $eventModel = new CalendarEvent();
-            $importedCount = $eventModel->importEventsFromIcsContent($calendarId, $icsContent);
+            $importedCount = $eventModel->importEventsFromIcsContent($calendarId, $icsContent, $userId);
 
             $this->getDb()->commit();
 

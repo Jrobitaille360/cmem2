@@ -14,13 +14,13 @@
 			POST, DELETE(Soft ou hard), GET entrypoints  users/app/ 
 			GET, PUT entrypoints users/app/{ap_id}
 			
-	
+	- soft vs hard delete (cron job of maintenance hard delete xx days old...)	
 	
 	
 Flutter client app
 
-	- delete event, occurences, occrences to come
 	- edit event, occurences, occrences to come
+	- ajouter un view périodique des données pour mise à jour par autres clients
 	- import ics
 	- admin param
 	- save state of app

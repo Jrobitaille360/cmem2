@@ -237,7 +237,7 @@ class EventOccurrence extends BaseModel
             
             $query = "SELECT eo.*, 
                       ce.title, ce.description, ce.location, ce.all_day, ce.color, 
-                      ce.status, ce.timezone, ce.organizer_email, ce.attendees, 
+                      ce.status, ce.timezone, ce.attendees, 
                       ce.meeting_link, ce.notifications, ce.recurrence_rule
                       FROM event_occurrences eo
                       LEFT JOIN calendar_events ce ON eo.event_id = ce.id
@@ -291,7 +291,7 @@ class EventOccurrence extends BaseModel
             $placeholders = implode(',', array_fill(0, count($eventIds), '?'));
             $query = "SELECT eo.*, 
                       ce.title, ce.description, ce.location, ce.all_day, ce.color, 
-                      ce.status, ce.timezone, ce.organizer_email, ce.attendees, 
+                      ce.status, ce.timezone, ce.attendees, 
                       ce.meeting_link, ce.notifications, ce.recurrence_rule
                       FROM event_occurrences eo
                       LEFT JOIN calendar_events ce ON eo.event_id = ce.id
@@ -347,7 +347,7 @@ class EventOccurrence extends BaseModel
 
             $query = "SELECT eo.*, 
                       ce.title, ce.description, ce.location, ce.all_day, ce.color, 
-                      ce.status, ce.timezone, ce.organizer_email, ce.attendees, 
+                      ce.status, ce.timezone, ce.attendees, 
                       ce.meeting_link, ce.notifications, ce.recurrence_rule,
                       ce.start_datetime as event_start_datetime, ce.end_datetime as event_end_datetime
                       FROM event_occurrences eo
@@ -487,7 +487,6 @@ class EventOccurrence extends BaseModel
                             'color' => $event['color'],
                             'status' => $event['status'],
                             'timezone' => $event['timezone'],
-                            'organizer_email' => $event['organizer_email'],
                             'attendees' => $event['attendees'],
                             'meeting_link' => $event['meeting_link'],
                             'notifications' => $event['notifications'],
@@ -521,7 +520,6 @@ class EventOccurrence extends BaseModel
                         'color' => $event['color'],
                         'status' => $event['status'],
                         'timezone' => $event['timezone'],
-                        'organizer_email' => $event['organizer_email'],
                         'attendees' => $event['attendees'],
                         'meeting_link' => $event['meeting_link'],
                         'notifications' => $event['notifications'],
@@ -696,7 +694,6 @@ class EventOccurrence extends BaseModel
                             'color' => $event['color'],
                             'status' => $event['status'],
                             'timezone' => $event['timezone'],
-                            'organizer_email' => $event['organizer_email'],
                             'attendees' => $event['attendees'],
                             'meeting_link' => $event['meeting_link'],
                             'notifications' => $event['notifications'],
@@ -731,7 +728,6 @@ class EventOccurrence extends BaseModel
                         'color' => $event['color'],
                         'status' => $event['status'],
                         'timezone' => $event['timezone'],
-                        'organizer_email' => $event['organizer_email'],
                         'attendees' => $event['attendees'],
                         'meeting_link' => $event['meeting_link'],
                         'notifications' => $event['notifications'],
@@ -762,17 +758,17 @@ class EventOccurrence extends BaseModel
     /**
      * Trouve une occurrence par event_id et occurrence_date
      */
-    public static function findByEventIdAndDate(int $eventId, string $occurrenceId): ?array
+    public static function findOccurrenceWithId(int $occurrenceId): ?array
     {
         try {
             $db = (new static())->getDb();
-            $stmt = $db->prepare("SELECT * FROM event_occurrences WHERE event_id = ? AND id = ?");
-            $stmt->execute([$eventId, $occurrenceId]);
+            $stmt = $db->prepare("SELECT * FROM event_occurrences WHERE id = ?");
+            $stmt->execute([$occurrenceId]);
             $result = $stmt->fetch(PDO::FETCH_ASSOC);
             return $result ?: null;
         } catch (\Exception $e) {
             LogService::error("Erreur lors de la recherche d'occurrence", [
-                'event_id' => $eventId,
+                
                 'occurrence_id' => $occurrenceId,
                 'error' => $e->getMessage()
             ]);
@@ -926,23 +922,23 @@ class EventOccurrence extends BaseModel
     }
 
     /**
-     * Annule toutes les occurrences d'un événement à partir d'une date donnée
+     * Annule toutes les occurrences d'un événement à partir d'un id
      */
-    public static function cancelFromDate(int $eventId, string $fromDate): int
+    public static function cancelFromId(int $eventId, string $occurrenceId): int
     {
         try {
             $db = (new static())->getDb();
             $stmt = $db->prepare(
                 "UPDATE event_occurrences SET is_cancelled = 1, updated_at = CURRENT_TIMESTAMP 
-                 WHERE event_id = ? AND occurrence_date >= ? AND is_cancelled = 0"
+                 WHERE event_id = ? AND id >= ? AND is_cancelled = 0"
             );
-            $stmt->execute([$eventId, $fromDate]);
+            $stmt->execute([$eventId, $occurrenceId]);
 
             $affectedRows = $stmt->rowCount();
 
             LogService::info("Occurrences annulées à partir d'une date", [
                 'event_id' => $eventId,
-                'from_date' => $fromDate,
+                'from_id' => $occurrenceId,
                 'cancelled_count' => $affectedRows
             ]);
 
@@ -950,7 +946,7 @@ class EventOccurrence extends BaseModel
         } catch (\Exception $e) {
             LogService::error("Erreur lors de l'annulation des occurrences futures", [
                 'event_id' => $eventId,
-                'from_date' => $fromDate,
+                'from_id' => $occurrenceId,
                 'error' => $e->getMessage()
             ]);
             return 0;
@@ -960,7 +956,7 @@ class EventOccurrence extends BaseModel
     /**
      * Modifie toutes les occurrences d'un événement à partir d'une date donnée
      */
-    public static function modifyFromDate(int $eventId, string $fromId, array $modifications): int
+    public static function modifyFromId(int $eventId, string $fromId, array $modifications): int
     {
         try {
             $db = (new static())->getDb();

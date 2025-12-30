@@ -631,7 +631,7 @@ ADD CONSTRAINT `fk_api_keys_plan` FOREIGN KEY (`plan_id`) REFERENCES `plans` (`i
 
 -- 5. Insérer les plans par défaut
 INSERT INTO `plans` (`name`, `display_name`, `description`, `price`, `currency`, `duration_days`, `api_rate_limit`, `features`, `is_active`) VALUES
-('free', 'Plan Gratuit', 'Plan gratuit avec limitations pour tester l\'API', 0.00, 'EUR', 30, 10, '{"scopes":["read"],"max_requests_per_day":1000,"expires_in_days":7,"email_support":false,"priority_support":false}', 1),
+('free', 'Plan Gratuit', 'Plan gratuit avec limitations pour tester l API', 0.00, 'EUR', 30, 10, '{"scopes":["read"],"max_requests_per_day":1000,"expires_in_days":7,"email_support":false,"priority_support":false}', 1),
 ('bronze', 'Plan Bronze', 'Plan bronze avec fonctionnalités essentielles', 9.99, 'EUR', 30, 100, '{"scopes":["read","write"],"max_requests_per_day":10000,"expires_in_days":null,"email_support":true,"priority_support":false}', 1),
 ('argent', 'Plan Argent', 'Plan argent avec fonctionnalités avancées', 19.99, 'EUR', 30, 300, '{"scopes":["read","write","delete"],"max_requests_per_day":50000,"expires_in_days":null,"email_support":true,"priority_support":true,"webhook_support":true}', 1),
 ('platine', 'Plan Platine', 'Plan platine avec toutes les fonctionnalités premium', 49.99, 'EUR', 30, 1000, '{"scopes":["read","write","delete","admin"],"max_requests_per_day":"unlimited","expires_in_days":null,"email_support":true,"priority_support":true,"webhook_support":true,"custom_integrations":true,"dedicated_support":true}', 1)

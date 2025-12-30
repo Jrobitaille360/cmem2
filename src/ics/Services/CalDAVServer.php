@@ -745,10 +745,6 @@ class CalDAVServer
             $ics .= "LOCATION:" . TimezoneHelper::escapeIcsText($event['location']) . "\r\n";
         }
         
-        if (!empty($event['organizer_email'])) {
-            $ics .= "ORGANIZER:mailto:" . $event['organizer_email'] . "\r\n";
-        }
-        
         $ics .= "STATUS:" . strtoupper($event['status']) . "\r\n";
         $ics .= "SEQUENCE:" . ($event['sequence'] ?? 0) . "\r\n";
         
@@ -810,11 +806,6 @@ class CalDAVServer
                     break;
                 case 'LOCATION':
                     $eventData['location'] = $this->unescapeIcsString($value);
-                    break;
-                case 'ORGANIZER':
-                    if (strpos($value, 'mailto:') === 0) {
-                        $eventData['organizer_email'] = substr($value, 7);
-                    }
                     break;
                 case 'STATUS':
                     $eventData['status'] = strtolower($value);
@@ -886,7 +877,6 @@ class CalDAVServer
         $event->endDatetime = $eventData['end_datetime'];
         $event->allDay = $eventData['all_day'] ?? false;
         $event->location = $eventData['location'] ?? null;
-        $event->organizerEmail = $eventData['organizer_email'] ?? null;
         $event->status = $eventData['status'] ?? 'confirmed';
         
         // Forcer l'UID si fourni
@@ -894,8 +884,8 @@ class CalDAVServer
             $stmt = $this->db->prepare("
                 INSERT INTO calendar_events (
                     calendar_id, title, description, start_datetime, end_datetime,
-                    all_day, location, organizer_email, status, uid, sequence
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    all_day, location, status, uid, sequence
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             
             $stmt->execute([
@@ -906,7 +896,6 @@ class CalDAVServer
                 $event->endDatetime,
                 $event->allDay ? 1 : 0,
                 $event->location,
-                $event->organizerEmail,
                 $event->status,
                 $eventData['uid'],
                 $eventData['sequence'] ?? 0
@@ -928,7 +917,7 @@ class CalDAVServer
         $stmt = $this->db->prepare("
             UPDATE calendar_events 
             SET title = ?, description = ?, start_datetime = ?, end_datetime = ?,
-                all_day = ?, location = ?, organizer_email = ?, status = ?
+                all_day = ?, location = ?, status = ?
             WHERE id = ?
         ");
         
@@ -939,7 +928,6 @@ class CalDAVServer
             $eventData['end_datetime'],
             ($eventData['all_day'] ?? false) ? 1 : 0,
             $eventData['location'] ?? null,
-            $eventData['organizer_email'] ?? null,
             $eventData['status'] ?? 'confirmed',
             $eventId
         ]);

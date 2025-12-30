@@ -922,15 +922,15 @@ class CalendarController
         // Validation des champs de base
         $validation = Validator::validate($input, [
             'title' => 'required|string',
+            'user_id' => 'optional|integer',
             'start_datetime' => 'required|date_or_datetime',
             'end_datetime' => 'required|date_or_datetime',
-            'description' => 'optionnal|string',
-            'all_day' => 'optionnal|boolean',
-            'location' => 'optionnal|string',
-            'organizer_email' => 'optionnal|email',
-            'attendees' => 'optionnal|array',
-            'recurrence_rule' => 'optionnal|string',
-            'status' => 'optionnal|string|in:confirmed,tentative,cancelled',
+            'description' => 'optional|string',
+            'all_day' => 'optional|boolean',
+            'location' => 'optional|string',
+            'attendees' => 'optional|array',
+            'recurrence_rule' => 'optional|string',
+            'status' => 'optional|string|in:confirmed,tentative,cancelled',
         ]);
 
         if (!$validation['valid']) {
@@ -986,13 +986,13 @@ class CalendarController
         try {
             $event = new CalendarEvent();
             $event->calendarId = $calendarId;
+            $event->userId = $userId;
             $event->title = $input['title'];
             $event->startDatetime = $input['start_datetime'];
             $event->endDatetime = $input['end_datetime'];
             $event->description = $input['description'] ?? null;
             $event->allDay = $input['all_day'] ?? false;
             $event->location = $input['location'] ?? null;
-            $event->organizerEmail = $input['organizer_email'] ?? null;
             $event->attendees = $input['attendees'] ?? null;
             $event->recurrenceRule = $input['recurrence_rule'] ?? null;
             $event->status = $input['status'] ?? 'confirmed';
@@ -1025,16 +1025,16 @@ class CalendarController
         
         // Validation des champs de base
         $validation = Validator::validate($input, [
-            'title' => 'optionnal|string',
-            'start_datetime' => 'optionnal|date_or_datetime',
-            'end_datetime' => 'optionnal|date_or_datetime',
-            'description' => 'optionnal|string',
-            'all_day' => 'optionnal|boolean',
-            'location' => 'optionnal|string',
-            'organizer_email' => 'optionnal|email',
-            'color' => 'optionnal|color',
-            'recurrence_rule' => 'optionnal|string',
-            'status' => 'optionnal|string|in:confirmed,tentative,cancelled',
+            'title' => 'optional|string',
+            'user_id' => 'optional|integer',
+            'start_datetime' => 'optional|date_or_datetime',
+            'end_datetime' => 'optional|date_or_datetime',
+            'description' => 'optional|string',
+            'all_day' => 'optional|boolean',
+            'location' => 'optional|string',
+            'color' => 'optional|color',
+            'recurrence_rule' => 'optional|string',
+            'status' => 'optional|string|in:confirmed,tentative,cancelled',
         ]);
         
         if (!$validation['valid']) {
@@ -1132,9 +1132,9 @@ class CalendarController
                 $event->location = $input['location'];
                 $updatedFields[] = 'location';
             }
-            if (isset($input['organizer_email'])) {
-                $event->organizerEmail = $input['organizer_email'];
-                $updatedFields[] = 'organizer_email';
+            if (isset($input['user_id'])) {
+                $event->userId = $input['user_id'];
+                $updatedFields[] = 'user_id';
             }
             if (isset($input['attendees'])) {
                 $event->attendees = $input['attendees'];
@@ -1387,7 +1387,7 @@ class CalendarController
         
         $input = Response::getRequestParams();
         $validation = Validator::validate($input, [
-            'occurrence_date' => 'required|date_or_datetime',
+            'occurrence_id' => 'required|integer',
             'scope' => 'optional|string|in:only_this,all_future,all',
         ]);
         if (!$validation['valid']) {
@@ -1399,7 +1399,7 @@ class CalendarController
             return;
         }
 
-        $occurrenceDate = $input['occurrence_date'] ?? null;
+        $occurrenceId = $input['occurrence_id'] ?? null;
                 
         $cal = new Calendar();
         
@@ -1471,11 +1471,11 @@ class CalendarController
             
             if ($scope === 'only_this') {
                 // Annuler seulement cette occurrence
-                $occurrence = \ICS\Models\EventOccurrence::findByEventIdAndDate($eventId, $occurrenceDate);
+                $occurrence = \ICS\Models\EventOccurrence::findOccurrenceWithId($occurrenceId);
                 if (!$occurrence) {
                     LogService::warning("Occurrence non trouvée", [
-                        'event_id' => $eventId,
-                        'occurrence_date' => $occurrenceDate
+                        'occurrence_id' => $occurrenceId,
+                        'scope' => $scope,
                     ]);
                     LoggingMiddleware::logExit(404);
                     Response::error('Occurrence non trouvée', null, 404);
@@ -1493,12 +1493,12 @@ class CalendarController
                 $cancelledCount = 1;
             } elseif ($scope === 'all_future') {
                 // Annuler toutes les occurrences à partir de cette date
-                $cancelledCount = \ICS\Models\EventOccurrence::cancelFromDate($eventId, $occurrenceDate);
+                $cancelledCount = \ICS\Models\EventOccurrence::cancelFromId($eventId, $occurrenceId);
                 
                 if ($cancelledCount == 0) {
                     LogService::warning("Aucune occurrence future trouvée", [
                         'event_id' => $eventId,
-                        'occurrence_date' => $occurrenceDate
+                        'occurrence_id' => $occurrenceId
                     ]);
                     LoggingMiddleware::logExit(404);
                     Response::error('Aucune occurrence future trouvée', null, 404);
@@ -1519,7 +1519,7 @@ class CalendarController
             LogService::info("Occurrences annulées", [
                 'event_id' => $eventId,
                 'scope' => $scope,
-                'occurrence_date' => $occurrenceDate,
+                'occurrence_id' => $occurrenceId,
                 'cancelled_count' => $cancelledCount,
                 'user_id' => $userId
             ]);
@@ -1528,7 +1528,7 @@ class CalendarController
             Response::success("Occurrences annulées avec succès ($scopeLabel)", [
                 'event_id' => $eventId,
                 'scope' => $scope,
-                'occurrence_date' => $occurrenceDate,
+                'occurrence_id' => $occurrenceId,
                 'cancelled_count' => $cancelledCount,
                 'cancelled_at' => date('Y-m-d H:i:s')
             ]);
@@ -1662,7 +1662,7 @@ class CalendarController
             
             if ($scope === 'all_future') {
                 // Modifier toutes les occurrences à partir de cette date
-                $modifiedCount = \ICS\Models\EventOccurrence::modifyFromDate($eventId, $occurrenceId, $modifications);
+                $modifiedCount = \ICS\Models\EventOccurrence::modifyFromId($eventId, $occurrenceId, $modifications);
                 
                 if ($modifiedCount == 0) {
                     LogService::warning("Aucune occurrence future trouvée pour modification", [
@@ -1695,7 +1695,7 @@ class CalendarController
             }
             
             // Scope 'only_this' - modifier seulement cette occurrence
-            $occurrence = \ICS\Models\EventOccurrence::findByEventIdAndDate($eventId, $occurrenceId);
+            $occurrence = \ICS\Models\EventOccurrence::findOccurrenceWithId( $occurrenceId);
             
             if (!$occurrence) {
                 LogService::warning("Occurrence non trouvée", [
@@ -1711,14 +1711,9 @@ class CalendarController
             $occModel = new \ICS\Models\EventOccurrence();
             $occModel->id = $occurrence['id'];
             $occModel->eventId = $eventId;
-            $result = $occModel->modify($modifications);
+            $occModel->modify($modifications);
             
-            if (!$result) {
-                throw new \Exception("Échec de la modification de l'occurrence");
-            }
-            
-            $modifiedCount = 1;
-            
+            $modifiedCount = 1;          
             LogService::info("Occurrence modifiée", [
                 'event_id' => $eventId,
                 'occurrence_id' => $occurrence['id'],

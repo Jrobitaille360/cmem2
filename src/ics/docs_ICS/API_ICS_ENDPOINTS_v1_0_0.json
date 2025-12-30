@@ -257,8 +257,8 @@
             "eventId": "integer (required) - ID de l'événement récurrent"
           },
           "query_params": {
-            "occurrence_date": "string (required) - Date de l'occurrence à annuler (YYYY-MM-DD)",
-            "scope": "optional|string|in:only_this,all_future,all - Portée de l'annulation"
+            "occurrence_id": "string (required) - ID de l'occurrence à annuler. for futur occurrences id>= this id",
+            "scope": "optional|string|in:only_this,all_future,all - Portée de l'annulation (note all pour supprimer l'événement entier)"
           },
           "response": "Confirmation d'annulation de l'occurrence"
         },

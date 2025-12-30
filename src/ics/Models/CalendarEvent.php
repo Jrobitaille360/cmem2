@@ -13,13 +13,13 @@ class CalendarEvent extends BaseModel
     
     public $id;
     public $calendarId;
+    public $userId;
     public $title;
     public $description;
     public $startDatetime;
     public $endDatetime;
     public $allDay;
     public $location;
-    public $organizerEmail;
     public $attendees;
     public $recurrenceRule;
     public $status;
@@ -42,8 +42,8 @@ class CalendarEvent extends BaseModel
         
         try {
             $query = "INSERT INTO calendar_events (
-                    calendar_id, title, description, start_datetime, end_datetime,
-                    all_day, location, organizer_email, attendees, recurrence_rule, status,
+                    calendar_id, user_id, title, description, start_datetime, end_datetime,
+                    all_day, location, attendees, recurrence_rule, status,
                     timezone, meeting_link, notifications, color
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ";
@@ -60,13 +60,13 @@ class CalendarEvent extends BaseModel
 
             $stmt->execute([
                 $this->calendarId,
+                $this->userId,
                 $this->title,
                 $this->description ?? null,
                 $this->startDatetime,
                 $this->endDatetime,
                 $this->allDay ? 1 : 0,
                 $this->location ?? null,
-                $this->organizerEmail ?? null,
                 $this->attendees ? json_encode($this->attendees) : null,
                 $this->recurrenceRule ?? null,
                 $this->status ?? 'confirmed',
@@ -305,9 +305,9 @@ class CalendarEvent extends BaseModel
                 $values[] = $this->location;
             }
 
-            if(isset($this->organizerEmail)) {
-                $fields[] = "organizer_email = ?";
-                $values[] = $this->organizerEmail;
+            if(isset($this->userId)) {
+                $fields[] = "user_id = ?";
+                $values[] = $this->userId;
             }
 
             if(isset($this->attendees)) {
@@ -557,7 +557,7 @@ class CalendarEvent extends BaseModel
      * @param string $icsContent Le contenu du fichier ICS.
      * @return int Le nombre d'événements importés.
      */
-    public function importEventsFromIcsContent(int $calendarId, string $icsContent): int
+    public function importEventsFromIcsContent(int $calendarId, string $icsContent, string $userId): int
     {
         // J'utilise un simple parseur manuel car je ne peux pas ajouter de dépendances.
         // Pour une solution de production, une bibliothèque comme `johngrogg/ics-parser` serait préférable.
@@ -603,6 +603,7 @@ class CalendarEvent extends BaseModel
             try {
                 $event = new self();
                 $event->calendarId = $calendarId;
+                $event->userId = $userId;
                 $event->title = $eventData['SUMMARY'] ?? 'Sans titre';
                 $event->description = $eventData['DESCRIPTION'] ?? null;
                 $event->location = $eventData['LOCATION'] ?? null;

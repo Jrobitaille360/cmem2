@@ -34,13 +34,13 @@ CREATE TABLE calendars (
 CREATE TABLE calendar_events (
     id INT AUTO_INCREMENT PRIMARY KEY,
     calendar_id INT NOT NULL,
+    user_id INT NOT NULL,
     title VARCHAR(255) NOT NULL,
     description TEXT,
     start_datetime DATETIME NOT NULL,
     end_datetime DATETIME NOT NULL,
     all_day BOOLEAN DEFAULT FALSE,
     location VARCHAR(255),
-    organizer_email VARCHAR(255),
     attendees JSON,
     recurrence_rule VARCHAR(255),
     status ENUM('confirmed', 'tentative', 'cancelled') DEFAULT 'confirmed',
@@ -52,7 +52,9 @@ CREATE TABLE calendar_events (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP NULL,
     FOREIGN KEY (calendar_id) REFERENCES calendars(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     INDEX idx_calendar_events (calendar_id),
+    INDEX idx_user_events (user_id),
     INDEX idx_event_dates (start_datetime, end_datetime)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
