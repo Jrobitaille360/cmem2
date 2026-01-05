@@ -11,6 +11,8 @@ use AuthGroups\Utils\ColorName;
 use AuthGroups\Middleware\LoggingMiddleware;
 use AuthGroups\Services\LogService;
 use AuthGroups\Services\EmailService;
+use AuthGroups\Models\User;
+use PharIo\Manifest\Email;
 
 class CalendarController
 {
@@ -360,6 +362,34 @@ class CalendarController
         $cal = new Calendar();
         $calendar = $cal->getById($calendarId);
         
+        // find user by userid or email
+        $targetUser = null;
+        if (isset($input['user_id'])) {
+            $userModel = new User();
+            $targetUser = $userModel->findById($input['user_id']);
+            if (!$targetUser) {
+                LoggingMiddleware::logExit(400);
+                Response::error('Utilisateur spécifié introuvable', null, 400);
+                return;
+            }
+        } elseif (isset($input['email'])) {
+            $userModel = new User();
+            $targetUser = $userModel->findByEmail($input['email']);
+            if ($targetUser) {
+                // Si l'utilisateur existe, utiliser son ID pour le partage
+                $input['user_id'] = $targetUser['id'];
+                unset($input['email']);
+            }
+        }
+
+        // Vérifier que l'utilisateur ne partage pas avec lui-même
+        if ($targetUser && $targetUser['id'] == $userId) {
+            LoggingMiddleware::logExit(400);
+            Response::error('Vous ne pouvez pas partager un calendrier avec vous-même', null, 400);
+            return;
+        }
+
+
         // Vérifier que l'utilisateur possède le calendrier ou a les droits d'écriture
         if (!$calendar || !$cal->canUserWrite($calendarId, $userId)) {
             logService::warning("Tentative de partage d'un calendrier sans permission", [
@@ -374,25 +404,15 @@ class CalendarController
         $permission = $input['permission'] ?? 'read';
         
         try {
-            if (isset($input['user_id'])) {
-                // Partage avec un utilisateur existant
-                $shareResult = $cal->shareWith($calendarId, $input['user_id'], $permission);
-                LogService::info("Calendrier partagé avec utilisateur", [
+            $shareResult = $cal->shareWith($calendarId, $targetUser['id'], $targetUser['email'], $permission);
+
+            LogService::info("Calendrier partagé avec utilisateur", [
                     'calendar_id' => $calendarId,
                     'shared_with_user_id' => $input['user_id'],
+                    'shared_with_email' => $targetUser['email'],
                     'shared_by_user_id' => $userId,
                     'permission' => $permission
                 ]);
-            } else {
-                // Partage par email
-                $shareResult = $cal->shareWithEmail($calendarId, $input['email'], $permission);
-                LogService::info("Calendrier partagé par email", [
-                    'calendar_id' => $calendarId,
-                    'shared_with_email' => $input['email'],
-                    'shared_by_user_id' => $userId,
-                    'permission' => $permission
-                ]);
-            }
             
             LoggingMiddleware::logExit(200);
             Response::success('Calendrier partagé avec succès', [
@@ -977,7 +997,10 @@ class CalendarController
         $cal = new Calendar();
 
         // Vérifier l'accès en écriture au calendrier
-        if (!$cal->canUserWrite($calendarId, $userId)) {
+
+        $droit = $cal->canUserWrite($calendarId, $userId); 
+
+        if (!$droit) {
             LoggingMiddleware::logExit(403);
             Response::error('Permission insuffisante pour ajouter un événement à ce calendrier', null, 403);
             return;

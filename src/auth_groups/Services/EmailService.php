@@ -327,11 +327,11 @@ class EmailService {
         
         $subject = "Réinitialisation de votre mot de passe";
         
-        $resetUrl = $_ENV['APP_URL'] . "/reset-password?token=" . $resetToken;
+       // $resetUrl = $_ENV['APP_URL'] . "/reset-password?token=" . $resetToken;
         
         $body = $this->buildPasswordResetTemplate([
             'email' => $email,
-            'resetUrl' => $resetUrl
+            'resetToken' => $resetToken
         ]);
         
         $result = $this->sendEmail($email, $subject, $body, true);
@@ -677,11 +677,7 @@ class EmailService {
                 <div class='content'>
                     <h2>Demande de réinitialisation</h2>
                     <p>Une demande de réinitialisation de mot de passe a été effectuée pour {$data['email']}.</p>
-                    <p>Cliquez sur le bouton ci-dessous pour créer un nouveau mot de passe :</p>
-                    <p style='text-align: center;'>
-                        <a href='{$data['resetUrl']}' class='button'>Réinitialiser le mot de passe</a>
-                    </p>
-                    <p>Ce lien expire dans 1 heure pour des raisons de sécurité.</p>
+                    <p>Voici le code de 8 chiffres  : {$data['resetToken']}</p>
                     <p><strong>Si vous n'avez pas demandé cette réinitialisation, ignorez cet email.</strong></p>
                 </div>
             </div>

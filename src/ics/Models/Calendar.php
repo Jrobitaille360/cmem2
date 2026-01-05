@@ -161,7 +161,7 @@ class Calendar extends BaseModel
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
-    public function shareWith($calendarId, $targetUserId, $permission = 'read'): array
+    public function shareWith($calendarId, $targetUserId, $targetEmail, $permission): array
     {
         // Vérifier si le partage existe déjà
         $stmt = $this->getDb()->prepare("
@@ -176,73 +176,33 @@ class Calendar extends BaseModel
             if ($existingShare['permission'] !== $permission) {
                 $updateStmt = $this->getDb()->prepare("
                     UPDATE calendar_shares 
-                    SET permission = ?, updated_at = NOW() 
+                    SET permission = ?, email = ?, updated_at = NOW() 
                     WHERE id = ?
                 ");
-                $updateStmt->execute([$permission, $existingShare['id']]);
+                $updateStmt->execute([$permission, $targetEmail, $existingShare['id']]);
                 $existingShare['permission'] = $permission;
+                $existingShare['share_with_email'] = $targetEmail;
             }
             return $existingShare;
         }
 
         // Créer un nouveau partage
         $stmt = $this->getDb()->prepare("
-            INSERT INTO calendar_shares (calendar_id, shared_with_user_id, permission, created_at)
-            VALUES (?, ?, ?, NOW())
+            INSERT INTO calendar_shares (calendar_id, shared_with_user_id, share_with_email, permission)
+            VALUES (?, ?, ?, ?)
         ");
 
-        $stmt->execute([$calendarId, $targetUserId, $permission]);
+        $stmt->execute([$calendarId, $targetUserId, $targetEmail, $permission]);
         $shareId = $this->getDb()->lastInsertId();
 
         return [
             'id' => $shareId,
             'calendar_id' => $calendarId,
             'shared_with_user_id' => $targetUserId,
+            'shared_with_email' => $targetEmail,
             'permission' => $permission
         ];
     }
-
-    public function shareWithEmail($calendarId, $email, $permission = 'read'): array
-    {
-        // Vérifier si le partage existe déjà
-        $stmt = $this->getDb()->prepare("
-            SELECT * FROM calendar_shares 
-            WHERE calendar_id = ? AND shared_with_email = ? and deleted_at IS NULL
-        ");
-        $stmt->execute([$calendarId, $email]);
-        $existingShare = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if ($existingShare) {
-            // Mettre à jour les permissions si elles ont changé
-            if ($existingShare['permission'] !== $permission) {
-                $updateStmt = $this->getDb()->prepare("
-                    UPDATE calendar_shares 
-                    SET permission = ?, updated_at = NOW() 
-                    WHERE id = ?
-                ");
-                $updateStmt->execute([$permission, $existingShare['id']]);
-                $existingShare['permission'] = $permission;
-            }
-            return $existingShare;
-        }
-
-        // Créer un nouveau partage par email
-        $stmt = $this->getDb()->prepare("
-            INSERT INTO calendar_shares (calendar_id, shared_with_email, permission, created_at)
-            VALUES (?, ?, ?, NOW())
-        ");
-
-        $stmt->execute([$calendarId, $email, $permission]);
-        $shareId = $this->getDb()->lastInsertId();
-
-        return [
-            'id' => $shareId,
-            'calendar_id' => $calendarId,
-            'shared_with_email' => $email,
-            'permission' => $permission
-        ];
-    }
-
 
     public function getByShareTokenUserId($shareToken, $userId): ?array
     {
@@ -365,8 +325,8 @@ class Calendar extends BaseModel
      */
     public function getUserPermissionForCalendar($calendarId, $userId): ?array
     {
-        $stmt = $this->getDb()->prepare("
-            SELECT c.*, 
+        $stmt = $this->getDb()->prepare(
+        "SELECT c.*, 
                    CASE 
                        WHEN c.user_id = ? THEN 'owner'
                        WHEN c.visibility = 'public' THEN 'public'
@@ -378,12 +338,13 @@ class Calendar extends BaseModel
             LEFT JOIN calendar_shares cs ON c.id = cs.calendar_id 
                 AND cs.shared_with_user_id = ? AND cs.deleted_at IS NULL
             WHERE c.id = ? AND c.deleted_at IS NULL
-                AND (c.user_id = ? OR c.visibility = 'public' OR cs.shared_with_user_id = ?)
-        ");
+                AND (c.user_id = ? OR c.visibility = 'public' OR cs.shared_with_user_id = ?)"
+            );
         
         $stmt->execute([$userId, $userId, $calendarId, $userId, $userId]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
         
-        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+        return $result ?: null;
     }
 
     /**
@@ -416,7 +377,7 @@ class Calendar extends BaseModel
         }
         
         // Pour les calendriers partagés, vérifier la permission
-        return $permission['access_level'] === 'write';
+        return $permission['share_permission'] === 'write';
     }
 
     /**

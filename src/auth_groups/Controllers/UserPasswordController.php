@@ -39,7 +39,12 @@ class UserPasswordController {
             return false;
         }
         // Générer un token de réinitialisation
-        $token = bin2hex(random_bytes(32));
+        // token 8 chiffres 0-9 débutant par un chiffre 1-9
+        $token = '';
+        $token .= random_int(1, 9);
+        for ($i = 0; $i < 7; $i++) {
+            $token .= random_int(0, 9);
+        }
         // Insérer le token dans la table
         $pdo = \Database::getInstance()->getConnection();
         $stmt = $pdo->prepare("INSERT INTO password_resets (user_id, token, expires_at) VALUES (:user_id, :token, DATE_ADD(NOW(), INTERVAL 1 HOUR))");
