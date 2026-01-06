@@ -92,7 +92,10 @@ class CalendarRouteHandler extends BaseRouteHandler
             ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && isset($segments[3]) && ctype_digit($segments[3]) && isset($segments[4]) && $segments[4] === 'hard' && $method === 'DELETE') => 
                 $this->controller->hardDeleteEvent((int)$segments[3], (int)$action, $user['user_id']),
                 
-
+            // GET /calendars/{id}/share - Récupérer les partages d'un calendrier
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'share' && $method === 'GET') => 
+                $this->controller->getCalendarShares((int)$action, $user['user_id']),
+ 
                 
             // POST /calendars/{id}/share - Partager un calendrier
             ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'share' && $method === 'POST') => 

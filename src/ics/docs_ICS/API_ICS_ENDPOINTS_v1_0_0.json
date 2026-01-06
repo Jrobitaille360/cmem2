@@ -117,6 +117,16 @@
           "response": "Token de partage généré"
         },
         {
+          "method": "GET",
+          "path": "/calendars/{id}/share",
+          "description": "Récupérer les partages d'un calendrier",
+          "params": {
+            "id": "integer (required) - ID du calendrier"
+          },
+          "body": {},
+          "response": "Liste des partages du calendrier"
+        },
+        {
           "method": "DELETE",
           "path": "/calendars/{id}/share",
           "description": "Supprimer le partage d'un calendrier",

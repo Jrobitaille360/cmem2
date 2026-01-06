@@ -431,6 +431,16 @@ class Calendar extends BaseModel
         return $stmt->execute($params);
     }
 
+    /** récupère les partages d'un calendrier */
+    public function getSharesForCalendar($calendarId): array
+    {
+        $stmt = $this->getDb()->prepare("SELECT * FROM calendar_shares WHERE calendar_id = ? AND deleted_at IS NULL");
+        $stmt->execute([$calendarId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+
+
     /**
      * Vérifie si un utilisateur peut supprimer un partage
      * - Le propriétaire du calendrier peut supprimer n'importe quel partage

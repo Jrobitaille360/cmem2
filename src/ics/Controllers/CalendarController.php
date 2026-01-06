@@ -659,6 +659,41 @@ class CalendarController
     }
 
     /**
+     * récupère les partages d'un calendrier
+     */
+    public function getCalendarShares($calendarId, $userId): void
+    {   
+        LoggingMiddleware::logEntry();         
+        try {
+            $cal = new Calendar();
+            // Vérifier que l'utilisateur possède le calendrier ou a les droits d'écriture
+            if (!$cal->canUserWrite($calendarId, $userId)) {
+                logService::warning("Tentative de récupération des partages d'un calendrier sans permission", [
+                    'calendar_id' => $calendarId,
+                    'user_id' => $userId
+                ]);
+                LoggingMiddleware::logExit(403);
+                Response::error('Permission insuffisante pour voir les partages de ce calendrier', null, 403);
+                return;
+            }
+
+            $shares = $cal->getSharesForCalendar($calendarId);
+            LoggingMiddleware::logExit(200);
+            Response::success('Partages du calendrier récupérés avec succès', [
+                'shares' => $shares,
+                'count' => count($shares)
+            ]);
+        } catch (\Exception $e) {
+            LogService::error("Erreur lors de la récupération des partages du calendrier", [
+                'exception' => $e->getMessage()
+            ]);
+            LoggingMiddleware::logExit(500);
+            Response::error('Erreur lors de la récupération des partages du calendrier', null, 500);
+        }
+    }
+
+
+    /**
      * Importe un calendrier complet depuis un fichier ICS.
      */
     public function importIcsFile($userId): void
