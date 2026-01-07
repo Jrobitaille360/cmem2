@@ -159,10 +159,10 @@ class EventValidator
             }
 
             // Valider le type
-            if (!in_array($notification['type'], ['notification', 'e-mail'])) {
+            if (!in_array($notification['type'], ['notification', 'email'])) {
                 return [
                     'valid' => false,
-                    'error' => "Le type de notification #{$index} doit être 'notification' ou 'e-mail'",
+                    'error' => "Le type de notification #{$index} doit être 'notification' ou 'email'",
                     'data' => null
                 ];
             }
