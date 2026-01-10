@@ -130,13 +130,14 @@ class UserManagerController {
                     $apiKeyResult = null;
                 }
                 
-                // 3. Générer un token de vérification d'email
-                $verificationToken = bin2hex(random_bytes(32));
+                // 3. Générer un token de vérification d'email 1 chiffre de 1 à 9 et 7 chiffres de 0 à 9
+                
+                $verificationToken = mt_rand(1, 9) . str_pad(mt_rand(0, 9999999), 7, '0', STR_PAD_LEFT);
                 $expiresAt = date('Y-m-d H:i:s', time() + (24 * 60 * 60)); // Expire dans 24h
                 
                 // 4. Créer un token d'invitation pour choisir un plan
-                $planInvitationToken = bin2hex(random_bytes(32));
-                $planInvitationExpires = date('Y-m-d H:i:s', time() + (7 * 24 * 60 * 60)); // 7 jours
+               // $planInvitationToken = bin2hex(random_bytes(32));
+               // $planInvitationExpires = date('Y-m-d H:i:s', time() + (7 * 24 * 60 * 60)); // 7 jours
                 
                 // Insérer le token de vérification dans la base de données
                 $stmt = $pdo->prepare("
@@ -150,15 +151,8 @@ class UserManagerController {
                 ]);
                 
                 // Insérer l'invitation au choix de plan
-                $stmt = $pdo->prepare("
-                    INSERT INTO plan_invitations (user_id, invitation_token, expires_at) 
-                    VALUES (:user_id, :token, :expires_at)
-                ");
-                $stmt->execute([
-                    'user_id' => $createdUser['id'],
-                    'token' => $planInvitationToken,
-                    'expires_at' => $planInvitationExpires
-                ]);
+                //$stmt = $pdo->prepare(" INSERT INTO plan_invitations (user_id, invitation_token, expires_at) VALUES (:user_id, :token, :expires_at)");
+                //$stmt->execute([ 'user_id' => $createdUser['id'], 'expires_at' => $planInvitationExpires ]);
                 
                 // 5. Envoyer l'email avec API key + invitation au choix de plan
                 try {
@@ -167,8 +161,7 @@ class UserManagerController {
                         $createdUser['email'],
                         $createdUser['name'],
                         $verificationToken,
-                        $apiKeyResult ? $apiKeyResult['key'] : null,
-                        $planInvitationToken
+                        $apiKeyResult ? $apiKeyResult['key'] : null,//  $planInvitationToken
                     );
                     
                     if ($emailSent) {
@@ -229,8 +222,8 @@ class UserManagerController {
                         'plan_limited' => true
                     ],
                     'plan_invitation' => [
-                        'token' => $planInvitationToken,
-                        'expires_at' => $planInvitationExpires,
+                        //'token' => $planInvitationToken,
+                        //'expires_at' => $planInvitationExpires,
                         'available_plans' => ['bronze', 'argent', 'platine']
                     ],
                     'verification_token' => $verificationToken,
@@ -240,11 +233,11 @@ class UserManagerController {
                 // En développement, inclure les tokens pour les tests
                 if(defined('APP_ENV') && APP_ENV === 'development') {
                     $responseData['verification_token'] = $verificationToken;
-                    $responseData['plan_invitation_token'] = $planInvitationToken;
+                    //$responseData['plan_invitation_token'] = $planInvitationToken;
                 }
 
                 LoggingMiddleware::logExit(201);
-                Response::success('Nouvel utilisateur créé avec API key gratuite. Un email de confirmation avec invitation aux plans payants a été envoyé.', $responseData, 201);
+                Response::success('Nouvel utilisateur créée ', $responseData, 201);
                 return true;
             } else {
                 LogService::error("Échec de la création utilisateur", [

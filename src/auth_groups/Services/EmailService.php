@@ -406,7 +406,7 @@ class EmailService {
     /**
      * Envoyer un email d'inscription avec API key gratuite et invitation aux plans
      */
-    public function sendRegistrationWithApiKeyAndPlanInvitation($email, $username, $verificationToken, $apiKey, $planInvitationToken) {
+    public function sendRegistrationWithApiKeyAndPlanInvitation($email, $username, $verificationToken, $apiKey, /* $planInvitationToken */) {
         LogService::info("EmailService: Envoi email inscription avec API key et invitation plan", [
             'email' => $email,
             'username' => $username,
@@ -415,16 +415,17 @@ class EmailService {
         
         $subject = "🎉 Bienvenue sur AuthGroups API - Votre clé gratuite et invitation aux plans premium";
         
-        $verificationUrl = $_ENV['APP_URL'] . '/users/verify-email?token=' . $verificationToken;
-        $planInvitationUrl = $_ENV['APP_URL'] . '/users/choose-plan?token=' . $planInvitationToken;
+        //$verificationUrl = $_ENV['APP_URL'] . '/users/verify-email?token=' . $verificationToken;
+        //$planInvitationUrl = $_ENV['APP_URL'] . '/users/choose-plan?//token=' . $planInvitationToken;
         
         $body = $this->buildRegistrationWithApiKeyTemplate([
             'username' => $username,
             'email' => $email,
             'apiKey' => $apiKey,
-            'verificationUrl' => $verificationUrl,
-            'planInvitationUrl' => $planInvitationUrl,
-            'planInvitationToken' => $planInvitationToken
+            'verificationToken' => $verificationToken,
+          //  'verificationUrl' => $verificationUrl,
+            //'planInvitationUrl' => $planInvitationUrl,
+            //'planInvitationToken' => $planInvitationToken
         ]);
         
         $result = $this->sendEmail($email, $subject, $body, true);
@@ -1288,30 +1289,18 @@ class EmailService {
                     font-family: monospace;
                     word-break: break-all;
                 }
-                .plan-section { 
-                    background: #fff3e0; 
-                    border-left: 4px solid #FF9800; 
+                .verification-code-box { 
+                    background: #fff3cd; 
+                    border: 2px solid #FF9800; 
                     padding: 20px; 
                     margin: 20px 0; 
-                    border-radius: 0 8px 8px 0;
-                }
-                .plan-grid {
-                    display: grid;
-                    grid-template-columns: repeat(3, 1fr);
-                    gap: 15px;
-                    margin: 20px 0;
-                }
-                .plan-card {
-                    background: white;
-                    border: 2px solid #ddd;
-                    padding: 15px;
-                    text-align: center;
                     border-radius: 8px;
-                    transition: all 0.3s ease;
+                    text-align: center;
+                    font-family: monospace;
+                    font-size: 24px;
+                    font-weight: bold;
+                    color: #856404;
                 }
-                .plan-bronze { border-color: #CD7F32; }
-                .plan-argent { border-color: #C0C0C0; }
-                .plan-platine { border-color: #E5E4E2; }
                 .button { 
                     display: inline-block; 
                     background: linear-gradient(135deg, #4CAF50, #45a049); 
@@ -1323,9 +1312,6 @@ class EmailService {
                     font-weight: bold;
                     box-shadow: 0 4px 8px rgba(0,0,0,0.1);
                 }
-                .button-secondary {
-                    background: linear-gradient(135deg, #FF9800, #F57C00);
-                }
                 .warning { 
                     background: #fff3cd; 
                     border: 1px solid #ffeaa7; 
@@ -1335,7 +1321,6 @@ class EmailService {
                     color: #856404;
                 }
                 .footer { text-align: center; padding: 20px; font-size: 12px; color: #666; }
-                .highlight { background: #ffeb3b; padding: 2px 6px; border-radius: 3px; }
                 .steps {
                     counter-reset: step-counter;
                     list-style: none;
@@ -1395,71 +1380,31 @@ class EmailService {
                         </ul>
                     </div>
                     
-                    <h2>💎 Passez à un plan premium pour plus de fonctionnalités</h2>
-                    <div class='plan-section'>
-                        <p>Débloquez tout le potentiel de l'API avec nos plans premium :</p>
-                        
-                        <div class='plan-grid'>
-                            <div class='plan-card plan-bronze'>
-                                <h4>🥉 Bronze</h4>
-                                <div style='font-size: 20px; font-weight: bold; color: #CD7F32;'>9.99€/mois</div>
-                                <ul style='text-align: left; font-size: 14px;'>
-                                    <li>100 req/min</li>
-                                    <li>Lecture + Écriture</li>
-                                    <li>Support email</li>
-                                </ul>
-                            </div>
-                            <div class='plan-card plan-argent'>
-                                <h4>🥈 Argent</h4>
-                                <div style='font-size: 20px; font-weight: bold; color: #C0C0C0;'>19.99€/mois</div>
-                                <ul style='text-align: left; font-size: 14px;'>
-                                    <li>300 req/min</li>
-                                    <li>Toutes opérations</li>
-                                    <li>Support prioritaire</li>
-                                    <li>Webhooks</li>
-                                </ul>
-                            </div>
-                            <div class='plan-card plan-platine'>
-                                <h4>🏆 Platine</h4>
-                                <div style='font-size: 20px; font-weight: bold; color: #E5E4E2;'>49.99€/mois</div>
-                                <ul style='text-align: left; font-size: 14px;'>
-                                    <li>1000 req/min</li>
-                                    <li>Accès admin</li>
-                                    <li>Support dédié</li>
-                                    <li>Intégrations custom</li>
-                                </ul>
-                            </div>
-                        </div>
-                        
-                        <p style='text-align: center;'>
-                            <a href='{$data['planInvitationUrl']}' class='button button-secondary'>
-                                🎯 Choisir mon plan premium
-                            </a>
-                        </p>
-                    </div>
-                    
                     <h2>📋 Prochaines étapes</h2>
                     <ol class='steps'>
                         <li>
                             <strong>Confirmez votre email</strong><br>
-                            <span style='color: #666;'>Cliquez sur le bouton ci-dessous pour activer votre compte</span>
+                            <span style='color: #666;'>Saisissez le code de vérification ci-dessous sur la page de confirmation</span>
                         </li>
                         <li>
                             <strong>Testez votre API key gratuite</strong><br>
                             <span style='color: #666;'>Utilisez votre clé pour faire vos premiers appels API</span>
                         </li>
-                        <li>
-                            <strong>Choisissez un plan premium</strong><br>
-                            <span style='color: #666;'>Débloquez toutes les fonctionnalités avant expiration</span>
-                        </li>
                     </ol>
                     
+                    <div class='verification-code-box'>
+                        <h3 style='margin-top: 0; color: #FF9800;'>🔢 Code de vérification :</h3>
+                        <code>{$data['verificationToken']}</code>
+                        
+                        <p style='margin-bottom: 0; font-size: 14px; color: #856404;'>
+                        voici votre code de vérification email ----{$data['verificationToken']}..... 
+                            <strong>⚠️ Ce code expire dans 24 heures.</strong>
+                        </p>
+                    </div>
+                    
                     <p style='text-align: center; margin: 40px 0;'>
-                        <a href='{$data['verificationUrl']}' class='button'>
-                            ✅ Confirmer mon email
-                        </a>
-                        <a href='{$data['planInvitationUrl']}' class='button button-secondary'>
-                            💎 Voir les plans premium
+                        <a href='{$_ENV['APP_URL']}/verify-email' class='button'>
+                            ✅ Aller à la page de confirmation
                         </a>
                     </p>
                     
