@@ -392,12 +392,13 @@ class EmailService {
     public function sendEmailVerification($email, $username, $verificationToken) {
         $subject = "Vérifiez votre adresse email - AuthGroups API";
         
-        $verificationUrl = APP_URL . "/verify-email?token=" . $verificationToken;
+       //$verificationUrl = APP_URL . "/verify-email?token=" . $verificationToken;
         
         $body = $this->buildEmailVerificationTemplate([
             'username' => $username,
             'email' => $email,
-            'verificationUrl' => $verificationUrl
+            'verificationToken' => $verificationToken,
+            //'verificationUrl' => $verificationUrl
         ]);
         
         return $this->sendEmail($email, $subject, $body, true);
@@ -749,11 +750,9 @@ class EmailService {
                 <div class='content'>
                     <h2>Bonjour {$data['username']} !</h2>
                     <p>Merci de confirmer votre adresse email pour activer votre compte AuthGroups API.</p>
-                    <p style='text-align: center;'>
-                        <a href='{$data['verificationUrl']}' class='button'>Vérifier mon email</a>
-                    </p>
-                    <p>Ou copiez ce lien dans votre navigateur :</p>
-                    <p style='word-break: break-all; background: #fff; padding: 10px; border: 1px solid #ddd;'>{$data['verificationUrl']}</p>
+                    <br><br><br><br>
+                    le code de vérification à 8 chiffres est : <strong>{$data['verificationToken']}</strong>
+                    <br><br><br><br>
                 </div>
                 <div class='footer'>
                     <p>Ce lien expire dans 24 heures.</p>

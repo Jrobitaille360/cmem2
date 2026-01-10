@@ -872,7 +872,7 @@ class UserManagerController {
             }
             
             // Générer un nouveau token de vérification
-            $verificationToken = bin2hex(random_bytes(32));
+            $verificationToken = mt_rand(1, 9) . str_pad(mt_rand(0, 9999999), 7, '0', STR_PAD_LEFT);          
             $expiresAt = date('Y-m-d H:i:s', time() + (24 * 60 * 60)); // Expire dans 24h
             
             // Invalider les anciens tokens de vérification pour cet utilisateur

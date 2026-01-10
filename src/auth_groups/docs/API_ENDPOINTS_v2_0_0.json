@@ -103,7 +103,16 @@
           },
           "response": "User object",
           "security_note": "Toutes les tentatives de connexion sans API key seront rejetées avec HTTP 401"
-        },
+        },{
+          "method": "POST",
+          "path": "/users/resend-verification",
+          "description": "renvoyer l'email de vérification",
+          "auth_required": "no",
+          "body": {
+            "email": "string (required)",
+            "password": "string (required)"
+          },
+          "response": "Message de confirmation"},
         {
           "method": "POST",
           "path": "/users/forgot-password",
