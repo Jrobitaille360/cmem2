@@ -117,7 +117,7 @@ class PublicRouteHandler extends BaseRouteHandler
                 $this->controllers['users']->confirmEmail(),
                 
             // Route de renvoi d'email de vérification publique
-            ($controller === 'users' && $action === 'resend-verification' && $method === 'POST') => 
+            ($controller === 'users' && $action === 'resend-verification-email' && $method === 'POST') => 
                 $this->controllers['users']->resendVerificationEmail(),
                 
             default => false

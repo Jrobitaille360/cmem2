@@ -906,10 +906,19 @@ class UserManagerController {
                         'email' => $userData['email']
                     ]);
                     LoggingMiddleware::logExit(200);
-                    Response::success('Un nouvel email de vérification a été envoyé à votre adresse', [
-                        'email' => $userData['email'],
-                        'expires_in' => '24 heures'
-                    ]);
+                    if($_ENV['APP_ENV'] === 'development') {
+                        Response::success('Un nouvel email de vérification a été envoyé à votre adresse', [
+                            'email' => $userData['email'],
+                            'token_expires_at' => $expiresAt,
+                            'verification_token' => $verificationToken,
+                        ]);
+                        return true;
+                    } else {   
+                        Response::success('Un nouvel email de vérification a été envoyé à votre adresse', [
+                            'email' => $userData['email'],
+                            'token_expires_at' => $expiresAt,                      
+                        ]);
+                    }
                     return true;
                 } else {
                     LogService::warning("Échec renvoi email de vérification", [
