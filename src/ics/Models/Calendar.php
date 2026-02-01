@@ -188,7 +188,7 @@ class Calendar extends BaseModel
 
         // Créer un nouveau partage
         $stmt = $this->getDb()->prepare("
-            INSERT INTO calendar_shares (calendar_id, shared_with_user_id, share_with_email, permission)
+            INSERT INTO calendar_shares (calendar_id, shared_with_user_id, shared_with_email, permission)
             VALUES (?, ?, ?, ?)
         ");
 
