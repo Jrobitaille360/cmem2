@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Parse command-line arguments in the format -KEY:VALUE
+for arg in "$@"; do
+    if [[ $arg == -* ]]; then
+        key="${arg%%:*}"
+        value="${arg#*:}"
+        key="${key#-}"  # Remove leading -
+        export "$key"="$value"
+    fi
+done
+
 
 # Dossier source à sauvegarder
 SOURCE_DIR="/home/lmdkhdg5/cmem2.journauxdebord.com"
