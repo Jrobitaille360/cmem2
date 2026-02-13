@@ -1,4 +1,9 @@
 <?php
+/**
+ * Export des tables MySQL en JSON puis ZIP chiffre.
+ * Usage CLI: php backup_data.php [chemin_absolu_sortie]
+ * Usage HTTP: GET/POST ?dir=C:\chemin\absolu\sortie
+ */
 require_once __DIR__ . '/auth_groups/loader.php';
 
 function respond(array $payload, int $statusCode = 200): void {
@@ -13,7 +18,26 @@ function respond(array $payload, int $statusCode = 200): void {
 	echo json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
 }
 
+function isAbsolutePath(string $path): bool {
+	if ($path === '') {
+		return false;
+	}
+	if ($path[0] === '/' || $path[0] === '\\') {
+		return true;
+	}
+	return (bool)preg_match('/^[A-Za-z]:[\/\\\\]/', $path);
+}
+
 try {
+	$outputDir = null;
+	if (PHP_SAPI === 'cli') {
+		if ($argc >= 2) {
+			$outputDir = $argv[1];
+		}
+	} else {
+		$outputDir = $_GET['dir'] ?? $_POST['dir'] ?? null;
+	}
+
 	$db = Database::getInstance()->getConnection();
 	$tablesStmt = $db->query('SHOW TABLES');
 	$tables = [];
@@ -32,8 +56,15 @@ try {
 		$export['tables'][$table] = $stmt->fetchAll(PDO::FETCH_ASSOC);
 	}
 
-	$baseDir = defined('TMP_ASSETS_DIR') ? TMP_ASSETS_DIR : (__DIR__ . '/../tmp_assets/');
-	$downloadDir = rtrim($baseDir, '/\\') . '/downloads/';
+	if ($outputDir !== null && $outputDir !== '') {
+		if (!isAbsolutePath($outputDir)) {
+			throw new RuntimeException('Le parametre dir doit etre un chemin absolu.');
+		}
+		$downloadDir = rtrim($outputDir, '/\\') . '/';
+	} else {
+		$baseDir = defined('TMP_ASSETS_DIR') ? TMP_ASSETS_DIR : (__DIR__ . '/../tmp_assets/');
+		$downloadDir = rtrim($baseDir, '/\\') . '/downloads/';
+	}
 	if (!is_dir($downloadDir)) {
 		mkdir($downloadDir, 0755, true);
 	}
