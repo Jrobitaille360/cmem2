@@ -18,24 +18,17 @@ function respond(array $payload, int $statusCode = 200): void {
 	echo json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
 }
 
-function isAbsolutePath(string $path): bool {
-	if ($path === '') {
-		return false;
-	}
-	if ($path[0] === '/' || $path[0] === '\\') {
-		return true;
-	}
-	return (bool)preg_match('/^[A-Za-z]:[\/\\\\]/', $path);
-}
 
 try {
-	$outputDir = null;
-	if (PHP_SAPI === 'cli') {
-		if ($argc >= 2) {
-			$outputDir = $argv[1];
-		}
-	} else {
-		$outputDir = $_GET['dir'] ?? $_POST['dir'] ?? null;
+	
+    $outputDir = $_ENV['BACKUP_DIR'] ?? null;
+    if ($outputDir == null || $outputDir === '') {
+		throw new RuntimeException(message: 'Le parametre dir est requis.');
+    }
+
+    $password = $_ENV['BACKUP_PASSPHRASE'] ?? 'NO PHRASE';
+    if ($password === '') {
+		throw new RuntimeException(message: 'BACKUP_PASSPHRASE is empty; cannot protect ZIP.');
 	}
 
 	$db = Database::getInstance()->getConnection();
@@ -56,15 +49,8 @@ try {
 		$export['tables'][$table] = $stmt->fetchAll(PDO::FETCH_ASSOC);
 	}
 
-	if ($outputDir !== null && $outputDir !== '') {
-		if (!isAbsolutePath($outputDir)) {
-			throw new RuntimeException('Le parametre dir doit etre un chemin absolu.');
-		}
-		$downloadDir = rtrim($outputDir, '/\\') . '/';
-	} else {
-		$baseDir = defined('TMP_ASSETS_DIR') ? TMP_ASSETS_DIR : (__DIR__ . '/../tmp_assets/');
-		$downloadDir = rtrim($baseDir, '/\\') . '/downloads/';
-	}
+	$downloadDir = rtrim($outputDir, '/\\') . '/';
+	
 	if (!is_dir($downloadDir)) {
 		mkdir($downloadDir, 0755, true);
 	}
@@ -80,11 +66,6 @@ try {
 
 	if (file_put_contents($jsonPath, $json) === false) {
 		throw new RuntimeException('Failed to write JSON file.');
-	}
-
-	$password = $_ENV['DB_PASS'] ?? '';
-	if ($password === '') {
-		throw new RuntimeException('DB_PASS is empty; cannot protect ZIP.');
 	}
 
 	$zip = new ZipArchive();
@@ -110,7 +91,16 @@ try {
 
 	respond([
 		'ok' => true,
-		'zip_path' => $zipPath,
+        'export' => [
+            'exported_at' => $export['exported_at'],
+            'database' => $export['database'],
+            'tables_count' => count($export['tables'])
+        ],
+        'argv' => $argv,
+        'argc' => $argc,
+        'output_dir' => $outputDir,
+        'download_dir' => $downloadDir,
+        'zip_path' => $zipPath,
 		'tables_count' => count($tables)
 	]);
 } catch (Throwable $e) {
