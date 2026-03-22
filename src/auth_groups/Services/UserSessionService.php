@@ -14,7 +14,7 @@ class UserSessionService
     /**
      * Créer une nouvelle session lors du login avec API Key
      */
-    public static function createSession(int $userId, int $apiKeyId, ?string $userAgent = null, ?string $ipAddress = null, int $durationHours = 24): ?int {
+    public static function createSession(int $userId, ?int $apiKeyId = null, ?string $userAgent = null, ?string $ipAddress = null, int $durationHours = 24): ?int {
         try {
             $pdo = \Database::getInstance()->getConnection();
             

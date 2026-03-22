@@ -38,25 +38,10 @@ abstract class BaseRouteHandler implements RouteHandlerInterface
     }
     
     /**
-     * Met à jour l'activité de l'utilisateur si authentifié avec API Key
+     * Met à jour l'activité de la session (JWT — pas d'api_key_id).
      */
     protected function updateUserActivity($user): void {
-        if (!$user || !isset($user['user_id'])) {
-            return;
-        }
-        
-        try {
-            $apiKeyId = isset($user['api_key_id']) ? $user['api_key_id'] : null;
-            if ($apiKeyId) {
-                UserSessionService::updateActivity($user['user_id'], $apiKeyId);
-            }
-        } catch (Exception $e) {
-            // Log l'erreur mais ne pas interrompre le processus
-            \AuthGroups\Services\LogService::error("Erreur mise à jour activité session", [
-                'error' => $e->getMessage(),
-                'user_id' => $user['user_id']
-            ]);
-        }
+        // Avec JWT stateless, pas de mise à jour de session nécessaire ici.
     }
     
     /**

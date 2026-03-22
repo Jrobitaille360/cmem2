@@ -4,6 +4,7 @@ namespace AuthGroups\Routing;
 
 use AuthGroups\Routing\RouteHandlers\{
     PublicRouteHandler,
+    AuthRouteHandler,
     UserRouteHandler,
     GroupRouteHandler,
     TagRouteHandler,
@@ -31,13 +32,14 @@ class Router
     private function initializeRouteHandlers(): void {
         $this->publicHandler = new PublicRouteHandler();
         $this->routeHandlers = [
-            'users' => new UserRouteHandler($this->authService),
-            'groups' => new GroupRouteHandler($this->authService),
-            'tags' => new TagRouteHandler($this->authService),
-            'files' => new FileRouteHandler($this->authService),
-            'stats' => new StatsRouteHandler($this->authService),
+            'auth'         => new AuthRouteHandler(),
+            'users'        => new UserRouteHandler($this->authService),
+            'groups'       => new GroupRouteHandler($this->authService),
+            'tags'         => new TagRouteHandler($this->authService),
+            'files'        => new FileRouteHandler($this->authService),
+            'stats'        => new StatsRouteHandler($this->authService),
             'secret-admin' => new SecretAdminRouteHandler(),
-            'plans' => new PlanRouteHandler($this->authService)
+            'plans'        => new PlanRouteHandler($this->authService)
         ];
         
         // Intégrer les route handlers des plugins

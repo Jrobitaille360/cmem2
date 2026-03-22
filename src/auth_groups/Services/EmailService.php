@@ -1645,4 +1645,63 @@ class EmailService {
         </body>
         </html>";
     }
+
+    // -----------------------------------------------------------------------
+    // Méthodes JWT / OTP
+    // -----------------------------------------------------------------------
+
+    /**
+     * Envoyer un code OTP par email (connexion sans mot de passe).
+     */
+    public function sendOtpCode(string $email, string $username, string $code): bool
+    {
+        $expiryMinutes = defined('OTP_EXPIRY_MINUTES') ? (int) OTP_EXPIRY_MINUTES : 15;
+        $appName       = defined('APP_NAME') ? APP_NAME : 'CMEM2';
+
+        $subject = "Votre code de connexion — {$appName}";
+        $body    = "
+        <html><body style='font-family:Arial,sans-serif;background:#f4f4f4;padding:20px'>
+        <div style='max-width:480px;margin:auto;background:#fff;border-radius:8px;padding:32px'>
+            <h2 style='color:#333'>Connexion à {$appName}</h2>
+            <p>Bonjour <strong>" . htmlspecialchars($username) . "</strong>,</p>
+            <p>Votre code de connexion est :</p>
+            <div style='text-align:center;margin:24px 0'>
+                <span style='font-size:36px;font-weight:bold;letter-spacing:8px;color:#007bff'>{$code}</span>
+            </div>
+            <p style='color:#666'>Ce code expire dans <strong>{$expiryMinutes} minutes</strong>.</p>
+            <p style='color:#999;font-size:12px'>Si vous n'avez pas demandé ce code, ignorez cet email.</p>
+        </div>
+        </body></html>";
+
+        return $this->sendEmail($email, $subject, $body);
+    }
+
+    /**
+     * Envoyer l'email de vérification à l'inscription (sans API key).
+     */
+    public function sendRegistrationVerification(string $email, string $username, string $verificationToken): bool
+    {
+        $appName = defined('APP_NAME') ? APP_NAME : 'CMEM2';
+        $baseUrl = defined('BASE_URL') ? BASE_URL : '';
+
+        $subject = "Bienvenue sur {$appName} — Vérifiez votre email";
+        $body    = "
+        <html><body style='font-family:Arial,sans-serif;background:#f4f4f4;padding:20px'>
+        <div style='max-width:520px;margin:auto;background:#fff;border-radius:8px;padding:32px'>
+            <h2 style='color:#333'>Bienvenue sur {$appName} !</h2>
+            <p>Bonjour <strong>" . htmlspecialchars($username) . "</strong>,</p>
+            <p>Votre compte a bien été créé. Vérifiez votre adresse email avec le code ci-dessous :</p>
+            <div style='text-align:center;margin:24px 0'>
+                <span style='font-size:28px;font-weight:bold;letter-spacing:4px;color:#28a745'>{$verificationToken}</span>
+            </div>
+            <p>Ou envoyez ce code via : <code>POST {$baseUrl}/users/verify-email</code></p>
+            <p>Une fois votre email vérifié, connectez-vous avec :<br>
+               <code>POST {$baseUrl}/auth/login</code> (email + password)<br>
+               ou <code>POST {$baseUrl}/auth/send-code</code> (code OTP)</p>
+            <p style='color:#999;font-size:12px'>Ce token expire dans 24 heures.</p>
+        </div>
+        </body></html>";
+
+        return $this->sendEmail($email, $subject, $body);
+    }
 }

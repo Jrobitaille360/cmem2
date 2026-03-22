@@ -2,17 +2,173 @@
   "api": {
     "name": "AuthGroups API",
     "version": "2.0.0",
-    "description": "API REST complète pour la gestion d'authentification, groupes, fichiers et tags avec sécurité renforcée",
-    "generated": "2025-11-02",
+    "description": "API REST complète pour la gestion d'authentification, groupes, fichiers et tags",
+    "generated": "2026-03-22",
     "base_url": "/",
     "authentication": {
-      "types": ["API_KEY"],
-      "api_key_header": "X-API-Key: {key}",
-      "security_update": "TOUS les logins nécessitent maintenant une API key valide",
-      "api_key_management": "Gestion des API keys UNIQUEMENT via secret-admin avec authentification renforcée"
-    }
+      "type": "JWT_BEARER",
+      "header": "Authorization: Bearer {jwt_token}",
+      "algorithm": "HS256",
+      "expiry": "15 jours",
+      "obtain": "POST /auth/login  ou  POST /auth/send-code + POST /auth/verify-code",
+      "refresh": "POST /auth/refresh (device token longue durée — sans re-login)"
+    },
+    "breaking_changes_since_v1": [
+      "Suppression de X-API-Key — remplacée par JWT Bearer",
+      "POST /users/login supprimé — remplacé par POST /auth/login",
+      "POST /users/logout supprimé — remplacé par POST /auth/logout",
+      "Les API keys ne sont plus créées à l'inscription",
+      "La réponse de /users/register ne contient plus api_key"
+    ]
   },
   "endpoints": {
+    "auth": {
+      "description": "Authentification JWT — connexion, OTP, device tokens, logout",
+      "base_path": "/auth",
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/auth/login",
+          "description": "Connexion par email + mot de passe — retourne un JWT (15 jours)",
+          "auth_required": false,
+          "body": {
+            "email": "string (required)",
+            "password": "string (required)",
+            "device_id": "string (optional) — UUID stable côté client pour obtenir un device_token longue durée",
+            "device_name": "string (optional) — nom lisible de l'appareil (défaut: User-Agent)"
+          },
+          "response": {
+            "token": "string — JWT Bearer",
+            "token_type": "Bearer",
+            "expires_at": "datetime",
+            "user": { "id": "integer", "name": "string", "email": "string", "role": "string" },
+            "device_token": "string (présent uniquement si device_id fourni)",
+            "device_id": "string (présent uniquement si device_id fourni)"
+          },
+          "errors": {
+            "400": "Champs email ou password manquants / format invalide",
+            "401": "Email ou mot de passe incorrect",
+            "403": "Email non vérifié"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/auth/send-code",
+          "description": "Envoyer un code OTP à 6 chiffres par email (valide 15 minutes)",
+          "auth_required": false,
+          "body": {
+            "email": "string (required)"
+          },
+          "response": {
+            "message": "string — réponse générique (même si email inconnu, pour protéger l'énumération)"
+          },
+          "errors": {
+            "400": "Email manquant ou format invalide",
+            "403": "Email non vérifié"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/auth/verify-code",
+          "description": "Vérifier le code OTP et obtenir un JWT",
+          "auth_required": false,
+          "body": {
+            "email": "string (required)",
+            "code": "string (required) — code OTP à 6 chiffres",
+            "device_id": "string (optional) — pour obtenir un device_token longue durée",
+            "device_name": "string (optional)"
+          },
+          "response": {
+            "token": "string — JWT Bearer",
+            "token_type": "Bearer",
+            "expires_at": "datetime",
+            "user": { "id": "integer", "name": "string", "email": "string", "role": "string" },
+            "device_token": "string (présent uniquement si device_id fourni)",
+            "device_id": "string (présent uniquement si device_id fourni)"
+          },
+          "errors": {
+            "400": "Champs manquants",
+            "401": "Code incorrect, expiré ou déjà utilisé (max 5 tentatives)"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/auth/refresh",
+          "description": "Renouveler le JWT via un device token longue durée — sans re-login",
+          "auth_required": false,
+          "body": {
+            "device_id": "string (required)",
+            "device_token": "string (required)"
+          },
+          "response": {
+            "token": "string — nouveau JWT Bearer",
+            "token_type": "Bearer",
+            "expires_at": "datetime",
+            "user": { "id": "integer", "name": "string", "email": "string", "role": "string" }
+          },
+          "errors": {
+            "400": "device_id ou device_token manquant",
+            "401": "Device token invalide, expiré ou révoqué"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/auth/logout",
+          "description": "Déconnexion — invalide la session en base (JWT reste valide côté serveur jusqu'à expiry, à supprimer côté client)",
+          "auth_required": true,
+          "headers": {
+            "Authorization": "Bearer {jwt_token}"
+          },
+          "response": {
+            "message": "string — confirmation"
+          },
+          "errors": {
+            "401": "JWT manquant ou invalide"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/auth/devices",
+          "description": "Lister les appareils de confiance de l'utilisateur connecté",
+          "auth_required": true,
+          "headers": {
+            "Authorization": "Bearer {jwt_token}"
+          },
+          "response": {
+            "devices": [
+              {
+                "device_id": "string",
+                "device_name": "string",
+                "last_used_at": "datetime",
+                "last_ip": "string",
+                "expires_at": "datetime"
+              }
+            ]
+          },
+          "errors": {
+            "401": "JWT manquant ou invalide"
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/auth/devices/{device_id}",
+          "description": "Révoquer le device token d'un appareil",
+          "auth_required": true,
+          "headers": {
+            "Authorization": "Bearer {jwt_token}"
+          },
+          "params": {
+            "device_id": "string (required)"
+          },
+          "response": {
+            "message": "string — confirmation"
+          },
+          "errors": {
+            "401": "JWT manquant ou invalide"
+          }
+        }
+      ]
+    },
     "public": {
       "description": "Endpoints accessibles sans authentification",
       "routes": [
@@ -21,61 +177,21 @@
           "path": "/",
           "description": "Informations générales sur l'API",
           "auth_required": false,
-          "response": "Information de l'API avec version et endpoints disponibles"
+          "response": "Informations de bienvenue avec liens vers /help et /health"
         },
         {
           "method": "GET",
           "path": "/help",
-          "description": "Aide et liste des endpoints disponibles par catégorie",
+          "description": "Liste complète des endpoints disponibles",
           "auth_required": false,
-          "response": {
-            "success": true,
-            "data": {
-              "api": {
-                "name": "AuthGroups API",
-                "version": "1.3.0",
-                "documentation": "/src/auth_groups/docs/"
-              },
-              "endpoints": {
-                "public": [
-                  "POST /users/register - Inscription",
-                  "POST /users/login - Connexion",
-                  "POST /users/forgot-password - Demander réinitialisation",
-                  "GET /users/request-password-reset - Formulaire réinitialisation",
-                  "POST /users/reset-password - Réinitialiser mot de passe",
-                  "GET /users/reset-password - Formulaire réinitialisation",
-                  "GET /users/verify-email - Vérification email",
-                  "POST /users/resend-verification - Renvoyer email vérification",
-                  "GET /groups - Groupes publics",
-                  "POST /groups/join - Rejoindre avec code",
-                  "GET /health - Santé de l'API",
-                  "GET /help - Cette aide"
-                ],
-                "authenticated": {
-                  "users": "Gestion des utilisateurs (profil, avatar, mot de passe, etc.)",
-                  "groups": "Gestion des groupes (création, modification, membres, invitations)",
-                  "files": "Gestion des fichiers (upload, download, suppression)",
-                  "tags": "Gestion des tags (création, modification, association)",
-                  "stats": "Statistiques et analytics (plateforme, groupes, utilisateurs)"
-                },
-                "admin": {
-                  "secret-admin": "Endpoints d'administration (authentification renforcée requise)",
-                  "secret-admin/api-keys": "Gestion sécurisée des clés API (création, révocation, régénération)"
-                }
-              },
-              "authentication": {
-                "api_key": "X-API-Key: {key}"
-              },
-              "documentation": "Voir /src/auth_groups/docs/ pour la documentation complète"
-            }
-          }
+          "response": "Catalogue complet des routes"
         },
         {
           "method": "GET",
           "path": "/health",
-          "description": "Vérifier l'état de santé de l'API",
+          "description": "État de santé de l'API (DB, logs, plugins)",
           "auth_required": false,
-          "response": "Statut de l'API (healthy/unhealthy)"
+          "response": "{ status, services: { database, file_storage, logging, plugins }, environment }"
         },
         {
           "method": "POST",
@@ -84,39 +200,33 @@
           "auth_required": false,
           "body": {
             "name": "string (required)",
-            "email": "string (required, email format)",
-            "password": "string (required, min 6 characters)"
+            "email": "string (required, format email)",
+            "password": "string (required, min 8 caractères)"
           },
-          "response": "User object avec email de vérification envoyé"
+          "response": {
+            "user": { "id": "integer", "name": "string", "email": "string" },
+            "next_steps": {
+              "verify_email": "POST /users/verify-email avec le token reçu par email",
+              "login": "POST /auth/login après vérification"
+            },
+            "auth_method": "jwt"
+          },
+          "notes": "Un email de vérification est envoyé. Connexion impossible avant vérification."
         },
         {
           "method": "POST",
-          "path": "/users/login",
-          "description": "Connexion utilisateur - NÉCESSITE UNE API KEY VALIDE",
-          "auth_required": "API_KEY_MANDATORY",
-          "headers": {
-            "X-API-Key": "string (required) - API key valide obligatoire"
-          },
+          "path": "/users/verify-email",
+          "description": "Vérifier l'adresse email avec le token reçu par email",
+          "auth_required": false,
           "body": {
-            "email": "string (required)",
-            "password": "string (required)"
+            "token": "string (required)"
           },
-          "response": "User object",
-          "security_note": "Toutes les tentatives de connexion sans API key seront rejetées avec HTTP 401"
-        },{
-          "method": "POST",
-          "path": "/users/resend-verification-email",
-          "description": "renvoyer l'email de vérification",
-          "auth_required": "no",
-          "body": {
-            "email": "string (required)",
-            "password": "string (required)"
-          },
-          "response": "Message de confirmation"},
+          "response": "Message de confirmation"
+        },
         {
           "method": "POST",
-          "path": "/users/forgot-password",
-          "description": "Demander un lien de réinitialisation de mot de passe",
+          "path": "/users/resend-verification-email",
+          "description": "Renvoyer l'email de vérification",
           "auth_required": false,
           "body": {
             "email": "string (required)"
@@ -125,12 +235,22 @@
         },
         {
           "method": "POST",
+          "path": "/users/request-password-reset",
+          "description": "Demander un lien de réinitialisation de mot de passe",
+          "auth_required": false,
+          "body": {
+            "email": "string (required)"
+          },
+          "response": "Message de confirmation (générique pour protéger l'énumération)"
+        },
+        {
+          "method": "POST",
           "path": "/users/reset-password",
-          "description": "Réinitialiser le mot de passe avec un token",
+          "description": "Réinitialiser le mot de passe avec le token reçu par email",
           "auth_required": false,
           "body": {
             "token": "string (required)",
-            "new_password": "string (required, min 6 characters)"
+            "new_password": "string (required, min 8 caractères)"
           },
           "response": "Message de confirmation"
         },
@@ -139,17 +259,17 @@
           "path": "/groups",
           "description": "Liste des groupes publics",
           "auth_required": false,
-          "response": "Liste des groupes publics"
+          "response": "Array de groupes publics"
         },
         {
           "method": "POST",
           "path": "/groups/join",
-          "description": "Rejoindre un groupe avec un code d'invitation",
+          "description": "Rejoindre un groupe avec un code d'invitation (public)",
           "auth_required": false,
           "body": {
             "code": "string (required)"
           },
-          "response": "Confirmation de l'ajout au groupe"
+          "response": "Message de confirmation"
         }
       ]
     },
@@ -157,15 +277,14 @@
       "description": "Gestion des utilisateurs",
       "base_path": "/users",
       "auth_required": true,
+      "auth_header": "Authorization: Bearer {jwt_token}",
       "routes": [
         {
           "method": "GET",
           "path": "/users",
           "description": "Liste de tous les utilisateurs",
           "roles": ["ADMINISTRATEUR"],
-          "body": {
-            "email": "string (optional)"
-          },
+          "query": { "email": "string (optional)" },
           "response": "Array d'utilisateurs"
         },
         {
@@ -195,18 +314,14 @@
           "method": "GET",
           "path": "/users/{id}",
           "description": "Obtenir les détails d'un utilisateur",
-          "params": {
-            "id": "integer (required)"
-          },
+          "params": { "id": "integer (required)" },
           "response": "User object"
         },
         {
           "method": "PUT",
           "path": "/users/{id}",
           "description": "Modifier un utilisateur",
-          "params": {
-            "id": "integer (required)"
-          },
+          "params": { "id": "integer (required)" },
           "roles": ["ADMINISTRATEUR", "MODERATEUR"],
           "body": {
             "name": "string (optional)",
@@ -219,9 +334,7 @@
           "method": "DELETE",
           "path": "/users/{id}",
           "description": "Supprimer un utilisateur",
-          "params": {
-            "id": "integer (required)"
-          },
+          "params": { "id": "integer (required)" },
           "roles": ["ADMINISTRATEUR"],
           "response": "Message de confirmation"
         },
@@ -229,16 +342,14 @@
           "method": "POST",
           "path": "/users/avatar",
           "description": "Uploader son avatar",
-          "body": "multipart/form-data avec fichier image",
+          "body": "multipart/form-data avec fichier image (JPEG/PNG/WebP, max 2 MB)",
           "response": "URL de l'avatar"
         },
         {
           "method": "POST",
           "path": "/users/{id}/avatar",
           "description": "Uploader l'avatar d'un utilisateur",
-          "params": {
-            "id": "integer (required)"
-          },
+          "params": { "id": "integer (required)" },
           "roles": ["ADMINISTRATEUR"],
           "body": "multipart/form-data avec fichier image",
           "response": "URL de l'avatar"
@@ -249,7 +360,7 @@
           "description": "Changer son mot de passe",
           "body": {
             "old_password": "string (required)",
-            "new_password": "string (required, min 6 characters)"
+            "new_password": "string (required, min 8 caractères)"
           },
           "response": "Message de confirmation"
         },
@@ -257,28 +368,16 @@
           "method": "PUT",
           "path": "/users/{id}/password",
           "description": "Changer le mot de passe d'un utilisateur",
-          "params": {
-            "id": "integer (required)"
-          },
+          "params": { "id": "integer (required)" },
           "roles": ["ADMINISTRATEUR"],
-          "body": {
-            "new_password": "string (required, min 6 characters)"
-          },
-          "response": "Message de confirmation"
-        },
-        {
-          "method": "POST",
-          "path": "/users/logout",
-          "description": "Se déconnecter",
+          "body": { "new_password": "string (required)" },
           "response": "Message de confirmation"
         },
         {
           "method": "POST",
           "path": "/users/{id}/restore",
           "description": "Restaurer un utilisateur supprimé",
-          "params": {
-            "id": "integer (required)"
-          },
+          "params": { "id": "integer (required)" },
           "roles": ["ADMINISTRATEUR"],
           "response": "User object restauré"
         },
@@ -288,44 +387,36 @@
           "description": "Créer une configuration d'application",
           "body": {
             "app_id": "string (required)",
-            "json_data": "object (optional, JSON)"
+            "json_data": "object (optional)"
           },
           "response": "App setup object"
         },
         {
           "method": "GET",
           "path": "/users/app/",
-          "description": "Lister toutes les configurations d'applications de l'utilisateur",
-          "response": "Array of app setup objects"
+          "description": "Lister les configurations d'applications de l'utilisateur",
+          "response": "Array de app setup objects"
         },
         {
           "method": "GET",
           "path": "/users/app/{app_id}",
-          "description": "Récupérer une configuration d'application spécifique",
-          "params": {
-            "app_id": "string (required)"
-          },
+          "description": "Récupérer une configuration d'application",
+          "params": { "app_id": "string (required)" },
           "response": "App setup object"
         },
         {
           "method": "PUT",
           "path": "/users/app/{app_id}",
           "description": "Mettre à jour une configuration d'application",
-          "params": {
-            "app_id": "string (required)"
-          },
-          "body": {
-            "json_data": "object (optional, JSON)"
-          },
+          "params": { "app_id": "string (required)" },
+          "body": { "json_data": "object (optional)" },
           "response": "App setup object mis à jour"
         },
         {
           "method": "DELETE",
           "path": "/users/app/{app_id}",
-          "description": "Supprimer une configuration d'application (soft delete)",
-          "params": {
-            "app_id": "string (required)"
-          },
+          "description": "Supprimer une configuration d'application",
+          "params": { "app_id": "string (required)" },
           "response": "Message de confirmation"
         }
       ]
@@ -334,6 +425,7 @@
       "description": "Gestion des groupes",
       "base_path": "/groups",
       "auth_required": true,
+      "auth_header": "Authorization: Bearer {jwt_token}",
       "routes": [
         {
           "method": "POST",
@@ -372,27 +464,21 @@
           "method": "GET",
           "path": "/groups/user/{user_id}",
           "description": "Obtenir les groupes d'un utilisateur",
-          "params": {
-            "user_id": "integer (required)"
-          },
+          "params": { "user_id": "integer (required)" },
           "response": "Array de groupes"
         },
         {
           "method": "GET",
           "path": "/groups/{id}",
           "description": "Obtenir les détails d'un groupe",
-          "params": {
-            "id": "integer (required)"
-          },
+          "params": { "id": "integer (required)" },
           "response": "Group object"
         },
         {
           "method": "PUT",
           "path": "/groups/{id}",
           "description": "Modifier un groupe",
-          "params": {
-            "id": "integer (required)"
-          },
+          "params": { "id": "integer (required)" },
           "body": {
             "name": "string (optional)",
             "description": "string (optional)",
@@ -404,27 +490,21 @@
           "method": "DELETE",
           "path": "/groups/{id}",
           "description": "Supprimer un groupe",
-          "params": {
-            "id": "integer (required)"
-          },
+          "params": { "id": "integer (required)" },
           "response": "Message de confirmation"
         },
         {
           "method": "POST",
           "path": "/groups/{id}/restore",
           "description": "Restaurer un groupe supprimé",
-          "params": {
-            "id": "integer (required)"
-          },
+          "params": { "id": "integer (required)" },
           "response": "Group object restauré"
         },
         {
           "method": "POST",
           "path": "/groups/{id}/invite",
           "description": "Inviter un utilisateur au groupe",
-          "params": {
-            "id": "integer (required)"
-          },
+          "params": { "id": "integer (required)" },
           "body": {
             "email": "string (required)",
             "role": "string (optional, default: MEMBRE)"
@@ -435,31 +515,25 @@
           "method": "POST",
           "path": "/groups/{id}/leave",
           "description": "Quitter un groupe",
-          "params": {
-            "id": "integer (required)"
-          },
+          "params": { "id": "integer (required)" },
           "response": "Message de confirmation"
         },
         {
           "method": "GET",
           "path": "/groups/{id}/members",
           "description": "Obtenir les membres d'un groupe",
-          "params": {
-            "id": "integer (required)"
-          },
+          "params": { "id": "integer (required)" },
           "response": "Array de membres"
         },
         {
           "method": "POST",
           "path": "/groups/{group_id}/members/{user_id}",
-          "description": "Ajouter un utilisateur à un groupe (pour administrateurs)",
+          "description": "Ajouter un utilisateur à un groupe",
           "params": {
             "group_id": "integer (required)",
             "user_id": "integer (required)"
           },
-          "body": {
-            "role": "string (optional, default: member)"
-          },
+          "body": { "role": "string (optional, default: MEMBRE)" },
           "response": "Message de confirmation"
         },
         {
@@ -470,9 +544,7 @@
             "group_id": "integer (required)",
             "user_id": "integer (required)"
           },
-          "body": {
-            "role": "string (required)"
-          },
+          "body": { "role": "string (required)" },
           "response": "Message de confirmation"
         }
       ]
@@ -481,6 +553,7 @@
       "description": "Gestion des fichiers",
       "base_path": "/files",
       "auth_required": true,
+      "auth_header": "Authorization: Bearer {jwt_token}",
       "routes": [
         {
           "method": "POST",
@@ -493,45 +566,35 @@
           "method": "GET",
           "path": "/files/{id}",
           "description": "Télécharger un fichier",
-          "params": {
-            "id": "integer (required)"
-          },
+          "params": { "id": "integer (required)" },
           "response": "Fichier binaire"
         },
         {
           "method": "GET",
           "path": "/files/{id}/info",
           "description": "Obtenir les informations d'un fichier",
-          "params": {
-            "id": "integer (required)"
-          },
+          "params": { "id": "integer (required)" },
           "response": "File object"
         },
         {
           "method": "DELETE",
           "path": "/files/{id}",
           "description": "Supprimer un fichier",
-          "params": {
-            "id": "integer (required)"
-          },
+          "params": { "id": "integer (required)" },
           "response": "Message de confirmation"
         },
         {
           "method": "POST",
           "path": "/files/{id}/restore",
           "description": "Restaurer un fichier supprimé",
-          "params": {
-            "id": "integer (required)"
-          },
+          "params": { "id": "integer (required)" },
           "response": "File object restauré"
         },
         {
           "method": "GET",
           "path": "/files/user/{user_id}",
           "description": "Obtenir les fichiers d'un utilisateur",
-          "params": {
-            "user_id": "integer (required)"
-          },
+          "params": { "user_id": "integer (required)" },
           "response": "Array de File objects"
         }
       ]
@@ -540,6 +603,7 @@
       "description": "Gestion des tags",
       "base_path": "/tags",
       "auth_required": true,
+      "auth_header": "Authorization: Bearer {jwt_token}",
       "routes": [
         {
           "method": "GET",
@@ -566,18 +630,14 @@
           "method": "GET",
           "path": "/tags/{id}",
           "description": "Obtenir les détails d'un tag",
-          "params": {
-            "id": "integer (required)"
-          },
+          "params": { "id": "integer (required)" },
           "response": "Tag object"
         },
         {
           "method": "PUT",
           "path": "/tags/{id}",
           "description": "Modifier un tag",
-          "params": {
-            "id": "integer (required)"
-          },
+          "params": { "id": "integer (required)" },
           "body": {
             "name": "string (optional)",
             "color": "string (optional)",
@@ -589,18 +649,14 @@
           "method": "DELETE",
           "path": "/tags/{id}",
           "description": "Supprimer un tag",
-          "params": {
-            "id": "integer (required)"
-          },
+          "params": { "id": "integer (required)" },
           "response": "Message de confirmation"
         },
         {
           "method": "POST",
           "path": "/tags/{id}/restore",
           "description": "Restaurer un tag supprimé",
-          "params": {
-            "id": "integer (required)"
-          },
+          "params": { "id": "integer (required)" },
           "response": "Tag object restauré"
         },
         {
@@ -613,21 +669,19 @@
           "method": "GET",
           "path": "/tags/by-table/{table}",
           "description": "Obtenir les tags par table d'association",
-          "params": {
-            "table": "string (required, values: groups|files|all)"
-          },
+          "params": { "table": "string (required) — groups | files | all" },
           "response": "Array de tags"
         },
         {
           "method": "GET",
           "path": "/tags/most-used",
-          "description": "Obtenir les tags les plus utilisés",
+          "description": "Tags les plus utilisés",
           "response": "Array de tags avec compteur d'utilisation"
         },
         {
           "method": "POST",
           "path": "/tags/get-or-create",
-          "description": "Obtenir ou créer un tag",
+          "description": "Obtenir ou créer un tag par nom",
           "body": {
             "name": "string (required)",
             "color": "string (optional)"
@@ -638,22 +692,20 @@
           "method": "GET",
           "path": "/tags/user/{user_id}",
           "description": "Obtenir les tags d'un utilisateur",
-          "params": {
-            "user_id": "integer (required)"
-          },
+          "params": { "user_id": "integer (required)" },
           "response": "Array de tags"
         },
         {
           "method": "PUT",
           "path": "/tags/{tag_id}/{item_id}",
-          "description": "Associer/Dissocier un tag à un élément",
+          "description": "Associer ou dissocier un tag à un élément",
           "params": {
             "tag_id": "integer (required)",
             "item_id": "integer (required)"
           },
           "body": {
-            "action": "string (required, values: associate|dissociate)",
-            "table": "string (required, values: groups|files)"
+            "action": "string (required) — associate | dissociate",
+            "table": "string (required) — groups | files"
           },
           "response": "Message de confirmation"
         }
@@ -663,6 +715,7 @@
       "description": "Statistiques et analytics",
       "base_path": "/stats",
       "auth_required": true,
+      "auth_header": "Authorization: Bearer {jwt_token}",
       "routes": [
         {
           "method": "POST",
@@ -696,9 +749,7 @@
           "method": "GET",
           "path": "/stats/users/{id}",
           "description": "Statistiques d'un utilisateur spécifique",
-          "params": {
-            "id": "integer (required)"
-          },
+          "params": { "id": "integer (required)" },
           "response": "Object avec statistiques utilisateur"
         },
         {
@@ -708,20 +759,21 @@
           "response": "Object avec statistiques utilisateur"
         }
       ]
-    },    
+    },
     "secret-admin": {
-      "description": "Endpoints d'administration secrets avec sécurité renforcée",
+      "description": "Endpoints d'administration — authentification JWT + clé secrète requises",
       "base_path": "/secret-admin",
       "auth_required": true,
+      "auth_header": "Authorization: Bearer {jwt_token}",
       "roles": ["ADMINISTRATEUR"],
-      "additional_security": "ADMIN_SECRET_KEY required in request body/params",
+      "additional_security": "ADMIN_SECRET_KEY obligatoire dans le body/params",
       "routes": [
         {
           "method": "POST",
           "path": "/secret-admin/execute-procedure",
           "description": "Exécuter une procédure stockée MySQL",
           "body": {
-            "secret": "string (required)",
+            "secret": "string (required) — ADMIN_SECRET_KEY",
             "procedure_name": "string (required)",
             "params": "array (optional)"
           },
@@ -731,116 +783,20 @@
           "method": "GET",
           "path": "/secret-admin/procedures",
           "description": "Lister les procédures disponibles",
-          "params": {
-            "secret": "string (required)"
-          },
+          "query": { "secret": "string (required) — ADMIN_SECRET_KEY" },
           "response": "Array des procédures disponibles"
-        },
-        {
-          "method": "POST",
-          "path": "/secret-admin/api-keys",
-          "description": "Créer une nouvelle API key (sécurisé)",
-          "body": {
-            "admin_secret": "string (required) - ADMIN_SECRET_KEY",
-            "user_id": "integer (required) - ID utilisateur propriétaire",
-            "name": "string (required) - Nom descriptif de la clé",
-            "scopes": "array (optional) - Permissions [read, write, delete, admin]",
-            "environment": "string (optional) - production|test",
-            "expires_in_days": "integer (optional) - Expiration en jours",
-            "rate_limit_per_minute": "integer (optional) - Limite par minute",
-            "rate_limit_per_hour": "integer (optional) - Limite par heure",
-            "notes": "string (optional) - Notes administratives"
-          },
-          "response": "ApiKey object avec clé complète (visible une seule fois)",
-          "security_warning": "⚠️ Clé visible uniquement à la création - sauvegardez immédiatement"
-        },
-        {
-          "method": "GET",
-          "path": "/secret-admin/api-keys",
-          "description": "Lister toutes les API keys (administrateur)",
-          "params": {
-            "admin_secret": "string (required) - ADMIN_SECRET_KEY",
-            "user_id": "integer (optional) - Filtrer par utilisateur"
-          },
-          "response": "Array de toutes les API keys avec détails administrateur"
-        },
-        {
-          "method": "GET",
-          "path": "/secret-admin/api-keys/{id}",
-          "description": "Obtenir les détails d'une API key spécifique",
-          "params": {
-            "id": "integer (required) - ID de la clé",
-            "admin_secret": "string (required) - ADMIN_SECRET_KEY"
-          },
-          "response": "ApiKey object avec détails complets (sans la clé secrète)"
-        },
-        {
-          "method": "DELETE",
-          "path": "/secret-admin/api-keys/{id}",
-          "description": "Révoquer une API key",
-          "params": {
-            "id": "integer (required) - ID de la clé"
-          },
-          "body": {
-            "admin_secret": "string (required) - ADMIN_SECRET_KEY",
-            "reason": "string (optional) - Raison de la révocation"
-          },
-          "response": "Confirmation de révocation avec détails administrateur"
-        },
-        {
-          "method": "POST",
-          "path": "/secret-admin/api-keys/{id}/regenerate",
-          "description": "Régénérer une API key (nouvelle clé, ancienne révoquée)",
-          "params": {
-            "id": "integer (required) - ID de la clé à régénérer"
-          },
-          "body": {
-            "admin_secret": "string (required) - ADMIN_SECRET_KEY"
-          },
-          "response": "Nouvelle ApiKey object avec clé complète (visible une seule fois)",
-          "security_warning": "⚠️ Nouvelle clé visible uniquement à la régénération"
         }
       ]
     }
   },
-  "http_codes": {
-    "200": "Success - Requête réussie",
-    "201": "Created - Ressource créée avec succès",
-    "400": "Bad Request - Paramètres invalides",
-    "401": "Unauthorized - Authentification requise ou invalide (API key manquante/invalide)",
-    "403": "Forbidden - Permissions insuffisantes",
-    "404": "Not Found - Ressource non trouvée",
-    "409": "Conflict - Conflit avec l'état actuel",
-    "410": "Gone - Endpoint déplacé/supprimé (ex: anciens endpoints API keys)",
-    "422": "Unprocessable Entity - Validation échouée",
-    "429": "Too Many Requests - Rate limit dépassé",
-    "500": "Internal Server Error - Erreur serveur"
-  },
-  "response_format": {
-    "success": {
-      "success": true,
-      "data": "mixed",
-      "message": "string (optional)"
-    },
-    "error": {
-      "success": false,
-      "error": "string",
-      "details": "mixed (optional)",
-      "code": "integer"
-    }
-  },
-  "notes": {
-    "pagination": "Certains endpoints supportent la pagination via les paramètres ?page=1&limit=20",
-    "soft_delete": "Les suppressions sont des soft deletes - les ressources peuvent être restaurées",
-    "rate_limiting": "Rate limiting appliqué pour les API Keys selon les scopes configurés",
-    "cors": "CORS activé pour les origines autorisées",
-    "logging": "Toutes les requêtes sont loggées pour l'audit",
-    "security_update_v1_3_0": {
-      "api_key_requirement": "TOUS les logins nécessitent maintenant une API key valide",
-      "api_key_management": "Gestion des API keys UNIQUEMENT via /secret-admin/api-keys avec authentification renforcée",
-      "deprecated_endpoints": "Les anciens endpoints /api-keys/* retournent HTTP 410 Gone",
-      "breaking_change": "Cette mise à jour contient des changements incompatibles - migration requise",
-      "bootstrap_script": "Utilisez bootstrap_create_first_api_key.php pour créer votre première API key"
-    }
+  "database_migration": {
+    "file": "src/auth_groups/docs/MIGRATION_JWT.sql",
+    "tables_added": [
+      "otp_codes — codes OTP à 6 chiffres pour connexion par email",
+      "device_tokens — tokens longue durée par appareil pour renouvellement JWT"
+    ],
+    "tables_modified": [
+      "user_sessions — colonne api_key_id rendue nullable (sessions JWT sans clé API)"
+    ]
   }
 }

@@ -243,7 +243,24 @@ define('REQUIRE_EMAIL_VERIFICATION', filter_var($_ENV['REQUIRE_EMAIL_VERIFICATIO
 
 // Configuration des sessions utilisateur
 define('MAX_CONCURRENT_SESSIONS', (int)($_ENV['MAX_CONCURRENT_SESSIONS'] ?? 5));
-define('SESSION_TIMEOUT', (int)($_ENV['SESSION_TIMEOUT'] ?? 3600)); // 1 heure par défaut  
+define('SESSION_TIMEOUT', (int)($_ENV['SESSION_TIMEOUT'] ?? 3600)); // 1 heure par défaut
+
+// ============================================
+// JWT - JSON Web Tokens
+// ============================================
+define('JWT_SECRET', $_ENV['JWT_SECRET'] ?? '');
+define('JWT_EXPIRY_DAYS', (int)($_ENV['JWT_EXPIRY_DAYS'] ?? 15));
+
+// ============================================
+// OTP - One-Time Password (connexion par code)
+// ============================================
+define('OTP_EXPIRY_MINUTES', (int)($_ENV['OTP_EXPIRY_MINUTES'] ?? 15));
+define('OTP_MAX_ATTEMPTS', (int)($_ENV['OTP_MAX_ATTEMPTS'] ?? 5));
+
+// ============================================
+// DEVICE TOKENS - Appareils de confiance
+// ============================================
+define('DEVICE_TOKEN_EXPIRY_DAYS', (int)($_ENV['DEVICE_TOKEN_EXPIRY_DAYS'] ?? 365));
 
 /**
  * Configuration des uploads pour le module auth_groups

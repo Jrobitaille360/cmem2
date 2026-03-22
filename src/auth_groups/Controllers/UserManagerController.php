@@ -93,44 +93,7 @@ class UserManagerController {
                     ]);
                 }
                 
-                // 2. Créer une API key limitée (plan free)
-                try {
-                    $apiKeyConfig = Plan::getApiKeyConfigForPlan(Plan::PLAN_FREE);
-                    $apiKeyResult = ApiKey::generate(
-                        $createdUser['id'],
-                        "Clé API gratuite - " . $createdUser['name'],
-                        $apiKeyConfig
-                    );
-                    
-                    // Marquer cette API key comme liée au plan gratuit
-                    if ($freePlan && $apiKeyResult) {
-                        $stmt = $pdo->prepare("
-                            UPDATE api_keys 
-                            SET plan_id = :plan_id, plan_limited = 1
-                            WHERE id = :api_key_id
-                        ");
-                        $stmt->execute([
-                            'plan_id' => $freePlan['id'],
-                            'api_key_id' => $apiKeyResult['data']['id']
-                        ]);
-                    }
-                    
-                    LogService::info("API key gratuite créée", [
-                        'user_id' => $createdUser['id'],
-                        'api_key_id' => $apiKeyResult['data']['id'],
-                        'key_prefix' => substr($apiKeyResult['key'], 0, 12) . '...'
-                    ]);
-                    
-                } catch (Exception $apiKeyError) {
-                    LogService::error("Erreur lors de la création de l'API key gratuite", [
-                        'user_id' => $createdUser['id'],
-                        'error' => $apiKeyError->getMessage()
-                    ]);
-                    // Continuer même si l'API key n'est pas créée
-                    $apiKeyResult = null;
-                }
-                
-                // 3. Générer un token de vérification d'email 1 chiffre de 1 à 9 et 7 chiffres de 0 à 9
+                // 2. Générer un token de vérification d'email 1 chiffre de 1 à 9 et 7 chiffres de 0 à 9
                 
                 $verificationToken = mt_rand(1, 9) . str_pad(mt_rand(0, 9999999), 7, '0', STR_PAD_LEFT);
                 $expiresAt = date('Y-m-d H:i:s', time() + (24 * 60 * 60)); // Expire dans 24h
@@ -154,34 +117,32 @@ class UserManagerController {
                 //$stmt = $pdo->prepare(" INSERT INTO plan_invitations (user_id, invitation_token, expires_at) VALUES (:user_id, :token, :expires_at)");
                 //$stmt->execute([ 'user_id' => $createdUser['id'], 'expires_at' => $planInvitationExpires ]);
                 
-                // 5. Envoyer l'email avec API key + invitation au choix de plan
+                // 3. Envoyer l'email de vérification
                 try {
                     $emailService = new EmailService();
-                    $emailSent = $emailService->sendRegistrationWithApiKeyAndPlanInvitation(
+                    $emailSent = $emailService->sendRegistrationVerification(
                         $createdUser['email'],
                         $createdUser['name'],
-                        $verificationToken,
-                        $apiKeyResult ? $apiKeyResult['key'] : null,//  $planInvitationToken
+                        $verificationToken
                     );
-                    
+
                     if ($emailSent) {
-                        LogService::info("Email d'inscription avec API key et invitation plan envoyé", [
+                        LogService::info("Email de vérification d'inscription envoyé", [
                             'user_id' => $createdUser['id'],
-                            'email' => $createdUser['email']
+                            'email'   => $createdUser['email']
                         ]);
                     } else {
                         LogService::warning("Échec envoi email d'inscription", [
                             'user_id' => $createdUser['id'],
-                            'email' => $createdUser['email']
+                            'email'   => $createdUser['email']
                         ]);
                         Response::error("Échec de l'envoi de l'email d'inscription", null, 500);
                     }
                 } catch (Exception $emailError) {
-                    // Ne pas faire échouer la création si l'email ne peut pas être envoyé
                     LogService::error("Erreur lors de l'envoi de l'email d'inscription", [
                         'user_id' => $createdUser['id'],
-                        'email' => $createdUser['email'],
-                        'error' => $emailError->getMessage()
+                        'email'   => $createdUser['email'],
+                        'error'   => $emailError->getMessage()
                     ]);
                     Response::error("Échec de l'envoi de l'email d'inscription", null, 500);
                     return false;
@@ -197,43 +158,31 @@ class UserManagerController {
                 // Format de réponse conforme à la documentation
                 $responseData = [
                     'user' => [
-                        'id' => $createdUser['id'],
-                        'name' => $createdUser['name'],
-                        'email' => $createdUser['email'],
-                        'role' => $createdUser['role'],
-                        'profile_image' => $createdUser['profile_image'],
-                        'bio' => $createdUser['bio'],
-                        'phone' => $createdUser['phone'],
-                        'date_of_birth' => $createdUser['date_of_birth'],
-                        'location' => $createdUser['location'],
+                        'id'             => $createdUser['id'],
+                        'name'           => $createdUser['name'],
+                        'email'          => $createdUser['email'],
+                        'role'           => $createdUser['role'],
+                        'profile_image'  => $createdUser['profile_image'],
+                        'bio'            => $createdUser['bio'],
+                        'phone'          => $createdUser['phone'],
+                        'date_of_birth'  => $createdUser['date_of_birth'],
+                        'location'       => $createdUser['location'],
                         'email_verified' => $createdUser['email_verified'],
-                        'last_login' => $createdUser['last_login'],
-                        'created_at' => $createdUser['created_at'],
-                        'updated_at' => $createdUser['updated_at'],
-                        'plan' => 'free'
+                        'last_login'     => $createdUser['last_login'],
+                        'created_at'     => $createdUser['created_at'],
+                        'updated_at'     => $createdUser['updated_at'],
+                        'plan'           => 'free'
                     ],
-                    'api_key' => [
-                        'key' => $apiKeyResult ? $apiKeyResult['key'] : null,
-                        'name' => $apiKeyResult ? $apiKeyResult['data']['name'] : null,
-                        'environment' => $apiKeyResult ? $apiKeyResult['data']['environment'] : null,
-                        'scopes' => $apiKeyResult ? json_decode($apiKeyResult['data']['scopes'], true) : [],
-                        'rate_limit_per_minute' => $apiKeyResult ? $apiKeyResult['data']['rate_limit_per_minute'] : null,
-                        'expires_at' => $apiKeyResult ? $apiKeyResult['data']['expires_at'] : null,
-                        'plan_limited' => true
+                    'next_steps' => [
+                        'verify_email' => 'Vérifiez votre email avec le token reçu : POST /users/verify-email',
+                        'login'        => 'Connectez-vous ensuite : POST /auth/login',
                     ],
-                    'plan_invitation' => [
-                        //'token' => $planInvitationToken,
-                        //'expires_at' => $planInvitationExpires,
-                        'available_plans' => ['bronze', 'argent', 'platine']
-                    ],
-                    'verification_token' => $verificationToken,
-                    'auth_method' => 'api_key'
+                    'auth_method' => 'jwt',
                 ];
-                
-                // En développement, inclure les tokens pour les tests
-                if(defined('APP_ENV') && APP_ENV === 'development') {
+
+                // En développement, inclure le token de vérification pour les tests
+                if (defined('APP_ENV') && APP_ENV === 'development') {
                     $responseData['verification_token'] = $verificationToken;
-                    //$responseData['plan_invitation_token'] = $planInvitationToken;
                 }
 
                 LoggingMiddleware::logExit(201);

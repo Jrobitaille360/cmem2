@@ -56,7 +56,7 @@ class PublicRouteHandler extends BaseRouteHandler
     }
     
     protected function getSupportedControllers(): array {
-        return ['help', 'health', 'users', 'groups', 'secret-admin'];
+        return ['help', 'health', 'users', 'groups', 'secret-admin', 'test'];
     }
     
     protected function handleRoute(array $request) {
@@ -99,11 +99,6 @@ class PublicRouteHandler extends BaseRouteHandler
             ($controller === 'users' && $action === 'register' && $method === 'POST') => 
                 $this->controllers['users']->create(),
                 
-            // Route de connexion publique - AVEC VALIDATION API KEY OBLIGATOIRE
-            ($controller === 'users' && $action === 'login' && $method === 'POST') => 
-                $this->handleLoginWithApiKey(),
-            // PAR pour créer la première clé API si aucune n'existe encore:
-            //    $this->controllers['users']->authenticate(),    
             // Route de demande de changement de mot de passe publique
             ($controller === 'users' && $action === 'request-password-reset' && $method === 'POST') => 
                 $this->controllers['users']->requestPasswordChange(),
@@ -117,9 +112,13 @@ class PublicRouteHandler extends BaseRouteHandler
                 $this->controllers['users']->confirmEmail(),
                 
             // Route de renvoi d'email de vérification publique
-            ($controller === 'users' && $action === 'resend-verification-email' && $method === 'POST') => 
+            ($controller === 'users' && $action === 'resend-verification-email' && $method === 'POST') =>
                 $this->controllers['users']->resendVerificationEmail(),
-                
+
+            // Route d'injection OTP (développement uniquement)
+            ($controller === 'test' && $action === 'inject-otp' && $method === 'POST') =>
+                $this->devInjectOtp(),
+
             default => false
         };
         return $res;
@@ -136,7 +135,7 @@ class PublicRouteHandler extends BaseRouteHandler
             'quick_start' => [
                 'documentation' => 'GET /help - Liste complète des endpoints disponibles',
                 'health_check' => 'GET /health - Vérifier l\'état de l\'API',
-                'authentication' => 'Requiert une API Key pour la plupart des endpoints'
+                'authentication' => 'JWT Bearer token requis (POST /auth/login ou POST /auth/verify-code)'
             ],
             'main_features' => [
                 'users' => 'Gestion complète des utilisateurs (inscription, authentification, profils)',
@@ -172,11 +171,17 @@ class PublicRouteHandler extends BaseRouteHandler
                     'GET /health - Statut de santé de l\'API',
                     'GET /plans - Liste des plans d\'abonnement disponibles',
                     'POST /users/register - Inscription d\'un nouvel utilisateur',
-                    'POST /users/login - Connexion utilisateur (requiert API Key)',
+                    'POST /auth/login - Connexion email + password → JWT (15 jours)',
+                    'POST /auth/send-code - Envoyer un code OTP par email',
+                    'POST /auth/verify-code - Vérifier le code OTP → JWT (15 jours)',
+                    'POST /auth/refresh - Renouveler le JWT via device token (sans re-login)',
+                    'POST /auth/logout - Déconnexion (JWT requis)',
+                    'GET /auth/devices - Lister les appareils de confiance (JWT requis)',
+                    'DELETE /auth/devices/{device_id} - Révoquer un appareil (JWT requis)',
                     'POST /users/request-password-reset - Demande de réinitialisation de mot de passe',
                     'POST /users/reset-password - Réinitialisation de mot de passe avec token',
                     'POST /users/verify-email - Vérification d\'email avec token',
-                    'POST /users/resend-verification - Renvoi d\'email de vérification',
+                    'POST /users/resend-verification-email - Renvoi d\'email de vérification',
                     'GET /groups - Liste des groupes publics',
                     'POST /groups/join - Rejoindre un groupe avec code d\'invitation'
                 ],
@@ -231,14 +236,11 @@ class PublicRouteHandler extends BaseRouteHandler
                 ]
             ],
             'authentication' => [
-                'api_key' => [
-                    'header' => 'X-API-Key: {your_api_key}',
-                    'alternative' => 'Authorization: Bearer {your_api_key}',
-                    'scopes' => 'read, write, admin (selon les permissions)',
-                    'environments' => 'development, staging, production'
-                ],
-                'session' => [
-                    'usage' => 'Stocker et inclure dans les requêtes suivantes'
+                'jwt' => [
+                    'header'     => 'Authorization: Bearer {jwt_token}',
+                    'obtain'     => 'POST /auth/login (email+password) ou POST /auth/send-code + POST /auth/verify-code (OTP)',
+                    'expiry'     => '15 jours',
+                    'algorithm'  => 'HS256'
                 ]
             ],
             'rate_limiting' => [
@@ -316,90 +318,6 @@ class PublicRouteHandler extends BaseRouteHandler
             ]
         ];
         Response::success('health_status', $info);
-    }
-
-    private function hasAuthToken(): bool {
-        $authHeader = null;
-
-        // 1. Standard
-        if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
-            $authHeader = $_SERVER['HTTP_AUTHORIZATION'];
-        }
-        // 2. Apache mod_rewrite
-        elseif (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
-            $authHeader = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
-        }
-        // 3. Fallback: apache_request_headers (fonctionne seulement si Apache)
-        elseif (function_exists('apache_request_headers')) {
-            $headers = apache_request_headers();
-            if (isset($headers['Authorization'])) {
-                $authHeader = $headers['Authorization'];
-            } elseif (isset($headers['authorization'])) {
-                $authHeader = $headers['authorization'];
-            }
-        }
-        
-        return !empty($authHeader) && strpos($authHeader, 'Bearer ') === 0;
-    }
-    
-    /**
-     * Gestion du login avec validation obligatoire d'API key
-     * 
-     * SÉCURITÉ : Tous les logins nécessitent une API key valide
-     * Cette méthode vérifie d'abord la présence et validité d'une API key,
-     * puis procède à l'authentification (email + password).
-     */
-    private function handleLoginWithApiKey(): void
-    {
-        try {
-            // ÉTAPE 1: Vérifier qu'une API key valide est fournie
-            $apiKeyData = \AuthGroups\Middleware\ApiKeyAuthMiddleware::requireApiKey();
-            
-            if (!$apiKeyData) {
-                // L'erreur a déjà été envoyée par requireApiKey()
-                return;
-            }
-            
-            // ÉTAPE 2: Vérifier que la clé a les permissions appropriées pour le login
-            if (!isset($apiKeyData['scopes']) || !is_array($apiKeyData['scopes'])) {
-                LogService::warning('API key sans scopes valides utilisée pour login', [
-                    'api_key_id' => $apiKeyData['id'],
-                    'user_id' => $apiKeyData['user_id'],
-                    'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown'
-                ]);
-                
-               Response::error('API key invalide', [
-                    'error' => 'INVALID_API_KEY_SCOPES',
-                    'message' => 'Cette API key n\'a pas les permissions appropriées'
-                ], 403);
-                return;
-            }
-            
-            // ÉTAPE 3: Log de sécurité pour traçabilité
-            LogService::info('Login tenté avec API key valide', [
-                'api_key_id' => $apiKeyData['id'],
-                'api_key_user_id' => $apiKeyData['user_id'],
-                'api_key_environment' => $apiKeyData['environment'],
-                'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
-                'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown'
-            ]);
-            
-            // ÉTAPE 4: Procéder au login avec api_key + email + password
-            $this->controllers['users']->authenticate();
-            
-        } catch (\Exception $e) {
-            LogService::error('Erreur lors de la validation API key pour login', [
-                'error' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown'
-            ]);
-            
-            Response::error('Erreur de validation de sécurité', [
-                'error' => 'SECURITY_VALIDATION_ERROR',
-                'message' => 'Une erreur est survenue lors de la validation de sécurité'
-            ], 500);
-        }
     }
 
 }
