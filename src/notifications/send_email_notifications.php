@@ -11,7 +11,10 @@
  *   Ne pas utiliser `php` seul : pointe vers php-cgi en mode cron → 403 Forbidden.
  *
  * Crontab active (production — toutes les minutes) :
- *   * * * * * /usr/local/bin/php /home/lmdkhdg5/cmem2.journauxdebord.com/src/notifications/send_email_notifications.php >> /home/lmdkhdg5/logs/notifications.log 2>&1
+ *   * * * * * /usr/local/bin/php /home/lmdkhdg5/cmem2.journauxdebord.com/src/notifications/send_email_notifications.php >> /home/lmdkhdg5/logs/notifications-$(date +\%Y-\%m-\%d).log 2>&1
+ *
+ * Rotation des logs (un fichier par jour, garder 2 jours) — à ajouter en crontab :
+ *   5 0 * * * find /home/lmdkhdg5/logs/ -name "notifications-*.log" -mtime +2 -delete
  *
  * Test manuel (SSH) :
  *   /usr/local/bin/php /home/lmdkhdg5/cmem2.journauxdebord.com/src/notifications/send_email_notifications.php
