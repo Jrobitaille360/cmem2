@@ -4,13 +4,20 @@
  * Script cron — Envoi des notifications email planifiées
  *
  * Usage :
- *   php src/notifications/send_email_notifications.php [--dry-run] [--batch=50]
+ *   /usr/local/bin/php src/notifications/send_email_notifications.php [--dry-run] [--batch=50]
  *
- * Crontab recommandé (toutes les 60 secondes, R6 spec) :
- *   * * * * * php /chemin/vers/cmem2_API/src/notifications/send_email_notifications.php >> /chemin/vers/logs/notifications.log 2>&1
+ * IMPORTANT — Binaire PHP CLI (serveur verdun / cPanel) :
+ *   /usr/local/bin/php  (PHP 8.3.30 CLI, confirmé 2026-03-23)
+ *   Ne pas utiliser `php` seul : pointe vers php-cgi en mode cron → 403 Forbidden.
  *
- * Crontab acceptable (toutes les 5 minutes) :
- *   * /5 * * * * php /chemin/vers/cmem2_API/src/notifications/send_email_notifications.php
+ * Crontab active (production — toutes les minutes) :
+ *   * * * * * /usr/local/bin/php /home/lmdkhdg5/cmem2.journauxdebord.com/src/notifications/send_email_notifications.php >> /home/lmdkhdg5/logs/notifications.log 2>&1
+ *
+ * Test manuel (SSH) :
+ *   /usr/local/bin/php /home/lmdkhdg5/cmem2.journauxdebord.com/src/notifications/send_email_notifications.php
+ *
+ * Dry-run (liste ce qui serait envoyé sans envoyer) :
+ *   /usr/local/bin/php /home/lmdkhdg5/cmem2.journauxdebord.com/src/notifications/send_email_notifications.php --dry-run
  */
 
 // Ce script doit être exécuté en CLI uniquement

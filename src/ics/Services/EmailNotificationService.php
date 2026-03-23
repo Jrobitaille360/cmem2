@@ -25,6 +25,67 @@ use DateInterval;
 class EmailNotificationService
 {
     // ------------------------------------------------------------------
+    // Envoi immédiat déclenché par le client
+    // ------------------------------------------------------------------
+
+    /**
+     * Envoie immédiatement le courriel de rappel pour une occurrence spécifique.
+     * Appelé par POST /notifications/send-email.
+     *
+     * @param int    $userId           Propriétaire authentifié
+     * @param int    $eventId
+     * @param string $occurrenceDate   "Y-m-d"
+     * @param int    $recurrenceIndex
+     * @return bool  true si envoyé, false sinon
+     */
+    public static function sendEmailNow(
+        int $userId,
+        int $eventId,
+        string $occurrenceDate,
+        int $recurrenceIndex
+    ): bool {
+        $event = self::loadEventData($eventId);
+        if (!$event) {
+            LogService::warning('EmailNotificationService::sendEmailNow: événement introuvable', [
+                'event_id' => $eventId,
+            ]);
+            return false;
+        }
+
+        $occurrence = self::loadOccurrence($eventId, $occurrenceDate, $recurrenceIndex);
+        $data       = self::resolveOccurrenceData($event, $occurrence);
+
+        $userInfo = self::getUserNotificationInfo($userId);
+        if (!$userInfo) {
+            return false;
+        }
+        $recipientEmail = $userInfo['notification_email'] ?: $userInfo['email'];
+
+        $subject = "Rappel : {$data['title']}";
+        $body    = self::buildBody($data, 0);
+
+        $emailService = new EmailService();
+        $ok = $emailService->sendEmail($recipientEmail, $subject, $body, false);
+
+        if ($ok) {
+            LogService::info('EmailNotificationService::sendEmailNow: courriel envoyé', [
+                'user_id'          => $userId,
+                'event_id'         => $eventId,
+                'occurrence_date'  => $occurrenceDate,
+                'recurrence_index' => $recurrenceIndex,
+                'recipient'        => $recipientEmail,
+            ]);
+        } else {
+            LogService::warning('EmailNotificationService::sendEmailNow: échec SMTP', [
+                'event_id'  => $eventId,
+                'recipient' => $recipientEmail,
+            ]);
+        }
+
+        return $ok;
+    }
+
+    // ------------------------------------------------------------------
     // Planification
     // ------------------------------------------------------------------
 
@@ -295,6 +356,40 @@ class EmailNotificationService
         );
         $stmt->execute([$eventId]);
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    /**
+     * Charge une occurrence par event_id + date + recurrence_index.
+     * Retourne null si elle n'existe pas (occurrence non-modifiée).
+     */
+    private static function loadOccurrence(int $eventId, string $occurrenceDate, int $recurrenceIndex): ?array
+    {
+        $db   = self::getDb();
+        $stmt = $db->prepare(
+            "SELECT modified_title, modified_start_datetime, modified_end_datetime, modified_location
+             FROM event_occurrences
+             WHERE event_id = ? AND occurrence_date = ? AND recurrence_index = ?
+             LIMIT 1"
+        );
+        $stmt->execute([$eventId, $occurrenceDate, $recurrenceIndex]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    /**
+     * Fusionne les champs modifiés de l'occurrence avec les champs de l'événement de base.
+     * Les champs de l'occurrence ont priorité si non nuls.
+     */
+    private static function resolveOccurrenceData(array $event, ?array $occurrence): array
+    {
+        return [
+            'title'          => ($occurrence['modified_title']          ?? null) ?: $event['title'],
+            'start_datetime' => ($occurrence['modified_start_datetime'] ?? null) ?: $event['start_datetime'],
+            'end_datetime'   => ($occurrence['modified_end_datetime']   ?? null) ?: $event['end_datetime'],
+            'location'       => ($occurrence['modified_location']       ?? null) ?: ($event['location'] ?? null),
+            'meeting_link'   => $event['meeting_link']   ?? null,
+            'description'    => $event['description']    ?? null,
+            'timezone'       => $event['timezone']       ?? 'America/Montreal',
+        ];
     }
 
     /**

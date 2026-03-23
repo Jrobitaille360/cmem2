@@ -43,6 +43,10 @@ class NotificationRouteHandler extends BaseRouteHandler
 
         match (true) {
 
+            // POST /notifications/send-email
+            ($sub === 'send-email' && $method === 'POST') =>
+                $this->controller->sendEmailForOccurrence($user['user_id']),
+
             // GET /notifications/email
             ($sub === 'email' && $method === 'GET' && $third === '') =>
                 $this->controller->listEmailNotifications($user['user_id']),

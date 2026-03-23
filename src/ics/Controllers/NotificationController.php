@@ -22,6 +22,54 @@ use AuthGroups\Utils\Response;
 class NotificationController
 {
     // ------------------------------------------------------------------
+    // POST /notifications/send-email
+    // ------------------------------------------------------------------
+
+    /**
+     * Déclenche l'envoi immédiat d'un courriel de rappel pour une occurrence.
+     *
+     * Corps requis : event_id, calendar_id, occurrence_date, recurrence_index
+     */
+    public function sendEmailForOccurrence(int $userId): void
+    {
+        LoggingMiddleware::logEntry();
+        $input = Response::getRequestParams();
+
+        $eventId          = isset($input['event_id'])          ? (int)$input['event_id']          : null;
+        $occurrenceDate   = isset($input['occurrence_date'])   ? trim($input['occurrence_date'])   : null;
+        $recurrenceIndex  = isset($input['recurrence_index'])  ? (int)$input['recurrence_index']  : 0;
+
+        if (!$eventId || !$occurrenceDate) {
+            LoggingMiddleware::logExit(400);
+            Response::error('Paramètres requis : event_id, occurrence_date', null, 400);
+            return;
+        }
+
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $occurrenceDate)) {
+            LoggingMiddleware::logExit(400);
+            Response::error('occurrence_date doit être au format YYYY-MM-DD', null, 400);
+            return;
+        }
+
+        try {
+            $ok = EmailNotificationService::sendEmailNow($userId, $eventId, $occurrenceDate, $recurrenceIndex);
+
+            if (!$ok) {
+                LoggingMiddleware::logExit(500);
+                Response::error('Échec de l\'envoi du courriel', null, 500);
+                return;
+            }
+
+            LoggingMiddleware::logExit(200);
+            Response::success('Courriel envoyé', ['message' => 'Courriel envoyé']);
+        } catch (\Exception $e) {
+            LogService::error('NotificationController::sendEmailForOccurrence', ['error' => $e->getMessage()]);
+            LoggingMiddleware::logExit(500);
+            Response::error('Erreur serveur', null, 500);
+        }
+    }
+
+    // ------------------------------------------------------------------
     // GET /notifications/email
     // ------------------------------------------------------------------
 

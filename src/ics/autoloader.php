@@ -110,6 +110,9 @@ function registerICSRoutes() {
             },
             'caldav' => function($authService) {
                 return new \ICS\Routing\RouteHandlers\CalDAVRouteHandler($authService);
+            },
+            'notifications' => function($authService) {
+                return new \ICS\Routing\RouteHandlers\NotificationRouteHandler($authService);
             }
         ];
         
@@ -161,7 +164,8 @@ if (!registerICSRoutes()) {
         $GLOBALS['pending_route_handlers']['ics'] = [
             'calendars' => '\ICS\Routing\RouteHandlers\CalendarRouteHandler',
             'calendar' => '\ICS\Routing\RouteHandlers\CalendarRouteHandler',
-            'caldav' => '\ICS\Routing\RouteHandlers\CalDAVRouteHandler'
+            'caldav' => '\ICS\Routing\RouteHandlers\CalDAVRouteHandler',
+            'notifications' => '\ICS\Routing\RouteHandlers\NotificationRouteHandler'
         ];
         
         if (defined('APP_DEBUG') && APP_DEBUG) {
