@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(diff \"src/auth_groups/Routing/RouteHandlers/UserRouteHandler.php\" \"src/auth_groups/Routing/RouteHandlers/UserRouteHandler \\(# Name clash 2026-03-23 38yjbiC #\\).php\")"
     ]
   }
 }
