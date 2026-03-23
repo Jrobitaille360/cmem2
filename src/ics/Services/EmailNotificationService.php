@@ -1,0 +1,372 @@
+<?php
+
+namespace ICS\Services;
+
+use ICS\Models\EmailNotificationQueue;
+use AuthGroups\Services\EmailService;
+use AuthGroups\Services\LogService;
+use PDO;
+use DateTime;
+use DateTimeZone;
+use DateInterval;
+
+/**
+ * Gère la planification, l'annulation et l'envoi des notifications email
+ * liées aux événements du calendrier.
+ *
+ * Points d'entrée pour le CalendarController :
+ *   - scheduleEmailsForEvent()   → après createEvent()
+ *   - rescheduleEmailsForEvent() → après updateEvent() si notifications fournie
+ *   - cancelEmailsForEvent()     → après deleteEvent()
+ *
+ * Point d'entrée pour le cron :
+ *   - processDueNotifications()
+ */
+class EmailNotificationService
+{
+    // ------------------------------------------------------------------
+    // Planification
+    // ------------------------------------------------------------------
+
+    /**
+     * Planifie les notifications email d'un événement nouvellement créé.
+     *
+     * @param array $event   Données de l'événement (résultat de CalendarEvent::create())
+     * @param int   $userId  ID du propriétaire
+     */
+    public static function scheduleEmailsForEvent(array $event, int $userId): void
+    {
+        $notifications = self::parseNotifications($event['notifications'] ?? null);
+        if (empty($notifications)) {
+            return;
+        }
+
+        $userInfo = self::getUserNotificationInfo($userId);
+        if (!$userInfo || !$userInfo['email_notifications_enabled']) {
+            return;
+        }
+
+        $recipientEmail = $userInfo['notification_email'] ?: $userInfo['email'];
+        $timezone       = $event['timezone'] ?? 'America/Montreal';
+        $eventId        = (int)$event['id'];
+        $calendarId     = (int)$event['calendar_id'];
+
+        foreach ($notifications as $notif) {
+            if (($notif['type'] ?? '') !== 'email') {
+                continue;
+            }
+            $minutes = (int)($notif['minutes'] ?? 0);
+            if ($minutes <= 0) {
+                continue;
+            }
+
+            $fireAt = self::calcFireAt($event['start_datetime'], $timezone, $minutes);
+            if ($fireAt === null || $fireAt <= new DateTime('now', new DateTimeZone('UTC'))) {
+                // fire_at déjà passé → ignorer silencieusement (R1 à la planification)
+                continue;
+            }
+
+            $entry                = new EmailNotificationQueue();
+            $entry->userId        = $userId;
+            $entry->eventId       = $eventId;
+            $entry->calendarId    = $calendarId;
+            $entry->occurrenceKey = "{$eventId}_0_" . substr($event['start_datetime'], 0, 10);
+            $entry->fireAt        = $fireAt->format('Y-m-d H:i:s');
+            $entry->minutesBefore = $minutes;
+            $entry->recipientEmail = $recipientEmail;
+            $entry->schedule();
+        }
+    }
+
+    /**
+     * Annule les emails en attente et replanifie selon les nouvelles données.
+     * N'est appelé que si le champ `notifications` était présent dans la requête PUT.
+     *
+     * @param int   $eventId  ID de l'événement
+     * @param array $event    Données mises à jour (résultat de CalendarEvent::findById())
+     * @param int   $userId   ID du propriétaire
+     */
+    public static function rescheduleEmailsForEvent(int $eventId, array $event, int $userId): void
+    {
+        EmailNotificationQueue::cancelPendingForEvent($eventId);
+        self::scheduleEmailsForEvent($event, $userId);
+    }
+
+    /**
+     * Annule toutes les notifications en attente pour un événement supprimé. (R3)
+     */
+    public static function cancelEmailsForEvent(int $eventId): void
+    {
+        EmailNotificationQueue::cancelPendingForEvent($eventId);
+    }
+
+    // ------------------------------------------------------------------
+    // Envoi (cron)
+    // ------------------------------------------------------------------
+
+    /**
+     * Traite les notifications dues et les envoie.
+     * À appeler depuis le script cron.
+     *
+     * @param int $batchSize Nombre maximum de notifications à traiter par exécution
+     * @return array Statistiques : ['sent', 'failed', 'skipped']
+     */
+    public static function processDueNotifications(int $batchSize = 50): array
+    {
+        $stats = ['sent' => 0, 'failed' => 0, 'skipped' => 0];
+        $rows  = EmailNotificationQueue::getDueNotifications($batchSize);
+
+        if (empty($rows)) {
+            return $stats;
+        }
+
+        $emailService = new EmailService();
+
+        foreach ($rows as $row) {
+            // R4 : si l'utilisateur a désactivé ses notifications → passer
+            if (!(bool)$row['email_notifications_enabled']) {
+                $stats['skipped']++;
+                continue;
+            }
+
+            $eventData = self::loadEventData((int)$row['event_id']);
+            if (!$eventData) {
+                EmailNotificationQueue::markAttemptFailed((int)$row['id'], 'Événement introuvable');
+                $stats['failed']++;
+                continue;
+            }
+
+            $subject = self::buildSubject($eventData, (int)$row['minutes_before']);
+            $body    = self::buildBody($eventData, (int)$row['minutes_before']);
+
+            $ok = $emailService->sendEmail($row['recipient_email'], $subject, $body, false);
+
+            if ($ok) {
+                EmailNotificationQueue::markSent((int)$row['id']);
+                $stats['sent']++;
+                LogService::info('EmailNotificationService: email envoyé', [
+                    'notification_id' => $row['id'],
+                    'event_id'        => $row['event_id'],
+                    'recipient'       => $row['recipient_email'],
+                ]);
+            } else {
+                EmailNotificationQueue::markAttemptFailed(
+                    (int)$row['id'],
+                    'Échec SMTP (attempt ' . ($row['attempt_count'] + 1) . ')'
+                );
+                $stats['failed']++;
+                LogService::warning('EmailNotificationService: échec envoi email', [
+                    'notification_id' => $row['id'],
+                    'event_id'        => $row['event_id'],
+                ]);
+            }
+        }
+
+        return $stats;
+    }
+
+    // ------------------------------------------------------------------
+    // Préférences utilisateur
+    // ------------------------------------------------------------------
+
+    /**
+     * Retourne les préférences de notification d'un utilisateur.
+     */
+    public static function getPreferences(int $userId): ?array
+    {
+        $db   = self::getDb();
+        $stmt = $db->prepare(
+            "SELECT email_notifications_enabled, notification_email, email
+             FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1"
+        );
+        $stmt->execute([$userId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return null;
+        }
+        return [
+            'email_notifications_enabled' => (bool)$row['email_notifications_enabled'],
+            'notification_email'          => $row['notification_email'],
+            'account_email'               => $row['email'],
+        ];
+    }
+
+    /**
+     * Met à jour les préférences de notification d'un utilisateur.
+     *
+     * @param int        $userId
+     * @param bool|null  $enabled          null = ne pas modifier
+     * @param string|null $notificationEmail null = ne pas modifier ('' = effacer)
+     * @return array Préférences mises à jour
+     */
+    public static function updatePreferences(
+        int $userId,
+        ?bool $enabled,
+        ?string $notificationEmail
+    ): ?array {
+        $db     = self::getDb();
+        $fields = [];
+        $params = [];
+
+        if ($enabled !== null) {
+            $fields[] = 'email_notifications_enabled = ?';
+            $params[] = $enabled ? 1 : 0;
+        }
+        if ($notificationEmail !== null) {
+            $fields[] = 'notification_email = ?';
+            $params[] = ($notificationEmail === '') ? null : $notificationEmail;
+        }
+
+        if (!empty($fields)) {
+            $params[] = $userId;
+            $db->prepare(
+                "UPDATE users SET " . implode(', ', $fields) . " WHERE id = ?"
+            )->execute($params);
+        }
+
+        return self::getPreferences($userId);
+    }
+
+    // ------------------------------------------------------------------
+    // Helpers privés
+    // ------------------------------------------------------------------
+
+    /**
+     * Calcule fire_at en UTC à partir de start_datetime (dans le timezone de l'événement).
+     */
+    private static function calcFireAt(string $startDatetime, string $timezone, int $minutes): ?DateTime
+    {
+        try {
+            $tz    = new DateTimeZone($timezone);
+            $start = new DateTime($startDatetime, $tz);
+            $start->sub(new DateInterval("PT{$minutes}M"));
+            $start->setTimezone(new DateTimeZone('UTC'));
+            return $start;
+        } catch (\Exception $e) {
+            LogService::warning('EmailNotificationService: calcul fire_at échoué', [
+                'start'    => $startDatetime,
+                'timezone' => $timezone,
+                'error'    => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Décode le champ notifications (JSON ou tableau).
+     */
+    private static function parseNotifications(mixed $raw): array
+    {
+        if (empty($raw)) {
+            return [];
+        }
+        if (is_string($raw)) {
+            $decoded = json_decode($raw, true);
+            return is_array($decoded) ? $decoded : [];
+        }
+        return is_array($raw) ? $raw : [];
+    }
+
+    /**
+     * Récupère email et préférences de notification d'un utilisateur.
+     */
+    private static function getUserNotificationInfo(int $userId): ?array
+    {
+        $db   = self::getDb();
+        $stmt = $db->prepare(
+            "SELECT email, email_notifications_enabled, notification_email
+             FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1"
+        );
+        $stmt->execute([$userId]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    /**
+     * Charge les données d'un événement pour la composition de l'email.
+     */
+    private static function loadEventData(int $eventId): ?array
+    {
+        $db   = self::getDb();
+        $stmt = $db->prepare(
+            "SELECT id, title, start_datetime, end_datetime, timezone,
+                    location, meeting_link, description
+             FROM calendar_events
+             WHERE id = ? AND deleted_at IS NULL LIMIT 1"
+        );
+        $stmt->execute([$eventId]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    /**
+     * Construit le sujet de l'email (§4 spec).
+     */
+    private static function buildSubject(array $event, int $minutes): string
+    {
+        return "[CMEM] Rappel : {$event['title']} dans {$minutes} minutes";
+    }
+
+    /**
+     * Construit le corps texte de l'email (§4 spec).
+     */
+    private static function buildBody(array $event, int $minutes): string
+    {
+        $timezone = $event['timezone'] ?? 'America/Montreal';
+
+        try {
+            $tz    = new DateTimeZone($timezone);
+            $start = new DateTime($event['start_datetime'], $tz);
+            $end   = new DateTime($event['end_datetime'],   $tz);
+
+            $dateStr  = self::formatDateFr($start);
+            $timeStr  = $start->format('H:i') . ' – ' . $end->format('H:i') . " ({$timezone})";
+        } catch (\Exception $e) {
+            $dateStr = $event['start_datetime'];
+            $timeStr = $event['end_datetime'];
+        }
+
+        $body  = "Rappel pour votre événement :\n\n";
+        $body .= "  Titre  : {$event['title']}\n";
+        $body .= "  Date   : {$dateStr}\n";
+        $body .= "  Heure  : {$timeStr}\n";
+
+        if (!empty($event['location'])) {
+            $body .= "  Lieu   : {$event['location']}\n";
+        }
+        if (!empty($event['meeting_link'])) {
+            $body .= "  Lien   : {$event['meeting_link']}\n";
+        }
+        if (!empty($event['description'])) {
+            $desc  = mb_substr(strip_tags($event['description']), 0, 300);
+            $body .= "\n  Note   : {$desc}\n";
+        }
+
+        $body .= "\nCet email a été envoyé automatiquement par CMEM.\n";
+        return $body;
+    }
+
+    /**
+     * Formate une date en français lisible.
+     */
+    private static function formatDateFr(DateTime $dt): string
+    {
+        $jours  = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+        $mois   = ['','janvier','février','mars','avril','mai','juin',
+                   'juillet','août','septembre','octobre','novembre','décembre'];
+
+        $dow = (int)$dt->format('w');
+        $d   = (int)$dt->format('j');
+        $m   = (int)$dt->format('n');
+        $y   = $dt->format('Y');
+
+        return "{$jours[$dow]} {$d} {$mois[$m]} {$y}";
+    }
+
+    /**
+     * Connexion PDO partagée.
+     */
+    private static function getDb(): PDO
+    {
+        require_once __DIR__ . '/../../auth_groups/database.php';
+        return \Database::getInstance()->getConnection();
+    }
+}

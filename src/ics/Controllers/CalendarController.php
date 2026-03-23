@@ -5,6 +5,7 @@ namespace ICS\Controllers;
 use ICS\Models\Calendar;
 use ICS\Models\CalendarEvent;
 use ICS\Utils\TimezoneHelper;
+use ICS\Services\EmailNotificationService;
 use AuthGroups\Utils\Response;
 use AuthGroups\Utils\Validator;
 use AuthGroups\Utils\ColorName;
@@ -1062,6 +1063,18 @@ class CalendarController
             $event->color = $eventValidation['data']['color'] ?? null;
 
             $result = $event->create();
+
+            // Planifier les notifications email (§1.1 spec)
+            try {
+                EmailNotificationService::scheduleEmailsForEvent($result, $userId);
+            } catch (\Exception $notifEx) {
+                LogService::warning("Échec planification notifications email (création)", [
+                    'event_id' => $result['id'] ?? null,
+                    'error'    => $notifEx->getMessage(),
+                ]);
+            }
+
+
             LoggingMiddleware::logExit(201);
             Response::success('Événement créé avec succès', $result, 201);
         } catch (\Exception $e) {
@@ -1239,7 +1252,20 @@ class CalendarController
             
             // Récupérer les données mises à jour
             $updatedEvent = $event->findById($eventId);
-            
+
+            // Replanifier les notifications email si le champ `notifications` était fourni (§1.2 spec)
+            if (in_array('notifications', $updatedFields, true) && $updatedEvent) {
+                try {
+                    EmailNotificationService::rescheduleEmailsForEvent($eventId, $updatedEvent, $userId);
+                } catch (\Exception $notifEx) {
+                    LogService::warning("Échec replanification notifications email (mise à jour)", [
+                        'event_id' => $eventId,
+                        'error'    => $notifEx->getMessage(),
+                    ]);
+                }
+            }
+
+
             LogService::info("Événement mis à jour", [
                 'event_id' => $eventId,
                 'calendar_id' => $calendarId,
@@ -1299,7 +1325,18 @@ class CalendarController
             
             // Annuler toutes les occurrences de l'événement
             $cancelledCount = \ICS\Models\EventOccurrence::cancelAllForEvent($eventId);
-            
+
+            // Annuler les notifications email en attente (§1.3 spec)
+            try {
+                EmailNotificationService::cancelEmailsForEvent($eventId);
+            } catch (\Exception $notifEx) {
+                LogService::warning("Échec annulation notifications email (suppression)", [
+                    'event_id' => $eventId,
+                    'error'    => $notifEx->getMessage(),
+                ]);
+            }
+
+
             LogService::info("Événement supprimé (soft delete)", [
                 'event_id' => $eventId,
                 'calendar_id' => $calendarId,

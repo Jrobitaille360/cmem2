@@ -1,0 +1,242 @@
+<?php
+
+namespace ICS\Controllers;
+
+use ICS\Models\EmailNotificationQueue;
+use ICS\Services\EmailNotificationService;
+use AuthGroups\Services\EmailService;
+use AuthGroups\Services\LogService;
+use AuthGroups\Middleware\LoggingMiddleware;
+use AuthGroups\Utils\Response;
+
+/**
+ * Gère les endpoints du système de notifications email.
+ *
+ * Routes :
+ *   GET    /notifications/email                  → listEmailNotifications()
+ *   DELETE /notifications/email/{id}             → cancelEmailNotification()
+ *   POST   /notifications/email/test             → sendTestEmail()
+ *   GET    /users/me/notification-preferences    → getPreferences()
+ *   PUT    /users/me/notification-preferences    → updatePreferences()
+ */
+class NotificationController
+{
+    // ------------------------------------------------------------------
+    // GET /notifications/email
+    // ------------------------------------------------------------------
+
+    /**
+     * Liste les notifications email planifiées de l'utilisateur courant.
+     *
+     * Query params : status, from, to, sort  (voir spec §2.1)
+     */
+    public function listEmailNotifications(int $userId): void
+    {
+        LoggingMiddleware::logEntry();
+
+        $status = $_GET['status'] ?? 'pending';
+        $from   = $_GET['from']   ?? null;
+        $to     = $_GET['to']     ?? null;
+        $sort   = $_GET['sort']   ?? 'fire_at_asc';
+
+        // Validation status
+        $allowedStatuses = ['pending', 'sent', 'failed', 'all'];
+        if (!in_array($status, $allowedStatuses, true)) {
+            LoggingMiddleware::logExit(400);
+            Response::error('Valeur status invalide', ['status' => 'Doit être : pending, sent, failed ou all'], 400);
+            return;
+        }
+
+        // Validation sort
+        $allowedSorts = ['fire_at_asc', 'fire_at_desc'];
+        if (!in_array($sort, $allowedSorts, true)) {
+            LoggingMiddleware::logExit(400);
+            Response::error('Valeur sort invalide', ['sort' => 'Doit être : fire_at_asc ou fire_at_desc'], 400);
+            return;
+        }
+
+        // Defaults dates
+        if (!$from) {
+            $from = date('Y-m-d');
+        }
+        if (!$to) {
+            $to = date('Y-m-d', strtotime('+30 days'));
+        }
+
+        try {
+            $rows = EmailNotificationQueue::listForUser($userId, $status, $from, $to, $sort);
+            LoggingMiddleware::logExit(200);
+            Response::success('Notifications récupérées', [
+                'data'  => $rows,
+                'total' => count($rows),
+            ]);
+        } catch (\Exception $e) {
+            LogService::error('NotificationController::listEmailNotifications', ['error' => $e->getMessage()]);
+            LoggingMiddleware::logExit(500);
+            Response::error('Erreur serveur', null, 500);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // DELETE /notifications/email/{id}
+    // ------------------------------------------------------------------
+
+    /**
+     * Annule une notification email planifiée.
+     */
+    public function cancelEmailNotification(int $notificationId, int $userId): void
+    {
+        LoggingMiddleware::logEntry();
+
+        try {
+            $result = EmailNotificationQueue::cancelOne($notificationId, $userId);
+
+            switch ($result['reason'] ?? '') {
+                case 'not_found':
+                    LoggingMiddleware::logExit(404);
+                    Response::error('Notification introuvable ou déjà envoyée', null, 404);
+                    return;
+
+                case 'forbidden':
+                    LoggingMiddleware::logExit(403);
+                    Response::error('Accès refusé', null, 403);
+                    return;
+
+                case 'already_sent':
+                    LoggingMiddleware::logExit(409);
+                    Response::error(
+                        'La notification a déjà été envoyée, non annulable',
+                        ['code' => 'ALREADY_SENT'],
+                        409
+                    );
+                    return;
+            }
+
+            LoggingMiddleware::logExit(200);
+            Response::success('Notification annulée', ['message' => 'Notification annulée']);
+        } catch (\Exception $e) {
+            LogService::error('NotificationController::cancelEmailNotification', ['error' => $e->getMessage()]);
+            LoggingMiddleware::logExit(500);
+            Response::error('Erreur serveur', null, 500);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // POST /notifications/email/test
+    // ------------------------------------------------------------------
+
+    /**
+     * Envoie immédiatement un email de test (validation SMTP).
+     */
+    public function sendTestEmail(int $userId): void
+    {
+        LoggingMiddleware::logEntry();
+
+        $input = Response::getRequestParams();
+
+        // Récupère l'email cible (paramètre ou email du compte)
+        $targetEmail = null;
+        if (!empty($input['email'])) {
+            $targetEmail = trim($input['email']);
+            if (!filter_var($targetEmail, FILTER_VALIDATE_EMAIL)) {
+                LoggingMiddleware::logExit(400);
+                Response::error('Adresse email invalide', null, 400);
+                return;
+            }
+        } else {
+            $prefs = EmailNotificationService::getPreferences($userId);
+            $targetEmail = $prefs['notification_email'] ?: $prefs['account_email'];
+        }
+
+        try {
+            $emailService = new EmailService();
+            $subject = '[CMEM] Email de test — notifications';
+            $body    = "Ceci est un email de test envoyé depuis CMEM.\n\n"
+                     . "Si vous recevez ce message, votre configuration SMTP est fonctionnelle.\n";
+
+            $ok = $emailService->sendEmail($targetEmail, $subject, $body, false);
+
+            if (!$ok) {
+                LoggingMiddleware::logExit(500);
+                Response::error('Échec de l\'envoi SMTP', ['code' => 'SMTP_ERROR'], 500);
+                return;
+            }
+
+            LogService::info('NotificationController: email de test envoyé', [
+                'user_id'  => $userId,
+                'to'       => $targetEmail,
+            ]);
+            LoggingMiddleware::logExit(200);
+            Response::success("Email de test envoyé à {$targetEmail}", [
+                'message' => "Email de test envoyé à {$targetEmail}",
+            ]);
+        } catch (\Exception $e) {
+            LogService::error('NotificationController::sendTestEmail', ['error' => $e->getMessage()]);
+            LoggingMiddleware::logExit(500);
+            Response::error('Erreur serveur', null, 500);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // GET /users/me/notification-preferences
+    // ------------------------------------------------------------------
+
+    public function getPreferences(int $userId): void
+    {
+        LoggingMiddleware::logEntry();
+        try {
+            $prefs = EmailNotificationService::getPreferences($userId);
+            if (!$prefs) {
+                LoggingMiddleware::logExit(404);
+                Response::error('Utilisateur introuvable', null, 404);
+                return;
+            }
+            LoggingMiddleware::logExit(200);
+            Response::success('Préférences de notification', $prefs);
+        } catch (\Exception $e) {
+            LogService::error('NotificationController::getPreferences', ['error' => $e->getMessage()]);
+            LoggingMiddleware::logExit(500);
+            Response::error('Erreur serveur', null, 500);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // PUT /users/me/notification-preferences
+    // ------------------------------------------------------------------
+
+    public function updatePreferences(int $userId): void
+    {
+        LoggingMiddleware::logEntry();
+        $input = Response::getRequestParams();
+
+        $enabled           = isset($input['email_notifications_enabled'])
+            ? (bool)$input['email_notifications_enabled']
+            : null;
+
+        $notificationEmail = null;
+        if (array_key_exists('notification_email', $input)) {
+            $val = $input['notification_email'];
+            if ($val !== null && $val !== '' && !filter_var($val, FILTER_VALIDATE_EMAIL)) {
+                LoggingMiddleware::logExit(400);
+                Response::error('notification_email invalide', null, 400);
+                return;
+            }
+            $notificationEmail = ($val === null) ? '' : $val; // '' → effacer
+        }
+
+        try {
+            $updated = EmailNotificationService::updatePreferences($userId, $enabled, $notificationEmail);
+            if (!$updated) {
+                LoggingMiddleware::logExit(404);
+                Response::error('Utilisateur introuvable', null, 404);
+                return;
+            }
+            LoggingMiddleware::logExit(200);
+            Response::success('Préférences mises à jour', $updated);
+        } catch (\Exception $e) {
+            LogService::error('NotificationController::updatePreferences', ['error' => $e->getMessage()]);
+            LoggingMiddleware::logExit(500);
+            Response::error('Erreur serveur', null, 500);
+        }
+    }
+}

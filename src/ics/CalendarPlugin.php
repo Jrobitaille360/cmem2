@@ -7,13 +7,15 @@ use Core\PluginManager;
 use ICS\Routing\RouteHandlers\CalendarRouteHandler;
 use ICS\Routing\RouteHandlers\CalendarPublicRoute;
 use ICS\Routing\RouteHandlers\CalDAVRouteHandler;
+use ICS\Routing\RouteHandlers\NotificationRouteHandler;
 
 class CalendarPlugin implements PluginInterface
 {
     private array $config;
-    private ?CalendarRouteHandler $routeHandler = null;
-    private ?CalendarPublicRoute $publicRouteHandler = null;
-    private ?CalDAVRouteHandler $caldavRouteHandler = null;
+    private ?CalendarRouteHandler     $routeHandler = null;
+    private ?CalendarPublicRoute      $publicRouteHandler = null;
+    private ?CalDAVRouteHandler       $caldavRouteHandler = null;
+    private ?NotificationRouteHandler $notificationRouteHandler = null;
 
     /**
      * Logging sûr qui vérifie si LogService est disponible
@@ -69,9 +71,16 @@ class CalendarPlugin implements PluginInterface
                     $this->publicRouteHandler = new CalendarPublicRoute();
                 }
                 return $this->publicRouteHandler;
+            },
+            'notifications' => function($authService) {
+                if ($this->notificationRouteHandler === null) {
+                    $this->notificationRouteHandler = new NotificationRouteHandler($authService);
+                }
+                return $this->notificationRouteHandler;
             }
         ]);
-        
+
+
         // Exécuter les migrations si nécessaire
         $this->runMigrations();
         
@@ -104,6 +113,12 @@ class CalendarPlugin implements PluginInterface
                     $this->publicRouteHandler = new CalendarPublicRoute();
                 }
                 return $this->publicRouteHandler;
+            },
+            'notifications' => function($authService) {
+                if ($this->notificationRouteHandler === null) {
+                    $this->notificationRouteHandler = new NotificationRouteHandler($authService);
+                }
+                return $this->notificationRouteHandler;
             }
         ];
     }

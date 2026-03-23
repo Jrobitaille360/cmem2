@@ -59,7 +59,7 @@ Toutes les dépendances Sebastian (code coverage, assertions, etc.) :
 ## Résumé des Licences
 
 | Type de Licence | Nombre de Packages | Compatibilité MIT |
-|-----------------|-------------------|-------------------|
+| ----------------- | ------------------- | ------------------- |
 | MIT | 2 | ✅ Oui |
 | BSD-3-Clause | 28 | ✅ Oui |
 | LGPL-2.1-only | 1 | ✅ Oui (linking) |
