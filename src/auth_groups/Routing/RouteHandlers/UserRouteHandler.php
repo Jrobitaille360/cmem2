@@ -6,16 +6,26 @@ use AuthGroups\Routing\BaseRouteHandler;
 use AuthGroups\Controllers\UserController;
 use AuthGroups\Controllers\PlanController;
 use AuthGroups\Utils\Response;
+use ICS\Controllers\NotificationController;
 
 class UserRouteHandler extends BaseRouteHandler 
 {
     private UserController $controller;
     private PlanController $planController;
-    
+    private ?NotificationController $notificationController = null;
+
     public function __construct($authService) {
         parent::__construct($authService);
         $this->controller = new UserController();
         $this->planController = new PlanController();
+    }
+
+    private function getNotificationController(): NotificationController
+    {
+        if ($this->notificationController === null) {
+            $this->notificationController = new NotificationController();
+        }
+        return $this->notificationController;
     }
     
     protected function getSupportedControllers(): array {
@@ -95,6 +105,14 @@ class UserRouteHandler extends BaseRouteHandler
             ($action && ctype_digit($action) && $method === 'DELETE' && !$id) =>
                 $this->validateIdAndCall($action, fn($targetId) => 
                     $this->controller->delete($targetId, $user['user_id'], $user['role'])),
+
+            // GET /users/me/notification-preferences
+            ($action === 'me' && isset($segments[2]) && $segments[2] === 'notification-preferences' && $method === 'GET') =>
+                $this->getNotificationController()->getPreferences($user['user_id']),
+
+            // PUT /users/me/notification-preferences
+            ($action === 'me' && isset($segments[2]) && $segments[2] === 'notification-preferences' && $method === 'PUT') =>
+                $this->getNotificationController()->updatePreferences($user['user_id']),
 
             // POST /users/app/
             ($action === 'app' && $method === 'POST' && !$id) =>

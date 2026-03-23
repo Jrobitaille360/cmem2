@@ -1,3 +1,7 @@
+# Logs
+error_log
+*.log
+
 # Fichiers de configuration sensibles
 .env
 .env.auth_groups
