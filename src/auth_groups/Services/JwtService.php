@@ -123,7 +123,7 @@ class JwtService
     {
         if (!defined('JWT_SECRET') || JWT_SECRET === '') {
             throw new RuntimeException(
-                'JWT_SECRET non configuré. Ajoutez JWT_SECRET dans .env.auth_groups.'
+                'JWT_SECRET non configuré. Ajoutez JWT_SECRET dans .env.'
             );
         }
         return JWT_SECRET;

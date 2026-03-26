@@ -4,10 +4,9 @@ error_log
 
 # Fichiers de configuration sensibles
 .env
-.env.auth_groups
 .env.cmem1
 .env.local
-.env.auth_groups.journauxdebord
+.env.journauxdebord
 docs/lmdkhdg5_cmem2.sql
 
 # Credentials Google Calendar
