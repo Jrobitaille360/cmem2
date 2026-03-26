@@ -29,6 +29,7 @@ storage/
 vendor/
 # Dossiers test
 test*/
+.phpunit.result.cache
 
 # Fichiers temporaires PHP
 *.tmp
