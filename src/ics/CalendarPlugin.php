@@ -157,7 +157,7 @@ class CalendarPlugin implements PluginInterface
 
     private function runMigrations(): void
     {
-        $migrationsPath = __DIR__ . '/docs_ICS/migrations/';
+        $migrationsPath = __DIR__ . '/../../docs/docs_ICS/migrations/';
         if (is_dir($migrationsPath)) {
             // Logique de migration
             if (defined('LOG_ENABLED') && LOG_ENABLED) {
