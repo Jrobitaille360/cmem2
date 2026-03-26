@@ -12,33 +12,26 @@ abstract class BaseModel {
     use SoftDeleteTrait;
     
     protected $table;
-    protected static $db = null;
-    
+    protected $db = null;
+
     public $id;
     public $created_at;
     public $updated_at;
     public $deleted_at;
-    
+
     /**
      * Constructeur simplifié - pas d'injection de dépendance
      */
     public function __construct() {
-        // Connexion automatique via le singleton
-        if (self::$db === null) {
-            require_once __DIR__ . '/../database.php';
-            self::$db = \Database::getInstance()->getConnection();
-        }
+        require_once __DIR__ . '/../database.php';
+        $this->db = \Database::getInstance()->getConnection();
     }
-    
+
     /**
      * Getter pour la connexion DB (pour compatibilité avec le code existant)
      */
     protected function getDb(): PDO {
-        if (self::$db === null) {
-            require_once __DIR__ . '/../database.php';
-            self::$db = \Database::getInstance()->getConnection();
-        }
-        return self::$db;
+        return $this->db;
     }
     
     /**

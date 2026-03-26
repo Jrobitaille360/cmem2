@@ -23,36 +23,41 @@ class Group extends BaseModel
     public $visibility;
 
     /**
-     * Créer un nouveau groupe
+     * Créer un nouveau groupe (avec transaction)
      */
     public function create()
     {
-        $query = "INSERT INTO {$this->table} 
-         (name, description, owner_id, max_members, visibility) 
-         VALUES (:name, :description, :owner_id, :max_members, :visibility)";
+        try {
+            $this->getDb()->beginTransaction();
 
-        $stmt = $this->getDb()->prepare($query);
+            $query = "INSERT INTO {$this->table}
+                     (name, description, owner_id, max_members, visibility)
+                     VALUES (:name, :description, :owner_id, :max_members, :visibility)";
 
-        // Nettoyage des données
-        $this->name = htmlspecialchars(strip_tags($this->name));
-        $this->visibility = $this->normalizeVisibility($this->visibility);
-        $this->max_members = $this->max_members ?? 50;
+            $stmt = $this->getDb()->prepare($query);
 
-        // Liaison des paramètres
-        $stmt->bindParam(':name', $this->name);
-        $stmt->bindParam(':description', $this->description);
-        $stmt->bindParam(':owner_id', $this->owner_id);
-        $stmt->bindParam(':max_members', $this->max_members);
-        $stmt->bindParam(':visibility', $this->visibility);
-      
+            $this->visibility  = $this->normalizeVisibility($this->visibility);
+            $this->max_members = $this->max_members ?? 50;
 
-        if ($stmt->execute())
-        {
+            $stmt->bindParam(':name', $this->name);
+            $stmt->bindParam(':description', $this->description);
+            $stmt->bindParam(':owner_id', $this->owner_id);
+            $stmt->bindParam(':max_members', $this->max_members);
+            $stmt->bindParam(':visibility', $this->visibility);
+
+            if (!$stmt->execute()) {
+                $this->getDb()->rollBack();
+                return false;
+            }
+
             $this->id = $this->getDb()->lastInsertId();
+            $this->getDb()->commit();
             return true;
-        }
 
-        return false;
+        } catch (Exception $e) {
+            $this->getDb()->rollBack();
+            return false;
+        }
     }
 
     /**
@@ -71,12 +76,10 @@ class Group extends BaseModel
                  WHERE id = :id AND deleted_at IS NULL";
 
         $stmt = $this->getDb()->prepare($query);
-        
-        // Nettoyage des données
-        $name = htmlspecialchars(strip_tags($this->name));
+
         $visibility = $this->normalizeVisibility($this->visibility);
 
-        $stmt->bindParam(':name', $name);
+        $stmt->bindParam(':name', $this->name);
         $stmt->bindParam(':description', $this->description);
         $stmt->bindParam(':max_members', $this->max_members);
         $stmt->bindParam(':visibility', $visibility);
@@ -85,45 +88,19 @@ class Group extends BaseModel
         return $stmt->execute();
     }
 
+    /**
+     * Créer un groupe à partir d'un tableau d'entrée — délègue à create()
+     * Retourne l'ID du nouveau groupe, ou false en cas d'échec.
+     */
     public function create2($input, $currentUserId)
     {
+        $this->name        = $input['name'] ?? '';
+        $this->description = $input['description'] ?? '';
+        $this->max_members = $input['max_members'] ?? 50;
+        $this->visibility  = $input['visibility'] ?? 'private';
+        $this->owner_id    = $currentUserId;
 
-        try {
-            // Démarrer une transaction
-            $this->getDb()->beginTransaction();
-
-            // Créer le groupe
-            $query = "INSERT INTO {$this->table} 
-                     (name, description, owner_id, max_members, visibility) 
-                     VALUES (:name, :description, :owner_id, :max_members, :visibility)";
-
-            $stmt = $this->getDb()->prepare($query);
-
-            // Valeurs par défaut
-            $name = htmlspecialchars(strip_tags($input['name']));
-            $description = $input['description'] ?? '';
-            $max_members = $input['max_members'] ?? 50;
-            $visibility = $this->normalizeVisibility($input['visibility'] ?? 'private');
-
-            $stmt->bindParam(':name', $name);
-            $stmt->bindParam(':description', $description);
-            $stmt->bindParam(':owner_id', $currentUserId);
-            $stmt->bindParam(':max_members', $max_members);
-            $stmt->bindParam(':visibility', $visibility);
-
-            if (!$stmt->execute()) {
-                $this->getDb()->rollBack();
-                return false;
-            }
-            $groupId = $this->getDb()->lastInsertId();
-            //$this->findById($groupId);
-            $this->getDb()->commit();
-    
-            return $groupId;
-        } catch (Exception $e) {
-            $this->getDb()->rollBack();
-            return false;
-        }
+        return $this->create() ? (int) $this->id : false;
     }
 
     /**
@@ -137,9 +114,7 @@ class Group extends BaseModel
         foreach (['name', 'description', 'max_members', 'visibility'] as $field) {
             if (isset($data[$field])) {
                 $updates[] = "{$field} = :{$field}";
-                if ($field === 'name') {
-                    $params[":{$field}"] = htmlspecialchars(strip_tags($data[$field]));
-                } elseif ($field === 'visibility') {
+                if ($field === 'visibility') {
                     $params[":{$field}"] = $this->normalizeVisibility($data[$field]);
                 } else {
                     $params[":{$field}"] = $data[$field];
@@ -608,6 +583,44 @@ class Group extends BaseModel
         $stmt->bindParam(':user_id', $userId, PDO::PARAM_INT);
 
         return $stmt->execute();
+    }
+
+    /**
+     * Compter les groupes d'un utilisateur
+     */
+    public function countByUserId(int $userId): int
+    {
+        $query = "SELECT COUNT(*) as total
+                  FROM {$this->table} g
+                  INNER JOIN group_members gm ON g.id = gm.group_id
+                  WHERE gm.user_id = :user_id
+                    AND g.deleted_at IS NULL
+                    AND gm.deleted_at IS NULL";
+
+        $stmt = $this->getDb()->prepare($query);
+        $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
+        $stmt->execute();
+        return (int) $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+    }
+
+    /**
+     * Compter les groupes publics (avec filtre de recherche optionnel)
+     */
+    public function countPublic(string $searchString = ''): int
+    {
+        $query = "SELECT COUNT(*) as total FROM {$this->table}
+                  WHERE visibility = 'public' AND deleted_at IS NULL";
+
+        if (!empty($searchString)) {
+            $query .= " AND name LIKE :search";
+        }
+
+        $stmt = $this->getDb()->prepare($query);
+        if (!empty($searchString)) {
+            $stmt->bindValue(':search', "%{$searchString}%", PDO::PARAM_STR);
+        }
+        $stmt->execute();
+        return (int) $stmt->fetch(PDO::FETCH_ASSOC)['total'];
     }
 
     /**

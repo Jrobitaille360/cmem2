@@ -37,14 +37,10 @@ class User extends BaseModel {
                  VALUES (:name, :email, :password_hash, :role, :profile_image, :bio, :phone, :date_of_birth, :location, :email_verified)";
         
         $stmt = $this->getDb()->prepare($query);
-        
-        // Nettoyage des données
-        $this->name = htmlspecialchars(strip_tags($this->name));
-        $this->email = htmlspecialchars(strip_tags($this->email));
+
         $this->role = $this->role ?? 'UTILISATEUR';
         $this->email_verified = $this->email_verified ?? 0;
-        
-        // Liaison des paramètres
+
         $stmt->bindParam(':name', $this->name);
         $stmt->bindParam(':email', $this->email);
         $stmt->bindParam(':password_hash', $this->password_hash);
@@ -68,32 +64,21 @@ class User extends BaseModel {
      */
     public function findById($id, $withTrashed = false) {
         $query = "SELECT * FROM {$this->table} WHERE id = :id";
-        
+
         if (!$withTrashed) {
             $query .= " AND deleted_at IS NULL";
         }
-        
+
         $stmt = $this->getDb()->prepare($query);
         $stmt->bindParam(':id', $id, PDO::PARAM_INT);
         $stmt->execute();
         $data = $stmt->fetch(PDO::FETCH_ASSOC);
-        if(!$data) {
+
+        if (!$data) {
             return $data;
         }
-        $this->id = $data['id'] ;
-        $this->name = $data['name'] ;
-        $this->email = $data['email'] ;
-        $this->role = $data['role'] ;
-        $this->profile_image = $data['profile_image'] ;
-        $this->bio = $data['bio'];
-        $this->phone = $data['phone'] ;
-        $this->date_of_birth = $data['date_of_birth'] ;
-        $this->location = $data['location'] ;
-        $this->email_verified = $data['email_verified'] ;
-        $this->last_login = $data['last_login'] ;
-        $this->created_at = $data['created_at'] ;
-        $this->updated_at = $data['updated_at'] ;
-        $this->deleted_at = $data['deleted_at'] ;
+
+        $this->mapFromArray($data);
         return $data;
     }
 
@@ -104,25 +89,14 @@ class User extends BaseModel {
         $query = "SELECT * FROM {$this->table} WHERE email = :email AND deleted_at IS NULL";
         $stmt = $this->getDb()->prepare($query);
         $stmt->bindParam(':email', $email);
-        $stmt->execute();    
+        $stmt->execute();
         $data = $stmt->fetch(PDO::FETCH_ASSOC);
-        if(!$data) {
+
+        if (!$data) {
             return $data;
         }
-        $this->id = $data['id'] ;
-        $this->name = $data['name'] ;
-        $this->email = $data['email'] ;
-        $this->role = $data['role'] ;
-        $this->profile_image = $data['profile_image'] ;
-        $this->bio = $data['bio'];
-        $this->phone = $data['phone'] ;
-        $this->date_of_birth = $data['date_of_birth'] ;
-        $this->location = $data['location'] ;
-        $this->email_verified = $data['email_verified'] ;
-        $this->last_login = $data['last_login'] ;
-        $this->created_at = $data['created_at'] ;
-        $this->updated_at = $data['updated_at'] ;
-        $this->deleted_at = $data['deleted_at'] ;
+
+        $this->mapFromArray($data);
         return $data;
     }
 
@@ -144,12 +118,7 @@ class User extends BaseModel {
                  WHERE id = :id AND deleted_at IS NULL";
         
         $stmt = $this->getDb()->prepare($query);
-        
-        // Nettoyage des données
-        $this->name = htmlspecialchars(strip_tags($this->name));
-        $this->email = htmlspecialchars(strip_tags($this->email));
-        
-        // Liaison des paramètres
+
         $stmt->bindParam(':id', $this->id);
         $stmt->bindParam(':name', $this->name);
         $stmt->bindParam(':email', $this->email);
@@ -243,6 +212,21 @@ class User extends BaseModel {
         $stmt = $this->getDb()->query($query);
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         return (int)$result['total'];
+    }
+
+    /**
+     * Compter les utilisateurs avec filtre optionnel (miroir de getAll)
+     */
+    public function countFiltered(?string $email = null): int {
+        if ($email) {
+            $query = "SELECT COUNT(*) as total FROM {$this->table} WHERE deleted_at IS NULL AND email = :email";
+            $stmt = $this->getDb()->prepare($query);
+            $stmt->bindParam(':email', $email);
+            $stmt->execute();
+        } else {
+            $stmt = $this->getDb()->query("SELECT COUNT(*) as total FROM {$this->table} WHERE deleted_at IS NULL");
+        }
+        return (int) $stmt->fetch(PDO::FETCH_ASSOC)['total'];
     }
 
     /**

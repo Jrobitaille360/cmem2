@@ -2,6 +2,7 @@
 
 namespace AuthGroups\Services;
 
+use AuthGroups\Models\JwtBlacklist;
 use RuntimeException;
 
 /**
@@ -39,6 +40,7 @@ class JwtService
             'iss'   => defined('BASE_URL') ? BASE_URL : 'cmem2-api',
             'iat'   => $now,
             'exp'   => $now + ($expiryDays * 86400),
+            'jti'   => self::generateJti(),
             'sub'   => (int) $user['id'],
             'email' => $user['email'],
             'role'  => $user['role']  ?? 'UTILISATEUR',
@@ -92,6 +94,15 @@ class JwtService
             return null;
         }
 
+        // Vérifier la blacklist (tokens révoqués via logout)
+        if (isset($payload['jti'])) {
+            $blacklist = new JwtBlacklist();
+            if ($blacklist->isBlacklisted($payload['jti'])) {
+                LogService::warning('JWT révoqué (blacklisté)', ['jti' => $payload['jti']]);
+                return null;
+            }
+        }
+
         return $payload;
     }
 
@@ -116,6 +127,17 @@ class JwtService
             );
         }
         return JWT_SECRET;
+    }
+
+    /**
+     * Génère un UUID v4 aléatoire pour le claim jti.
+     */
+    private static function generateJti(): string
+    {
+        $bytes = random_bytes(16);
+        $bytes[6] = chr((ord($bytes[6]) & 0x0f) | 0x40); // version 4
+        $bytes[8] = chr((ord($bytes[8]) & 0x3f) | 0x80); // variant RFC 4122
+        return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($bytes), 4));
     }
 
     private static function base64UrlEncode(string $data): string

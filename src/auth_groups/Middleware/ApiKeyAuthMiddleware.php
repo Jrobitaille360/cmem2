@@ -65,15 +65,14 @@ class ApiKeyAuthMiddleware
         $rateLimit = ApiKey::checkRateLimit($keyData['id']);
         
         if (!$rateLimit['allowed']) {
-            Response::error([
+            Response::error('Limite de taux dépassée pour cette clé API', [
                 'error' => 'RATE_LIMIT_EXCEEDED',
-                'message' => 'Limite de taux dépassée pour cette clé API',
                 'limit' => $keyData['rate_limit_per_minute'],
                 'reset_at' => $rateLimit['reset_at']
-            ], 429); // Too Many Requests
+            ], 429);
             return null;
         }
-        
+
         // Ajouter les informations de rate limiting aux headers (pour info client)
         header("X-RateLimit-Remaining: " . $rateLimit['remaining']);
         header("X-RateLimit-Reset: " . $rateLimit['reset_at']);

@@ -2,8 +2,10 @@
 
 namespace AuthGroups\Controllers;
 
+use AuthGroups\Models\JwtBlacklist;
 use AuthGroups\Models\User;
 use AuthGroups\Services\JwtService;
+use AuthGroups\Services\RateLimitService;
 use AuthGroups\Services\OtpService;
 use AuthGroups\Services\DeviceTokenService;
 use AuthGroups\Services\EmailService;
@@ -46,11 +48,24 @@ class AuthController
             return;
         }
 
+        $email = strtolower(trim($input['email']));
+
+        if (!RateLimitService::check($email, 'login')) {
+            LogService::warning('Rate limit login dépassé', ['email' => $email]);
+            LoggingMiddleware::logExit(429);
+            Response::error('Trop de tentatives de connexion', [
+                'error'   => 'RATE_LIMIT_EXCEEDED',
+                'message' => 'Trop d\'échecs consécutifs. Réessayez dans ' . RATE_LIMIT_AUTH_WINDOW_MINUTES . ' minutes.',
+            ], 429);
+            return;
+        }
+
         $userModel = new User();
-        $userData  = $userModel->authenticate($input['email'], $input['password']);
+        $userData  = $userModel->authenticate($email, $input['password']);
 
         if (!$userData) {
-            LogService::warning('Connexion échouée (email/password)', ['email' => $input['email']]);
+            RateLimitService::record($email, 'login');
+            LogService::warning('Connexion échouée (email/password)', ['email' => $email]);
             LoggingMiddleware::logExit(401);
             Response::error('Email ou mot de passe incorrect', null, 401);
             return;
@@ -70,6 +85,7 @@ class AuthController
             return;
         }
 
+        RateLimitService::clear($email, 'login');
         $this->issueToken($userData, 'email/password');
     }
 
@@ -93,7 +109,20 @@ class AuthController
             return;
         }
 
-        $email     = strtolower(trim($input['email']));
+        $email = strtolower(trim($input['email']));
+
+        if (!RateLimitService::check($email, 'send-code')) {
+            LogService::warning('Rate limit send-code dépassé', ['email' => $email]);
+            LoggingMiddleware::logExit(429);
+            Response::error('Trop de demandes de code', [
+                'error'   => 'RATE_LIMIT_EXCEEDED',
+                'message' => 'Trop de demandes consécutives. Réessayez dans ' . RATE_LIMIT_AUTH_WINDOW_MINUTES . ' minutes.',
+            ], 429);
+            return;
+        }
+
+        RateLimitService::record($email, 'send-code');
+
         $userModel = new User();
         $userData  = $userModel->findByEmail($email);
 
@@ -231,17 +260,28 @@ class AuthController
         $token     = JwtService::generate($userData);
         $expiresAt = JwtService::getExpiresAt();
 
-        LogService::info('JWT renouvelé via device token', [
+        // A3 — Rotation du device token : invalider l'ancien, émettre le nouveau.
+        // Le client DOIT remplacer son device_token par la nouvelle valeur retournée.
+        $newDeviceToken = DeviceTokenService::generate(
+            (int) $record['user_id'],
+            trim($input['device_id']),
+            $record['device_name']
+        );
+
+        LogService::info('JWT renouvelé via device token (token rotaté)', [
             'user_id'   => $userData['id'],
             'device_id' => $input['device_id'],
         ]);
 
         LoggingMiddleware::logExit(200);
         Response::success('Token renouvelé', [
-            'token'      => $token,
-            'token_type' => 'Bearer',
-            'expires_at' => $expiresAt,
-            'user'       => [
+            'token'        => $token,
+            'token_type'   => 'Bearer',
+            'expires_at'   => $expiresAt,
+            'device_token' => $newDeviceToken,
+            'device_id'    => trim($input['device_id']),
+            'device_note'  => 'Remplacez votre device_token par cette nouvelle valeur.',
+            'user'         => [
                 'id'    => $userData['id'],
                 'name'  => $userData['name'],
                 'email' => $userData['email'],
@@ -283,16 +323,53 @@ class AuthController
     }
 
     // -----------------------------------------------------------------------
-    // POST /auth/logout  (JWT requis, appelé depuis AuthRouteHandler)
+    // GET /auth/me  (JWT requis)
     // -----------------------------------------------------------------------
 
-    public function logout(int $userId): void
+    /**
+     * Retourne le profil de l'utilisateur authentifié (données fraîches depuis la DB).
+     */
+    public function me(int $userId): void
     {
         LoggingMiddleware::logEntry();
 
+        $user = new User();
+        $data = $user->findById($userId);
+
+        if (!$data) {
+            LogService::warning('GET /auth/me — utilisateur introuvable', ['user_id' => $userId]);
+            LoggingMiddleware::logExit(404);
+            Response::error('Utilisateur introuvable', null, 404);
+            return;
+        }
+
+        unset($data['password_hash']);
+
+        LoggingMiddleware::logExit(200);
+        Response::success('Profil utilisateur', ['user' => $data]);
+    }
+
+    // -----------------------------------------------------------------------
+    // POST /auth/logout  (JWT requis, appelé depuis AuthRouteHandler)
+    // -----------------------------------------------------------------------
+
+    public function logout(int $userId, ?string $jti = null, ?int $tokenExp = null): void
+    {
+        LoggingMiddleware::logEntry();
+
+        // Blacklister le token JWT actuel pour invalider immédiatement la session
+        if ($jti !== null) {
+            $expiresAt = $tokenExp
+                ? date('Y-m-d H:i:s', $tokenExp)
+                : date('Y-m-d H:i:s', time() + 60); // fallback : 1 min si exp absent
+
+            $blacklist = new JwtBlacklist();
+            $blacklist->add($jti, $userId, $expiresAt);
+        }
+
         UserSessionService::endAllUserSessions($userId);
 
-        LogService::info('Déconnexion', ['user_id' => $userId]);
+        LogService::info('Déconnexion', ['user_id' => $userId, 'jti' => $jti]);
         LoggingMiddleware::logExit(200);
         Response::success('Déconnexion réussie', [
             'message' => 'Token JWT révoqué côté serveur. Supprimez-le côté client.',

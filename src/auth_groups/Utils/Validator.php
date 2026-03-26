@@ -5,215 +5,212 @@ namespace AuthGroups\Utils;
 use AuthGroups\Utils\ColorName;
 
 class Validator {
-    
-    public static  $errors = [];
-    
+
     /**
      * Valider des données selon des règles
      */
-    public static  function validate($data, $rules): array {
-        self::$errors = [];
-        
+    public static function validate($data, $rules): array {
+        $errors = [];
+
         foreach ($rules as $field => $ruleString) {
             $fieldRules = explode('|', $ruleString);
             $value = $data[$field] ?? null;
-            
+
             foreach ($fieldRules as $rule) {
-                self::applyRule($field, $value, $rule, $data);
+                self::applyRule($field, $value, $rule, $data, $errors);
             }
         }
-        
+
         return [
-            'valid' => empty(self::$errors),
-            'errors' => self::$errors
+            'valid' => empty($errors),
+            'errors' => $errors
         ];
     }
     
     /**
      * Appliquer une règle de validation
      */
-        private static  function applyRule($field, $value, $rule, $allData) {
+    private static function applyRule($field, $value, $rule, $allData, array &$errors): void {
         $parts = explode(':', $rule, 2);
         $ruleName = $parts[0];
         $parameter = $parts[1] ?? null;
         
         switch ($ruleName) {
             case 'required':
-                if (empty($value) && $value !== '0' && $value !== 0) {
-                    self::addError($field, "Le champ {$field} est requis");
+                if (!isset($value) || $value === '') {
+                    self::addError($field, "Le champ {$field} est requis", $errors);
                 }
                 break;
                 
             case 'string':
                 if ($value !== null && !is_string($value)) {
-                    self::addError($field, "Le champ {$field} doit être une chaîne de caractères");
+                    self::addError($field, "Le champ {$field} doit être une chaîne de caractères", $errors);
                 }
                 break;
-                
+
             case 'email':
                 if ($value !== null && !filter_var($value, FILTER_VALIDATE_EMAIL)) {
-                    self::addError($field, "Le champ {$field} doit être un email valide");
+                    self::addError($field, "Le champ {$field} doit être un email valide", $errors);
                 }
                 break;
-                
+
             case 'min':
                 if ($value !== null) {
                     $length = is_string($value) ? strlen($value) : $value;
                     if ($length < (int)$parameter) {
-                        self::addError($field, "Le champ {$field} doit avoir au minimum {$parameter} caractères");
+                        self::addError($field, "Le champ {$field} doit avoir au minimum {$parameter} caractères", $errors);
                     }
                 }
                 break;
-                
+
             case 'max':
                 if ($value !== null) {
                     $length = is_string($value) ? strlen($value) : $value;
                     if ($length > (int)$parameter) {
-                        self::addError($field, "Le champ {$field} doit avoir au maximum {$parameter} caractères");
+                        self::addError($field, "Le champ {$field} doit avoir au maximum {$parameter} caractères", $errors);
                     }
                 }
                 break;
-                
+
             case 'integer':
                 if ($value !== null && !filter_var($value, FILTER_VALIDATE_INT)) {
-                    self::addError($field, "Le champ {$field} doit être un entier");
+                    self::addError($field, "Le champ {$field} doit être un entier", $errors);
                 }
                 break;
-                
+
             case 'numeric':
                 if ($value !== null && !is_numeric($value)) {
-                    self::addError($field, "Le champ {$field} doit être numérique");
+                    self::addError($field, "Le champ {$field} doit être numérique", $errors);
                 }
                 break;
-                
+
             case 'boolean':
                 if ($value !== null && !is_bool($value) && !in_array($value, [0, 1, '0', '1', 'true', 'false'])) {
-                    self::addError($field, "Le champ {$field} doit être un booléen");
+                    self::addError($field, "Le champ {$field} doit être un booléen", $errors);
                 }
                 break;
-                
+
             case 'date':
                 if ($value !== null && !self::isValidDate($value)) {
-                    self::addError($field, "Le champ {$field} doit être une date valide (YYYY-MM-DD)");
+                    self::addError($field, "Le champ {$field} doit être une date valide (YYYY-MM-DD)", $errors);
                 }
                 break;
-                
+
             case 'datetime':
                 if ($value !== null && !self::isValidDateTime($value)) {
-                    self::addError($field, "Le champ {$field} doit être une date/heure valide (YYYY-MM-DD HH:MM:SS)");
+                    self::addError($field, "Le champ {$field} doit être une date/heure valide (YYYY-MM-DD HH:MM:SS)", $errors);
                 }
                 break;
+
             case 'date_or_datetime':
                 if ($value !== null && !self::isValidDate($value) && !self::isValidDateTime($value)) {
-                    self::addError($field, "Le champ {$field} doit être une date ou une date/heure valide");
-                }
-                break;    
-            case 'url':
-                if ($value !== null && !filter_var($value, FILTER_VALIDATE_URL)) {
-                    self::addError($field, "Le champ {$field} doit être une URL valide");
+                    self::addError($field, "Le champ {$field} doit être une date ou une date/heure valide", $errors);
                 }
                 break;
-                
+
+            case 'url':
+                if ($value !== null && !filter_var($value, FILTER_VALIDATE_URL)) {
+                    self::addError($field, "Le champ {$field} doit être une URL valide", $errors);
+                }
+                break;
+
             case 'in':
                 if ($value !== null) {
                     $allowedValues = explode(',', $parameter);
                     if (!in_array($value, $allowedValues)) {
-                        self::addError($field, "Le champ {$field} doit être l'une des valeurs suivantes: " . implode(', ', $allowedValues));
+                        self::addError($field, "Le champ {$field} doit être l'une des valeurs suivantes: " . implode(', ', $allowedValues), $errors);
                     }
                 }
                 break;
-                
+
             case 'unique':
                 // Cette règle nécessiterait une connexion à la base de données
-                // Elle pourrait être implémentée si nécessaire
                 break;
-                
+
             case 'confirmed':
                 $confirmField = $field . '_confirmation';
                 if ($value !== ($allData[$confirmField] ?? null)) {
-                    self::addError($field, "Le champ {$field} et sa confirmation ne correspondent pas");
+                    self::addError($field, "Le champ {$field} et sa confirmation ne correspondent pas", $errors);
                 }
                 break;
-                
+
             case 'array':
                 if ($value !== null && !is_array($value)) {
-                    self::addError($field, "Le champ {$field} doit être un tableau");
+                    self::addError($field, "Le champ {$field} doit être un tableau", $errors);
                 }
                 break;
-                
+
             case 'json':
                 if ($value !== null && json_decode($value) === null && json_last_error() !== JSON_ERROR_NONE) {
-                    self::addError($field, "Le champ {$field} doit être un JSON valide");
+                    self::addError($field, "Le champ {$field} doit être un JSON valide", $errors);
                 }
                 break;
-                
+
             case 'alpha':
                 if ($value !== null && !ctype_alpha($value)) {
-                    self::addError($field, "Le champ {$field} ne doit contenir que des lettres");
+                    self::addError($field, "Le champ {$field} ne doit contenir que des lettres", $errors);
                 }
                 break;
-                
+
             case 'alpha_num':
                 if ($value !== null && !ctype_alnum($value)) {
-                    self::addError($field, "Le champ {$field} ne doit contenir que des lettres et des chiffres");
+                    self::addError($field, "Le champ {$field} ne doit contenir que des lettres et des chiffres", $errors);
                 }
                 break;
-                
+
             case 'regex':
                 if ($value !== null && !preg_match($parameter, $value)) {
-                    self::addError($field, "Le champ {$field} ne correspond pas au format requis");
+                    self::addError($field, "Le champ {$field} ne correspond pas au format requis", $errors);
                 }
                 break;
-                
+
             case 'file':
                 if ($value !== null && !is_uploaded_file($value['tmp_name'] ?? '')) {
-                    self::addError($field, "Le champ {$field} doit être un fichier valide");
+                    self::addError($field, "Le champ {$field} doit être un fichier valide", $errors);
                 }
                 break;
-                
+
             case 'image':
                 if ($value !== null) {
                     $allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
                     $mimeType = $value['type'] ?? '';
                     if (!in_array($mimeType, $allowedMimes)) {
-                        self::addError($field, "Le champ {$field} doit être une image valide (JPEG, PNG, GIF, WebP)");
+                        self::addError($field, "Le champ {$field} doit être une image valide (JPEG, PNG, GIF, WebP)", $errors);
                     }
                 }
                 break;
-                
+
             case 'max_size':
                 if ($value !== null && isset($value['size'])) {
                     $maxSize = self::parseSize($parameter);
                     if ($value['size'] > $maxSize) {
-                        self::addError($field, "Le fichier {$field} ne doit pas dépasser " . self::formatSize($maxSize));
+                        self::addError($field, "Le fichier {$field} ne doit pas dépasser " . self::formatSize($maxSize), $errors);
                     }
                 }
                 break;
-                
+
             case 'color':
-                // Valide une couleur (hex, nom, RGB, HSL, etc.)
                 if ($value !== null && !self::validateColor($value)) {
-                    self::addError($field, "Le champ {$field} doit être une couleur valide (ex: #RRGGBB, RED, rgb(255,0,0), hsl(120,50%,50%))");
+                    self::addError($field, "Le champ {$field} doit être une couleur valide (ex: #RRGGBB, RED, rgb(255,0,0), hsl(120,50%,50%))", $errors);
                 }
                 break;
-                
+
             case 'hex_color':
-                // Valide uniquement le format hexadécimal
                 if ($value !== null && !self::validateHexColor($value)) {
-                    self::addError($field, "Le champ {$field} doit être une couleur hexadécimale valide (#RRGGBB)");
+                    self::addError($field, "Le champ {$field} doit être une couleur hexadécimale valide (#RRGGBB)", $errors);
                 }
                 break;
         }
     }
-    
+
     /**
      * Ajouter une erreur
      */
-    private static function addError($field, $message) {
-        if (!isset(self::$errors[$field])) {
-            self::$errors[$field] = [];
+    private static function addError(string $field, string $message, array &$errors): void {
+        if (!isset($errors[$field])) {
+            $errors[$field] = [];
         }
-        self::$errors[$field][] = $message;
+        $errors[$field][] = $message;
     }
     
     /**

@@ -31,66 +31,48 @@ class Router
 
     private function initializeRouteHandlers(): void {
         $this->publicHandler = new PublicRouteHandler();
+
+        // D1 — factory closures : le handler n'est instancié qu'à l'usage
+        $auth = $this->authService;
         $this->routeHandlers = [
-            'auth'         => new AuthRouteHandler(),
-            'users'        => new UserRouteHandler($this->authService),
-            'groups'       => new GroupRouteHandler($this->authService),
-            'tags'         => new TagRouteHandler($this->authService),
-            'files'        => new FileRouteHandler($this->authService),
-            'stats'        => new StatsRouteHandler($this->authService),
-            'secret-admin' => new SecretAdminRouteHandler(),
-            'plans'        => new PlanRouteHandler($this->authService)
+            'auth'         => fn() => new AuthRouteHandler(),
+            'users'        => fn() => new UserRouteHandler($auth),
+            'groups'       => fn() => new GroupRouteHandler($auth),
+            'tags'         => fn() => new TagRouteHandler($auth),
+            'files'        => fn() => new FileRouteHandler($auth),
+            'stats'        => fn() => new StatsRouteHandler($auth),
+            'secret-admin' => fn() => new SecretAdminRouteHandler(),
+            'plans'        => fn() => new PlanRouteHandler($auth)
         ];
-        
-        // Intégrer les route handlers des plugins
+
         $this->loadPluginRouteHandlers();
     }
     
     /**
-     * Charge les route handlers des plugins via le PluginManager
+     * Charge les route handlers des plugins via le PluginManager.
+     * Les factories reçoivent $authService en argument.
      */
     private function loadPluginRouteHandlers(): void {
         try {
-            // Essayer de charger via le PluginManager
-            if (isset($GLOBALS['plugin_manager'])) {
-                $pluginManager = $GLOBALS['plugin_manager'];
-                $pluginRoutes = $pluginManager->getPluginRouteHandlers();
-                
-                foreach ($pluginRoutes as $route => $handlerFactory) {
-                    if (is_callable($handlerFactory)) {
-                        $this->routeHandlers[$route] = $handlerFactory($this->authService);
-                    }
-                }
-                
-                if (!empty($pluginRoutes) && defined('APP_DEBUG') && APP_DEBUG) {
-                    LogService::info("Routes de plugins chargées", [
-                        'routes' => array_keys($pluginRoutes)
-                    ]);
+            if (!isset($GLOBALS['plugin_manager'])) {
+                return;
+            }
+
+            $pluginRoutes = $GLOBALS['plugin_manager']->getPluginRouteHandlers();
+
+            foreach ($pluginRoutes as $route => $handlerFactory) {
+                if (is_callable($handlerFactory)) {
+                    $auth = $this->authService;
+                    $this->routeHandlers[$route] = fn() => $handlerFactory($auth);
                 }
             }
-            
-            // Charger les routes en attente depuis les globals
-            if (isset($GLOBALS['pending_route_handlers'])) {
-                foreach ($GLOBALS['pending_route_handlers'] as $pluginName => $routes) {
-                    foreach ($routes as $route => $handlerClass) {
-                        if (class_exists($handlerClass)) {
-                            $this->routeHandlers[$route] = new $handlerClass($this->authService);
-                            
-                            if (defined('APP_DEBUG') && APP_DEBUG) {
-                                LogService::info("Route de plugin chargée", [
-                                    'plugin' => $pluginName,
-                                    'route' => $route,
-                                    'handler' => $handlerClass
-                                ]);
-                            }
-                        }
-                    }
-                }
-                
-                // Nettoyer les routes en attente après chargement
-                unset($GLOBALS['pending_route_handlers']);
+
+            if (!empty($pluginRoutes) && defined('APP_DEBUG') && APP_DEBUG) {
+                LogService::info("Routes de plugins chargées", [
+                    'routes' => array_keys($pluginRoutes)
+                ]);
             }
-            
+
         } catch (Exception $e) {
             LogService::warning("Erreur lors du chargement des routes de plugins", [
                 'error' => $e->getMessage()
@@ -102,16 +84,20 @@ class Router
      * Méthode publique pour ajouter un route handler (pour l'intégration directe)
      */
     public function addRouteHandler(string $route, $handler): void {
+        $auth = $this->authService;
+
         if (is_string($handler) && class_exists($handler)) {
-            $this->routeHandlers[$route] = new $handler($this->authService);
+            $this->routeHandlers[$route] = fn() => new $handler($auth);
+        } elseif (is_callable($handler)) {
+            $this->routeHandlers[$route] = fn() => $handler($auth);
         } elseif (is_object($handler)) {
-            $this->routeHandlers[$route] = $handler;
+            $this->routeHandlers[$route] = fn() => $handler;
         }
-        
+
         if (defined('APP_DEBUG') && APP_DEBUG) {
             LogService::info("Route handler ajouté", [
-                'route' => $route,
-                'handler' => is_string($handler) ? $handler : get_class($handler)
+                'route'   => $route,
+                'handler' => is_string($handler) ? $handler : (is_object($handler) ? get_class($handler) : 'callable')
             ]);
         }
     }
@@ -134,15 +120,15 @@ class Router
 
             // Essayer les autres handlers
             $controller = $request['controller'];
-            $handler = $this->routeHandlers[$controller] ?? null;
+            $factory    = $this->routeHandlers[$controller] ?? null;
 
-            if (!$handler) {
+            if (!$factory) {
                 LogService::warning('Endpoint non trouvé', $request);
                 Response::error('Endpoint non trouvé', null, 404);
                 return;
             }
 
-            $handler->handle($request);
+            $factory()->handle($request);
 
         } catch (Exception $e) {
             LogService::error('Erreur dans Router', [
@@ -160,7 +146,7 @@ class Router
         
         // Nettoyer l'URI - s'assurer que $uri n'est pas null
         $uri = $uri ?? '';
-        $uri = str_replace('/cmem2_API', '', $uri);
+        $uri = str_replace(defined('BASE_PATH') ? BASE_PATH : '/cmem2_API', '', $uri);
         $uri = str_replace('/index.php', '', $uri);
         $uri = trim($uri, '/');
         

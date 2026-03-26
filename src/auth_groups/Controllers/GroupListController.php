@@ -34,19 +34,23 @@ class GroupListController
             
             $pagination = Response::getPaginationParams();
             
-            $group = new Group(); // Instantiation simplifiée !
-            $groups = $group->getByUserId($userId, $pagination['limit'], ($pagination['page'] - 1) * $pagination['limit']);
-            
+            $group   = new Group();
+            $perPage = $pagination['limit'];
+            $groups  = $group->getByUserId($userId, $perPage, ($pagination['page'] - 1) * $perPage);
+            $total   = $group->countByUserId((int) $userId);
+
             LogService::info("Groupes utilisateur récupérés", [
-                'user_id' => $userId,
+                'user_id'      => $userId,
                 'groups_count' => count($groups),
-                'page' => $pagination['page']
+                'page'         => $pagination['page']
             ]);
             $data = [
-                'groups' => $groups,
-                'page' => $pagination['page'],
-                'limit' => $pagination['limit'],
-                'user_id' => $userId
+                'groups'      => $groups,
+                'total'       => $total,
+                'page'        => $pagination['page'],
+                'per_page'    => $perPage,
+                'total_pages' => (int) ceil($total / $perPage),
+                'user_id'     => $userId
             ];
 
             LoggingMiddleware::logExit(200);
@@ -69,20 +73,26 @@ class GroupListController
     public function getPublicGroups() {
         try {
             LoggingMiddleware::logEntry();          
-            $pagination = Response::getPaginationParams();
-            $group = new Group();
-            $params = Response::getRequestParams();
+            $pagination   = Response::getPaginationParams();
+            $params       = Response::getRequestParams();
             $searchString = $params['q'] ?? '';
-            $groups = $group->getPublicGroups($searchString,$pagination['limit'], ($pagination['page'] - 1) * $pagination['limit']);
+            $group        = new Group();
+            $perPage      = $pagination['limit'];
+            $groups       = $group->getPublicGroups($searchString, $perPage, ($pagination['page'] - 1) * $perPage);
+            $total        = $group->countPublic($searchString);
+
             LogService::info("Groupes publics récupérés", [
                 'groups_count' => count($groups),
-                'page' => $pagination['page']
-            ]);            
+                'page'         => $pagination['page']
+            ]);
             LoggingMiddleware::logExit(200);
-            $data = ['groups' => $groups,
-                     'page' => $pagination['page'],
-                     'limit' => $pagination['limit']];
-            Response::success("Groupes publics récupérés",$data);
+            Response::success("Groupes publics récupérés", [
+                'groups'      => $groups,
+                'total'       => $total,
+                'page'        => $pagination['page'],
+                'per_page'    => $perPage,
+                'total_pages' => (int) ceil($total / $perPage)
+            ]);
             return true;
         } catch (Exception $e) {
             LogService::error("Erreur lors de la récupération des groupes publics", [

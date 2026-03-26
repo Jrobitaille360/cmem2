@@ -8,6 +8,7 @@ error_log
 .env.cmem1
 .env.local
 .env.auth_groups.journauxdebord
+docs/lmdkhdg5_cmem2.sql
 
 # Credentials Google Calendar
 src/ics/credentials.json

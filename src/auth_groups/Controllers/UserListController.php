@@ -40,22 +40,24 @@ class UserListController {
                 'limit' => 'optional|integer|min:1|max:100'
             ]);
             $pagination = Response::getPaginationParams();            
-            $user = new User(); // Instantiation simplifiée !
-            $users = $user->getAll($pagination['limit'], ($pagination['page'] - 1) * $pagination['limit'], $input['email'] ?? null);            
-            // Compter le total
-            $total = $user->count();            
+            $email  = $input['email'] ?? null;
+            $user   = new User();
+            $users  = $user->getAll($pagination['limit'], ($pagination['page'] - 1) * $pagination['limit'], $email);
+            $total  = $user->countFiltered($email);
+            $perPage = $pagination['limit'];
+
             LogService::info("Liste des utilisateurs récupérée avec succès", [
                 'total_users' => $total,
                 'page' => $pagination['page'],
-                'limit' => $pagination['limit']
-            ]);            
+                'per_page' => $perPage
+            ]);
             LoggingMiddleware::logExit(200);
             Response::success('Liste des utilisateurs', [
-                'users' => $users,
-                'total' => $total,
-                'page' => $pagination['page'],
-                'limit' => $pagination['limit'],
-                'total_pages' => ceil($total / $pagination['limit'])
+                'users'       => $users,
+                'total'       => $total,
+                'page'        => $pagination['page'],
+                'per_page'    => $perPage,
+                'total_pages' => (int) ceil($total / $perPage)
             ]);
             return true;            
         } catch (Exception $e) {

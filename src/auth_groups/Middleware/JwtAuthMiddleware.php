@@ -45,6 +45,8 @@ class JwtAuthMiddleware
             'email'     => $payload['email'],
             'role'      => $payload['role'],
             'name'      => $payload['name'] ?? '',
+            'jti'       => $payload['jti']  ?? null,
+            'exp'       => $payload['exp']  ?? null,
             'auth_type' => 'jwt',
         ];
     }

@@ -15,7 +15,10 @@ use AuthGroups\Utils\Response;
  *   POST /auth/send-code
  *   POST /auth/verify-code
  *
- * Route protégée (JWT requis) :
+ * Routes protégées (JWT requis) :
+ *   GET  /auth/me
+ *   GET  /auth/devices
+ *   DELETE /auth/devices/{device_id}
  *   POST /auth/logout
  */
 class AuthRouteHandler extends BaseRouteHandler
@@ -58,6 +61,10 @@ class AuthRouteHandler extends BaseRouteHandler
             ($action === 'refresh' && $method === 'POST') =>
                 $this->controller->refresh(),
 
+            // GET /auth/me  (JWT requis)
+            ($action === 'me' && $method === 'GET') =>
+                $this->withAuth(fn($user) => $this->controller->me($user['user_id'])),
+
             // GET /auth/devices  (JWT requis)
             ($action === 'devices' && $method === 'GET' && !isset($segments[2])) =>
                 $this->withAuth(fn($user) => $this->controller->listDevices($user['user_id'])),
@@ -68,7 +75,11 @@ class AuthRouteHandler extends BaseRouteHandler
 
             // POST /auth/logout  (JWT obligatoire)
             ($action === 'logout' && $method === 'POST') =>
-                $this->withAuth(fn($user) => $this->controller->logout($user['user_id'])),
+                $this->withAuth(fn($user) => $this->controller->logout(
+                    $user['user_id'],
+                    $user['jti']  ?? null,
+                    $user['exp']  ?? null
+                )),
 
             default => Response::error('Route d\'authentification non trouvée', null, 404)
         };

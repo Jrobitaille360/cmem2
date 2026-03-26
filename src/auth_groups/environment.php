@@ -54,7 +54,8 @@ define('APP_VERSION', $_ENV['APP_VERSION'] ?? '2.0.0');
 
 // Configuration de l'API
 define('API_VERSION', 'v1');
-define('BASE_URL', $_ENV['BASE_URL'] ?? (APP_ENV === 'production' ? 'https://cmem1.journauxdebord.com' : 'http://localhost'));
+define('BASE_URL',  $_ENV['BASE_URL']  ?? (APP_ENV === 'production' ? 'https://cmem1.journauxdebord.com' : 'http://localhost'));
+define('BASE_PATH', $_ENV['BASE_PATH'] ?? '/cmem2_API');
 
 // Charger les configurations de plugins en attente maintenant que BASE_URL est définie
 if (isset($GLOBALS['pending_config_loads'])) {
@@ -244,6 +245,12 @@ define('REQUIRE_EMAIL_VERIFICATION', filter_var($_ENV['REQUIRE_EMAIL_VERIFICATIO
 // Configuration des sessions utilisateur
 define('MAX_CONCURRENT_SESSIONS', (int)($_ENV['MAX_CONCURRENT_SESSIONS'] ?? 5));
 define('SESSION_TIMEOUT', (int)($_ENV['SESSION_TIMEOUT'] ?? 3600)); // 1 heure par défaut
+
+// ============================================
+// RATE LIMITING — Authentification
+// ============================================
+define('RATE_LIMIT_AUTH_MAX_ATTEMPTS',   (int)($_ENV['RATE_LIMIT_AUTH_MAX_ATTEMPTS']   ?? 5));
+define('RATE_LIMIT_AUTH_WINDOW_MINUTES', (int)($_ENV['RATE_LIMIT_AUTH_WINDOW_MINUTES'] ?? 10));
 
 // ============================================
 // JWT - JSON Web Tokens
