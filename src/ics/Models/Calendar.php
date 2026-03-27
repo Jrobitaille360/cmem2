@@ -3,7 +3,8 @@
 namespace ICS\Models;
 
 use AuthGroups\Models\BaseModel;
-use ICS\Utils\TimezoneHelper;
+use ICS\Utils\IcsGenerator;
+use ICS\Utils\IcsParser;
 use PDO;
 
 class Calendar extends BaseModel
@@ -238,81 +239,7 @@ class Calendar extends BaseModel
     
     public static function generateIcsContent($calendar, $events): string
     {
-        $timezone = $calendar['timezone'] ?? 'America/Montreal';
-        
-        $ics = "BEGIN:VCALENDAR\r\n";
-        $ics .= "VERSION:2.0\r\n";
-        $ics .= "PRODID:-//CMEM Calendar//FR\r\n";
-        $ics .= "CALSCALE:GREGORIAN\r\n";
-        $ics .= "X-WR-CALNAME:" . TimezoneHelper::escapeIcsText($calendar['title']) . "\r\n";
-        
-        if (!empty($calendar['description'])) {
-            $ics .= "X-WR-CALDESC:" . TimezoneHelper::escapeIcsText($calendar['description']) . "\r\n";
-        }
-        
-        $ics .= "X-WR-TIMEZONE:" . $timezone . "\r\n";
-        
-        // Ajouter le bloc VTIMEZONE complet
-        $ics .= TimezoneHelper::generateVTimezone($timezone);
-        
-        foreach ($events as $event) {
-            $ics .= self::generateEventIcs($event, $timezone);
-        }
-        
-        $ics .= "END:VCALENDAR\r\n";
-        
-        return $ics;
-    }
-    
-    private static function generateEventIcs($event, $calendarTimezone = 'America/Montreal'): string
-    {
-        $eventIcs = "BEGIN:VEVENT\r\n";
-        $eventIcs .= "UID:event-" . $event['id'] . "@cmem-calendar.local\r\n";
-        
-        // Dates - Utiliser TimezoneHelper pour conversion correcte
-        if ($event['all_day']) {
-            // Pour les événements toute la journée, utiliser VALUE=DATE
-            $eventIcs .= "DTSTART;VALUE=DATE:" . date('Ymd', strtotime($event['start_datetime'])) . "\r\n";
-            $eventIcs .= "DTEND;VALUE=DATE:" . date('Ymd', strtotime($event['end_datetime'] . ' +1 day')) . "\r\n";
-        } else {
-            // Pour les événements avec heure, convertir en UTC
-            $eventIcs .= "DTSTART:" . TimezoneHelper::toICalDateTimeUTC($event['start_datetime'], $calendarTimezone) . "\r\n";
-            $eventIcs .= "DTEND:" . TimezoneHelper::toICalDateTimeUTC($event['end_datetime'], $calendarTimezone) . "\r\n";
-        }
-        
-        $eventIcs .= "SUMMARY:" . TimezoneHelper::escapeIcsText($event['title']) . "\r\n";
-        
-        if (!empty($event['description'])) {
-            $eventIcs .= "DESCRIPTION:" . TimezoneHelper::escapeIcsText($event['description']) . "\r\n";
-        }
-        
-        if (!empty($event['location'])) {
-            $eventIcs .= "LOCATION:" . TimezoneHelper::escapeIcsText($event['location']) . "\r\n";
-        }
-        
-        // Participants
-        if (!empty($event['attendees'])) {
-            $attendees = json_decode($event['attendees'], true);
-            if (is_array($attendees)) {
-                foreach ($attendees as $attendee) {
-                    $eventIcs .= "ATTENDEE:mailto:" . $attendee['email'] . "\r\n";
-                }
-            }
-        }
-        
-        // Règle de récurrence
-        if (!empty($event['recurrence_rule'])) {
-            $eventIcs .= "RRULE:" . $event['recurrence_rule'] . "\r\n";
-        }
-        
-        $eventIcs .= "STATUS:" . strtoupper($event['status']) . "\r\n";
-        $eventIcs .= "CREATED:" . TimezoneHelper::toICalDateTimeUTC($event['created_at'], $calendarTimezone) . "\r\n";
-        $eventIcs .= "LAST-MODIFIED:" . TimezoneHelper::toICalDateTimeUTC($event['updated_at'], $calendarTimezone) . "\r\n";
-        $eventIcs .= "DTSTAMP:" . gmdate('Ymd\THis\Z') . "\r\n";
-        
-        $eventIcs .= "END:VEVENT\r\n";
-        
-        return $eventIcs;
+        return IcsGenerator::generateCalendar($calendar, $events);
     }
     
     private static function generateIcsUrl($shareToken): string
@@ -521,19 +448,6 @@ class Calendar extends BaseModel
      */
     private static function parseIcsCalendarProperties(string $icsContent): array
     {
-        $properties = [];
-        $lines = explode("\n", str_replace("\r", "", $icsContent));
-
-        foreach ($lines as $line) {
-            if (strpos($line, 'BEGIN:VEVENT') !== false) {
-                // Arrêter de parser les propriétés du calendrier quand les événements commencent
-                break;
-            }
-
-            if (preg_match('/^(X-WR-CALNAME|X-WR-CALDESC|X-WR-TIMEZONE):(.*)$/', $line, $matches)) {
-                $properties[$matches[1]] = trim($matches[2]);
-            }
-        }
-        return $properties;
+        return IcsParser::parseCalendarProperties($icsContent);
     }
 }

@@ -45,21 +45,21 @@ D4                  (pipeline middleware — grosse refactorisation, EN DERNIER)
 
 ### A. Sécurité
 
-- [ ] **A1** — Blacklist JWT avec claim `jti` (UUID v4)
+- ✅ **A1** — Blacklist JWT avec claim `jti` (UUID v4)
   - Ajouter table `jwt_blacklist` ; invalider le token au logout
   - Actuellement : logout inefficace, token valide 15 jours après déconnexion
   - Retourner `401` sur token blacklisté dans le middleware JWT
   - > ⚠️ **Faille active.** Priorité absolue — à faire en tout premier.
 
-- [ ] **A2** — Rate limiting sur `/auth/login` et `/auth/send-code`
+- ✅ **A2** — Rate limiting sur `/auth/login` et `/auth/send-code`
   - 5 échecs / 10 min par couple email+IP → retour `429 Too Many Requests`
   - > 💡 Vérifier d'abord si Apache/Nginx peut gérer le rate limiting côté serveur (ex. `mod_ratelimit`, `limit_req` Nginx) avant d'implémenter en PHP pur. Un middleware centralisé PHP est acceptable si le serveur ne supporte pas cette config.
 
-- [ ] **A3** — Rotation du device token à chaque refresh réussi
+- ✅ **A3** — Rotation du device token à chaque refresh réussi
   - Ancien token invalidé dès qu'un nouveau est émis
   - > Dépend de A1 (mécanisme de blacklist). À faire après A1.
 
-- [ ] **A4** — Corriger CORS
+- ✅ **A4** — Corriger CORS
   - Ajouter `PATCH`, `HEAD`, `X-API-Key` dans les allowed headers
   - > Fix rapide, faible risque. Nécessaire pour les clients qui utilisent PATCH (ex. mises à jour partielles d'événements).
 
@@ -67,20 +67,20 @@ D4                  (pipeline middleware — grosse refactorisation, EN DERNIER)
 
 ### C. Validation & Réponses *(avant les modèles — bugs silencieux)*
 
-- [ ] **C1** — Vérifier reset de `self::$errors` en début de `validate()` dans `Validator`
+- ✅ **C1** — Vérifier reset de `self::$errors` en début de `validate()` dans `Validator`
   - Contamination entre appels successifs si le Validator est réutilisé dans la même requête
   - > 🐛 Bug insidieux difficile à reproduire en isolation mais catastrophique en production multi-validations.
 
-- [ ] **C2** — Corriger règle `required` dans `Validator`
+- ✅ **C2** — Corriger règle `required` dans `Validator`
   - Remplacer `empty()` par `isset($value) && $value !== ''`
   - `empty()` rejette `0` et `false`, ce qui est incorrect pour des champs numériques
   - > 🐛 Bug silencieux. Toute validation de champ numérique `0` échoue actuellement.
 
-- [ ] **C3** — Corriger appel `Response::error(array, 429)` dans `ApiKeyAuthMiddleware`
+- ✅ **C3** — Corriger appel `Response::error(array, 429)` dans `ApiKeyAuthMiddleware`
   - Le premier paramètre doit être une `string`, pas un `array`
   - > Fix rapide, une ligne.
 
-- [ ] **C4** — Ajouter `countFiltered()` et structure de pagination enrichie
+- ✅ **C4** — Ajouter `countFiltered()` et structure de pagination enrichie
   - Réponse paginée : `{ total, page, per_page, total_pages, data: [...] }`
   - > Nouveau feature — à faire après les fixes critiques. Nécessite modification des contrôleurs concernés.
 
@@ -88,19 +88,19 @@ D4                  (pipeline middleware — grosse refactorisation, EN DERNIER)
 
 ### B. Modèles
 
-- [ ] **B1** — Remplacer `static $db` par propriété d'instance dans `BaseModel`
+- ✅ **B1** — Remplacer `static $db` par propriété d'instance dans `BaseModel`
   - Évite les conflits en contexte multi-modèles (ex. deux modèles différents dans la même requête)
   - > ⚠️ Changement impactant — **tous les modèles héritant de `BaseModel` doivent être testés après ce changement.** Isoler dans son propre commit avec test de régression.
 
-- [ ] **B2** — Refactoriser `User::findById()` et `findByEmail()`
+- ✅ **B2** — Refactoriser `User::findById()` et `findByEmail()`
   - Utiliser `mapFromArray()` pour éliminer la duplication de mapping
   - > Safe à faire après B1. Réduction de dette technique.
 
-- [ ] **B3** — Fusionner `Group::create()` et `create2()`
+- ✅ **B3** — Fusionner `Group::create()` et `create2()`
   - Transaction unique + paramètre `$addOwnerAsMember` (bool)
   - > Simplifie la logique métier et élimine le risque d'incohérence entre les deux méthodes.
 
-- [ ] **B4** — Retirer `htmlspecialchars` des modèles
+- ✅ **B4** — Retirer `htmlspecialchars` des modèles
   - Les prepared statements PDO suffisent pour l'injection SQL
   - `htmlspecialchars` en modèle corrompt les données stockées (ex. `&amp;` au lieu de `&`)
   - > 🐛 Potentiellement source de données corrompues en DB. Safe à retirer.
@@ -109,11 +109,11 @@ D4                  (pipeline middleware — grosse refactorisation, EN DERNIER)
 
 ### E. UX / Opérations
 
-- [ ] **E1** — Créer endpoint `GET /auth/me`
+- ✅ **E1** — Créer endpoint `GET /auth/me`
   - JWT requis ; retourne profil à jour : `{ id, name, email, role, last_login }`
   - > Feature simple et à haute valeur — utile immédiatement pour tous les clients front-end.
 
-- [ ] **E2** — Nettoyage OTP automatique
+- ✅ **E2** — Nettoyage OTP automatique
   - Option 1 : cleanup opportuniste 1% des requêtes (dans le middleware)
   - Option 2 : script cron `src/cron/cleanup.php`
   - > La structure cron existe déjà dans le projet. Privilégier le script cron pour un comportement prévisible.
@@ -122,19 +122,19 @@ D4                  (pipeline middleware — grosse refactorisation, EN DERNIER)
 
 ### D. Router & Architecture
 
-- [ ] **D1** — Passer les handlers à des factory closures (lazy-load)
+- ✅ **D1** — Passer les handlers à des factory closures (lazy-load)
   - Actuellement tous les handlers sont instanciés au boot, même ceux non utilisés
   - > Amélioration de performance au démarrage, surtout quand les routes augmentent.
 
-- [ ] **D2** — Externaliser `BASE_PATH` dans `environment.php`
+- ✅ **D2** — Externaliser `BASE_PATH` dans `environment.php`
   - Remplacer le hardcodé `'/cmem2_API'` par une variable d'environnement
   - > Quick win — facilite le déploiement sur différents chemins de base.
 
-- [ ] **D3** — Supprimer le fallback `$GLOBALS['pending_route_handlers']`
+- ✅ **D3** — Supprimer le fallback `$GLOBALS['pending_route_handlers']`
   - Mécanisme fragile et non maintenable
   - > À faire après D1 pour s'assurer que le lazy-load remplace correctement ce fallback.
 
-- [ ] **D4** — Ajouter pipeline middleware dans `BaseRouteHandler::runMiddleware()`
+- ✅ **D4** — Ajouter pipeline middleware dans `BaseRouteHandler::runMiddleware()`
   - Auth, logging, CORS appelés manuellement actuellement → centraliser dans un pipeline
   - > ⚠️ **Grosse refactorisation architecturale — garder pour DERNIER dans Phase 0.**
   > Tester exhaustivement toutes les routes après ce changement. Un pipeline mal câblé peut silencieusement bypasser l'auth sur certaines routes.
@@ -155,22 +155,22 @@ D4                  (pipeline middleware — grosse refactorisation, EN DERNIER)
 
 > 1.1 en premier car les autres dépendent des wrappers sabre.
 
-- [ ] **1.1** — Intégrer `sabre/vobject`
+- ✅ **1.1** — Intégrer `sabre/vobject`
   - Créer wrappers `IcsParser` et `IcsGenerator` remplaçant les 3 parseurs manuels
     - `Calendar.php`, `CalendarEvent.php`, `CalDAVServer.php`
   - > 🔑 **Item fondateur de toutes les phases ICS suivantes.** Les parseurs manuels sont la principale source d'erreurs RFC. sabre/vobject est la référence de l'écosystème PHP CalDAV.
 
-- [ ] **1.3** — UID stable RFC-conforme
+- ✅ **1.3** — UID stable RFC-conforme
   - Générer UUID v4 à la création d'un événement (stocker dans colonne `uid` existante)
   - Actuellement : `'event-123@cmem'` — prédictible, non-conforme RFC 5545 §3.8.4.7
   - > À faire juste après 1.1. UIDs stables = synchronisation CalDAV fiable.
 
-- [ ] **1.4** — `DTSTART` avec paramètre `TZID`
+- ✅ **1.4** — `DTSTART` avec paramètre `TZID`
   - Émettre `DTSTART;TZID=America/Montreal:20260401T140000` quand la timezone est connue
   - Actuellement : toujours exporté en UTC `Z`, ce qui cause des décalages pour les clients
   - > Impact direct sur l'expérience utilisateur pour tous les événements localisés.
 
-- [ ] **1.2** — Line folding RFC 5545 §3.1
+- ✅ **1.2** — Line folding RFC 5545 §3.1
   - `sabre/vobject` gère le folding automatiquement ; vérifier que l'export respecte la limite 75 octets/ligne
   - > Simple vérification après 1.1 — sabre s'en charge, mais valider avec un vrai fichier .ics importé dans Google Calendar / Apple Calendar.
 
@@ -304,28 +304,28 @@ D4                  (pipeline middleware — grosse refactorisation, EN DERNIER)
 
 | #  | Phase | ID  | Description courte                         | Effort | Fait |
 |----|-------|-----|--------------------------------------------|--------|------|
-| 1  | Ph0   | A1  | Blacklist JWT (jti + table)                | 1h30   |      |
-| 2  | Ph0   | A2  | Rate limiting login / send-code            | 1h     |      |
-| 3  | Ph0   | A3  | Rotation device token au refresh           | 45min  |      |
-| 4  | Ph0   | A4  | Fix CORS (PATCH, HEAD, X-API-Key)          | 20min  |      |
-| 5  | Ph0   | C1  | Reset `$errors` dans Validator             | 15min  |      |
-| 6  | Ph0   | C2  | Fix règle `required` (empty → isset)       | 15min  |      |
-| 7  | Ph0   | C3  | Fix `Response::error(array, 429)`          | 10min  |      |
-| 8  | Ph0   | B1  | `static $db` → instance dans BaseModel     | 1h     |      |
-| 9  | Ph0   | B2  | Refactor `User::findById/findByEmail`      | 30min  |      |
-| 10 | Ph0   | B3  | Fusionner `Group::create()` + `create2()`  | 45min  |      |
-| 11 | Ph0   | B4  | Retirer `htmlspecialchars` des modèles     | 20min  |      |
-| 12 | Ph0   | C4  | `countFiltered()` + pagination enrichie    | 1h     |      |
-| 13 | Ph0   | E1  | Endpoint `GET /auth/me`                    | 45min  |      |
-| 14 | Ph0   | E2  | Cron nettoyage OTP                         | 30min  |      |
-| 15 | Ph0   | D1  | Lazy-load handlers (factory closures)      | 45min  |      |
-| 16 | Ph0   | D2  | Externaliser `BASE_PATH`                   | 20min  |      |
-| 17 | Ph0   | D3  | Supprimer fallback `$GLOBALS`              | 15min  |      |
-| 18 | Ph0   | D4  | Pipeline middleware dans `runMiddleware()` | 1h30   |      |
-| 19 | Ph1   | 1.1 | Intégrer sabre/vobject (wrappers)          | 2h     |      |
-| 20 | Ph1   | 1.3 | UID stable UUID v4                         | 45min  |      |
-| 21 | Ph1   | 1.4 | DTSTART;TZID=...                           | 45min  |      |
-| 22 | Ph1   | 1.2 | Line folding RFC 5545                      | 30min  |      |
+| 1  | Ph0   | A1  | Blacklist JWT (jti + table)                | 1h30   | ✅   |
+| 2  | Ph0   | A2  | Rate limiting login / send-code            | 1h     | ✅   |
+| 3  | Ph0   | A3  | Rotation device token au refresh           | 45min  | ✅   |
+| 4  | Ph0   | A4  | Fix CORS (PATCH, HEAD, X-API-Key)          | 20min  | ✅   |
+| 5  | Ph0   | C1  | Reset `$errors` dans Validator             | 15min  | ✅   |
+| 6  | Ph0   | C2  | Fix règle `required` (empty → isset)       | 15min  | ✅   |
+| 7  | Ph0   | C3  | Fix `Response::error(array, 429)`          | 10min  | ✅   |
+| 8  | Ph0   | B1  | `static $db` → instance dans BaseModel     | 1h     | ✅   |
+| 9  | Ph0   | B2  | Refactor `User::findById/findByEmail`      | 30min  | ✅   |
+| 10 | Ph0   | B3  | Fusionner `Group::create()` + `create2()`  | 45min  | ✅   |
+| 11 | Ph0   | B4  | Retirer `htmlspecialchars` des modèles     | 20min  | ✅   |
+| 12 | Ph0   | C4  | `countFiltered()` + pagination enrichie    | 1h     | ✅   |
+| 13 | Ph0   | E1  | Endpoint `GET /auth/me`                    | 45min  | ✅   |
+| 14 | Ph0   | E2  | Cron nettoyage OTP                         | 30min  | ✅   |
+| 15 | Ph0   | D1  | Lazy-load handlers (factory closures)      | 45min  | ✅   |
+| 16 | Ph0   | D2  | Externaliser `BASE_PATH`                   | 20min  | ✅   |
+| 17 | Ph0   | D3  | Supprimer fallback `$GLOBALS`              | 15min  | ✅   |
+| 18 | Ph0   | D4  | Pipeline middleware dans `runMiddleware()` | 1h30   | ✅   |
+| 19 | Ph1   | 1.1 | Intégrer sabre/vobject (wrappers)          | 2h     | ✅   |
+| 20 | Ph1   | 1.3 | UID stable UUID v4                         | 45min  | ✅   |
+| 21 | Ph1   | 1.4 | DTSTART;TZID=...                           | 45min  | ✅   |
+| 22 | Ph1   | 1.2 | Line folding RFC 5545                      | 30min  | ✅   |
 | 23 | Ph2   | 2.1 | CATEGORIES                                 | 1h     |      |
 | 24 | Ph2   | 2.2 | PRIORITY                                   | 45min  |      |
 | 25 | Ph2   | 2.3 | CLASS                                      | 30min  |      |

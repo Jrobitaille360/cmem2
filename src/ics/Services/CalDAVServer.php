@@ -4,6 +4,8 @@ namespace ICS\Services;
 
 use ICS\Models\Calendar;
 use ICS\Models\CalendarEvent;
+use ICS\Utils\IcsGenerator;
+use ICS\Utils\IcsParser;
 use ICS\Utils\TimezoneHelper;
 use AuthGroups\Services\LogService;
 use PDO;
@@ -704,7 +706,6 @@ class CalDAVServer
 
     private function generateSingleEventIcs($event): string
     {
-        // Récupérer le timezone du calendrier
         $calendarTimezone = 'America/Montreal';
         if (isset($event['calendar_id'])) {
             $stmt = $this->db->prepare("SELECT timezone FROM calendars WHERE id = ?");
@@ -714,109 +715,13 @@ class CalDAVServer
                 $calendarTimezone = $cal['timezone'];
             }
         }
-        
-        $ics = "BEGIN:VCALENDAR\r\n";
-        $ics .= "VERSION:2.0\r\n";
-        $ics .= "PRODID:-//CMEM2//CalDAV Server//EN\r\n";
-        $ics .= "CALSCALE:GREGORIAN\r\n";
-        
-        // Ajouter VTIMEZONE
-        $ics .= TimezoneHelper::generateVTimezone($calendarTimezone);
-        
-        $ics .= "BEGIN:VEVENT\r\n";
-        $ics .= "UID:" . $event['uid'] . "\r\n";
-        $ics .= "DTSTAMP:" . gmdate('Ymd\THis\Z') . "\r\n";
-        
-        if ($event['all_day']) {
-            $ics .= "DTSTART;VALUE=DATE:" . date('Ymd', strtotime($event['start_datetime'])) . "\r\n";
-            $ics .= "DTEND;VALUE=DATE:" . date('Ymd', strtotime($event['end_datetime'])) . "\r\n";
-        } else {
-            $ics .= "DTSTART:" . TimezoneHelper::toICalDateTimeUTC($event['start_datetime'], $calendarTimezone) . "\r\n";
-            $ics .= "DTEND:" . TimezoneHelper::toICalDateTimeUTC($event['end_datetime'], $calendarTimezone) . "\r\n";
-        }
-        
-        $ics .= "SUMMARY:" . TimezoneHelper::escapeIcsText($event['title']) . "\r\n";
-        
-        if (!empty($event['description'])) {
-            $ics .= "DESCRIPTION:" . TimezoneHelper::escapeIcsText($event['description']) . "\r\n";
-        }
-        
-        if (!empty($event['location'])) {
-            $ics .= "LOCATION:" . TimezoneHelper::escapeIcsText($event['location']) . "\r\n";
-        }
-        
-        $ics .= "STATUS:" . strtoupper($event['status']) . "\r\n";
-        $ics .= "SEQUENCE:" . ($event['sequence'] ?? 0) . "\r\n";
-        
-        if (!empty($event['last_modified'])) {
-            $ics .= "LAST-MODIFIED:" . TimezoneHelper::toICalDateTimeUTC($event['last_modified'], $calendarTimezone) . "\r\n";
-        }
-        
-        $ics .= "END:VEVENT\r\n";
-        $ics .= "END:VCALENDAR\r\n";
-        
-        return $ics;
+
+        return IcsGenerator::generateSingleEvent($event, $calendarTimezone);
     }
 
     private function parseIcsContent($icsContent): ?array
     {
-        $lines = explode("\n", str_replace("\r\n", "\n", $icsContent));
-        $eventData = [];
-        $inEvent = false;
-        
-        foreach ($lines as $line) {
-            $line = trim($line);
-            
-            if ($line == 'BEGIN:VEVENT') {
-                $inEvent = true;
-                continue;
-            }
-            
-            if ($line == 'END:VEVENT') {
-                break;
-            }
-            
-            if (!$inEvent) continue;
-            
-            if (strpos($line, ':') === false) continue;
-            
-            list($prop, $value) = explode(':', $line, 2);
-            
-            // Gérer les paramètres (ex: DTSTART;VALUE=DATE)
-            if (strpos($prop, ';') !== false) {
-                $prop = explode(';', $prop)[0];
-            }
-            
-            switch ($prop) {
-                case 'UID':
-                    $eventData['uid'] = $value;
-                    break;
-                case 'SUMMARY':
-                    $eventData['title'] = $this->unescapeIcsString($value);
-                    break;
-                case 'DESCRIPTION':
-                    $eventData['description'] = $this->unescapeIcsString($value);
-                    break;
-                case 'DTSTART':
-                    $eventData['start_datetime'] = $this->parseICalDate($value);
-                    $eventData['all_day'] = (strlen($value) == 8);
-                    break;
-                case 'DTEND':
-                    $eventData['end_datetime'] = $this->parseICalDate($value);
-                    break;
-                case 'LOCATION':
-                    $eventData['location'] = $this->unescapeIcsString($value);
-                    break;
-                case 'STATUS':
-                    $eventData['status'] = strtolower($value);
-                    break;
-                case 'SEQUENCE':
-                    $eventData['sequence'] = (int)$value;
-                    break;
-            }
-        }
-        
-        return !empty($eventData) ? $eventData : null;
+        return IcsParser::parseSingleEvent($icsContent);
     }
 
     private function parseICalDate($dateString): string
