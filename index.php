@@ -59,6 +59,11 @@ if (MAINTENANCE_MODE) {
     exit();
 }
 
+// Initialiser le PluginManager et charger les plugins (calendars, caldav, notifications…)
+$pluginManager = \Core\PluginManager::getInstance();
+$pluginManager->loadPlugins();
+$GLOBALS['plugin_manager'] = $pluginManager;
+
 // Initialiser et lancer le router
 try {
     $router = new Router();

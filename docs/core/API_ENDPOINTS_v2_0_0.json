@@ -1,9 +1,9 @@
 {
   "api": {
     "name": "AuthGroups API",
-    "version": "2.0.0",
-    "description": "API REST complète pour la gestion d'authentification, groupes, fichiers et tags",
-    "generated": "2026-03-22",
+    "version": "2.1.0",
+    "description": "API REST complète pour la gestion d'authentification, groupes, fichiers, tags, calendriers ICS et CalDAV",
+    "generated": "2026-03-26",
     "base_url": "/",
     "authentication": {
       "type": "JWT_BEARER",
@@ -48,7 +48,8 @@
           "errors": {
             "400": "Champs email ou password manquants / format invalide",
             "401": "Email ou mot de passe incorrect",
-            "403": "Email non vérifié"
+            "403": "Email non vérifié",
+            "429": "Trop de tentatives — réessayez dans 10 minutes (5 max / 10 min par email+IP)"
           }
         },
         {
@@ -64,7 +65,8 @@
           },
           "errors": {
             "400": "Email manquant ou format invalide",
-            "403": "Email non vérifié"
+            "403": "Email non vérifié",
+            "429": "Trop de tentatives — réessayez dans 10 minutes (5 max / 10 min par email+IP)"
           }
         },
         {
@@ -104,11 +106,28 @@
             "token": "string — nouveau JWT Bearer",
             "token_type": "Bearer",
             "expires_at": "datetime",
-            "user": { "id": "integer", "name": "string", "email": "string", "role": "string" }
+            "user": { "id": "integer", "name": "string", "email": "string", "role": "string" },
+            "device_token": "string — nouveau device token (l'ancien est révoqué, remplacer côté client)",
+            "device_id": "string"
           },
           "errors": {
             "400": "device_id ou device_token manquant",
             "401": "Device token invalide, expiré ou révoqué"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/auth/me",
+          "description": "Obtenir les informations de l'utilisateur connecté via le JWT courant",
+          "auth_required": true,
+          "headers": {
+            "Authorization": "Bearer {jwt_token}"
+          },
+          "response": {
+            "user": { "id": "integer", "name": "string", "email": "string", "role": "string" }
+          },
+          "errors": {
+            "401": "JWT manquant ou invalide"
           }
         },
         {
@@ -270,6 +289,34 @@
             "code": "string (required)"
           },
           "response": "Message de confirmation"
+        },
+        {
+          "method": "GET",
+          "path": "/plans",
+          "description": "Lister tous les plans d'abonnement disponibles",
+          "auth_required": false,
+          "response": "Array de plan objects"
+        },
+        {
+          "method": "GET",
+          "path": "/users/choose-plan",
+          "description": "Afficher l'invitation à choisir un plan (token requis en query string)",
+          "auth_required": false,
+          "query": {
+            "token": "string (required)"
+          },
+          "response": "Informations du plan à choisir"
+        },
+        {
+          "method": "POST",
+          "path": "/users/choose-plan",
+          "description": "Sélectionner un plan d'abonnement",
+          "auth_required": false,
+          "body": {
+            "token": "string (required)",
+            "plan_id": "integer (required)"
+          },
+          "response": "Message de confirmation"
         }
       ]
     },
@@ -312,6 +359,22 @@
         },
         {
           "method": "GET",
+          "path": "/users/me/notification-preferences",
+          "description": "Obtenir ses préférences de notifications",
+          "response": "Notification preferences object"
+        },
+        {
+          "method": "PUT",
+          "path": "/users/me/notification-preferences",
+          "description": "Mettre à jour ses préférences de notifications",
+          "body": {
+            "email_enabled": "boolean (optional)",
+            "reminder_minutes": "integer (optional)"
+          },
+          "response": "Notification preferences object mis à jour"
+        },
+        {
+          "method": "GET",
           "path": "/users/{id}",
           "description": "Obtenir les détails d'un utilisateur",
           "params": { "id": "integer (required)" },
@@ -337,6 +400,14 @@
           "params": { "id": "integer (required)" },
           "roles": ["ADMINISTRATEUR"],
           "response": "Message de confirmation"
+        },
+        {
+          "method": "POST",
+          "path": "/users/{id}/restore",
+          "description": "Restaurer un utilisateur supprimé",
+          "params": { "id": "integer (required)" },
+          "roles": ["ADMINISTRATEUR"],
+          "response": "User object restauré"
         },
         {
           "method": "POST",
@@ -375,15 +446,7 @@
         },
         {
           "method": "POST",
-          "path": "/users/{id}/restore",
-          "description": "Restaurer un utilisateur supprimé",
-          "params": { "id": "integer (required)" },
-          "roles": ["ADMINISTRATEUR"],
-          "response": "User object restauré"
-        },
-        {
-          "method": "POST",
-          "path": "/users/app/",
+          "path": "/users/app",
           "description": "Créer une configuration d'application",
           "body": {
             "app_id": "string (required)",
@@ -393,7 +456,7 @@
         },
         {
           "method": "GET",
-          "path": "/users/app/",
+          "path": "/users/app",
           "description": "Lister les configurations d'applications de l'utilisateur",
           "response": "Array de app setup objects"
         },
@@ -757,6 +820,273 @@
           "path": "/stats/my-stats",
           "description": "Obtenir ses propres statistiques",
           "response": "Object avec statistiques utilisateur"
+        }
+      ]
+    },
+    "calendars": {
+      "description": "Plugin ICS — Gestion des calendriers et événements",
+      "base_path": "/calendars",
+      "auth_required": true,
+      "auth_header": "Authorization: Bearer {jwt_token}",
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/calendars",
+          "description": "Créer un calendrier",
+          "body": {
+            "name": "string (required)",
+            "description": "string (optional)",
+            "timezone": "string (optional)",
+            "color": "string (optional)"
+          },
+          "response": "Calendar object"
+        },
+        {
+          "method": "GET",
+          "path": "/calendars",
+          "description": "Lister les calendriers de l'utilisateur",
+          "response": "Array de Calendar objects"
+        },
+        {
+          "method": "PUT",
+          "path": "/calendars/{id}",
+          "description": "Mettre à jour un calendrier",
+          "params": { "id": "integer (required)" },
+          "body": {
+            "name": "string (optional)",
+            "description": "string (optional)",
+            "timezone": "string (optional)",
+            "color": "string (optional)"
+          },
+          "response": "Calendar object mis à jour"
+        },
+        {
+          "method": "DELETE",
+          "path": "/calendars/{id}",
+          "description": "Supprimer un calendrier (soft delete)",
+          "params": { "id": "integer (required)" },
+          "response": "Message de confirmation"
+        },
+        {
+          "method": "DELETE",
+          "path": "/calendars/{id}/hard",
+          "description": "Supprimer définitivement un calendrier",
+          "params": { "id": "integer (required)" },
+          "response": "Message de confirmation"
+        },
+        {
+          "method": "GET",
+          "path": "/calendars/{id}/ics",
+          "description": "Télécharger le calendrier au format ICS",
+          "params": { "id": "integer (required)" },
+          "response": "Fichier .ics (text/calendar)"
+        },
+        {
+          "method": "POST",
+          "path": "/calendars/import",
+          "description": "Importer un fichier ICS pour créer/peupler un calendrier",
+          "body": "multipart/form-data avec fichier .ics",
+          "response": "Calendar object avec événements importés"
+        },
+        {
+          "method": "GET",
+          "path": "/calendars/{id}/share",
+          "description": "Lister les partages d'un calendrier",
+          "params": { "id": "integer (required)" },
+          "response": "Array de share objects"
+        },
+        {
+          "method": "POST",
+          "path": "/calendars/{id}/share",
+          "description": "Partager un calendrier avec un utilisateur",
+          "params": { "id": "integer (required)" },
+          "body": {
+            "user_id": "integer (required)",
+            "permission": "string (optional) — read | write"
+          },
+          "response": "Share object"
+        },
+        {
+          "method": "DELETE",
+          "path": "/calendars/{id}/share",
+          "description": "Supprimer un partage de calendrier",
+          "params": { "id": "integer (required)" },
+          "body": { "user_id": "integer (required)" },
+          "response": "Message de confirmation"
+        },
+        {
+          "method": "POST",
+          "path": "/calendars/{id}/events",
+          "description": "Créer un événement dans un calendrier",
+          "params": { "id": "integer (required)" },
+          "body": {
+            "title": "string (required)",
+            "start": "datetime (required)",
+            "end": "datetime (optional)",
+            "description": "string (optional)",
+            "location": "string (optional)",
+            "rrule": "string (optional) — règle de récurrence iCal (RRULE:FREQ=...)"
+          },
+          "response": "Event object"
+        },
+        {
+          "method": "GET",
+          "path": "/calendars/{id}/events",
+          "description": "Lister les événements d'un calendrier",
+          "params": { "id": "integer (required)" },
+          "query": {
+            "start": "datetime (optional)",
+            "end": "datetime (optional)"
+          },
+          "response": "Array de Event objects"
+        },
+        {
+          "method": "GET",
+          "path": "/calendars/{id}/events/{eventId}",
+          "description": "Obtenir un événement",
+          "params": { "id": "integer (required)", "eventId": "integer (required)" },
+          "response": "Event object"
+        },
+        {
+          "method": "PUT",
+          "path": "/calendars/{id}/events/{eventId}",
+          "description": "Mettre à jour un événement",
+          "params": { "id": "integer (required)", "eventId": "integer (required)" },
+          "body": {
+            "title": "string (optional)",
+            "start": "datetime (optional)",
+            "end": "datetime (optional)",
+            "description": "string (optional)",
+            "location": "string (optional)",
+            "rrule": "string (optional)"
+          },
+          "response": "Event object mis à jour"
+        },
+        {
+          "method": "DELETE",
+          "path": "/calendars/{id}/events/{eventId}",
+          "description": "Supprimer un événement (soft delete)",
+          "params": { "id": "integer (required)", "eventId": "integer (required)" },
+          "response": "Message de confirmation"
+        },
+        {
+          "method": "DELETE",
+          "path": "/calendars/{id}/events/{eventId}/hard",
+          "description": "Supprimer définitivement un événement",
+          "params": { "id": "integer (required)", "eventId": "integer (required)" },
+          "response": "Message de confirmation"
+        },
+        {
+          "method": "GET",
+          "path": "/calendars/{id}/events/occurrences",
+          "description": "Lister les occurrences de tous les événements du calendrier entre deux dates",
+          "params": { "id": "integer (required)" },
+          "query": {
+            "start": "datetime (required)",
+            "end": "datetime (required)"
+          },
+          "response": "Array d'occurrences"
+        },
+        {
+          "method": "GET",
+          "path": "/calendars/{id}/events/{eventId}/occurrences",
+          "description": "Lister les occurrences d'un événement récurrent",
+          "params": { "id": "integer (required)", "eventId": "integer (required)" },
+          "query": {
+            "start": "datetime (optional)",
+            "end": "datetime (optional)"
+          },
+          "response": "Array d'occurrences"
+        },
+        {
+          "method": "PUT",
+          "path": "/calendars/{id}/events/{eventId}/occurrences",
+          "description": "Modifier une occurrence spécifique d'un événement récurrent",
+          "params": { "id": "integer (required)", "eventId": "integer (required)" },
+          "body": {
+            "occurrence_date": "datetime (required)",
+            "title": "string (optional)",
+            "start": "datetime (optional)",
+            "end": "datetime (optional)"
+          },
+          "response": "Occurrence modifiée"
+        },
+        {
+          "method": "DELETE",
+          "path": "/calendars/{id}/events/{eventId}/occurrences",
+          "description": "Supprimer ou annuler une occurrence spécifique d'un événement récurrent",
+          "params": { "id": "integer (required)", "eventId": "integer (required)" },
+          "body": { "occurrence_date": "datetime (required)" },
+          "response": "Message de confirmation"
+        }
+      ]
+    },
+    "caldav": {
+      "description": "Plugin ICS — Interface CalDAV/WebDAV pour synchronisation avec clients natifs (iOS, Android, Thunderbird…)",
+      "base_path": "/caldav",
+      "auth_required": "JWT ou Basic Auth (user:password encodé base64)",
+      "notes": "Implémente le protocole CalDAV (RFC 4791). Compatible avec les clients CalDAV standards.",
+      "routes": [
+        {
+          "method": "OPTIONS",
+          "path": "/caldav/...",
+          "description": "Discovery CalDAV — réponse aux requêtes OPTIONS/PROPFIND pour la négociation de capacités",
+          "auth_required": false,
+          "response": "Headers CalDAV (DAV, Allow, etc.)"
+        },
+        {
+          "method": "GET",
+          "path": "/caldav/service-info",
+          "description": "Informations du service CalDAV",
+          "auth_required": true,
+          "response": "URLs de service, capacités, version"
+        },
+        {
+          "method": "GET",
+          "path": "/caldav/mobile-config",
+          "description": "Profil de configuration mobile pour iOS/Android",
+          "auth_required": true,
+          "response": "Fichier .mobileconfig ou instructions de configuration"
+        }
+      ]
+    },
+    "notifications": {
+      "description": "Plugin ICS — Gestion des notifications par email pour les événements",
+      "base_path": "/notifications",
+      "auth_required": true,
+      "auth_header": "Authorization: Bearer {jwt_token}",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/notifications/email",
+          "description": "Lister les notifications email planifiées",
+          "response": "Array de notification objects"
+        },
+        {
+          "method": "POST",
+          "path": "/notifications/email/test",
+          "description": "Envoyer un email de test",
+          "body": {
+            "email": "string (optional) — destinataire (défaut: email de l'utilisateur connecté)"
+          },
+          "response": "Message de confirmation"
+        },
+        {
+          "method": "DELETE",
+          "path": "/notifications/email/{id}",
+          "description": "Annuler une notification email planifiée",
+          "params": { "id": "integer (required)" },
+          "response": "Message de confirmation"
+        },
+        {
+          "method": "POST",
+          "path": "/notifications/send-email",
+          "description": "Envoyer un email de rappel pour une occurrence d'événement",
+          "body": {
+            "event_id": "integer (required)",
+            "occurrence_date": "datetime (required)"
+          },
+          "response": "Message de confirmation"
         }
       ]
     },

@@ -104,19 +104,20 @@ class PluginManager
             $pluginClass = $config['main_class'];
             if (class_exists($pluginClass)) {
                 $pluginInstance = new $pluginClass();
-                
-                if (method_exists($pluginInstance, 'initialize')) {
-                    $pluginInstance->initialize();
-                }
-                
+
+                // Enregistrer AVANT initialize() pour que registerPluginRoutes() trouve l'entrée
                 $this->loadedPlugins[$pluginName] = [
                     'instance' => $pluginInstance,
                     'config' => $config,
                     'status' => 'loaded'
                 ];
-                
+
                 // Charger les gestionnaires de routes du plugin (différé)
                 $this->storePluginRouteHandlersConfig($pluginName, $config);
+
+                if (method_exists($pluginInstance, 'initialize')) {
+                    $pluginInstance->initialize();
+                }
                 
                 $this->safeLog('info', "Plugin chargé avec succès", [
                     'plugin' => $pluginName,
