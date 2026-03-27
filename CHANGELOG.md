@@ -7,11 +7,9 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [2.1.0] — En cours
+## [2.1.0] — 2026-03-26
 
-> Plan complet : `src/cmem2_Plan_Complet_Ph0-5.md`
-
-- moved docs in /docs/
+> Plan complet : `docs/cmem2_Plan_Complet_Ph0-5.md`
 
 ### Sécurité
 
@@ -101,6 +99,26 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
   - `getMiddlewares()` : liste de callables surchargeable par les sous-classes
   - `runMiddleware()` : exécution séquentielle ; retourne `false` si interrompue
   - `handle()` délègue au pipeline puis à `handleRoute()`
+
+### Infrastructure / maintenance
+
+- Réorganisation `docs/` — migration de tous les documents dans `/docs/`
+  - `cmem2_Plan_Complet_Ph0-5.md`, `2.1.0_PRODUCTION.md`, `2.1.0_CLIENT.md`
+  - Sous-dossier `docs/docs_ICS/` pour la documentation du plugin ICS
+
+- Fix chemin migrations ICS dans `CalendarPlugin::runMigrations()`
+  - Chemin corrigé : `__DIR__ . '/docs_ICS/migrations/'` → `__DIR__ . '/../../docs/docs_ICS/migrations/'`
+
+- Renommage `.env.auth_groups` → `.env` (fichier de configuration unifié)
+  - `.env.example` mis à jour en conséquence
+  - `environment.php` et `JwtService.php` mis à jour (`ADMIN_ENDPOINT` → `SECRET_ADMIN_ENDPOINT`)
+
+- Séparation `docs/build_cmem2_DB.sql` — DDL pur uniquement
+  - Suppression des vues inutilisées : `active_api_keys`, `api_keys_stats_by_user`,
+    `group_statistics`, `v_active_users`, `v_group_dashboard`
+  - Suppression des tables orphelines : `user_plan_history`, `login_codes`
+  - Extraction des `INSERT users` sensibles dans `docs/seed_users.sql` (ignoré par git)
+  - Purge de l'historique git (données sensibles) via `filter-branch`
 
 ---
 
