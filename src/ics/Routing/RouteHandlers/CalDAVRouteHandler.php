@@ -109,76 +109,39 @@ class CalDAVRouteHandler extends BaseRouteHandler
     }
 
     /**
-     * Extrait l'ID utilisateur de la requête (API Key ou session)
+     * Extrait l'ID utilisateur de la requête (JWT ou session)
      */
     private function getUserIdFromRequest($request): ?int
     {
-        // 1. Vérifier d'abord les API Keys (X-API-Key ou Authorization: Bearer ag_xxx)
-        $apiKey = $this->getApiKeyFromRequest();
-        if ($apiKey) {
-            // Valider la clé API
-            $keyData = \AuthGroups\Models\ApiKey::validate($apiKey);
-            
-            if ($keyData && is_array($keyData)) {
-                // Clé valide, retourner l'ID utilisateur
-                \AuthGroups\Services\LogService::info("CalDAV: Authentification API Key réussie", [
-                    'user_id' => $keyData['user_id'],
-                    'api_key_id' => $keyData['id']
+        // 1. JWT Bearer token (Authorization: Bearer <jwt>)
+        $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+        if (preg_match('/^Bearer\s+(.+)$/i', $authHeader, $m)) {
+            $payload = \AuthGroups\Services\JwtService::validate(trim($m[1]));
+            if ($payload && isset($payload['sub'])) {
+                \AuthGroups\Services\LogService::info("CalDAV: Authentification JWT réussie", [
+                    'user_id' => $payload['sub']
                 ]);
-                return $keyData['user_id'];
-            } else {
-                // Clé invalide ou révoquée
-                \AuthGroups\Services\LogService::warning("CalDAV: API Key invalide ou révoquée", [
-                    'api_key_prefix' => substr($apiKey, 0, 20) . '...'
-                ]);
-                return null;
+                return (int) $payload['sub'];
             }
         }
-        
-        // 2. Vérifier la session
+
+        // 2. Session PHP active
         if (isset($_SESSION['user_id'])) {
             \AuthGroups\Services\LogService::info("CalDAV: Authentification par session", [
                 'user_id' => $_SESSION['user_id']
             ]);
-            return $_SESSION['user_id'];
+            return (int) $_SESSION['user_id'];
         }
-        
-        // 3. Vérifier le user_id dans la requête (pour les tests)
+
+        // 3. user_id direct dans la requête (tests uniquement)
         if (isset($request['user_id'])) {
             \AuthGroups\Services\LogService::info("CalDAV: Authentification de test", [
                 'user_id' => $request['user_id']
             ]);
-            return $request['user_id'];
+            return (int) $request['user_id'];
         }
-        
+
         \AuthGroups\Services\LogService::warning("CalDAV: Aucune méthode d'authentification détectée");
-        return null;
-    }
-    
-    /**
-     * Extrait la clé API depuis les headers
-     */
-    private function getApiKeyFromRequest(): ?string
-    {
-        // 1. Header X-API-Key (recommandé pour CalDAV)
-        if (isset($_SERVER['HTTP_X_API_KEY'])) {
-            return trim($_SERVER['HTTP_X_API_KEY']);
-        }
-        
-        // 2. Header Authorization: Bearer ag_xxx
-        if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
-            $authHeader = $_SERVER['HTTP_AUTHORIZATION'];
-            
-            if (preg_match('/^Bearer\s+(.+)$/i', $authHeader, $matches)) {
-                $token = trim($matches[1]);
-                
-                // Vérifier si c'est une API key (commence par ag_)
-                if (str_starts_with($token, 'ag_live_') || str_starts_with($token, 'ag_test_')) {
-                    return $token;
-                }
-            }
-        }
-        
         return null;
     }
 

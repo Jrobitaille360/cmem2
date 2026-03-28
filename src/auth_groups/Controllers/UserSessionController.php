@@ -110,7 +110,7 @@ class UserSessionController {
     
     /**
      * Obtenir les statistiques des utilisateurs en ligne
-     * GET /admin/online-stats
+     * GET /stats/online
      */
     public function getOnlineStats($currentUserId, $currentUserRole) {
         try {
@@ -150,7 +150,7 @@ class UserSessionController {
     
     /**
      * Nettoyer les sessions expirées
-     * POST /admin/cleanup-sessions
+     * POST /stats/cleanup-sessions
      */
     public function cleanupExpiredSessions($currentUserId, $currentUserRole) {
         try {

@@ -115,10 +115,6 @@ class PublicRouteHandler extends BaseRouteHandler
             ($controller === 'users' && $action === 'resend-verification-email' && $method === 'POST') =>
                 $this->controllers['users']->resendVerificationEmail(),
 
-            // Route d'injection OTP (développement uniquement)
-            ($controller === 'test' && $action === 'inject-otp' && $method === 'POST') =>
-                $this->devInjectOtp(),
-
             default => false
         };
         return $res;
@@ -209,10 +205,6 @@ class PublicRouteHandler extends BaseRouteHandler
                     'stats' => [
                         'description' => 'Statistiques et analytics',
                         'operations' => 'platform, users, groups, usage metrics'
-                    ],
-                    'api-keys' => [
-                        'description' => 'Gestion des clés API',
-                        'operations' => 'create, list, revoke, regenerate, scopes'
                     ],
                     'data' => [
                         'description' => 'Synchronisation hors-ligne',

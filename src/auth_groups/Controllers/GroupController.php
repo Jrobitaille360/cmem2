@@ -23,7 +23,6 @@ class GroupController
     private GroupManagerController $managerController;
     private GroupListController $listController;
 
-
     public function __construct() {
         $this->memberController = new GroupMemberController();
         $this->invitationController = new GroupInvitationController();

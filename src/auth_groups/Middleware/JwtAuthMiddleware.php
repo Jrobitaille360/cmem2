@@ -8,7 +8,6 @@ use AuthGroups\Utils\Response;
 
 /**
  * Middleware d'authentification par JWT (Bearer token).
- * Remplace ApiKeyAuthMiddleware.
  */
 class JwtAuthMiddleware
 {

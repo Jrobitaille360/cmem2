@@ -44,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS' && !$isCalDAVRequest) {
 }
 
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, X-API-Key, Authorization');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
 // Gérer les requêtes OPTIONS (preflight) sauf CalDAV
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS' && !$isCalDAVRequest) {

@@ -4,19 +4,22 @@ namespace AuthGroups\Routing\RouteHandlers;
 
 use AuthGroups\Routing\BaseRouteHandler;
 use AuthGroups\Controllers\UserController;
+use AuthGroups\Controllers\UserSessionController;
 use AuthGroups\Controllers\PlanController;
 use AuthGroups\Utils\Response;
 use ICS\Controllers\NotificationController;
 
-class UserRouteHandler extends BaseRouteHandler 
+class UserRouteHandler extends BaseRouteHandler
 {
     private UserController $controller;
+    private UserSessionController $sessionController;
     private PlanController $planController;
     private ?NotificationController $notificationController = null;
 
     public function __construct($authService) {
         parent::__construct($authService);
         $this->controller = new UserController();
+        $this->sessionController = new UserSessionController();
         $this->planController = new PlanController();
     }
 
@@ -58,10 +61,6 @@ class UserRouteHandler extends BaseRouteHandler
                 $this->validateIdAndCall($action, fn($targetId) => 
                     $this->controller->changePassword($targetId, $user['user_id'], $user['role'])),
 
-            // POST /users/logout
-            ($action === 'logout' && $method === 'POST') => 
-                $this->controller->logout($user['user_id']),
-
             // GET /users/choose-plan?token=xxx - Afficher invitation plan (public)
             ($action === 'choose-plan' && $method === 'GET') =>
                 $this->handlePlanInvitationView(),
@@ -91,9 +90,24 @@ class UserRouteHandler extends BaseRouteHandler
                 $this->validateIdAndCall($action, fn($targetId) => 
                     $this->controller->restore($targetId, $user['user_id'], $user['role'])),
 
+            // GET /users/{id}/sessions
+            (isset($segments[2]) && $segments[2] === 'sessions' && $method === 'GET') =>
+                $this->validateIdAndCall($action, fn($targetId) =>
+                    $this->sessionController->getUserSessions($targetId, $user['user_id'], $user['role'])),
+
+            // DELETE /users/{id}/sessions
+            (isset($segments[2]) && $segments[2] === 'sessions' && $method === 'DELETE') =>
+                $this->validateIdAndCall($action, fn($targetId) =>
+                    $this->sessionController->endAllUserSessions($targetId, $user['user_id'], $user['role'])),
+
+            // GET /users/{id}/session-status
+            (isset($segments[2]) && $segments[2] === 'session-status' && $method === 'GET') =>
+                $this->validateIdAndCall($action, fn($targetId) =>
+                    $this->sessionController->getSessionStatus($targetId, $user['user_id'], $user['role'])),
+
             // GET /users/{id}
             ($action && ctype_digit($action) && $method === 'GET' && !$id) =>
-                $this->validateIdAndCall($action, fn($targetId) => 
+                $this->validateIdAndCall($action, fn($targetId) =>
                     $this->controller->getById($targetId, $user['user_id'], $user['role'])),
 
             // PUT /users/{id}

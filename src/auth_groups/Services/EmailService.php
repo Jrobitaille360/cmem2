@@ -405,9 +405,9 @@ class EmailService {
     }
     
     /**
-     * Envoyer un email d'inscription avec API key gratuite et invitation aux plans
+     * @deprecated Conservé temporairement — ne pas appeler
      */
-    public function sendRegistrationWithApiKeyAndPlanInvitation($email, $username, $verificationToken, $apiKey, /* $planInvitationToken */) {
+    private function sendRegistrationWithApiKeyAndPlanInvitation($email, $username, $verificationToken, $apiKey, /* $planInvitationToken */) {
         LogService::info("EmailService: Envoi email inscription avec API key et invitation plan", [
             'email' => $email,
             'username' => $username,

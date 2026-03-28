@@ -393,8 +393,8 @@ class AuthController
         $token     = JwtService::generate($userData);
         $expiresAt = JwtService::getExpiresAt();
 
-        // Enregistrer la session (traçabilité ; api_key_id = null)
-        UserSessionService::createSession((int) $userData['id'], null);
+        // Enregistrer la session (traçabilité)
+        UserSessionService::createSession((int) $userData['id']);
 
         // Device token optionnel (si le client fournit un device_id)
         $deviceToken = null;

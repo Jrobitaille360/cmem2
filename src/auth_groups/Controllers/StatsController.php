@@ -262,45 +262,4 @@ class StatsController
         }
     }
 
-    /**
-     * Obtenir les statistiques d'utilisateurs en ligne en temps réel
-     * GET /stats/online-users
-     */
-    public function getOnlineUsersStats(int $userId, string $role): void {
-        try {
-            LogService::info('Récupération des statistiques d\'utilisateurs en ligne', [
-                'user_id' => $userId,
-                'role' => $role
-            ]);
-
-            // Seuls les admins peuvent voir ces statistiques
-            if ($role !== 'ADMINISTRATEUR') {
-                Response::error('Accès refusé', null, 403);
-                return;
-            }
-
-            $stats = OnlineUsersController::getOnlineUsersStats();
-            $activeSessions = OnlineUsersController::getActiveSessions2();
-
-            $response = [
-                'summary' => $stats,
-                'sessions' => $activeSessions,
-                'generated_at' => date('Y-m-d H:i:s')
-            ];
-
-            LogService::info('Statistiques d\'utilisateurs en ligne récupérées', [
-                'users_online' => $stats['users_online'],
-                'total_sessions' => $stats['total_sessions']
-            ]);
-
-            Response::success('Statistiques d\'utilisateurs en ligne', $response);
-
-        } catch (Exception $e) {
-            LogService::error('Erreur lors de la récupération des statistiques en ligne', [
-                'user_id' => $userId,
-                'error' => $e->getMessage()
-            ]);
-            Response::error('Erreur lors de la récupération des statistiques', null, 500);
-        }
-    }
 }

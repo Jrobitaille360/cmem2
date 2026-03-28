@@ -4,24 +4,27 @@ namespace AuthGroups\Routing\RouteHandlers;
 
 use AuthGroups\Routing\BaseRouteHandler;
 use AuthGroups\Controllers\SecretAdminController;
+use AuthGroups\Controllers\PluginController;
 use AuthGroups\Utils\Response;
 
 /**
  * Gestionnaire de routes pour l'endpoint admin secret
  * Ne doit pas être documenté publiquement
- * 
+ *
  * SÉCURITÉ RENFORCÉE : Double authentification requise
- * 1. API Key valide avec rôle ADMINISTRATEUR
+ * 1. JWT valide avec rôle ADMINISTRATEUR
  * 2. Session active dans user_sessions
  */
 class SecretAdminRouteHandler extends BaseRouteHandler
 {
     protected bool $requiresAuth = true;
     private SecretAdminController $controller;
+    private PluginController $pluginController;
 
     public function __construct() {
         parent::__construct(new \AuthGroups\Services\AuthService());
         $this->controller = new SecretAdminController();
+        $this->pluginController = new PluginController();
     }
     
     protected function getSupportedControllers(): array {
@@ -61,6 +64,10 @@ class SecretAdminRouteHandler extends BaseRouteHandler
             // GET /secret-admin/procedures
             ($controller === 'secret-admin' && $action === 'procedures' && $method === 'GET') =>
                 $this->controller->listProcedures($user),
+
+            // GET /secret-admin/plugins
+            ($controller === 'secret-admin' && $action === 'plugins' && $method === 'GET') =>
+                $this->pluginController->listPlugins(),
 
             default => false
         };

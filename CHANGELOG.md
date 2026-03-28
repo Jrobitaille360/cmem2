@@ -7,6 +7,88 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [2.1.1] — 2026-03-27
+
+### Plugin ICS — Phase 1 (Fondations iCal)
+
+- **[1.1]** Intégration `sabre/vobject` — remplacement des parseurs iCal manuels
+  - Wrappers centralisés autour de `Sabre\VObject\Component\VCalendar`
+  - Génération et parsing d'événements via la librairie de référence PHP CalDAV
+  - Prérequis de toutes les phases ICS suivantes
+
+- **[1.3]** UID stable RFC-conforme (UUID v4)
+  - `uid` généré une seule fois à la création, jamais modifié lors des mises à jour
+  - Garantit la fiabilité de la synchronisation CalDAV avec les clients externes
+
+- **[1.4]** `DTSTART` avec paramètre `TZID`
+  - Format `DTSTART;TZID=America/Montreal:20260101T090000` conforme RFC 5545
+  - Les événements exportés incluent le fuseau horaire explicitement
+
+- **[1.2]** Line folding RFC 5545 §3.1
+  - `sabre/vobject` gère automatiquement le repliement à 75 octets/ligne
+  - Vérifié compatible avec Google Calendar et Apple Calendar
+
+### Nettoyage — Retrait du système de clés API
+
+> Le système de clés API (`api_keys`) est entièrement retiré. L'authentification
+> est désormais exclusivement par JWT (`POST /auth/login`, `POST /auth/verify-code`).
+
+#### Fichiers supprimés
+
+- `src/auth_groups/Middleware/ApiKeyAuthMiddleware.php`
+- `src/auth_groups/Controllers/SecretApiKeyController.php`
+- `src/auth_groups/Models/ApiKey.php`
+
+#### Code retiré
+
+- `UserManagerController::authenticate()` — login par API key (mort depuis v2.0.0)
+- `UserController::authenticate()` et `UserController::logout()` — délégations orphelines
+- `POST /users/logout` — route supprimée depuis v2.0.0 mais encore présente dans `UserRouteHandler`
+- `UserSessionService::updateActivity()` — méthode morte (jamais appelée)
+- `UserSessionService::endSession(?int $apiKeyId)` — paramètre `api_key_id` retiré
+
+#### Base de données (`build_cmem2_DB.sql`)
+
+- Table `api_keys` supprimée
+- Colonne `api_key_id` retirée de `user_sessions`
+- Vue `active_user_sessions` reconstruite sans JOIN `api_keys`
+- Procédure `cleanup_expired_api_keys` retirée
+- Contraintes FK `fk_api_keys_*` retirées
+
+#### Divers
+
+- `index.php` — `X-API-Key` retiré de `Access-Control-Allow-Headers`
+- `restore_data.php` — `api_keys`, `login_codes`, `user_plan_history` retirés de la liste de restauration
+- `GET /help` — section `api-keys` retirée
+
+### Intégration routes — Sessions utilisateur et plugins
+
+- `GET /users/{id}/sessions` — sessions actives d'un utilisateur (self ou admin)
+- `DELETE /users/{id}/sessions` — terminer toutes les sessions (self ou admin)
+- `GET /users/{id}/session-status` — vérifier si session active (self ou admin)
+- `GET /stats/online` — statistiques sessions actives (admin)
+- `POST /stats/cleanup-sessions` — purge des sessions expirées (admin)
+- `GET /secret-admin/plugins` — liste des plugins chargés (admin)
+
+> Ces routes existaient dans `UserSessionController` et `PluginController`
+> mais n'étaient pas câblées dans les route handlers. Intégrées dans
+> `UserRouteHandler`, `StatsRouteHandler` et `SecretAdminRouteHandler`.
+
+### Migration DB (production existante)
+
+```sql
+-- Supprimer la colonne api_key_id de user_sessions
+ALTER TABLE `user_sessions`
+  DROP FOREIGN KEY `fk_user_sessions_api_key`,
+  DROP KEY `idx_api_key_id`,
+  DROP COLUMN `api_key_id`;
+
+-- Supprimer la table api_keys
+DROP TABLE IF EXISTS `api_keys`;
+```
+
+---
+
 ## [2.1.0] — 2026-03-26
 
 > Plan complet : `docs/cmem2_Plan_Complet_Ph0-5.md`

@@ -4,7 +4,6 @@ namespace AuthGroups\Controllers;
 
 use AuthGroups\Models\User;
 use AuthGroups\Models\Plan;
-use AuthGroups\Models\ApiKey;
 use AuthGroups\Services\EmailService;
 use AuthGroups\Services\AuthService;
 use AuthGroups\Utils\Response;
@@ -346,201 +345,6 @@ class UserManagerController {
         }
     }
    
-    /**
-     * Authentification utilisateur pour LOGIN
-     * Nécessite: api_key, email, password
-     * Crée une session dans user_sessions
-     */
-    public function authenticate() {
-        try {
-            LoggingMiddleware::logEntry();
-            
-            $input = Response::getRequestParams();
-            
-            // Validation des identifiants
-            $validation = Validator::validate($input, [
-                'email' => 'required|email',
-                'password' => 'required|string'
-            ]);
-            
-            if (!$validation['valid']) {
-                LogService::warning("Données d'authentification invalides", [
-                    'errors' => $validation['errors']
-                ]);
-                LoggingMiddleware::logExit(400);
-                Response::error('Données invalides', $validation['errors'], 400);
-                return false;
-            }
-            
-            // Vérifier que l'API Key est présente
-            $apiKeyData = \AuthGroups\Middleware\ApiKeyAuthMiddleware::requireApiKey();
-            if (!$apiKeyData) {
-                LogService::error("API Key manquante pour le login");
-                LoggingMiddleware::logExit(401);
-                Response::error('API Key requise pour le login', null, 401);
-                return false;
-            }
-            
-            // Authentifier avec email/password
-            $user = new User();
-            $userData = $user->authenticate($input['email'], $input['password']);
-            
-            if (!$userData) {
-                LogService::warning("Tentative d'authentification échouée", [
-                    'email' => $input['email']
-                ]);
-                LoggingMiddleware::logExit(401);
-                Response::error('Email ou mot de passe incorrect', null, 401);
-                return false;
-            }
-            
-            // Vérifier si l'email n'est pas vérifié
-            if (is_array($userData) && isset($userData['status']) && $userData['status'] === 'email_not_verified') {
-                LogService::warning("Tentative de connexion avec email non vérifié", [
-                    'email' => $input['email'],
-                    'user_id' => $userData['user_data']['id']
-                ]);
-                LoggingMiddleware::logExit(403);
-                Response::error('Email non vérifié', [
-                    'code' => 'EMAIL_NOT_VERIFIED',
-                    'message' => $userData['message'],
-                    'actions' => [
-                        'resend_verification' => [
-                            'endpoint' => '/public/users/resend-verification',
-                            'method' => 'POST',
-                            'params' => ['email']
-                        ],
-                        'verify_email' => [
-                            'endpoint' => '/public/users/verify-email',
-                            'method' => 'POST',
-                            'params' => ['token']
-                        ]
-                    ],
-                    'user_email' => $input['email']
-                ], 403);
-                return false;
-            }
-            
-            // est-ce qu'une session existe déjà pour cette API key ?
-            $existingSession = UserSessionService::getSessionByApiKey($apiKeyData['id']);
-            if ($existingSession) {
-                LogService::info("Session existante trouvée pour l'API Key", [
-                    'api_key_id' => $apiKeyData['id'],
-                    'session_id' => $existingSession['id']
-                ]);
-                LoggingMiddleware::logExit(200);
-                Response::success("Session existante", [
-                    'session_id' => $existingSession['id'],
-                    'user_id' => $existingSession['user_id']
-                ]);
-                return true;
-            }
-
-            // Créer une nouvelle session utilisateur dans user_sessions
-            $sessionId = UserSessionService::createSession(
-                $userData['id'], 
-                $apiKeyData['id']
-            );
-            
-            if (!$sessionId) {
-                LogService::error("Impossible de créer la session utilisateur", [
-                    'user_id' => $userData['id'],
-                    'api_key_id' => $apiKeyData['id']
-                ]);
-                LoggingMiddleware::logExit(500);
-                Response::error('Erreur lors de la création de session', null, 500);
-                return false;
-            }
-                
-            LogService::info("Authentification réussie (login)", [
-                'user_id' => $userData['id'],
-                'email' => $userData['email'],
-                'session_id' => $sessionId,
-                'api_key_id' => $apiKeyData['id']
-            ]);
-            
-            LoggingMiddleware::logExit(200);
-            Response::success("Connexion réussie", [
-                'session_id' => $sessionId,
-                'api_key_name' => $apiKeyData['name'],
-                'user' => [
-                    'id' => $userData['id'],
-                    'name' => $userData['name'],
-                    'email' => $userData['email'],
-                    'role' => $userData['role']
-                ]
-            ]);
-            
-            return true;
-            
-        } catch (Exception $e) {
-            LogService::error("Erreur lors de l'authentification", [
-                'error' => $e->getMessage()
-            ]);
-            LoggingMiddleware::logExit(500);
-            Response::error('Erreur serveur lors de l\'authentification');
-            return false;
-        }
-    }
-
-
-    /**
-     * Déconnexion - termine la session utilisateur
-     * Nécessite: api_key pour identifier la session
-     */
-    public function logout($userId) {
-        try {
-            LoggingMiddleware::logEntry();            
-            
-            // Vérifier si l'utilisateur existe
-            $user = new User();
-            $userData = $user->findById($userId);
-            if (!$userData) {
-                LogService::warning("Utilisateur non trouvé pour déconnexion", ['user_id' => $userId]);
-                LoggingMiddleware::logExit(404);
-                Response::error('Utilisateur non trouvé', null, 404);
-                return false;
-            }
-            
-            // Récupérer l'API Key pour identifier la session à terminer
-            $apiKeyData = \AuthGroups\Middleware\ApiKeyAuthMiddleware::requireApiKey();
-            $sessionsEnded = 0;
-            
-            if ($apiKeyData) {
-                // Terminer la session spécifique pour cette API Key
-                $sessionsEnded = UserSessionService::endSession($userId, $apiKeyData['id']);
-                LogService::info("Logout - Session terminée", [
-                    'user_id' => $userId,
-                    'api_key_id' => $apiKeyData['id'],
-                    'sessions_ended' => $sessionsEnded
-                ]);
-            } else {
-                // Fallback : terminer toutes les sessions actives de l'utilisateur
-                $sessionsEnded = UserSessionService::endAllUserSessions($userId);
-                LogService::info("Logout - Toutes les sessions terminées", [
-                    'user_id' => $userId,
-                    'sessions_ended' => $sessionsEnded
-                ]);
-            }
-            
-            LoggingMiddleware::logExit(200);
-            Response::success('Déconnexion réussie', [
-                'sessions_ended' => $sessionsEnded,
-                'message' => 'Session(s) terminée(s) avec succès'
-            ]);
-            return true;
-            
-        } catch (Exception $e) {
-            LogService::error("Erreur lors de la déconnexion", [
-                'user_id' => $userId,
-                'error' => $e->getMessage()
-            ]);
-            LoggingMiddleware::logExit(500);
-            Response::error('Erreur serveur lors de la déconnexion');
-            return false;
-        }
-    }
-
     public function updateProfile($userId,$currentUserId, $currentUserRole){
         try {
             LoggingMiddleware::logEntry();
@@ -789,7 +593,7 @@ class UserManagerController {
     /**
      * Renvoyer l'email de vérification pour un utilisateur
      */
-    public function resendVerificationEmail() {
+        public function resendVerificationEmail() {
         try {
             LoggingMiddleware::logEntry();
             $input = Response::getRequestParams();

@@ -37,7 +37,7 @@ class UserController {
         return $this->userListController->getById($id, $currentUserId, $currentUserRole);
     }
     
-     /**
+    /**
      * Créer un nouvel utilisateur
      */
     public function create() {
@@ -58,14 +58,6 @@ class UserController {
         return $this->userManagerController->restore($userId, $currentUserId, $currentUserRole);
     }
    
-    /**
-     * Authentification utilisateur pour LOGIN
-     * Nécessite: api_key, email, password
-     */
-    public function authenticate() {
-        return $this->userManagerController->authenticate();
-    }
-
     /**
      * Upload d'un avatar utilisateur
      * POST /users/avatar
@@ -91,10 +83,6 @@ class UserController {
      */
     public function changePassword($userId,$currentUserId, $currentUserRole) {
         return $this->userPasswordController->changePassword($userId,$currentUserId, $currentUserRole);
-    }
-
-    public function logout($userId) {
-       return $this->userManagerController->logout($userId);
     }
 
     public function updateProfile($userId,$currentUserId, $currentUserRole){

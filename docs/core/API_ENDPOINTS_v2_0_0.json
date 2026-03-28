@@ -1,9 +1,9 @@
 {
   "api": {
     "name": "AuthGroups API",
-    "version": "2.1.0",
+    "version": "2.1.1",
     "description": "API REST complète pour la gestion d'authentification, groupes, fichiers, tags, calendriers ICS et CalDAV",
-    "generated": "2026-03-26",
+    "generated": "2026-03-27",
     "base_url": "/",
     "authentication": {
       "type": "JWT_BEARER",
@@ -408,6 +408,30 @@
           "params": { "id": "integer (required)" },
           "roles": ["ADMINISTRATEUR"],
           "response": "User object restauré"
+        },
+        {
+          "method": "GET",
+          "path": "/users/{id}/sessions",
+          "description": "Lister les sessions actives d'un utilisateur",
+          "params": { "id": "integer (required)" },
+          "roles": ["ADMINISTRATEUR", "self"],
+          "response": "Array de sessions actives + total"
+        },
+        {
+          "method": "DELETE",
+          "path": "/users/{id}/sessions",
+          "description": "Terminer toutes les sessions actives d'un utilisateur",
+          "params": { "id": "integer (required)" },
+          "roles": ["ADMINISTRATEUR", "self"],
+          "response": "Nombre de sessions terminées"
+        },
+        {
+          "method": "GET",
+          "path": "/users/{id}/session-status",
+          "description": "Vérifier si un utilisateur a une session active",
+          "params": { "id": "integer (required)" },
+          "roles": ["ADMINISTRATEUR", "self"],
+          "response": "{ has_active_session, active_sessions_count, last_activity }"
         },
         {
           "method": "POST",
@@ -820,6 +844,20 @@
           "path": "/stats/my-stats",
           "description": "Obtenir ses propres statistiques",
           "response": "Object avec statistiques utilisateur"
+        },
+        {
+          "method": "GET",
+          "path": "/stats/online",
+          "description": "Sessions actives en cours sur la plateforme",
+          "roles": ["ADMINISTRATEUR"],
+          "response": "Statistiques des sessions actives"
+        },
+        {
+          "method": "POST",
+          "path": "/stats/cleanup-sessions",
+          "description": "Nettoyer les sessions expirées",
+          "roles": ["ADMINISTRATEUR"],
+          "response": "Nombre de sessions nettoyées"
         }
       ]
     },
@@ -1115,6 +1153,12 @@
           "description": "Lister les procédures disponibles",
           "query": { "secret": "string (required) — ADMIN_SECRET_KEY" },
           "response": "Array des procédures disponibles"
+        },
+        {
+          "method": "GET",
+          "path": "/secret-admin/plugins",
+          "description": "Lister les plugins chargés",
+          "response": "Array des plugins avec leur nom et statut"
         }
       ]
     }
@@ -1125,8 +1169,10 @@
       "otp_codes — codes OTP à 6 chiffres pour connexion par email",
       "device_tokens — tokens longue durée par appareil pour renouvellement JWT"
     ],
-    "tables_modified": [
-      "user_sessions — colonne api_key_id rendue nullable (sessions JWT sans clé API)"
+    "tables_modified": [],
+    "tables_removed": [
+      "api_keys — système de clés API retiré (v2.1.1), remplacé par JWT",
+      "user_sessions.api_key_id — colonne retirée (v2.1.1)"
     ]
   }
 }

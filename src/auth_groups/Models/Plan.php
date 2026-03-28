@@ -66,33 +66,6 @@ class Plan extends BaseModel
     }
     
     /**
-     * Obtenir la configuration par défaut pour une API key selon le plan
-     */
-    public static function getApiKeyConfigForPlan(string $planName): array
-    {
-        $plan = self::findByName($planName);
-        
-        if (!$plan) {
-            // Plan par défaut si non trouvé
-            return [
-                'scopes' => ['read'],
-                'rate_limit_per_minute' => 10,
-                'rate_limit_per_hour' => 100,
-                'expires_in_days' => 7 // Très limité pour forcer à choisir un plan
-            ];
-        }
-        
-        $features = json_decode($plan['features'], true) ?? [];
-        
-        return [
-            'scopes' => $features['scopes'] ?? ['read'],
-            'rate_limit_per_minute' => $plan['api_rate_limit'] ?? 60,
-            'rate_limit_per_hour' => ($plan['api_rate_limit'] ?? 60) * 60,
-            'expires_in_days' => $features['expires_in_days'] ?? null
-        ];
-    }
-    
-    /**
      * Initialiser les plans par défaut dans la base de données
      */
     public static function initializeDefaultPlans()

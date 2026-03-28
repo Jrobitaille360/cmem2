@@ -4,15 +4,18 @@ namespace AuthGroups\Routing\RouteHandlers;
 
 use AuthGroups\Routing\BaseRouteHandler;
 use AuthGroups\Controllers\StatsController;
+use AuthGroups\Controllers\UserSessionController;
 use AuthGroups\Utils\Response;
 
-class StatsRouteHandler extends BaseRouteHandler 
+class StatsRouteHandler extends BaseRouteHandler
 {
     private StatsController $controller;
-    
+    private UserSessionController $sessionController;
+
     public function __construct($authService) {
         parent::__construct($authService);
         $this->controller = new StatsController();
+        $this->sessionController = new UserSessionController();
     }
     
     protected function getSupportedControllers(): array {
@@ -50,7 +53,15 @@ class StatsRouteHandler extends BaseRouteHandler
             // GET /stats/my-stats
             ($action === 'my-stats' && $method === 'GET') =>
                 $this->controller->getUserStats($user['user_id'], $user['user_id'], $user['role']),
-                
+
+            // GET /stats/online - Sessions actives (admin)
+            ($action === 'online' && $method === 'GET') =>
+                $this->sessionController->getOnlineStats($user['user_id'], $user['role']),
+
+            // POST /stats/cleanup-sessions - Nettoyer les sessions expirées (admin)
+            ($action === 'cleanup-sessions' && $method === 'POST') =>
+                $this->sessionController->cleanupExpiredSessions($user['user_id'], $user['role']),
+
             default => Response::error('Route statistiques non trouvée', null, 404)
         };
     }

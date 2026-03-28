@@ -86,10 +86,10 @@ class GroupInvitationController
         }
     }
 
+    // TODO : valider car email semble suffisant et dédoubler avec joinByCode
     /**
      * Rejoindre un groupe via un token d'invitation
      */
-    // TODO : valider car email semble suffisant et dédoubler avec joinByCode
     public function joinGroup(): bool {
         try {
             $input = json_decode(file_get_contents('php://input'), true);

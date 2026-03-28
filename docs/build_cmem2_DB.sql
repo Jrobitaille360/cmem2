@@ -16,31 +16,6 @@ SET time_zone = "+00:00";
 /*!40101 SET NAMES utf8mb4 */;
 
 -- ============================================================
--- PROCÉDURES STOCKÉES
--- ============================================================
-
-DELIMITER $$
-
-DROP PROCEDURE IF EXISTS `CleanupExpiredSessions`$$
-$$
-DROP PROCEDURE IF EXISTS `CleanupOldStats`$$
-$$
-DROP PROCEDURE IF EXISTS `cleanup_expired_api_keys`$$
-$$
-DROP PROCEDURE IF EXISTS `GenerateGroupStats`$$
-$$
-DROP PROCEDURE IF EXISTS `GeneratePlatformStats`$$
-$$
-DROP PROCEDURE IF EXISTS `GenerateUserStats`$$
-$$
-DROP PROCEDURE IF EXISTS `ResetAuthenticationGroups`$$
-$$
-DROP PROCEDURE IF EXISTS `ResetICSTables`$$
-$$
-
-DELIMITER ;
-
--- ============================================================
 -- VUES — Doublures de structure (requises avant les vraies vues)
 -- ============================================================
 
@@ -48,7 +23,6 @@ DROP VIEW IF EXISTS `active_user_sessions`;
 CREATE TABLE `active_user_sessions` (
 `id` int(11)
 ,`user_id` int(11)
-,`api_key_id` int(11)
 ,`login_at` timestamp
 ,`last_activity_at` timestamp
 ,`logout_at` timestamp
@@ -60,8 +34,6 @@ CREATE TABLE `active_user_sessions` (
 ,`email` varchar(255)
 ,`username` varchar(255)
 ,`role` enum('ADMINISTRATEUR','UTILISATEUR')
-,`api_key_name` varchar(255)
-,`environment` enum('production','test')
 ,`minutes_since_activity` bigint(21)
 ,`session_duration_minutes` bigint(21)
 );
@@ -90,36 +62,6 @@ CREATE TABLE `v_admin_dashboard` (
 -- ============================================================
 -- TABLES
 -- ============================================================
-
--- ------------------------------------------------------------
--- api_keys
--- ------------------------------------------------------------
-DROP TABLE IF EXISTS `api_keys`;
-CREATE TABLE `api_keys` (
-  `id` int(11) NOT NULL,
-  `user_id` int(11) NOT NULL,
-  `plan_id` int(11) DEFAULT NULL,
-  `plan_limited` tinyint(1) NOT NULL DEFAULT 0,
-  `name` varchar(255) NOT NULL,
-  `key_prefix` varchar(10) NOT NULL DEFAULT 'ag_live',
-  `key_hash` varchar(255) NOT NULL,
-  `last_4` varchar(4) NOT NULL,
-  `scopes` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`scopes`)),
-  `environment` enum('production','test') NOT NULL DEFAULT 'production',
-  `rate_limit_per_minute` int(11) DEFAULT 60,
-  `rate_limit_per_hour` int(11) DEFAULT 3600,
-  `total_requests` int(11) DEFAULT 0,
-  `last_used_at` datetime DEFAULT NULL,
-  `last_used_ip` varchar(45) DEFAULT NULL,
-  `expires_at` datetime DEFAULT NULL,
-  `revoked_at` datetime DEFAULT NULL,
-  `revoked_reason` varchar(255) DEFAULT NULL,
-  `metadata` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`metadata`)),
-  `notes` text DEFAULT NULL,
-  `created_at` datetime DEFAULT current_timestamp(),
-  `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `deleted_at` datetime DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ------------------------------------------------------------
 -- caldav_locks
@@ -537,7 +479,6 @@ DROP TABLE IF EXISTS `user_sessions`;
 CREATE TABLE `user_sessions` (
   `id` int(11) NOT NULL,
   `user_id` int(11) NOT NULL,
-  `api_key_id` int(11) DEFAULT NULL,
   `login_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `last_activity_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `logout_at` timestamp NULL DEFAULT NULL,
@@ -571,18 +512,6 @@ CREATE TABLE `user_stats_snapshot` (
 -- ============================================================
 -- INDEX
 -- ============================================================
-
-ALTER TABLE `api_keys`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `unique_key_hash` (`key_hash`),
-  ADD KEY `idx_user_id` (`user_id`),
-  ADD KEY `idx_key_prefix` (`key_prefix`),
-  ADD KEY `idx_environment` (`environment`),
-  ADD KEY `idx_expires_at` (`expires_at`),
-  ADD KEY `idx_revoked_at` (`revoked_at`),
-  ADD KEY `idx_created_at` (`created_at`),
-  ADD KEY `idx_last_used_at` (`last_used_at`),
-  ADD KEY `idx_api_keys_plan_limited` (`plan_id`,`plan_limited`);
 
 ALTER TABLE `caldav_locks`
   ADD PRIMARY KEY (`id`),
@@ -739,7 +668,6 @@ ALTER TABLE `user_app_setup`
 ALTER TABLE `user_sessions`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_user_id` (`user_id`),
-  ADD KEY `idx_api_key_id` (`api_key_id`),
   ADD KEY `idx_active_sessions` (`user_id`,`is_active`,`expires_at`),
   ADD KEY `idx_cleanup` (`expires_at`,`is_active`);
 
@@ -753,7 +681,6 @@ ALTER TABLE `user_stats_snapshot`
 -- AUTO_INCREMENT
 -- ============================================================
 
-ALTER TABLE `api_keys`            MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 ALTER TABLE `caldav_locks`        MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 ALTER TABLE `caldav_sync_log`     MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 ALTER TABLE `calendars`           MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
@@ -784,15 +711,13 @@ ALTER TABLE `user_stats_snapshot` MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 DROP TABLE IF EXISTS `active_user_sessions`;
 DROP VIEW IF EXISTS `active_user_sessions`;
 CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `active_user_sessions` AS
-  SELECT `us`.`id`, `us`.`user_id`, `us`.`api_key_id`, `us`.`login_at`, `us`.`last_activity_at`,
+  SELECT `us`.`id`, `us`.`user_id`, `us`.`login_at`, `us`.`last_activity_at`,
     `us`.`logout_at`, `us`.`expires_at`, `us`.`ip_address`, `us`.`user_agent`, `us`.`is_active`,
     `us`.`session_data`, `u`.`email`, `u`.`name` AS `username`, `u`.`role`,
-    `ak`.`name` AS `api_key_name`, `ak`.`environment`,
     TIMESTAMPDIFF(MINUTE, `us`.`last_activity_at`, CURRENT_TIMESTAMP()) AS `minutes_since_activity`,
     TIMESTAMPDIFF(MINUTE, `us`.`login_at`, IFNULL(`us`.`logout_at`, CURRENT_TIMESTAMP())) AS `session_duration_minutes`
-  FROM (`user_sessions` `us`
+  FROM `user_sessions` `us`
     JOIN `users` `u` ON `us`.`user_id` = `u`.`id`
-    JOIN `api_keys` `ak` ON `us`.`api_key_id` = `ak`.`id`)
   WHERE `us`.`is_active` = 1
     AND `us`.`expires_at` > CURRENT_TIMESTAMP()
     AND `u`.`deleted_at` IS NULL;
@@ -823,10 +748,6 @@ CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW 
 -- ============================================================
 -- CONTRAINTES (CLÉS ÉTRANGÈRES)
 -- ============================================================
-
-ALTER TABLE `api_keys`
-  ADD CONSTRAINT `fk_api_keys_plan` FOREIGN KEY (`plan_id`) REFERENCES `plans` (`id`) ON DELETE SET NULL,
-  ADD CONSTRAINT `fk_api_keys_user_id` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 ALTER TABLE `caldav_locks`
   ADD CONSTRAINT `caldav_locks_ibfk_1` FOREIGN KEY (`calendar_id`) REFERENCES `calendars` (`id`) ON DELETE CASCADE,
@@ -901,15 +822,6 @@ ALTER TABLE `user_sessions`
 ALTER TABLE `user_stats_snapshot`
   ADD CONSTRAINT `user_stats_snapshot_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 
-COMMIT;
-
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-
--- ============================================================
--- MIGRATIONS — À exécuter une seule fois
--- ============================================================
 
 -- otp_codes
 CREATE TABLE IF NOT EXISTS `otp_codes` (
@@ -925,10 +837,6 @@ CREATE TABLE IF NOT EXISTS `otp_codes` (
     INDEX `idx_otp_email`   (`email`),
     INDEX `idx_otp_expires` (`expires_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Rendre api_key_id nullable (sessions JWT n'ont pas de clé)
-ALTER TABLE `user_sessions` DROP FOREIGN KEY `fk_user_sessions_api_key`;
-ALTER TABLE `user_sessions` MODIFY COLUMN `api_key_id` INT UNSIGNED NULL DEFAULT NULL;
 
 -- device_tokens
 CREATE TABLE IF NOT EXISTS `device_tokens` (
@@ -972,3 +880,177 @@ CREATE TABLE IF NOT EXISTS `login_attempts` (
     PRIMARY KEY (`id`),
     INDEX `idx_rate_limit` (`email`, `ip_address`, `endpoint`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+COMMIT;
+
+-- ============================================================
+-- PROCÉDURES STOCKÉES
+-- ============================================================
+DELIMITER $$
+
+DROP PROCEDURE IF EXISTS `CleanupExpiredSessions`$$
+$$
+DROP PROCEDURE IF EXISTS `CleanupOldStats`$$
+$$
+DROP PROCEDURE IF EXISTS `GenerateGroupStats`$$
+$$
+DROP PROCEDURE IF EXISTS `GeneratePlatformStats`$$
+$$
+DROP PROCEDURE IF EXISTS `GenerateUserStats`$$
+$$
+
+DELIMITER ;
+
+DELIMITER $$
+
+-- ===== Procédure pour générer les statistiques globales =====
+CREATE PROCEDURE GeneratePlatformStats()
+BEGIN
+    INSERT INTO platform_stats (
+        total_users, active_users_7d, active_users_30d, total_groups, 
+        total_tags, total_files, total_storage_mb, pending_invitations, avg_group_size
+    )
+    SELECT 
+        (SELECT COUNT(*) FROM users WHERE deleted_at IS NULL) as total_users,
+        (SELECT COUNT(*) FROM users WHERE deleted_at IS NULL AND last_login >= DATE_SUB(NOW(), INTERVAL 7 DAY)) as active_users_7d,
+        (SELECT COUNT(*) FROM users WHERE deleted_at IS NULL AND last_login >= DATE_SUB(NOW(), INTERVAL 30 DAY)) as active_users_30d,
+        (SELECT COUNT(*) FROM groups WHERE deleted_at IS NULL) as total_groups,
+        (SELECT COUNT(*) FROM tags WHERE deleted_at IS NULL) as total_tags,
+        (SELECT COUNT(*) FROM files) as total_files,
+        (SELECT ROUND(COALESCE(SUM(file_size), 0) / 1024 / 1024, 2) FROM files) as total_storage_mb,
+        (SELECT COUNT(*) FROM group_invitations WHERE status = 'pending' AND (expires_at IS NULL OR expires_at > NOW())) as pending_invitations,
+        (SELECT ROUND(AVG(member_count), 2) FROM (
+            SELECT COUNT(gm.user_id) as member_count 
+            FROM groups g 
+            LEFT JOIN group_members gm ON g.id = gm.group_id AND gm.deleted_at IS NULL 
+            WHERE g.deleted_at IS NULL 
+            GROUP BY g.id
+        ) as group_sizes) as avg_group_size;
+END$$
+
+-- ===== Procédure pour générer les statistiques par groupe =====
+CREATE PROCEDURE GenerateGroupStats()
+BEGIN
+    -- Supprimer les anciens snapshots (garder seulement les 30 derniers jours)
+    DELETE FROM group_stats_snapshot WHERE generated_at < DATE_SUB(NOW(), INTERVAL 30 DAY);
+    
+    INSERT INTO group_stats_snapshot (
+        group_id, group_name, visibility, member_count, tag_count, days_since_creation
+    )
+    SELECT 
+        g.id,
+        g.name,
+        g.visibility,
+        COALESCE(gm_count.member_count, 0),
+        COALESCE(gt_count.tag_count, 0),
+        DATEDIFF(NOW(), g.created_at) as days_since_creation
+    FROM groups g
+    LEFT JOIN (
+        SELECT group_id, COUNT(*) as member_count 
+        FROM group_members 
+        WHERE deleted_at IS NULL 
+        GROUP BY group_id
+    ) gm_count ON g.id = gm_count.group_id
+    LEFT JOIN (
+        SELECT group_id, COUNT(*) as tag_count 
+        FROM group_tag_relations 
+        WHERE deleted_at IS NULL 
+        GROUP BY group_id
+    ) gt_count ON g.id = gt_count.group_id
+    WHERE g.deleted_at IS NULL;
+END$$
+
+-- ===== Procédure pour générer les statistiques par utilisateur =====
+CREATE PROCEDURE GenerateUserStats()
+BEGIN
+    -- Supprimer les anciens snapshots (garder seulement les 30 derniers jours)
+    DELETE FROM user_stats_snapshot WHERE generated_at < DATE_SUB(NOW(), INTERVAL 30 DAY);
+    
+    INSERT INTO user_stats_snapshot (
+        user_id, user_name, role, last_login, groups_created, groups_joined,
+        tags_created, files_uploaded, storage_used_mb, invitations_sent, days_since_registration
+    )
+    SELECT 
+        u.id,
+        u.name,
+        u.role,
+        u.last_login,
+        COALESCE(groups_created.count, 0),
+        COALESCE(groups_joined.count, 0),
+        COALESCE(tags_created.count, 0),
+        COALESCE(files_uploaded.count, 0),
+        COALESCE(storage_used.storage_mb, 0),
+        COALESCE(invitations_sent.count, 0),
+        DATEDIFF(NOW(), u.created_at) as days_since_registration
+    FROM users u
+    LEFT JOIN (
+        SELECT owner_id, COUNT(*) as count 
+        FROM groups 
+        WHERE deleted_at IS NULL 
+        GROUP BY owner_id
+    ) groups_created ON u.id = groups_created.owner_id
+    LEFT JOIN (
+        SELECT user_id, COUNT(*) as count 
+        FROM group_members 
+        WHERE deleted_at IS NULL 
+        GROUP BY user_id
+    ) groups_joined ON u.id = groups_joined.user_id
+    LEFT JOIN (
+        SELECT tag_owner, COUNT(*) as count 
+        FROM tags 
+        WHERE deleted_at IS NULL 
+        GROUP BY tag_owner
+    ) tags_created ON u.id = tags_created.tag_owner
+    LEFT JOIN (
+        SELECT uploaded_by, COUNT(*) as count 
+        FROM files 
+        GROUP BY uploaded_by
+    ) files_uploaded ON u.id = files_uploaded.uploaded_by
+    LEFT JOIN (
+        SELECT uploaded_by, ROUND(COALESCE(SUM(file_size), 0) / 1024 / 1024, 2) as storage_mb
+        FROM files 
+        GROUP BY uploaded_by
+    ) storage_used ON u.id = storage_used.uploaded_by
+    LEFT JOIN (
+        SELECT invited_by, COUNT(*) as count 
+        FROM group_invitations 
+        GROUP BY invited_by
+    ) invitations_sent ON u.id = invitations_sent.invited_by
+    WHERE u.deleted_at IS NULL;
+END$$
+
+-- ===== Procédure de nettoyage des anciennes statistiques =====
+CREATE PROCEDURE CleanupOldStats()
+BEGIN
+    -- Garder seulement les 100 derniers snapshots de statistiques globales
+    DELETE FROM platform_stats 
+    WHERE id NOT IN (
+        SELECT id FROM (
+            SELECT id FROM platform_stats 
+            ORDER BY generated_at DESC 
+            LIMIT 100
+        ) as keep_stats
+    );
+    
+    -- Nettoyer les snapshots de plus de 30 jours
+    DELETE FROM group_stats_snapshot WHERE generated_at < DATE_SUB(NOW(), INTERVAL 30 DAY);
+    DELETE FROM user_stats_snapshot WHERE generated_at < DATE_SUB(NOW(), INTERVAL 30 DAY);
+    
+    SELECT 'Nettoyage des anciennes statistiques terminé' as message, NOW() as cleaned_at;
+END$$
+
+CREATE OR REPLACE PROCEDURE CleanupExpiredSessions()
+BEGIN
+    -- Marquer les sessions expirées comme inactives
+    UPDATE user_sessions 
+    SET is_active = 0, logout_at = NOW()
+    WHERE is_active = 1 
+      AND expires_at < NOW();
+      
+    -- Supprimer les anciennes sessions (plus de 30 jours)
+    DELETE FROM user_sessions 
+    WHERE logout_at < NOW() - INTERVAL 30 DAY
+       OR (is_active = 0 AND login_at < NOW() - INTERVAL 30 DAY);
+       
+    SELECT ROW_COUNT() as cleaned_sessions;
+END //
+DELIMITER ;

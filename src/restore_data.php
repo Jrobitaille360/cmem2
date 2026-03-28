@@ -105,10 +105,8 @@ try {
         'tags',
         'groups',
         'files',
-        'api_keys',
         'user_sessions',
         'user_app_setup',
-        'login_codes',
         'password_resets',
         'email_verifications',
         'notifications',
@@ -116,7 +114,6 @@ try {
         'group_invitations',
         'group_tag_relations',
         'file_tag_relations',
-        'user_plan_history',
         'plan_invitations',
         'group_stats_snapshot',
         'user_stats_snapshot',
@@ -136,15 +133,6 @@ try {
                 'values' => ['jrobitaille04@pm.me', 'user@cmem2.com']
             ]
         ],
-        'api_keys' => [
-            [
-                'column' => 'key_hash',
-                'values' => [
-                    'f9281a209030ab51f15c66e56ff6f55bb556fab82032919505ee3ea20fe589c4',
-                    '36577224f257ec561c9f0f7330420f2c6996308e199bc115a24f91b9659f9f0c'
-                ]
-            ]
-        ]
     ];
 
     $db = Database::getInstance()->getConnection();

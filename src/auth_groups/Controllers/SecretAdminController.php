@@ -15,7 +15,7 @@ use Exception;
 class SecretAdminController
 {
     private AdminModel $model;
-
+    
     public function __construct()
     {
         $this->model = new AdminModel();
@@ -104,7 +104,6 @@ class SecretAdminController
                 'AddCalDAVSupport',
                 'CleanupExpiredSessions',
                 'CleanupOldStats',
-                'cleanup_expired_api_keys',
                 'GenerateGroupStats',
                 'GeneratePlatformStats',
                 'GenerateUserStats',
@@ -225,12 +224,6 @@ class SecretAdminController
                     'description' => 'Nettoie les anciennes statistiques (garde les 100 derniers snapshots et supprime ceux de +30 jours)',
                     'parameters' => [],
                     'danger_level' => 'MEDIUM'
-                ],
-                'cleanup_expired_api_keys' => [
-                    'name' => 'cleanup_expired_api_keys',
-                    'description' => 'Marque comme révoquées les clés API expirées non encore révoquées',
-                    'parameters' => [],
-                    'danger_level' => 'LOW'
                 ],
                 'GenerateGroupStats' => [
                     'name' => 'GenerateGroupStats',

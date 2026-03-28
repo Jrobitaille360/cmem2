@@ -7,6 +7,9 @@ error_log
 .env.cmem1
 .env.local
 .env.journauxdebord
+.env prod
+.env dev
+
 docs/lmdkhdg5_cmem2.sql
 docs/seed_users.sql
 
