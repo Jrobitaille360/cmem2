@@ -127,7 +127,7 @@ class GroupMemberController
             ]);
 
             LoggingMiddleware::logExit(200);
-            Response::success('Vous avez quitté le groupe avec succès');
+            Response::success('Vous avez quitté le groupe avec succès', ['group_id' => $groupId]);
         } catch (Exception $e) {
             LogService::error("Erreur lors du départ du groupe", [
                 'group_id' => $groupId,
@@ -221,7 +221,7 @@ class GroupMemberController
             ]);
 
             LoggingMiddleware::logExit(200);
-            Response::success('Rôle mis à jour avec succès');
+            Response::success('Rôle mis à jour avec succès', ['group_id' => $groupId, 'user_id' => $userId]);
         } catch (Exception $e) {
             LogService::error("Erreur lors de la mise à jour du rôle", [
                 'error' => $e->getMessage()

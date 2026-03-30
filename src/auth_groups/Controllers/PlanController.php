@@ -62,6 +62,53 @@ class PlanController
     }
     
     /**
+     * Afficher un plan spécifique
+     * GET /plans/{id}
+     */
+    public function getPlan(int $id)
+    {
+        try {
+            LoggingMiddleware::logEntry();
+
+            $plan = Plan::getActiveById($id);
+
+            if (!$plan) {
+                LoggingMiddleware::logExit(404);
+                Response::error('Plan non trouvé', null, 404);
+                return false;
+            }
+
+            $features = json_decode($plan['features'], true) ?? [];
+            $formatted = [
+                'id'            => $plan['id'],
+                'name'          => $plan['name'],
+                'display_name'  => $plan['display_name'],
+                'description'   => $plan['description'],
+                'price'         => (float)$plan['price'],
+                'currency'      => $plan['currency'],
+                'duration_days' => $plan['duration_days'],
+                'api_rate_limit'=> $plan['api_rate_limit'],
+                'features'      => $features,
+                'is_recommended'=> $plan['name'] === 'argent',
+                'created_at'    => $plan['created_at']
+            ];
+
+            LoggingMiddleware::logExit(200);
+            Response::success('Plan récupéré', $formatted);
+            return true;
+
+        } catch (Exception $e) {
+            LogService::error("Erreur lors de la récupération du plan", [
+                'error' => $e->getMessage(),
+                'id'    => $id
+            ]);
+            LoggingMiddleware::logExit(500);
+            Response::error('Erreur serveur lors de la récupération du plan');
+            return false;
+        }
+    }
+
+    /**
      * Traiter la sélection d'un plan via token d'invitation
      * POST /users/choose-plan
      */

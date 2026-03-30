@@ -270,7 +270,7 @@ class UserManagerController {
                     'deleted_user_name' => $userData['name']
                 ]);                
                 LoggingMiddleware::logExit(200);
-                Response::success(['message' => 'Utilisateur supprimé avec succès']);
+                Response::success('Utilisateur supprimé avec succès', ['deleted' => true]);
                 return true;
             } else {
                 LogService::error("Échec de la suppression utilisateur", [
@@ -323,7 +323,7 @@ class UserManagerController {
                     'restored_user_name' => $userData['name']
                 ]);
                 LoggingMiddleware::logExit(200);
-                Response::success(['message' => 'Utilisateur restauré avec succès']);
+                Response::success('Utilisateur restauré avec succès', ['restored' => true]);
                 return true;
             } else {
                 LogService::error("Échec de la restauration utilisateur", [
@@ -612,16 +612,16 @@ class UserManagerController {
             $userData = $userModel->findByEmail($input['email']);
             
             if (!$userData) {
-                LoggingMiddleware::logExit(404);
-                Response::error('Aucun compte associé à cette adresse email', null, 404);
-                return false;
+                LoggingMiddleware::logExit(200);
+                Response::success('Si cette adresse est associée à un compte non vérifié, un email de vérification sera envoyé.');
+                return true;
             }
-            
+
             // Vérifier si l'email est déjà vérifié
             if ($userData['email_verified']) {
-                LoggingMiddleware::logExit(400);
-                Response::error('Cette adresse email est déjà vérifiée', null, 400);
-                return false;
+                LoggingMiddleware::logExit(200);
+                Response::success('Si cette adresse est associée à un compte non vérifié, un email de vérification sera envoyé.');
+                return true;
             }
             
             // Générer un nouveau token de vérification

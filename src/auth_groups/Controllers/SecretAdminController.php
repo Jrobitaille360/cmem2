@@ -5,6 +5,7 @@ namespace AuthGroups\Controllers;
 use AuthGroups\Utils\Response;
 use AuthGroups\Services\LogService;
 use AuthGroups\Models\AdminModel;
+use Core\PluginManager;
 use Exception;
 
 /**
@@ -164,6 +165,56 @@ class SecretAdminController
                 'line' => $e->getLine()
             ]);
             Response::error('Erreur lors de l\'exécution: ' . $e->getMessage(), null, 500);
+        }
+    }
+
+    /**
+     * Liste les plugins chargés
+     * GET /secret-admin/plugins?admin_secret=clé_secrète
+     *
+     * SÉCURITÉ : Double authentification requise
+     * 1. JWT valide avec rôle ADMINISTRATEUR (vérifié dans RouteHandler)
+     * 2. Clé secrète admin dans query param
+     */
+    public function listPlugins(array $authenticatedUser): void
+    {
+        try
+        {
+            $queryData = isset($_GET['admin_secret']) ? ['admin_secret' => $_GET['admin_secret']] : null;
+
+            if (!$this->verifySecretKey($queryData))
+            {
+                LogService::warning('Tentative d\'accès plugins admin sans clé secrète valide', [
+                    'admin_user_id' => $authenticatedUser['user_id'],
+                    'admin_email' => $authenticatedUser['email'],
+                    'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown'
+                ]);
+                Response::error('Clé secrète admin invalide', null, 403);
+                return;
+            }
+
+            $pluginManager = PluginManager::getInstance();
+            $plugins = $pluginManager->getLoadedPlugins();
+
+            LogService::info('Liste des plugins consultée via admin secret - AUTHENTIFIÉ', [
+                'admin_user_id' => $authenticatedUser['user_id'],
+                'admin_email' => $authenticatedUser['email'],
+                'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown'
+            ]);
+
+            Response::success('Plugins récupérés avec succès', [
+                'plugins' => $plugins,
+                'count' => count($plugins)
+            ]);
+        }
+        catch (Exception $e)
+        {
+            LogService::error('Erreur lors de la récupération des plugins', [
+                'error' => $e->getMessage(),
+                'admin_user_id' => $authenticatedUser['user_id'],
+                'admin_email' => $authenticatedUser['email']
+            ]);
+            Response::error('Erreur serveur: ' . $e->getMessage(), null, 500);
         }
     }
 

@@ -4,14 +4,9 @@ error_log
 
 # Fichiers de configuration sensibles
 .env
-.env.cmem1
-.env.local
-.env.journauxdebord
-.env prod
-.env dev
 
-docs/lmdkhdg5_cmem2.sql
-docs/seed_users.sql
+# répertoire de données privées
+private/
 
 # Credentials Google Calendar
 src/ics/credentials.json

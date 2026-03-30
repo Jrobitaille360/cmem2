@@ -52,7 +52,7 @@ class StatsRouteHandler extends BaseRouteHandler
 
             // GET /stats/my-stats
             ($action === 'my-stats' && $method === 'GET') =>
-                $this->controller->getUserStats($user['user_id'], $user['user_id'], $user['role']),
+                $this->controller->getMyStats($user['user_id']),
 
             // GET /stats/online - Sessions actives (admin)
             ($action === 'online' && $method === 'GET') =>

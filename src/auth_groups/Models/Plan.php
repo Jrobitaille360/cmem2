@@ -49,6 +49,23 @@ class Plan extends BaseModel
     }
     
     /**
+     * Obtenir un plan actif par son ID
+     */
+    public static function getActiveById(int $id)
+    {
+        $model = new self();
+        $db = $model->getDb();
+
+        $stmt = $db->prepare("
+            SELECT * FROM plans
+            WHERE id = :id AND is_active = 1
+        ");
+
+        $stmt->execute([':id' => $id]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+    /**
      * Obtenir un plan par son nom
      */
     public static function findByName(string $planName)

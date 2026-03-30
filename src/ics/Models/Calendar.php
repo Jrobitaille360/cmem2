@@ -61,6 +61,7 @@ class Calendar extends BaseModel
 
         return [
             'id' => $calendarId,
+            'title' => $this->title,
             'share_token' => $shareToken,
             'ics_url' => self::generateIcsUrl($shareToken),
             'ctag' => $ctag,
@@ -276,15 +277,22 @@ class Calendar extends BaseModel
 
     /**
      * Vérifie si un utilisateur est le propriétaire d'un calendrier.
+     * $includingDeleted = true pour inclure les calendriers soft-deleted (ex: hard delete).
      */
-    public function isOwner($calendarId, $userId): bool
+    public function isOwner($calendarId, $userId, bool $includingDeleted = false): bool
     {
-        $stmt = $this->getDb()->prepare("
-            SELECT id FROM {$this->table} 
-            WHERE id = ? AND user_id = ? AND deleted_at IS NULL
-        ");
+        $sql = "SELECT id FROM {$this->table} WHERE id = ? AND user_id = ?";
+        if (!$includingDeleted) {
+            $sql .= " AND deleted_at IS NULL";
+        }
+        $stmt = $this->getDb()->prepare($sql);
         $stmt->execute([$calendarId, $userId]);
         return $stmt->fetchColumn() !== false;
+    }
+
+    public function isOwnerIncludingDeleted($calendarId, $userId): bool
+    {
+        return $this->isOwner($calendarId, $userId, true);
     }
 
     /**

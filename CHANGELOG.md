@@ -7,6 +7,64 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [2.2.0] — 2026-03-30
+
+### Sécurité
+
+- **Anti-énumération** — `POST /auth/resend-verification` et `POST /users/password-change`
+  retournent désormais `200` avec message générique quelle que soit l'existence ou l'état du compte
+  (protège contre l'énumération d'adresses email)
+
+### Nouvelles routes
+
+- `GET /plans/{id}` — détails d'un plan spécifique (public, non authentifié)
+- `GET /stats/my-stats` — statistiques de l'utilisateur connecté (tout rôle authentifié)
+  → route existante, maintenant câblée sur une méthode dédiée (séparée de `GET /stats/users/{id}`)
+- `GET /secret-admin/plugins` — liste des plugins chargés, maintenant sécurisée avec `admin_secret`
+  (refactorisé : retiré de `PluginController` isolé, intégré dans `SecretAdminController`)
+
+### Normalisation des réponses
+
+- **Fichiers** — `POST /files` : réponse enveloppée dans `{ file: { id, name, … } }` (champ `file_id` → `id`)
+  `GET /files/{id}/info` : clé `data` → `file`
+  `GET /files/user/{id}` : champ `file_id` → `id` dans la liste
+- **Utilisateurs** — `GET /users/me` et `GET /users/{id}` : clé `data` → `user`
+  `DELETE /users/me`, `DELETE /users/{id}` : réponse `{ deleted: true }` (était message texte)
+  `POST /users/{id}/restore` : réponse `{ restored: true }`
+- **Groupes** — `PUT /groups/{id}`, `DELETE /groups/{id}`, `POST /groups/{id}/restore`,
+  `POST /groups/{id}/leave` : réponses incluent maintenant `{ group_id }`
+  `PUT /groups/{id}/members/{user_id}` : réponse inclut `{ group_id, user_id }`
+- **Tags** — `DELETE /tags/{id}`, `POST /tags/{id}/restore` : réponses incluent `{ tag_id }`
+  `PUT /tags/{tag_id}/{item_id}` : body `action` supprimé, paramètre renommé `table_associate` (était `table`)
+- **Apps** — `DELETE /users/app/{app_id}` : réponse `{ deleted: true }`
+- **Plans** — `GET /plans` : supporte maintenant pagination (`page`, `limit`) et filtre `active`
+
+### Correctifs
+
+- `GET /stats/users/{id}` — accès restreint aux administrateurs uniquement
+  (auparavant, un utilisateur pouvait consulter ses propres stats via cette route — désormais via `my-stats`)
+- `CalendarController` — `updateCalendar()` et `deleteCalendar()` retournent `404` si le calendrier n'existe pas,
+  avant même la vérification des permissions (ordre corrigé)
+- `CalendarController::hardDeleteCalendar()` — utilise `isOwner($id, $userId, includingDeleted: true)`
+  pour distinguer correctement `404` (inexistant) de `403` (pas propriétaire), y compris sur soft-deleted
+- `Calendar::create()` — le champ `title` est maintenant inclus dans la réponse de création
+
+### Refactorisation
+
+- `Calendar::isOwner()` — paramètre optionnel `$includingDeleted = false` remplace la méthode
+  `isOwnerIncludingDeleted()` séparée (rétrocompatible)
+- `StatsController::getMyStats()` — requête SQL simplifiée (`ORDER BY generated_at DESC LIMIT 1`
+  remplace la sous-requête corélée avec double bind)
+- `.gitignore` — remplace les multiples entrées `.env.*` par `private/` (répertoire de données privées)
+
+### Documentation
+
+- `docs/core/API_ENDPOINTS_v2_0_0.json` — mise à jour complète :
+  réponses détaillées (schemas JSON), codes HTTP, contraintes de validation,
+  champs `query` / `body` / `params` enrichis pour tous les modules
+
+---
+
 ## [2.1.1] — 2026-03-27
 
 ### Plugin ICS — Phase 1 (Fondations iCal)

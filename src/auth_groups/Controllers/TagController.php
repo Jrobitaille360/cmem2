@@ -216,7 +216,7 @@ class TagController {
             // Validation
             $validation = Validator::validate($input, [
                 'name' => 'required|string|min:1|max:100',
-                'table_associate' => 'required|in:groups,files,all',
+                'table_associate' => 'in:groups,files,all',
                 'color' => 'color'
             ]);
             
@@ -432,9 +432,9 @@ class TagController {
                     'tag_id' => $id,
                     'deleted_by' => $currentUserId
                 ]);
-                
+
                 LoggingMiddleware::logExit(200);
-                return Response::success('Tag supprimé avec succès');
+                return Response::success('Tag supprimé avec succès', ['tag_id' => (int)$id]);
             } else {
                 LogService::error("Échec de suppression du tag", [
                     'tag_id' => $id,
@@ -614,9 +614,9 @@ class TagController {
                     'tag_id' => $id,
                     'restored_by' => $currentUserId
                 ]);
-                
+
                 LoggingMiddleware::logExit(200);
-                return Response::success('Tag restauré avec succès');
+                return Response::success('Tag restauré avec succès', ['tag_id' => (int)$id]);
             } else {
                 LogService::error("Échec de restauration du tag", [
                     'tag_id' => $id,

@@ -3,7 +3,7 @@
     "name": "AuthGroups API",
     "version": "2.1.1",
     "description": "API REST complète pour la gestion d'authentification, groupes, fichiers, tags, calendriers ICS et CalDAV",
-    "generated": "2026-03-27",
+    "generated": "2026-03-30",
     "base_url": "/",
     "authentication": {
       "type": "JWT_BEARER",
@@ -250,7 +250,7 @@
           "body": {
             "email": "string (required)"
           },
-          "response": "Message de confirmation"
+          "response": "Message de confirmation (générique pour protéger l'énumération — retourne toujours 200)"
         },
         {
           "method": "POST",
@@ -295,7 +295,22 @@
           "path": "/plans",
           "description": "Lister tous les plans d'abonnement disponibles",
           "auth_required": false,
-          "response": "Array de plan objects"
+          "query": {
+            "page": "integer (optional)",
+            "limit": "integer (optional)",
+            "active": "integer 0|1 (optional)"
+          },
+          "response": "{ plans: Plan[], total: integer }"
+        },
+        {
+          "method": "GET",
+          "path": "/plans/{id}",
+          "description": "Obtenir les détails d'un plan spécifique",
+          "auth_required": false,
+          "params": {
+            "id": "integer (required)"
+          },
+          "response": "Plan object"
         },
         {
           "method": "GET",
@@ -338,7 +353,7 @@
           "method": "GET",
           "path": "/users/me",
           "description": "Obtenir son propre profil",
-          "response": "User object"
+          "response": "{ user: User object }"
         },
         {
           "method": "PUT",
@@ -355,7 +370,8 @@
           "method": "DELETE",
           "path": "/users/me",
           "description": "Supprimer son propre compte",
-          "response": "Message de confirmation"
+          "body": { "password": "string (required)" },
+          "response": "{ deleted: true }"
         },
         {
           "method": "GET",
@@ -378,7 +394,7 @@
           "path": "/users/{id}",
           "description": "Obtenir les détails d'un utilisateur",
           "params": { "id": "integer (required)" },
-          "response": "User object"
+          "response": "{ user: User object }"
         },
         {
           "method": "PUT",
@@ -396,10 +412,10 @@
         {
           "method": "DELETE",
           "path": "/users/{id}",
-          "description": "Supprimer un utilisateur",
+          "description": "Supprimer un utilisateur (soft delete)",
           "params": { "id": "integer (required)" },
           "roles": ["ADMINISTRATEUR"],
-          "response": "Message de confirmation"
+          "response": "{ deleted: true }"
         },
         {
           "method": "POST",
@@ -407,7 +423,7 @@
           "description": "Restaurer un utilisateur supprimé",
           "params": { "id": "integer (required)" },
           "roles": ["ADMINISTRATEUR"],
-          "response": "User object restauré"
+          "response": "{ restored: true }"
         },
         {
           "method": "GET",
@@ -502,9 +518,9 @@
         {
           "method": "DELETE",
           "path": "/users/app/{app_id}",
-          "description": "Supprimer une configuration d'application",
+          "description": "Supprimer une configuration d'application (soft delete)",
           "params": { "app_id": "string (required)" },
-          "response": "Message de confirmation"
+          "response": "{ deleted: true }"
         }
       ]
     },
@@ -569,23 +585,25 @@
           "body": {
             "name": "string (optional)",
             "description": "string (optional)",
-            "is_public": "boolean (optional)"
+            "visibility": "string (optional, in: public|private)",
+            "max_members": "integer (optional, 1-1000)"
           },
-          "response": "Group object mis à jour"
+          "response": "{ group_id: integer }"
         },
         {
           "method": "DELETE",
           "path": "/groups/{id}",
-          "description": "Supprimer un groupe",
+          "description": "Supprimer un groupe (soft delete par défaut)",
           "params": { "id": "integer (required)" },
-          "response": "Message de confirmation"
+          "body": { "force_delete": "boolean (optional, default: false)" },
+          "response": "{ group_id: integer }"
         },
         {
           "method": "POST",
           "path": "/groups/{id}/restore",
           "description": "Restaurer un groupe supprimé",
           "params": { "id": "integer (required)" },
-          "response": "Group object restauré"
+          "response": "{ group_id: integer }"
         },
         {
           "method": "POST",
@@ -594,7 +612,7 @@
           "params": { "id": "integer (required)" },
           "body": {
             "email": "string (required)",
-            "role": "string (optional, default: MEMBRE)"
+            "role": "string (optional, in: admin|moderator|member, default: member)"
           },
           "response": "Message de confirmation"
         },
@@ -603,7 +621,7 @@
           "path": "/groups/{id}/leave",
           "description": "Quitter un groupe",
           "params": { "id": "integer (required)" },
-          "response": "Message de confirmation"
+          "response": "{ group_id: integer }"
         },
         {
           "method": "GET",
@@ -620,8 +638,8 @@
             "group_id": "integer (required)",
             "user_id": "integer (required)"
           },
-          "body": { "role": "string (optional, default: MEMBRE)" },
-          "response": "Message de confirmation"
+          "body": { "role": "string (optional, in: admin|moderator|member, default: member)" },
+          "response": "{ group_id: integer, user_id: integer, role: string }"
         },
         {
           "method": "PUT",
@@ -631,8 +649,8 @@
             "group_id": "integer (required)",
             "user_id": "integer (required)"
           },
-          "body": { "role": "string (required)" },
-          "response": "Message de confirmation"
+          "body": { "role": "string (required, in: admin|moderator|member)" },
+          "response": "{ group_id: integer, user_id: integer }"
         }
       ]
     },
@@ -641,48 +659,146 @@
       "base_path": "/files",
       "auth_required": true,
       "auth_header": "Authorization: Bearer {jwt_token}",
+      "notes": [
+        "Types MIME acceptés : image (jpeg/png/gif/webp), pdf, txt, doc/docx, xls/xlsx, mp3/wav/ogg, mp4/avi/mov",
+        "Tailles max : image 5 MB, document 10 MB, audio 20 MB, vidéo 50 MB"
+      ],
       "routes": [
         {
           "method": "POST",
           "path": "/files",
-          "description": "Uploader un ou plusieurs fichiers",
-          "body": "multipart/form-data avec fichier(s)",
-          "response": "Array de File objects"
+          "description": "Uploader un fichier",
+          "body": {
+            "content_type": "multipart/form-data",
+            "fields": {
+              "file": "fichier binaire (required)",
+              "description": "string (optional)"
+            }
+          },
+          "response": {
+            "data": {
+              "file": {
+                "id": "integer",
+                "name": "string (nom original du fichier)",
+                "description": "string|null",
+                "file_name": "string (nom stocké sur le serveur)",
+                "mime_type": "string",
+                "file_size": "integer (octets)",
+                "media_type": "string (image|document|audio|video|default)",
+                "upload_date": "string (datetime)",
+                "upload_ip": "string",
+                "url": "string (chemin relatif /uploads/files/...)",
+                "owner_id": "integer"
+              }
+            }
+          },
+          "http_codes": { "201": "succès", "400": "fichier manquant/invalide", "401": "non authentifié" }
         },
         {
           "method": "GET",
           "path": "/files/{id}",
-          "description": "Télécharger un fichier",
+          "description": "Télécharger un fichier (contenu binaire)",
           "params": { "id": "integer (required)" },
-          "response": "Fichier binaire"
+          "response": "Fichier binaire avec headers Content-Type / Content-Disposition",
+          "http_codes": { "200": "succès", "401": "non authentifié", "403": "accès refusé", "404": "introuvable" }
         },
         {
           "method": "GET",
           "path": "/files/{id}/info",
-          "description": "Obtenir les informations d'un fichier",
+          "description": "Obtenir les métadonnées d'un fichier",
           "params": { "id": "integer (required)" },
-          "response": "File object"
+          "response": {
+            "data": {
+              "file": {
+                "id": "integer",
+                "original_name": "string",
+                "file_name": "string",
+                "file_path": "string",
+                "mime_type": "string",
+                "file_size": "integer",
+                "media_type": "string",
+                "uploaded_by": "integer",
+                "created_at": "string (datetime)",
+                "updated_at": "string (datetime)",
+                "deleted_at": "string|null"
+              }
+            }
+          },
+          "http_codes": { "200": "succès", "401": "non authentifié", "404": "introuvable" }
         },
         {
           "method": "DELETE",
           "path": "/files/{id}",
-          "description": "Supprimer un fichier",
+          "description": "Supprimer un fichier (soft delete par défaut)",
           "params": { "id": "integer (required)" },
-          "response": "Message de confirmation"
+          "body": {
+            "force_delete": "boolean (optional, default false — suppression physique si true)"
+          },
+          "response": {
+            "data": {
+              "file_id": "integer",
+              "force_delete": "boolean",
+              "file_deleted": "boolean (fichier physique supprimé)",
+              "db_deleted": "boolean|null"
+            }
+          },
+          "permissions": "propriétaire ou administrateur",
+          "http_codes": { "200": "succès", "401": "non authentifié", "403": "accès refusé", "404": "introuvable" }
         },
         {
           "method": "POST",
           "path": "/files/{id}/restore",
-          "description": "Restaurer un fichier supprimé",
+          "description": "Restaurer un fichier soft-deleted",
           "params": { "id": "integer (required)" },
-          "response": "File object restauré"
+          "response": {
+            "data": { "file_id": "integer" }
+          },
+          "permissions": "propriétaire ou administrateur",
+          "http_codes": { "200": "succès", "400": "fichier non supprimé", "401": "non authentifié", "403": "accès refusé", "404": "introuvable" }
         },
         {
           "method": "GET",
           "path": "/files/user/{user_id}",
-          "description": "Obtenir les fichiers d'un utilisateur",
+          "description": "Lister les fichiers d'un utilisateur (paginé)",
           "params": { "user_id": "integer (required)" },
-          "response": "Array de File objects"
+          "query": {
+            "page": "integer (optional, default 1)",
+            "limit": "integer (optional, default 20, max 100)"
+          },
+          "response": {
+            "data": {
+              "files": [
+                {
+                  "id": "integer",
+                  "original_name": "string",
+                  "description": "string|null",
+                  "mime_type": "string",
+                  "media_type": "string",
+                  "file_size": "integer",
+                  "download_count": "integer",
+                  "upload_date": "string (datetime)",
+                  "updated_at": "string (datetime)",
+                  "url": "string"
+                }
+              ],
+              "pagination": {
+                "current_page": "integer",
+                "limit": "integer",
+                "total_files": "integer",
+                "total_pages": "integer",
+                "has_next_page": "boolean",
+                "has_previous_page": "boolean"
+              },
+              "statistics": {
+                "total_files": "integer",
+                "total_size": "integer (octets)",
+                "categories": "object (media_type → count)"
+              },
+              "user_id": "integer"
+            }
+          },
+          "permissions": "propriétaire ou administrateur",
+          "http_codes": { "200": "succès", "401": "non authentifié", "403": "accès refusé" }
         }
       ]
     },
@@ -698,7 +814,9 @@
           "description": "Rechercher des tags",
           "query": {
             "q": "string (optional)",
-            "user_id": "integer (optional)"
+            "table_associate": "string (optional) — groups | files | all",
+            "page": "integer (optional)",
+            "limit": "integer (optional)"
           },
           "response": "Array de tags"
         },
@@ -708,6 +826,7 @@
           "description": "Créer un nouveau tag",
           "body": {
             "name": "string (required)",
+            "table_associate": "string (optional) — groups | files | all (défaut: groups)",
             "color": "string (optional)",
             "description": "string (optional)"
           },
@@ -735,16 +854,16 @@
         {
           "method": "DELETE",
           "path": "/tags/{id}",
-          "description": "Supprimer un tag",
+          "description": "Supprimer un tag (soft delete)",
           "params": { "id": "integer (required)" },
-          "response": "Message de confirmation"
+          "response": "{ tag_id: integer }"
         },
         {
           "method": "POST",
           "path": "/tags/{id}/restore",
           "description": "Restaurer un tag supprimé",
           "params": { "id": "integer (required)" },
-          "response": "Tag object restauré"
+          "response": "{ tag_id: integer }"
         },
         {
           "method": "GET",
@@ -763,6 +882,10 @@
           "method": "GET",
           "path": "/tags/most-used",
           "description": "Tags les plus utilisés",
+          "query": {
+            "table_associate": "string (optional) — groups | files | all (défaut: groups)",
+            "limit": "integer (optional, max 50, défaut: 10)"
+          },
           "response": "Array de tags avec compteur d'utilisation"
         },
         {
@@ -771,6 +894,7 @@
           "description": "Obtenir ou créer un tag par nom",
           "body": {
             "name": "string (required)",
+            "table_associate": "string (optional) — groups | files | all (défaut: groups)",
             "color": "string (optional)"
           },
           "response": "Tag object"
@@ -785,16 +909,15 @@
         {
           "method": "PUT",
           "path": "/tags/{tag_id}/{item_id}",
-          "description": "Associer ou dissocier un tag à un élément",
+          "description": "Associer ou dissocier un tag à un élément (toggle)",
           "params": {
             "tag_id": "integer (required)",
             "item_id": "integer (required)"
           },
           "body": {
-            "action": "string (required) — associate | dissociate",
-            "table": "string (required) — groups | files"
+            "table_associate": "string (required) — groups | files"
           },
-          "response": "Message de confirmation"
+          "response": "{ tag_id, item_id, action: 'associé' | 'dissocié' }"
         }
       ]
     },
@@ -837,12 +960,14 @@
           "path": "/stats/users/{id}",
           "description": "Statistiques d'un utilisateur spécifique",
           "params": { "id": "integer (required)" },
+          "roles": ["ADMINISTRATEUR"],
           "response": "Object avec statistiques utilisateur"
         },
         {
           "method": "GET",
           "path": "/stats/my-stats",
           "description": "Obtenir ses propres statistiques",
+          "roles": ["ADMINISTRATEUR", "MODERATEUR", "UTILISATEUR"],
           "response": "Object avec statistiques utilisateur"
         },
         {
@@ -872,17 +997,29 @@
           "path": "/calendars",
           "description": "Créer un calendrier",
           "body": {
-            "name": "string (required)",
+            "title": "string (required)",
             "description": "string (optional)",
-            "timezone": "string (optional)",
-            "color": "string (optional)"
+            "timezone": "string (optional) — défaut: America/Montreal",
+            "color": "string (optional) — hex #RRGGBB ou nom CSS",
+            "visibility": "string (optional) — private | public (défaut: private)",
+            "max_members": "integer (optional) — défaut: 1000"
           },
-          "response": "Calendar object"
+          "response": {
+            "id": "integer",
+            "title": "string",
+            "share_token": "string",
+            "ics_url": "string",
+            "ctag": "string",
+            "sync_token": "string"
+          },
+          "errors": {
+            "400": "Validation échouée (title manquant, timezone invalide, etc.)"
+          }
         },
         {
           "method": "GET",
           "path": "/calendars",
-          "description": "Lister les calendriers de l'utilisateur",
+          "description": "Lister les calendriers de l'utilisateur (propriétaire + partagés)",
           "response": "Array de Calendar objects"
         },
         {
@@ -891,40 +1028,59 @@
           "description": "Mettre à jour un calendrier",
           "params": { "id": "integer (required)" },
           "body": {
-            "name": "string (optional)",
+            "title": "string (optional)",
             "description": "string (optional)",
             "timezone": "string (optional)",
-            "color": "string (optional)"
+            "color": "string (optional) — hex #RRGGBB ou nom CSS",
+            "visibility": "string (optional) — private | public",
+            "max_members": "integer (optional)"
           },
-          "response": "Calendar object mis à jour"
+          "response": "Calendar object mis à jour",
+          "errors": {
+            "400": "Validation échouée (timezone invalide, etc.)",
+            "403": "Permission insuffisante (pas propriétaire ni accès write)",
+            "404": "Calendrier non trouvé"
+          }
         },
         {
           "method": "DELETE",
           "path": "/calendars/{id}",
           "description": "Supprimer un calendrier (soft delete)",
           "params": { "id": "integer (required)" },
-          "response": "Message de confirmation"
+          "response": "{ calendar_id, deleted_at }",
+          "errors": {
+            "403": "Permission insuffisante",
+            "404": "Calendrier non trouvé"
+          }
         },
         {
           "method": "DELETE",
           "path": "/calendars/{id}/hard",
-          "description": "Supprimer définitivement un calendrier",
+          "description": "Supprimer définitivement un calendrier — propriétaire uniquement, fonctionne aussi sur soft-deleted",
           "params": { "id": "integer (required)" },
-          "response": "Message de confirmation"
+          "response": "{ calendar_id }",
+          "errors": {
+            "403": "Non propriétaire",
+            "404": "Calendrier introuvable (ni actif ni soft-deleted)"
+          }
         },
         {
           "method": "GET",
           "path": "/calendars/{id}/ics",
           "description": "Télécharger le calendrier au format ICS",
           "params": { "id": "integer (required)" },
-          "response": "Fichier .ics (text/calendar)"
+          "response": "Fichier .ics (text/calendar)",
+          "errors": {
+            "403": "Accès non autorisé",
+            "404": "Calendrier non trouvé"
+          }
         },
         {
           "method": "POST",
           "path": "/calendars/import",
-          "description": "Importer un fichier ICS pour créer/peupler un calendrier",
-          "body": "multipart/form-data avec fichier .ics",
-          "response": "Calendar object avec événements importés"
+          "description": "Importer un fichier ICS pour créer un calendrier avec ses événements",
+          "body": "multipart/form-data — champ: icsfile (.ics)",
+          "response": "Calendar object avec nombre d'événements importés"
         },
         {
           "method": "GET",
@@ -936,21 +1092,35 @@
         {
           "method": "POST",
           "path": "/calendars/{id}/share",
-          "description": "Partager un calendrier avec un utilisateur",
+          "description": "Partager un calendrier avec un autre utilisateur — au moins user_id ou email requis",
           "params": { "id": "integer (required)" },
           "body": {
-            "user_id": "integer (required)",
-            "permission": "string (optional) — read | write"
+            "user_id": "integer (optional) — requis si email absent",
+            "email": "string (optional) — requis si user_id absent",
+            "permission": "string (optional) — read | write (défaut: read)"
           },
-          "response": "Share object"
+          "response": "Share object",
+          "errors": {
+            "400": "user_id et email tous les deux absents, ou données invalides",
+            "403": "Pas propriétaire du calendrier",
+            "404": "Utilisateur cible introuvable"
+          }
         },
         {
           "method": "DELETE",
           "path": "/calendars/{id}/share",
-          "description": "Supprimer un partage de calendrier",
+          "description": "Retirer un partage de calendrier — au moins user_id ou email requis",
           "params": { "id": "integer (required)" },
-          "body": { "user_id": "integer (required)" },
-          "response": "Message de confirmation"
+          "body": {
+            "user_id": "integer (optional) — requis si email absent",
+            "email": "string (optional) — requis si user_id absent"
+          },
+          "response": "Message de confirmation",
+          "errors": {
+            "400": "user_id et email tous les deux absents",
+            "403": "Pas propriétaire du calendrier",
+            "404": "Partage non trouvé"
+          }
         },
         {
           "method": "POST",
@@ -959,13 +1129,21 @@
           "params": { "id": "integer (required)" },
           "body": {
             "title": "string (required)",
-            "start": "datetime (required)",
-            "end": "datetime (optional)",
+            "start_datetime": "date ou datetime (required) — ISO 8601, ex: 2026-06-01T09:00:00 ou 2026-06-01",
+            "end_datetime": "date ou datetime (required) — doit être >= start_datetime",
             "description": "string (optional)",
             "location": "string (optional)",
-            "rrule": "string (optional) — règle de récurrence iCal (RRULE:FREQ=...)"
+            "all_day": "boolean (optional) — défaut: false",
+            "timezone": "string (optional) — défaut: timezone du calendrier",
+            "attendees": "array (optional) — liste de participants",
+            "recurrence_rule": "string (optional) — règle iCal sans préfixe RRULE:, ex: FREQ=WEEKLY;BYDAY=MO;COUNT=4",
+            "status": "string (optional) — confirmed | tentative | cancelled (défaut: confirmed)"
           },
-          "response": "Event object"
+          "response": "Event object",
+          "errors": {
+            "400": "Validation échouée ou end_datetime < start_datetime",
+            "403": "Permission insuffisante sur ce calendrier"
+          }
         },
         {
           "method": "GET",
@@ -973,17 +1151,24 @@
           "description": "Lister les événements d'un calendrier",
           "params": { "id": "integer (required)" },
           "query": {
-            "start": "datetime (optional)",
-            "end": "datetime (optional)"
+            "start": "date ou datetime (optional) — filtre début de plage",
+            "end": "date ou datetime (optional) — filtre fin de plage",
+            "last_update_after": "datetime (optional) — retourner uniquement les événements modifiés après cette date",
+            "expand_recurrence": "boolean (optional) — développer les récurrences (défaut: true)",
+            "expand_multi_jour": "boolean (optional) — développer les événements multi-jours (défaut: true)",
+            "limit": "integer (optional) — nombre max de résultats (défaut: 10000)"
           },
           "response": "Array de Event objects"
         },
         {
           "method": "GET",
           "path": "/calendars/{id}/events/{eventId}",
-          "description": "Obtenir un événement",
+          "description": "Obtenir le détail d'un événement",
           "params": { "id": "integer (required)", "eventId": "integer (required)" },
-          "response": "Event object"
+          "response": "Event object",
+          "errors": {
+            "404": "Événement non trouvé ou n'appartient pas à ce calendrier"
+          }
         },
         {
           "method": "PUT",
@@ -992,49 +1177,69 @@
           "params": { "id": "integer (required)", "eventId": "integer (required)" },
           "body": {
             "title": "string (optional)",
-            "start": "datetime (optional)",
-            "end": "datetime (optional)",
+            "start_datetime": "date ou datetime (optional)",
+            "end_datetime": "date ou datetime (optional)",
             "description": "string (optional)",
             "location": "string (optional)",
-            "rrule": "string (optional)"
+            "all_day": "boolean (optional)",
+            "color": "string (optional) — hex #RRGGBB",
+            "recurrence_rule": "string (optional)",
+            "status": "string (optional) — confirmed | tentative | cancelled"
           },
-          "response": "Event object mis à jour"
+          "response": "Event object mis à jour",
+          "errors": {
+            "400": "Validation échouée ou end_datetime < start_datetime",
+            "403": "Permission insuffisante",
+            "404": "Événement non trouvé"
+          }
         },
         {
           "method": "DELETE",
           "path": "/calendars/{id}/events/{eventId}",
           "description": "Supprimer un événement (soft delete)",
           "params": { "id": "integer (required)", "eventId": "integer (required)" },
-          "response": "Message de confirmation"
+          "response": "{ event_id, deleted_at }",
+          "errors": {
+            "403": "Permission insuffisante",
+            "404": "Événement non trouvé"
+          }
         },
         {
           "method": "DELETE",
           "path": "/calendars/{id}/events/{eventId}/hard",
           "description": "Supprimer définitivement un événement",
           "params": { "id": "integer (required)", "eventId": "integer (required)" },
-          "response": "Message de confirmation"
+          "response": "{ event_id }",
+          "errors": {
+            "403": "Permission insuffisante",
+            "404": "Événement non trouvé"
+          }
         },
         {
           "method": "GET",
           "path": "/calendars/{id}/events/occurrences",
-          "description": "Lister les occurrences de tous les événements du calendrier entre deux dates",
+          "description": "Lister toutes les occurrences des événements du calendrier (récurrences développées)",
           "params": { "id": "integer (required)" },
           "query": {
-            "start": "datetime (required)",
-            "end": "datetime (required)"
+            "start_date": "date ou datetime (optional) — début de plage",
+            "end_date": "date ou datetime (optional) — fin de plage",
+            "expand_multi_jour": "boolean (optional) — développer les événements multi-jours (défaut: true)"
           },
-          "response": "Array d'occurrences"
+          "response": "{ occurrences: Array, count: integer }"
         },
         {
           "method": "GET",
           "path": "/calendars/{id}/events/{eventId}/occurrences",
-          "description": "Lister les occurrences d'un événement récurrent",
+          "description": "Lister les occurrences pré-calculées d'un événement récurrent spécifique",
           "params": { "id": "integer (required)", "eventId": "integer (required)" },
           "query": {
-            "start": "datetime (optional)",
-            "end": "datetime (optional)"
+            "start_date": "date ou datetime (optional)",
+            "end_date": "date ou datetime (optional)"
           },
-          "response": "Array d'occurrences"
+          "response": "{ occurrences: Array, count: integer }",
+          "errors": {
+            "404": "Événement non trouvé"
+          }
         },
         {
           "method": "PUT",
@@ -1042,20 +1247,35 @@
           "description": "Modifier une occurrence spécifique d'un événement récurrent",
           "params": { "id": "integer (required)", "eventId": "integer (required)" },
           "body": {
-            "occurrence_date": "datetime (required)",
+            "occurrence_id": "string (required) — identifiant de l'occurrence (date ISO de l'occurrence originale)",
+            "scope": "string (optional) — only_this | all_future | all (défaut: only_this)",
             "title": "string (optional)",
-            "start": "datetime (optional)",
-            "end": "datetime (optional)"
+            "description": "string (optional)",
+            "location": "string (optional)",
+            "start_datetime": "datetime (optional)",
+            "end_datetime": "datetime (optional)"
           },
-          "response": "Occurrence modifiée"
+          "response": "Occurrence modifiée",
+          "errors": {
+            "400": "Validation échouée",
+            "403": "Permission insuffisante",
+            "404": "Occurrence non trouvée"
+          }
         },
         {
           "method": "DELETE",
           "path": "/calendars/{id}/events/{eventId}/occurrences",
-          "description": "Supprimer ou annuler une occurrence spécifique d'un événement récurrent",
+          "description": "Annuler/supprimer une occurrence spécifique d'un événement récurrent",
           "params": { "id": "integer (required)", "eventId": "integer (required)" },
-          "body": { "occurrence_date": "datetime (required)" },
-          "response": "Message de confirmation"
+          "body": {
+            "occurrence_id": "integer (required) — identifiant de l'occurrence",
+            "scope": "string (optional) — only_this | all_future | all (défaut: only_this)"
+          },
+          "response": "Message de confirmation",
+          "errors": {
+            "400": "Validation échouée",
+            "403": "Permission insuffisante"
+          }
         }
       ]
     },
@@ -1129,36 +1349,57 @@
       ]
     },
     "secret-admin": {
-      "description": "Endpoints d'administration — authentification JWT + clé secrète requises",
+      "description": "Endpoints d'administration — double authentification requise : JWT ADMINISTRATEUR + ADMIN_SECRET_KEY",
       "base_path": "/secret-admin",
       "auth_required": true,
       "auth_header": "Authorization: Bearer {jwt_token}",
       "roles": ["ADMINISTRATEUR"],
-      "additional_security": "ADMIN_SECRET_KEY obligatoire dans le body/params",
+      "additional_security": "ADMIN_SECRET_KEY obligatoire — body JSON (POST) ou query param admin_secret (GET)",
       "routes": [
         {
           "method": "POST",
           "path": "/secret-admin/execute-procedure",
           "description": "Exécuter une procédure stockée MySQL",
           "body": {
-            "secret": "string (required) — ADMIN_SECRET_KEY",
-            "procedure_name": "string (required)",
-            "params": "array (optional)"
+            "admin_secret": "string (required) — ADMIN_SECRET_KEY",
+            "procedure": "string (required) — nom PascalCase de la procédure",
+            "parameters": "array (optional)"
           },
-          "response": "Résultat de l'exécution"
+          "allowed_procedures": [
+            "AddCalDAVSupport",
+            "CleanupExpiredSessions",
+            "CleanupOldStats",
+            "GenerateGroupStats",
+            "GeneratePlatformStats",
+            "GenerateUserStats",
+            "ResetAuthenticationGroups",
+            "ResetICSTables"
+          ],
+          "response": "{ procedure, parameters, result, executed_at, executed_by: { admin_id, admin_email } }",
+          "errors": {
+            "400": "Procédure manquante ou non autorisée",
+            "403": "admin_secret invalide ou absent"
+          }
         },
         {
           "method": "GET",
           "path": "/secret-admin/procedures",
-          "description": "Lister les procédures disponibles",
-          "query": { "secret": "string (required) — ADMIN_SECRET_KEY" },
-          "response": "Array des procédures disponibles"
+          "description": "Lister les procédures disponibles avec leur description et niveau de danger",
+          "query": { "admin_secret": "string (required) — ADMIN_SECRET_KEY" },
+          "response": "{ count, procedures: Array, authentication_info, usage }",
+          "errors": {
+            "403": "admin_secret invalide ou absent"
+          }
         },
         {
           "method": "GET",
           "path": "/secret-admin/plugins",
           "description": "Lister les plugins chargés",
-          "response": "Array des plugins avec leur nom et statut"
+          "query": { "admin_secret": "string (required) — ADMIN_SECRET_KEY" },
+          "response": "{ plugins: object, count: integer }",
+          "errors": {
+            "403": "admin_secret invalide ou absent"
+          }
         }
       ]
     }

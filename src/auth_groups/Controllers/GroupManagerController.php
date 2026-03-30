@@ -136,7 +136,7 @@ class GroupManagerController
             ]);
 
             LoggingMiddleware::logExit(200);
-            Response::success('Groupe mis à jour avec succès');
+            Response::success('Groupe mis à jour avec succès', ['group_id' => $id]);
             return true;
         } catch (Exception $e) {
             LogService::error("Erreur lors de la mise à jour du groupe", [
@@ -204,7 +204,7 @@ class GroupManagerController
                 'force_delete' => $forceDelete
             ]);
             LoggingMiddleware::logExit(200);
-            Response::success('Groupe supprimé avec succès');
+            Response::success('Groupe supprimé avec succès', ['group_id' => $id]);
             return true;
         } catch (Exception $e) {
             LogService::error("Erreur lors de la suppression du groupe", [
@@ -273,7 +273,7 @@ class GroupManagerController
             ]);
 
             LoggingMiddleware::logExit(200);
-            Response::success('Groupe restauré avec succès');
+            Response::success('Groupe restauré avec succès', ['group_id' => $id]);
             return true;
         } catch (Exception $e) {
             LogService::error("Erreur lors de la restauration du groupe", [

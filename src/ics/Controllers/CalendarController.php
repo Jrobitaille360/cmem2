@@ -800,7 +800,15 @@ class CalendarController
         }
         
         $cal = new Calendar();
-        
+
+        $calendar = $cal->findById($calendarId);
+
+        if (!$calendar) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Calendrier non trouvé', null, 404);
+            return;
+        }
+
         // Vérifier que l'utilisateur a les droits d'écriture sur le calendrier
         if (!$cal->canUserWrite($calendarId, $userId)) {
             LogService::warning("Tentative de modification d'un calendrier sans permission d'écriture", [
@@ -811,8 +819,6 @@ class CalendarController
             Response::error('Permission insuffisante pour modifier ce calendrier', null, 403);
             return;
         }
-        
-        $calendar = $cal->findById($calendarId);
         
         try {
             // Mettre à jour les propriétés de l'instance
@@ -878,7 +884,15 @@ class CalendarController
         LoggingMiddleware::logEntry();
         
         $cal = new Calendar();
-        
+
+        $calendar = $cal->findById($calendarId);
+
+        if (!$calendar) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Calendrier non trouvé', null, 404);
+            return;
+        }
+
         // Vérifier que l'utilisateur a les droits d'écriture sur le calendrier
         if (!$cal->canUserWrite($calendarId, $userId)) {
             LogService::warning("Tentative de suppression d'un calendrier sans permission d'écriture", [
@@ -889,8 +903,6 @@ class CalendarController
             Response::error('Permission insuffisante pour supprimer ce calendrier', null, 403);
             return;
         }
-        
-        $calendar = $cal->findById($calendarId);
         
         try {
             // Le trait SoftDeleteTrait nécessite que l'ID soit défini sur l'instance
@@ -927,9 +939,15 @@ class CalendarController
         LoggingMiddleware::logEntry();
         
         $cal = new Calendar();
-        
-        // Vérifier que l'utilisateur a les droits d'écriture sur le calendrier
-        if (!$cal->canUserWrite($calendarId, $userId)) {
+
+        if (!$cal->isOwnerIncludingDeleted($calendarId, $userId)) {
+            // Distingue 404 (n'existe pas) de 403 (existe mais pas propriétaire)
+            $exists = $cal->findById($calendarId);
+            if (!$exists) {
+                LoggingMiddleware::logExit(404);
+                Response::error('Calendrier non trouvé', null, 404);
+                return;
+            }
             LogService::warning("Tentative de suppression définitive d'un calendrier sans permission d'écriture", [
                 'calendar_id' => $calendarId,
                 'user_id' => $userId
@@ -938,8 +956,6 @@ class CalendarController
             Response::error('Permission insuffisante pour supprimer définitivement ce calendrier', null, 403);
             return;
         }
-        
-        $calendar = $cal->findById($calendarId);
         
         try {
             // Le trait SoftDeleteTrait nécessite que l'ID soit défini sur l'instance

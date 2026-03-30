@@ -34,9 +34,9 @@ class UserPasswordController {
         $userData = $user->findByEmail($input['email']);
         if (!$userData) {
             LogService::warning("Utilisateur non trouvé pour demande de changement de mot de passe", ['email' => $input['email']]);
-            LoggingMiddleware::logExit(404);
-            Response::error('Si.. le courriel existe, un courriel de demande de changement de mot de passe a été envoyé.', null, 404);
-            return false;
+            LoggingMiddleware::logExit(200);
+            Response::success('Si ce courriel existe, un courriel de demande de changement de mot de passe a été envoyé.');
+            return true;
         }
         // Générer un token de réinitialisation
         // token 8 chiffres 0-9 débutant par un chiffre 1-9

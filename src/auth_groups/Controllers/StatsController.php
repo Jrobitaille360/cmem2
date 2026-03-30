@@ -211,12 +211,48 @@ class StatsController
     }
 
     /**
+     * Obtenir ses propres statistiques (tout utilisateur authentifié)
+     */
+    public function getMyStats(int $userId): void {
+        try {
+            LogService::info('Récupération de ses propres statistiques', ['user_id' => $userId]);
+
+            $db = \Database::getInstance()->getConnection();
+
+            $stmt = $db->prepare("
+                SELECT * FROM user_stats_snapshot
+                WHERE user_id = :user_id
+                ORDER BY generated_at DESC
+                LIMIT 1
+            ");
+            $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
+            $stmt->execute();
+
+            $userStats = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$userStats) {
+                Response::error('Aucune statistique trouvée', null, 404);
+                return;
+            }
+
+            Response::success('Statistiques utilisateur récupérées', $userStats);
+
+        } catch (Exception $e) {
+            LogService::error('Erreur lors de la récupération des statistiques', [
+                'user_id' => $userId,
+                'error' => $e->getMessage()
+            ]);
+            Response::error('Erreur lors de la récupération des statistiques', null, 500);
+        }
+    }
+
+    /**
      * Obtenir les statistiques d'un utilisateur spécifique
      */
     public function getUserStats(int $targetUserId, int $requestingUserId, string $role): void {
         try {
-            // Vérification des permissions (soi-même ou admin)
-            if ($targetUserId !== $requestingUserId && $role !== 'ADMINISTRATEUR') {
+            // Vérification des permissions (admin uniquement)
+            if ($role !== 'ADMINISTRATEUR') {
                 Response::error('Accès non autorisé', null, 403);
                 return;
             }

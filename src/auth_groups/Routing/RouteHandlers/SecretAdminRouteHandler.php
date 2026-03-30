@@ -4,7 +4,6 @@ namespace AuthGroups\Routing\RouteHandlers;
 
 use AuthGroups\Routing\BaseRouteHandler;
 use AuthGroups\Controllers\SecretAdminController;
-use AuthGroups\Controllers\PluginController;
 use AuthGroups\Utils\Response;
 
 /**
@@ -19,12 +18,10 @@ class SecretAdminRouteHandler extends BaseRouteHandler
 {
     protected bool $requiresAuth = true;
     private SecretAdminController $controller;
-    private PluginController $pluginController;
 
     public function __construct() {
         parent::__construct(new \AuthGroups\Services\AuthService());
         $this->controller = new SecretAdminController();
-        $this->pluginController = new PluginController();
     }
     
     protected function getSupportedControllers(): array {
@@ -67,7 +64,7 @@ class SecretAdminRouteHandler extends BaseRouteHandler
 
             // GET /secret-admin/plugins
             ($controller === 'secret-admin' && $action === 'plugins' && $method === 'GET') =>
-                $this->pluginController->listPlugins(),
+                $this->controller->listPlugins($user),
 
             default => false
         };

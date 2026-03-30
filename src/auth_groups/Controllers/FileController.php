@@ -126,20 +126,22 @@ class FileController
             }
 
             $result = [
-                'file_id' => $fileModel->id,
-                'original_name' => $fileModel->original_name,
-                'description' => $fileModel->description,
-                'file_name' => $fileModel->file_name,
-                'mime_type' => $fileModel->mime_type,
-                'file_size' => $fileModel->file_size,
-                'media_type' => $fileModel->media_type,
-                'upload_date' => $fileModel->created_at,
-                'upload_ip' => $fileModel->upload_ip,
-                'url' => $fileModel->file_path,
-                'owner_id' => $userId
+                'file' => [
+                    'id'           => $fileModel->id,
+                    'name'         => $fileModel->original_name,
+                    'description'  => $fileModel->description,
+                    'file_name'    => $fileModel->file_name,
+                    'mime_type'    => $fileModel->mime_type,
+                    'file_size'    => $fileModel->file_size,
+                    'media_type'   => $fileModel->media_type,
+                    'upload_date'  => $fileModel->created_at,
+                    'upload_ip'    => $fileModel->upload_ip,
+                    'url'          => $fileModel->file_path,
+                    'owner_id'     => $userId,
+                ]
             ];
 
-            LogService::info('Fichier uploadé avec succès', $result);
+            LogService::info('Fichier uploadé avec succès', $result['file']);
             LoggingMiddleware::logExit(201);
             Response::success('Fichier uploadé avec succès', $result, 201);
             return true;
@@ -234,7 +236,7 @@ class FileController
         }
 
         Response::success('Information sur le fichier récupérée avec succès', [
-            'data' => $fileInfo
+            'file' => $fileInfo
         ]);
     }
     
@@ -421,7 +423,7 @@ class FileController
             $formattedFiles = [];
             foreach ($files as $file) {
                 $formattedFiles[] = [
-                    'file_id' => (int)$file['id'],
+                    'id'            => (int)$file['id'],
                     'original_name' => $file['original_name'],
                     'description' => $file['description'],
                     'mime_type' => $file['mime_type'],

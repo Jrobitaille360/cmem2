@@ -33,9 +33,13 @@ class PlanRouteHandler extends BaseRouteHandler
         
         match(true) {
             // GET /plans - Lister tous les plans disponibles (public)
-            ($method === 'GET' && count($segments) === 1) => 
+            ($method === 'GET' && count($segments) === 1) =>
                 $this->planController->listPlans(),
-                
+
+            // GET /plans/{id} - Détails d'un plan spécifique (public)
+            ($method === 'GET' && count($segments) === 2 && is_numeric($segments[1])) =>
+                $this->planController->getPlan((int)$segments[1]),
+
             default => Response::error('Route de plan non trouvée', null, 404)
         };
     }

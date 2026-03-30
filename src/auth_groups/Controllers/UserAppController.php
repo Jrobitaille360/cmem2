@@ -285,7 +285,7 @@ class UserAppController
                     'id' => $existing['id']
                 ]);
                 LoggingMiddleware::logExit(200);
-                Response::success('Configuration d\'application supprimée');
+                Response::success('Configuration d\'application supprimée', ['deleted' => true]);
                 return true;
             } else {
                 LogService::error("Échec de suppression de configuration d'app", [

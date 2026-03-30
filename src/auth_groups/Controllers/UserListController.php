@@ -104,7 +104,7 @@ class UserListController {
                 'accessed_by' => $currentUserId
             ]);
             LoggingMiddleware::logExit(200);
-            Response::success("Données utilisateur récupérées", ['data' => $userData]);
+            Response::success("Données utilisateur récupérées", ['user' => $userData]);
             return true;
         } catch (Exception $e) {
             LogService::error("Erreur lors de la récupération de l'utilisateur", [
