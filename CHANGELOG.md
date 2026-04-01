@@ -71,6 +71,7 @@ Tous ces champs sont optionnels, rétrocompatibles, et disponibles sur :
 ### Migrations DB
 
 Exécuter dans l'ordre :
+
 1. `docs/docs_ICS/migrations/20260331_ph2_vevent_props.sql` (Ph2 — 7 colonnes `calendar_events`)
 2. `docs/docs_ICS/migrations/20260401_ph3_organizer.sql` (Ph3 — 2 colonnes `calendar_events`)
 3. `docs/docs_ICS/migrations/20260401_ph4_recurrence.sql` (Ph4 — colonnes `rdate`, `related_to`, `duration`)
