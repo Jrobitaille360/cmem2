@@ -62,10 +62,9 @@ spl_autoload_register(function ($className) {
     }
     
     // Logging optionnel pour le débogage
-    if (defined('APP_DEBUG') && APP_DEBUG) {
-        error_log("ICS Autoloader: Impossible de charger la classe {$className}");
-        error_log("ICS Autoloader: Chemin testé: {$filePath}");
-    }
+    \AuthGroups\Services\LogService::debug("ICS Autoloader: Impossible de charger la classe {$className}", [
+        'tested_path' => $filePath
+    ]);
 });
 
 // Inclure les fichiers de configuration du module
@@ -120,10 +119,7 @@ function registerICSRoutes() {
         $pluginManager->registerPluginRoutes('ics', $icsRouteHandlers);
         
         // Logging pour le débogage
-        error_log("ICS Autoloader: Routes enregistrées avec succès via PluginManager (calendars, calendar, caldav)");
-        if (defined('APP_DEBUG') && APP_DEBUG) {
-            error_log("ICS: Routes enregistrées avec succès (calendars, calendar)");
-        }
+        \AuthGroups\Services\LogService::info("ICS Autoloader: Routes enregistrées avec succès via PluginManager (calendars, calendar, caldav)");
         
         return true;
     }
@@ -142,9 +138,7 @@ function integrateICSWithRouter() {
         $routerInstance->addRouteHandler('calendar', '\ICS\Routing\RouteHandlers\CalendarRouteHandler');
         $routerInstance->addRouteHandler('caldav', '\ICS\Routing\RouteHandlers\CalDAVRouteHandler');
         
-        if (defined('APP_DEBUG') && APP_DEBUG) {
-            error_log("ICS: Intégration directe avec le Router réussie (calendars, calendar, caldav)");
-        }
+        \AuthGroups\Services\LogService::debug("ICS: Intégration directe avec le Router réussie (calendars, calendar, caldav)");
         
         return true;
     }
@@ -168,8 +162,6 @@ if (!registerICSRoutes()) {
             'notifications' => '\ICS\Routing\RouteHandlers\NotificationRouteHandler'
         ];
         
-        if (defined('APP_DEBUG') && APP_DEBUG) {
-            error_log("ICS: Routes mises en attente pour enregistrement ultérieur (calendars, calendar, caldav)");
-        }
+        \AuthGroups\Services\LogService::debug("ICS: Routes mises en attente pour enregistrement ultérieur (calendars, calendar, caldav)");
     }
 }

@@ -88,6 +88,61 @@ class IcsParser
         $event['rrule']       = isset($vevent->RRULE)       ? (string)$vevent->RRULE       : null;
         $event['sequence']    = isset($vevent->SEQUENCE)    ? (int)(string)$vevent->SEQUENCE : 0;
 
+        // Phase 2.1 — CATEGORIES → tableau de chaînes
+        if (isset($vevent->CATEGORIES)) {
+            $raw = (string)$vevent->CATEGORIES;
+            $event['categories'] = array_values(array_filter(array_map('trim', explode(',', $raw))));
+        } else {
+            $event['categories'] = null;
+        }
+
+        // Phase 2.2 — PRIORITY
+        $event['priority'] = isset($vevent->PRIORITY) ? (int)(string)$vevent->PRIORITY : 0;
+
+        // Phase 2.3 — CLASS
+        $event['class'] = isset($vevent->CLASS)
+            ? strtoupper((string)$vevent->CLASS)
+            : 'PUBLIC';
+
+        // Phase 2.4 — TRANSP
+        $event['transp'] = isset($vevent->TRANSP)
+            ? strtoupper((string)$vevent->TRANSP)
+            : 'OPAQUE';
+
+        // Phase 2.5 — URL (→ meeting_link)
+        $event['url'] = isset($vevent->URL) ? (string)$vevent->URL : null;
+
+        // Phase 2.5 — GEO : "lat;lng"
+        if (isset($vevent->GEO)) {
+            $parts = explode(';', (string)$vevent->GEO, 2);
+            $event['geo_lat'] = isset($parts[0]) ? (float)$parts[0] : null;
+            $event['geo_lng'] = isset($parts[1]) ? (float)$parts[1] : null;
+        } else {
+            $event['geo_lat'] = null;
+            $event['geo_lng'] = null;
+        }
+
+        // Phase 2.6 — ATTACH → [{url|data_base64, mime_type}]
+        $attachments = [];
+        if (isset($vevent->ATTACH)) {
+            foreach ($vevent->ATTACH as $attachProp) {
+                $encoding = strtoupper((string)($attachProp['ENCODING'] ?? ''));
+                $mimeType = isset($attachProp['FMTTYPE']) ? (string)$attachProp['FMTTYPE'] : null;
+                $value    = (string)$attachProp;
+
+                if ($encoding === 'BASE64') {
+                    $entry = ['data_base64' => $value];
+                } else {
+                    $entry = ['url' => $value];
+                }
+                if ($mimeType !== null) {
+                    $entry['mime_type'] = $mimeType;
+                }
+                $attachments[] = $entry;
+            }
+        }
+        $event['attachments'] = empty($attachments) ? null : $attachments;
+
         // DTSTART
         if (isset($vevent->DTSTART)) {
             $dtstart  = $vevent->DTSTART;

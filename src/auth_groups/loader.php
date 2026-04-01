@@ -80,10 +80,7 @@ if (!empty($config_errors)) {
         echo "</pre>";
     }
     
-    // Log les erreurs si possible
-    if (LOG_ENABLED && defined('LOG_DIR') && is_dir(LOG_DIR)) {
-        error_log("Configuration errors: " . implode(', ', $config_errors), 3, LOG_DIR . 'errors.log');
-    }
+    \AuthGroups\Services\LogService::error("Configuration errors: " . implode(', ', $config_errors));
     
     // En production, arrêter l'exécution si erreurs critiques
     if (APP_ENV === 'production') {
@@ -147,12 +144,10 @@ function loadPlugins(): void {
             define('PLUGIN_ANALYTICS_ENABLED', $pluginAnalyticsEnabled);
         }
         
-        if (APP_DEBUG && !empty($loadedPluginNames)) {
-            error_log("Plugins chargés: " . implode(', ', $loadedPluginNames));
-        }
+        \AuthGroups\Services\LogService::debug("Plugins chargés: " . implode(', ', $loadedPluginNames));
         
     } catch (\Exception $e) {
-        error_log("Erreur lors du chargement des plugins: " . $e->getMessage());
+        \AuthGroups\Services\LogService::error("Erreur lors du chargement des plugins: " . $e->getMessage());
         
         // Définir des constantes par défaut en cas d'échec
         if (!defined('LOADED_PLUGINS')) {

@@ -148,6 +148,67 @@ class IcsGenerator
             $vevent->add('RRULE', $event['recurrence_rule']);
         }
 
+        // Phase 2.1 — CATEGORIES
+        if (!empty($event['categories'])) {
+            $cats = is_string($event['categories'])
+                ? json_decode($event['categories'], true)
+                : $event['categories'];
+            if (is_array($cats) && !empty($cats)) {
+                $vevent->add('CATEGORIES', implode(',', $cats));
+            }
+        }
+
+        // Phase 2.2 — PRIORITY (0 = non défini, on n'exporte pas 0 car c'est la valeur par défaut)
+        $priority = isset($event['priority']) ? (int)$event['priority'] : 0;
+        if ($priority !== 0) {
+            $vevent->add('PRIORITY', (string)$priority);
+        }
+
+        // Phase 2.3 — CLASS
+        if (!empty($event['class'])) {
+            $vevent->add('CLASS', strtoupper($event['class']));
+        }
+
+        // Phase 2.4 — TRANSP
+        if (!empty($event['transp'])) {
+            $vevent->add('TRANSP', strtoupper($event['transp']));
+        }
+
+        // Phase 2.5 — URL (meeting_link déjà en DB)
+        if (!empty($event['meeting_link'])) {
+            $vevent->add('URL', $event['meeting_link']);
+        }
+
+        // Phase 2.5 — GEO
+        if (!empty($event['geo_lat']) && !empty($event['geo_lng'])) {
+            // RFC 5545 §3.8.1.6 : GEO:48.8534;2.3488
+            $vevent->add('GEO', round((float)$event['geo_lat'], 6) . ';' . round((float)$event['geo_lng'], 6));
+        }
+
+        // Phase 2.6 — ATTACH
+        if (!empty($event['attachments'])) {
+            $attachments = is_string($event['attachments'])
+                ? json_decode($event['attachments'], true)
+                : $event['attachments'];
+            if (is_array($attachments)) {
+                foreach ($attachments as $att) {
+                    if (!empty($att['url'])) {
+                        $params = [];
+                        if (!empty($att['mime_type'])) {
+                            $params['FMTTYPE'] = $att['mime_type'];
+                        }
+                        $vevent->add($tmpCal->createProperty('ATTACH', $att['url'], $params));
+                    } elseif (!empty($att['data_base64'])) {
+                        $params = ['ENCODING' => 'BASE64'];
+                        if (!empty($att['mime_type'])) {
+                            $params['FMTTYPE'] = $att['mime_type'];
+                        }
+                        $vevent->add($tmpCal->createProperty('ATTACH', $att['data_base64'], $params));
+                    }
+                }
+            }
+        }
+
         $vevent->add('STATUS', strtoupper($event['status'] ?? 'CONFIRMED'));
         $vevent->add('SEQUENCE', (string)($event['sequence'] ?? 0));
 

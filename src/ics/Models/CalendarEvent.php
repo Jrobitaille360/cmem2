@@ -28,6 +28,14 @@ class CalendarEvent extends BaseModel
     public $color;
     public $createdAt;
     public $updatedAt;
+    // Phase 2 — propriétés VEVENT
+    public $priority;    // 2.2 — TINYINT 0–9
+    public $class;       // 2.3 — PUBLIC|PRIVATE|CONFIDENTIAL
+    public $transp;      // 2.4 — OPAQUE|TRANSPARENT
+    public $categories;  // 2.1 — JSON array de chaînes
+    public $geoLat;      // 2.5 — DECIMAL(10,7)
+    public $geoLng;      // 2.5 — DECIMAL(10,7)
+    public $attachments; // 2.6 — JSON array [{url, mime_type}]
 
     public function __construct() {
         parent::__construct();
@@ -43,8 +51,9 @@ class CalendarEvent extends BaseModel
             $query = "INSERT INTO calendar_events (
                     calendar_id, user_id, title, description, start_datetime, end_datetime,
                     all_day, location, attendees, recurrence_rule, status,
-                    timezone, meeting_link, notifications, color, uid
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    timezone, meeting_link, notifications, color, uid,
+                    priority, class, transp, categories, geo_lat, geo_lng, attachments
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ";
 
             $stmt = $this->getDb()->prepare($query);
@@ -76,7 +85,15 @@ class CalendarEvent extends BaseModel
                 $this->meetingLink ?? null,
                 $notificationsJson,
                 $this->color ?? null,
-                $uid
+                $uid,
+                // Phase 2
+                $this->priority ?? 0,
+                $this->class ?? 'PUBLIC',
+                $this->transp ?? 'OPAQUE',
+                isset($this->categories) ? json_encode($this->categories) : null,
+                $this->geoLat ?? null,
+                $this->geoLng ?? null,
+                isset($this->attachments) ? json_encode($this->attachments) : null,
             ]);
 
             $eventId = $this->getDb()->lastInsertId();
@@ -349,7 +366,41 @@ class CalendarEvent extends BaseModel
                 $fields[] = "color = ?";
                 $values[] = $this->color;
             }
-                      
+
+            // Phase 2
+            if (isset($this->priority)) {
+                $fields[] = "priority = ?";
+                $values[] = (int)$this->priority;
+            }
+            if (isset($this->class)) {
+                $fields[] = "class = ?";
+                $values[] = $this->class;
+            }
+            if (isset($this->transp)) {
+                $fields[] = "transp = ?";
+                $values[] = $this->transp;
+            }
+            if (isset($this->categories)) {
+                $fields[] = "categories = ?";
+                $values[] = is_array($this->categories)
+                    ? json_encode($this->categories)
+                    : $this->categories;
+            }
+            if (isset($this->geoLat)) {
+                $fields[] = "geo_lat = ?";
+                $values[] = $this->geoLat;
+            }
+            if (isset($this->geoLng)) {
+                $fields[] = "geo_lng = ?";
+                $values[] = $this->geoLng;
+            }
+            if (isset($this->attachments)) {
+                $fields[] = "attachments = ?";
+                $values[] = is_array($this->attachments)
+                    ? json_encode($this->attachments)
+                    : $this->attachments;
+            }
+
             if (empty($fields)) {
                 return false;
             }
@@ -592,6 +643,15 @@ class CalendarEvent extends BaseModel
                 $event->endDatetime     = $eventData['end_datetime'];
                 $event->recurrenceRule  = $eventData['rrule'];
                 $event->status          = $eventData['status'];
+                // Phase 2
+                if (isset($eventData['categories']))  $event->categories  = $eventData['categories'];
+                if (isset($eventData['priority']))     $event->priority    = $eventData['priority'];
+                if (isset($eventData['class']))        $event->class       = $eventData['class'];
+                if (isset($eventData['transp']))       $event->transp      = $eventData['transp'];
+                if (isset($eventData['url']))          $event->meetingLink = $eventData['url'];
+                if (isset($eventData['geo_lat']))      $event->geoLat      = $eventData['geo_lat'];
+                if (isset($eventData['geo_lng']))      $event->geoLng      = $eventData['geo_lng'];
+                if (isset($eventData['attachments']))  $event->attachments = $eventData['attachments'];
 
                 $event->create();
                 $importedCount++;

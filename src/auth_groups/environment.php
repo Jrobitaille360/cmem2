@@ -64,9 +64,7 @@ if (isset($GLOBALS['pending_config_loads'])) {
             if (file_exists($configFile)) {
                 require_once $configFile;
                 
-                if (defined('APP_DEBUG') && APP_DEBUG) {
-                    error_log("Configuration plugin chargée: {$pluginName} - " . basename($configFile));
-                }
+                \AuthGroups\Services\LogService::debug("Configuration plugin chargée: {$pluginName} - " . basename($configFile));
             }
         }
     }

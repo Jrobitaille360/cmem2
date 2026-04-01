@@ -182,31 +182,31 @@ D4                  (pipeline middleware — grosse refactorisation, EN DERNIER)
 >
 > **Migrations SQL requises** pour chaque item ajoutant des colonnes → `src/ics/docs_ICS/migrations/`
 
-- [ ] **2.1** — `CATEGORIES`
+- ✅ **2.1** — `CATEGORIES`
   - Mapper les tags système auth_groups → export `CATEGORIES:Travail,Personnel`
   - Import : parser CSV de catégories
   - > Bonne cohérence avec le système de groupes existant.
 
-- [ ] **2.2** — `PRIORITY`
+- ✅ **2.2** — `PRIORITY`
   - Colonne `priority TINYINT(1) DEFAULT 0`
   - Valeurs RFC 5545 : 0=non défini, 1=haute, 5=normale, 9=basse
   - > Simple à ajouter, très utile pour les clients de type gestionnaire de tâches.
 
-- [ ] **2.3** — `CLASS`
+- ✅ **2.3** — `CLASS`
   - `ENUM('PUBLIC','PRIVATE','CONFIDENTIAL')`
   - Contrôle de confidentialité en contexte entreprise / CalDAV partagé
   - > Nécessaire pour les calendriers d'équipe.
 
-- [ ] **2.4** — `TRANSP`
+- ✅ **2.4** — `TRANSP`
   - `ENUM('OPAQUE','TRANSPARENT')` — contrôle si l'événement bloque le temps libre
   - Impact direct sur la disponibilité affichée dans les clients CalDAV (Outlook, Thunderbird)
 
-- [ ] **2.5** — `URL` et `GEO`
+- ✅ **2.5** — `URL` et `GEO`
   - Exporter `meeting_link` existant comme `URL:https://...`
   - Ajouter colonnes `geo_lat DECIMAL(10,7)`, `geo_lng DECIMAL(10,7)`
   - > `meeting_link` est déjà en DB — export URL = migration minime.
 
-- [ ] **2.6** — `ATTACH`
+- ✅ **2.6** — `ATTACH`
   - Colonne `attachments JSON`
   - Export `ATTACH:https://...` ou `ATTACH;ENCODING=BASE64:...`
   - > À faire en dernier dans Ph2 — la gestion BASE64 peut alourdir les .ics.
@@ -326,12 +326,12 @@ D4                  (pipeline middleware — grosse refactorisation, EN DERNIER)
 | 20 | Ph1   | 1.3 | UID stable UUID v4                         | 45min  | ✅   |
 | 21 | Ph1   | 1.4 | DTSTART;TZID=...                           | 45min  | ✅   |
 | 22 | Ph1   | 1.2 | Line folding RFC 5545                      | 30min  | ✅   |
-| 23 | Ph2   | 2.1 | CATEGORIES                                 | 1h     |      |
-| 24 | Ph2   | 2.2 | PRIORITY                                   | 45min  |      |
-| 25 | Ph2   | 2.3 | CLASS                                      | 30min  |      |
-| 26 | Ph2   | 2.4 | TRANSP                                     | 30min  |      |
-| 27 | Ph2   | 2.5 | URL + GEO                                  | 45min  |      |
-| 28 | Ph2   | 2.6 | ATTACH                                     | 1h     |      |
+| 23 | Ph2   | 2.1 | CATEGORIES                                 | 1h     | ✅   |
+| 24 | Ph2   | 2.2 | PRIORITY                                   | 45min  | ✅   |
+| 25 | Ph2   | 2.3 | CLASS                                      | 30min  | ✅   |
+| 26 | Ph2   | 2.4 | TRANSP                                     | 30min  | ✅   |
+| 27 | Ph2   | 2.5 | URL + GEO                                  | 45min  | ✅   |
+| 28 | Ph2   | 2.6 | ATTACH                                     | 1h     | ✅   |
 | 29 | Ph3   | 3.1 | ATTENDEE complet                           | 1h30   |      |
 | 30 | Ph3   | 3.2 | ORGANIZER                                  | 45min  |      |
 | 31 | Ph3   | 3.3 | iTIP de base (REQUEST/REPLY/CANCEL)        | 1h30   |      |

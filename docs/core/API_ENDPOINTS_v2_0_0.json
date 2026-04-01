@@ -1,9 +1,9 @@
 {
   "api": {
     "name": "AuthGroups API",
-    "version": "2.1.1",
+    "version": "2.2.1",
     "description": "API REST complète pour la gestion d'authentification, groupes, fichiers, tags, calendriers ICS et CalDAV",
-    "generated": "2026-03-30",
+    "generated": "2026-03-31",
     "base_url": "/",
     "authentication": {
       "type": "JWT_BEARER",
@@ -987,7 +987,7 @@
       ]
     },
     "calendars": {
-      "description": "Plugin ICS — Gestion des calendriers et événements",
+      "description": "Plugin ICS — Gestion des calendriers et événements (v2.2.1 — Phase 2 : CATEGORIES, PRIORITY, CLASS, TRANSP, GEO, ATTACH)",
       "base_path": "/calendars",
       "auth_required": true,
       "auth_header": "Authorization: Bearer {jwt_token}",
@@ -1067,9 +1067,9 @@
         {
           "method": "GET",
           "path": "/calendars/{id}/ics",
-          "description": "Télécharger le calendrier au format ICS",
+          "description": "Télécharger le calendrier au format ICS (RFC 5545) — inclut CATEGORIES, PRIORITY, CLASS, TRANSP, URL, GEO, ATTACH si renseignés",
           "params": { "id": "integer (required)" },
-          "response": "Fichier .ics (text/calendar)",
+          "response": "Fichier .ics (text/calendar) — VCALENDAR avec VTIMEZONE + VEVENTs",
           "errors": {
             "403": "Accès non autorisé",
             "404": "Calendrier non trouvé"
@@ -1137,11 +1137,21 @@
             "timezone": "string (optional) — défaut: timezone du calendrier",
             "attendees": "array (optional) — liste de participants",
             "recurrence_rule": "string (optional) — règle iCal sans préfixe RRULE:, ex: FREQ=WEEKLY;BYDAY=MO;COUNT=4",
-            "status": "string (optional) — confirmed | tentative | cancelled (défaut: confirmed)"
+            "status": "string (optional) — confirmed | tentative | cancelled (défaut: confirmed)",
+            "meeting_link": "string (optional) — URL https valide — exportée comme VEVENT URL:",
+            "color": "string (optional) — hex #RRGGBB",
+            "notifications": "array (optional) — [{type: notification|email, minutes: integer>=0}]",
+            "priority": "integer (optional) — RFC 5545 PRIORITY: 0=non défini, 1=haute, 5=normale, 9=basse (défaut: 0)",
+            "class": "string (optional) — PUBLIC | PRIVATE | CONFIDENTIAL (défaut: PUBLIC)",
+            "transp": "string (optional) — OPAQUE | TRANSPARENT (défaut: OPAQUE) — OPAQUE bloque le temps libre",
+            "categories": "array of strings (optional) — ex: [\"Travail\",\"Réunion\"] — exporté comme CATEGORIES",
+            "geo_lat": "decimal (optional) — latitude WGS84 -90..90 — requis si geo_lng fourni",
+            "geo_lng": "decimal (optional) — longitude WGS84 -180..180 — requis si geo_lat fourni",
+            "attachments": "array (optional) — [{url: string, mime_type: string}] ou [{data_base64: string, mime_type: string}]"
           },
           "response": "Event object",
           "errors": {
-            "400": "Validation échouée ou end_datetime < start_datetime",
+            "400": "Validation échouée (end_datetime < start_datetime, priority hors 0–9, class/transp invalide, geo_lat sans geo_lng, etc.)",
             "403": "Permission insuffisante sur ce calendrier"
           }
         },
@@ -1173,7 +1183,7 @@
         {
           "method": "PUT",
           "path": "/calendars/{id}/events/{eventId}",
-          "description": "Mettre à jour un événement",
+          "description": "Mettre à jour un événement — seuls les champs fournis sont modifiés",
           "params": { "id": "integer (required)", "eventId": "integer (required)" },
           "body": {
             "title": "string (optional)",
@@ -1184,11 +1194,20 @@
             "all_day": "boolean (optional)",
             "color": "string (optional) — hex #RRGGBB",
             "recurrence_rule": "string (optional)",
-            "status": "string (optional) — confirmed | tentative | cancelled"
+            "status": "string (optional) — confirmed | tentative | cancelled",
+            "meeting_link": "string (optional) — URL https valide",
+            "notifications": "array (optional) — [{type: notification|email, minutes: integer>=0}]",
+            "priority": "integer (optional) — 0=non défini, 1=haute, 5=normale, 9=basse",
+            "class": "string (optional) — PUBLIC | PRIVATE | CONFIDENTIAL",
+            "transp": "string (optional) — OPAQUE | TRANSPARENT",
+            "categories": "array of strings (optional)",
+            "geo_lat": "decimal (optional) — latitude -90..90 — requis si geo_lng fourni",
+            "geo_lng": "decimal (optional) — longitude -180..180 — requis si geo_lat fourni",
+            "attachments": "array (optional) — [{url: string, mime_type: string}] ou [{data_base64: string, mime_type: string}]"
           },
           "response": "Event object mis à jour",
           "errors": {
-            "400": "Validation échouée ou end_datetime < start_datetime",
+            "400": "Validation échouée (end_datetime < start_datetime, priority hors 0–9, class/transp invalide, geo_lat sans geo_lng, etc.)",
             "403": "Permission insuffisante",
             "404": "Événement non trouvé"
           }

@@ -3,6 +3,7 @@
 namespace AuthGroups\Models;
 
 use PDO;
+use AuthGroups\Services\LogService;
 
 /**
  * Classe de base simplifiée pour les modèles avec support des soft deletes
@@ -165,7 +166,7 @@ abstract class BaseModel {
             
             return $stmt->execute();
         } catch (\PDOException $e) {
-            error_log("Erreur base de données: " . $e->getMessage());
+            LogService::error("Erreur base de données", ['exception' => $e->getMessage()]);
             return false;
         }
     }
@@ -216,7 +217,7 @@ abstract class BaseModel {
             ];
             
         } catch (\PDOException $e) {
-            error_log("Erreur lors de l'exécution de la procédure $procedureName: " . $e->getMessage());
+            LogService::error("Erreur lors de l'exécution de la procédure {$procedureName}", ['exception' => $e->getMessage()]);
             return [
                 'success' => false,
                 'error' => $e->getMessage()

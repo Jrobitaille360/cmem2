@@ -6,6 +6,7 @@ use Core\PluginInterface;
 use Core\PluginManager;
 use ICS\Routing\RouteHandlers\CalendarRouteHandler;
 use ICS\Routing\RouteHandlers\CalendarPublicRoute;
+use AuthGroups\Services\LogService;
 use ICS\Routing\RouteHandlers\CalDAVRouteHandler;
 use ICS\Routing\RouteHandlers\NotificationRouteHandler;
 
@@ -27,13 +28,13 @@ class CalendarPlugin implements PluginInterface
             try {
                 switch ($level) {
                     case 'info':
-                        \AuthGroups\Services\LogService::info($message, $context);
+                        LogService::info($message, $context);
                         break;
                     case 'warning':
-                        \AuthGroups\Services\LogService::warning($message, $context);
+                        LogService::warning($message, $context);
                         break;
                     case 'error':
-                        \AuthGroups\Services\LogService::error($message, $context);
+                        LogService::error($message, $context);
                         break;
                 }
             } catch (\Exception $e) {
@@ -160,9 +161,7 @@ class CalendarPlugin implements PluginInterface
         $migrationsPath = __DIR__ . '/../../docs/docs_ICS/migrations/';
         if (is_dir($migrationsPath)) {
             // Logique de migration
-            if (defined('LOG_ENABLED') && LOG_ENABLED) {
-                error_log("Migrations ICS exécutées");
-            }
+            LogService::info("Migrations ICS exécutées");
         }
     }
 }

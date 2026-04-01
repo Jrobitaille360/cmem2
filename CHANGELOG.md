@@ -7,6 +7,36 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [2.2.1] — 2026-03-31
+
+### Plugin ICS — Phase 2 (Propriétés VEVENT enrichies)
+
+- **[2.1]** `CATEGORIES` — tableau de chaînes, sérialisé `CATEGORIES:Travail,Réunion` dans l'ICS
+- **[2.2]** `PRIORITY` — entier 0–9 (0 = non défini, 1 = haute, 9 = basse), propriété RFC 5545 `PRIORITY`
+- **[2.3]** `CLASS` — `PUBLIC` | `PRIVATE` | `CONFIDENTIAL`, propriété `CLASS`
+- **[2.4]** `TRANSP` — `OPAQUE` | `TRANSPARENT`, propriété `TRANSP`
+- **[2.5]** `GEO` — latitude/longitude WGS84 (`geo_lat`, `geo_lng`), propriété `GEO:lat;lng`
+  - Les deux champs doivent être fournis ensemble — fournir l'un sans l'autre retourne `400`
+- **[2.6]** `ATTACH` — tableau d'objets `{url}` ou `{data_base64}` avec `mime_type` optionnel,
+  propriété `ATTACH;FMTTYPE=…:…` pour URL, `ATTACH;ENCODING=BASE64;…` pour données inline
+
+Tous ces champs sont optionnels, rétrocompatibles, et disponibles sur :
+`POST /calendars/{id}/events`, `PUT /calendars/{id}/events/{eventId}`,
+`GET /calendars/{id}/events/{eventId}`, `GET /calendars/{id}/ics`, import ICS
+
+### Migration DB
+
+Exécuter : `docs/docs_ICS/migrations/20260331_ph2_vevent_props.sql`
+(ajoute 7 colonnes à `calendar_events` : `priority`, `class`, `transp`, `categories`, `geo_lat`, `geo_lng`, `attachments`)
+
+### Documentation
+
+- `docs/2.2.1_CLIENT.md` — guide migration client (aucun changement cassant)
+- `docs/2.2.1_PRODUCTION.md` — procédure déploiement production
+- `docs/core/API_ENDPOINTS_v2_0_0.json` — mis à jour (version 2.2.1, 10 nouveaux champs sur POST/PUT events)
+
+---
+
 ## [2.2.0] — 2026-03-30
 
 ### Sécurité

@@ -72,7 +72,7 @@ class InvitationService {
             
             return false;
         } catch (Exception $e) {
-            error_log('Erreur createGroupInvitation: ' . $e->getMessage());
+            LogService::error('Erreur createGroupInvitation', ['exception' => $e->getMessage()]);
             return false;
         }
     }
@@ -221,7 +221,7 @@ class InvitationService {
         
         // Pour l'instant, log l'email (en développement)
         if ($_ENV['APP_ENV'] === 'development') {
-            error_log("EMAIL D'INVITATION:\nTo: {$email}\nSubject: {$subject}\nBody: {$message}");
+            LogService::debug("EMAIL D'INVITATION", ['to' => $email, 'subject' => $subject]);
             return true;
         }
         

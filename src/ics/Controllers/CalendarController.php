@@ -1003,6 +1003,14 @@ class CalendarController
             'attendees' => 'optional|array',
             'recurrence_rule' => 'optional|string',
             'status' => 'optional|string|in:confirmed,tentative,cancelled',
+            // Phase 2
+            'priority' => 'optional|integer',
+            'class' => 'optional|string|in:PUBLIC,PRIVATE,CONFIDENTIAL',
+            'transp' => 'optional|string|in:OPAQUE,TRANSPARENT',
+            'categories' => 'optional|array',
+            'geo_lat' => 'optional|numeric',
+            'geo_lng' => 'optional|numeric',
+            'attachments' => 'optional|array',
         ]);
 
         if (!$validation['valid']) {
@@ -1077,6 +1085,14 @@ class CalendarController
             $event->meetingLink = $eventValidation['data']['meeting_link'] ?? null;
             $event->notifications = $eventValidation['data']['notifications'] ?? null;
             $event->color = $eventValidation['data']['color'] ?? null;
+            // Phase 2
+            if (isset($eventValidation['data']['priority']))    $event->priority    = $eventValidation['data']['priority'];
+            if (isset($eventValidation['data']['class']))       $event->class       = $eventValidation['data']['class'];
+            if (isset($eventValidation['data']['transp']))      $event->transp      = $eventValidation['data']['transp'];
+            if (isset($eventValidation['data']['categories']))  $event->categories  = $eventValidation['data']['categories'];
+            if (isset($eventValidation['data']['geo_lat']))     $event->geoLat      = $eventValidation['data']['geo_lat'];
+            if (isset($eventValidation['data']['geo_lng']))     $event->geoLng      = $eventValidation['data']['geo_lng'];
+            if (isset($eventValidation['data']['attachments'])) $event->attachments = $eventValidation['data']['attachments'];
 
             $result = $event->create();
 
@@ -1122,6 +1138,14 @@ class CalendarController
             'color' => 'optional|color',
             'recurrence_rule' => 'optional|string',
             'status' => 'optional|string|in:confirmed,tentative,cancelled',
+            // Phase 2
+            'priority' => 'optional|integer',
+            'class' => 'optional|string|in:PUBLIC,PRIVATE,CONFIDENTIAL',
+            'transp' => 'optional|string|in:OPAQUE,TRANSPARENT',
+            'categories' => 'optional|array',
+            'geo_lat' => 'optional|numeric',
+            'geo_lng' => 'optional|numeric',
+            'attachments' => 'optional|array',
         ]);
         
         if (!$validation['valid']) {
@@ -1252,6 +1276,35 @@ class CalendarController
             if (isset($eventValidation['data']['color'])) {
                 $event->color = $eventValidation['data']['color'];
                 $updatedFields[] = 'color';
+            }
+            // Phase 2
+            if (isset($eventValidation['data']['priority'])) {
+                $event->priority = $eventValidation['data']['priority'];
+                $updatedFields[] = 'priority';
+            }
+            if (isset($eventValidation['data']['class'])) {
+                $event->class = $eventValidation['data']['class'];
+                $updatedFields[] = 'class';
+            }
+            if (isset($eventValidation['data']['transp'])) {
+                $event->transp = $eventValidation['data']['transp'];
+                $updatedFields[] = 'transp';
+            }
+            if (isset($eventValidation['data']['categories'])) {
+                $event->categories = $eventValidation['data']['categories'];
+                $updatedFields[] = 'categories';
+            }
+            if (isset($eventValidation['data']['geo_lat'])) {
+                $event->geoLat = $eventValidation['data']['geo_lat'];
+                $updatedFields[] = 'geo_lat';
+            }
+            if (isset($eventValidation['data']['geo_lng'])) {
+                $event->geoLng = $eventValidation['data']['geo_lng'];
+                $updatedFields[] = 'geo_lng';
+            }
+            if (isset($eventValidation['data']['attachments'])) {
+                $event->attachments = $eventValidation['data']['attachments'];
+                $updatedFields[] = 'attachments';
             }
             
             LogService::info("Champs à mettre à jour", [

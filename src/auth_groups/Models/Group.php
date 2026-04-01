@@ -3,6 +3,7 @@
 namespace AuthGroups\Models;
 
 use AuthGroups\Services\EmailService;
+use AuthGroups\Services\LogService;
 use PDO;
 use Exception;
 use InvalidArgumentException;
@@ -500,7 +501,7 @@ class Group extends BaseModel
             } catch (Exception $e)
             {
                 // L'erreur d'email n'empêche pas l'invitation
-                error_log("Email invitation failed: " . $e->getMessage());
+                LogService::warning("Email invitation failed", ['exception' => $e->getMessage()]);
             }
 
             $this->getDb()->commit();
