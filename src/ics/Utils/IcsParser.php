@@ -56,6 +56,7 @@ class IcsParser
         }
 
         foreach ($vcalendar->VEVENT as $vevent) {
+            /** @var \Sabre\VObject\Component $vevent */
             $events[] = self::normalizeVEvent($vevent);
         }
 
@@ -74,7 +75,9 @@ class IcsParser
             return null;
         }
 
-        return self::normalizeVEvent($vcalendar->VEVENT);
+        /** @var \Sabre\VObject\Component $firstVEvent */
+        $firstVEvent = $vcalendar->VEVENT;
+        return self::normalizeVEvent($firstVEvent);
     }
 
     /**
@@ -83,10 +86,10 @@ class IcsParser
      * Les datetimes sont stockés en heure locale (America/Montreal par défaut),
      * cohérent avec la convention actuelle de la DB et TimezoneHelper.
      *
-     * @param \Sabre\VObject\Component\VEvent $vevent
+     * @param \Sabre\VObject\Component $vevent
      * @param string $localTimezone  Timezone cible pour le stockage en DB
      */
-    private static function normalizeVEvent($vevent, string $localTimezone = 'America/Montreal'): array
+    private static function normalizeVEvent(\Sabre\VObject\Component $vevent, string $localTimezone = 'America/Montreal'): array
     {
         $event = [];
 
@@ -196,8 +199,76 @@ class IcsParser
         }
         $event['attachments'] = empty($attachments) ? null : $attachments;
 
+        // Phase 4.3 — RELATED-TO : UID de l'événement parent (RFC 5545 §3.8.4.5)
+        $event['related_to'] = null;
+        if (isset($vevent->{'RELATED-TO'})) {
+            $event['related_to'] = (string)$vevent->{'RELATED-TO'};
+        }
+
+        // Phase 4.5 — DURATION (RFC 5545 §3.8.2.5)
+        $event['duration'] = isset($vevent->DURATION) ? (string)$vevent->DURATION : null;
+
+        // Phase 4.2 — RDATE : dates additionnelles → CSV de datetimes locales
+        $rdates = [];
+        if (isset($vevent->RDATE)) {
+            $tz = new \DateTimeZone($localTimezone);
+            foreach ($vevent->RDATE as $rdateProp) {
+                /** @var \Sabre\VObject\Property\ICalendar\DateTime $rdateProp */
+                try {
+                    foreach ($rdateProp->getDateTimes() as $dt) {
+                        $rdates[] = $dt->setTimezone($tz)->format('Y-m-d H:i:s');
+                    }
+                } catch (\Exception $e) {
+                    // Ignorer les valeurs RDATE non parsables
+                }
+            }
+        }
+        $event['rdate'] = empty($rdates) ? null : implode(',', $rdates);
+
+        // Phase 4.1 — EXDATE : liste de datetimes annulées → pour création d'occurrences annulées
+        $exdates = [];
+        if (isset($vevent->EXDATE)) {
+            $tz = new \DateTimeZone($localTimezone);
+            foreach ($vevent->EXDATE as $exdateProp) {
+                /** @var \Sabre\VObject\Property\ICalendar\DateTime $exdateProp */
+                try {
+                    foreach ($exdateProp->getDateTimes() as $dt) {
+                        $exdates[] = $dt->setTimezone($tz)->format('Y-m-d H:i:s');
+                    }
+                } catch (\Exception $e) {
+                    // Ignorer les valeurs EXDATE non parsables
+                }
+            }
+        }
+        $event['exdates'] = empty($exdates) ? null : $exdates;
+
+        // Phase 4.4 — VALARM → notifications JSON [{type, minutes}]
+        $notifications = [];
+        if (isset($vevent->VALARM)) {
+            foreach ($vevent->VALARM as $alarm) {
+                /** @var \Sabre\VObject\Component $alarm */
+                $actionRaw = strtolower((string)($alarm->ACTION ?? 'display'));
+                $type      = ($actionRaw === 'email') ? 'email' : 'notification';
+                $minutes   = 0;
+
+                if (isset($alarm->TRIGGER)) {
+                    $triggerStr = (string)$alarm->TRIGGER;
+                    // Formats : -PT30M, PT1H30M, -P1D, PT0S
+                    if (preg_match('/-?PT(?:(\d+)H)?(?:(\d+)M)?/', $triggerStr, $m)) {
+                        $minutes = ((int)($m[1] ?? 0)) * 60 + (int)($m[2] ?? 0);
+                    } elseif (preg_match('/-?P(\d+)D/', $triggerStr, $m)) {
+                        $minutes = (int)$m[1] * 24 * 60;
+                    }
+                }
+
+                $notifications[] = ['type' => $type, 'minutes' => $minutes];
+            }
+        }
+        $event['notifications'] = empty($notifications) ? null : $notifications;
+
         // DTSTART
         if (isset($vevent->DTSTART)) {
+            /** @var \Sabre\VObject\Property\ICalendar\DateTime $dtstart */
             $dtstart  = $vevent->DTSTART;
             $isAllDay = ($dtstart->getValueType() === 'DATE');
             $event['all_day'] = $isAllDay;
@@ -213,8 +284,9 @@ class IcsParser
             $event['start_datetime'] = null;
         }
 
-        // DTEND
+        // DTEND — Phase 4.5 : si absent mais DURATION présent, calculer end_datetime
         if (isset($vevent->DTEND)) {
+            /** @var \Sabre\VObject\Property\ICalendar\DateTime $dtend */
             $dtend    = $vevent->DTEND;
             $isAllDay = ($dtend->getValueType() === 'DATE');
 
@@ -227,10 +299,189 @@ class IcsParser
                 $tz = new \DateTimeZone($localTimezone);
                 $event['end_datetime'] = $dtend->getDateTime($tz)->format('Y-m-d H:i:s');
             }
+        } elseif (!empty($event['duration']) && !empty($event['start_datetime'])) {
+            // Phase 4.5 — calculer end_datetime depuis DTSTART + DURATION
+            try {
+                $dtStart  = new \DateTime($event['start_datetime']);
+                $interval = new \DateInterval(ltrim($event['duration'], '-'));
+                $dtStart->add($interval);
+                $event['end_datetime'] = $dtStart->format('Y-m-d H:i:s');
+            } catch (\Exception $e) {
+                $event['end_datetime'] = $event['start_datetime'];
+            }
         } else {
             $event['end_datetime'] = $event['start_datetime'];
         }
 
         return $event;
+    }
+
+    // ====================================================================
+    // Phase 5.1 — VTODO parsing
+    // ====================================================================
+
+    /**
+     * Parse tous les VTODO d'un fichier ICS.
+     * Retourne un tableau de tâches normalisées (clés en snake_case).
+     */
+    public static function parseTodos(string $icsContent): array
+    {
+        $vcalendar = Reader::read($icsContent, Reader::OPTION_FORGIVING);
+
+        if (!isset($vcalendar->VTODO)) {
+            return [];
+        }
+
+        $todos = [];
+        foreach ($vcalendar->VTODO as $vtodo) {
+            $todos[] = self::normalizeVTodo($vtodo);
+        }
+        return $todos;
+    }
+
+    /**
+     * Normalise un composant VTODO sabre/vobject en tableau PHP.
+     *
+     * @param \Sabre\VObject\Component $vtodo
+     * @param string $localTimezone Timezone cible pour le stockage en DB
+     */
+    private static function normalizeVTodo($vtodo, string $localTimezone = 'America/Montreal'): array
+    {
+        $tz   = new \DateTimeZone($localTimezone);
+        $todo = [];
+
+        $todo['uid']         = isset($vtodo->UID)         ? (string)$vtodo->UID         : null;
+        $todo['title']       = isset($vtodo->SUMMARY)     ? (string)$vtodo->SUMMARY     : 'Sans titre';
+        $todo['description'] = isset($vtodo->DESCRIPTION) ? (string)$vtodo->DESCRIPTION : null;
+        $todo['location']    = isset($vtodo->LOCATION)    ? (string)$vtodo->LOCATION    : null;
+        $todo['status']      = isset($vtodo->STATUS)
+            ? strtoupper((string)$vtodo->STATUS)
+            : 'NEEDS-ACTION';
+        $todo['priority']    = isset($vtodo->PRIORITY)    ? (int)(string)$vtodo->PRIORITY : 0;
+        $todo['percent_complete'] = isset($vtodo->{'PERCENT-COMPLETE'})
+            ? (int)(string)$vtodo->{'PERCENT-COMPLETE'}
+            : 0;
+        $todo['sequence']    = isset($vtodo->SEQUENCE)    ? (int)(string)$vtodo->SEQUENCE : 0;
+        $todo['url']         = isset($vtodo->URL)         ? (string)$vtodo->URL          : null;
+        $todo['related_to']  = isset($vtodo->{'RELATED-TO'}) ? (string)$vtodo->{'RELATED-TO'} : null;
+
+        if (isset($vtodo->CATEGORIES)) {
+            $raw = (string)$vtodo->CATEGORIES;
+            $todo['categories'] = array_values(array_filter(array_map('trim', explode(',', $raw))));
+        } else {
+            $todo['categories'] = null;
+        }
+
+        $todo['dtstart']   = isset($vtodo->DTSTART)
+            ? (($vtodo->DTSTART instanceof \Sabre\VObject\Property\ICalendar\DateTime) ? $vtodo->DTSTART->getDateTime($tz)->format('Y-m-d H:i:s') : (string)$vtodo->DTSTART)
+            : null;
+        $todo['due']       = isset($vtodo->DUE)
+            ? (($vtodo->DUE instanceof \Sabre\VObject\Property\ICalendar\DateTime) ? $vtodo->DUE->getDateTime($tz)->format('Y-m-d H:i:s') : (string)$vtodo->DUE)
+            : null;
+        $todo['completed'] = isset($vtodo->COMPLETED)
+            ? (($vtodo->COMPLETED instanceof \Sabre\VObject\Property\ICalendar\DateTime) ? $vtodo->COMPLETED->getDateTime($tz)->format('Y-m-d H:i:s') : (string)$vtodo->COMPLETED)
+            : null;
+
+        $todo['organizer_email'] = null;
+        $todo['organizer_name']  = null;
+        if (isset($vtodo->ORGANIZER)) {
+            $orgRaw = (string)$vtodo->ORGANIZER;
+            $todo['organizer_email'] = (stripos($orgRaw, 'mailto:') === 0)
+                ? substr($orgRaw, 7) : $orgRaw;
+            if (isset($vtodo->ORGANIZER['CN'])) {
+                $todo['organizer_name'] = (string)$vtodo->ORGANIZER['CN'];
+            }
+        }
+
+        $attendees = [];
+        if (isset($vtodo->ATTENDEE)) {
+            foreach ($vtodo->ATTENDEE as $attendeeProp) {
+                $raw   = (string)$attendeeProp;
+                $email = (stripos($raw, 'mailto:') === 0) ? substr($raw, 7) : $raw;
+                if (empty($email)) {
+                    continue;
+                }
+                $entry = ['email' => $email];
+                if (isset($attendeeProp['CN'])) {
+                    $entry['name'] = (string)$attendeeProp['CN'];
+                }
+                if (isset($attendeeProp['PARTSTAT'])) {
+                    $entry['partstat'] = (string)$attendeeProp['PARTSTAT'];
+                }
+                $attendees[] = $entry;
+            }
+        }
+        $todo['attendees'] = empty($attendees) ? null : $attendees;
+
+        return $todo;
+    }
+
+    // ====================================================================
+    // Phase 5.2 — VJOURNAL parsing
+    // ====================================================================
+
+    /**
+     * Parse tous les VJOURNAL d'un fichier ICS.
+     * Retourne un tableau de journaux normalisés (clés en snake_case).
+     */
+    public static function parseJournals(string $icsContent): array
+    {
+        $vcalendar = Reader::read($icsContent, Reader::OPTION_FORGIVING);
+
+        if (!isset($vcalendar->VJOURNAL)) {
+            return [];
+        }
+
+        $journals = [];
+        foreach ($vcalendar->VJOURNAL as $vjournal) {
+            $journals[] = self::normalizeVJournal($vjournal);
+        }
+        return $journals;
+    }
+
+    /**
+     * Normalise un composant VJOURNAL sabre/vobject en tableau PHP.
+     *
+     * @param \Sabre\VObject\Component $vjournal
+     * @param string $localTimezone Timezone cible pour le stockage en DB
+     */
+    private static function normalizeVJournal($vjournal, string $localTimezone = 'America/Montreal'): array
+    {
+        $tz      = new \DateTimeZone($localTimezone);
+        $journal = [];
+
+        $journal['uid']         = isset($vjournal->UID)         ? (string)$vjournal->UID         : null;
+        $journal['summary']     = isset($vjournal->SUMMARY)     ? (string)$vjournal->SUMMARY     : 'Sans titre';
+        $journal['description'] = isset($vjournal->DESCRIPTION) ? (string)$vjournal->DESCRIPTION : null;
+        $journal['status']      = isset($vjournal->STATUS)
+            ? strtoupper((string)$vjournal->STATUS)
+            : 'DRAFT';
+        $journal['sequence']    = isset($vjournal->SEQUENCE)    ? (int)(string)$vjournal->SEQUENCE : 0;
+        $journal['url']         = isset($vjournal->URL)         ? (string)$vjournal->URL          : null;
+        $journal['related_to']  = isset($vjournal->{'RELATED-TO'}) ? (string)$vjournal->{'RELATED-TO'} : null;
+
+        if (isset($vjournal->CATEGORIES)) {
+            $raw = (string)$vjournal->CATEGORIES;
+            $journal['categories'] = array_values(array_filter(array_map('trim', explode(',', $raw))));
+        } else {
+            $journal['categories'] = null;
+        }
+
+        $journal['dtstart'] = isset($vjournal->DTSTART)
+            ? (($vjournal->DTSTART instanceof \Sabre\VObject\Property\ICalendar\DateTime) ? $vjournal->DTSTART->getDateTime($tz)->format('Y-m-d H:i:s') : (string)$vjournal->DTSTART)
+            : null;
+
+        $journal['organizer_email'] = null;
+        $journal['organizer_name']  = null;
+        if (isset($vjournal->ORGANIZER)) {
+            $orgRaw = (string)$vjournal->ORGANIZER;
+            $journal['organizer_email'] = (stripos($orgRaw, 'mailto:') === 0)
+                ? substr($orgRaw, 7) : $orgRaw;
+            if (isset($vjournal->ORGANIZER['CN'])) {
+                $journal['organizer_name'] = (string)$vjournal->ORGANIZER['CN'];
+            }
+        }
+
+        return $journal;
     }
 }

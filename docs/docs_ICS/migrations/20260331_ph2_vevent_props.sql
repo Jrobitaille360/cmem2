@@ -38,3 +38,4 @@ ALTER TABLE calendar_events
     ADD COLUMN attachments JSON NULL
         COMMENT 'RFC 5545 ATTACH — [{url, mime_type}] ou [{data_base64, mime_type}]'
         AFTER geo_lng;
+

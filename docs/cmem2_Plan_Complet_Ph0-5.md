@@ -247,26 +247,26 @@ D4                  (pipeline middleware — grosse refactorisation, EN DERNIER)
 >
 > **Nouvelles colonnes DB :** `exdate TEXT`, `rdate TEXT`, `related_to VARCHAR(255)`, `duration VARCHAR(20)`
 
-- [ ] **4.1** — `EXDATE` — exceptions de récurrence
+- ✅ **4.1** — `EXDATE` — exceptions de récurrence
   - Source : `event_occurrences` avec `is_cancelled = 1`
   - Export : `EXDATE;TZID=America/Montreal:20260401T140000,20260408T140000`
   - Import : créer occurrences annulées correspondantes
 
-- [ ] **4.2** — `RDATE` — dates additionnelles
+- ✅ **4.2** — `RDATE` — dates additionnelles
   - Colonne `rdate TEXT` (dates ISO séparées par virgule)
   - Export/import ; générer `event_occurrences` correspondantes
 
-- [ ] **4.3** — `RELATED-TO`
+- ✅ **4.3** — `RELATED-TO`
   - Colonne `related_to VARCHAR(255)` (UID parent)
   - Export : `RELATED-TO;RELTYPE=PARENT:<uid>`
   - Import : stocker UID brut si résolution locale échoue
 
-- [ ] **4.4** — `VALARM`
+- ✅ **4.4** — `VALARM`
   - Convertir `notifications JSON` existant `[{ type, minutes_before }]` en blocs `BEGIN:VALARM`
   - Export : `ACTION:DISPLAY` / `ACTION:EMAIL`, `TRIGGER:-PT30M`, `DESCRIPTION:Rappel`
   - > La structure notifications est déjà en DB — c'est principalement un travail d'export.
 
-- [ ] **4.5** — `DURATION` vs `DTEND`
+- ✅ **4.5** — `DURATION` vs `DTEND`
   - Colonne `duration VARCHAR(20)` format ISO 8601 (ex. `PT1H30M`)
   - Si `duration` défini → export `DURATION:PT1H30M` (sans `DTEND`)
   - Import : calculer `end_datetime` depuis `DTSTART + DURATION`
@@ -279,18 +279,18 @@ D4                  (pipeline middleware — grosse refactorisation, EN DERNIER)
 >
 > À planifier selon les besoins réels des utilisateurs.
 
-- [ ] **5.1** — `VTODO`
+- ✅ **5.1** — `VTODO`
   - Nouvelle table `calendar_todos (calendar_id, title, status, due, priority, percent_complete, description)`
   - Modèle + contrôleur + routes CRUD
   - Ajouter `VTODO` au `supported-component-set` dans `CalDAVServer`
   - > Haute valeur pour les utilisateurs qui gèrent des tâches via leur client CalDAV (Thunderbird, Apple Reminders).
 
-- [ ] **5.2** — `VJOURNAL`
+- ✅ **5.2** — `VJOURNAL`
   - Table `calendar_journals (calendar_id, summary, description, dtstart)`
   - Modèle + routes basiques
   - > Utilisé par Emacs org-mode, Evolution. Usage de niche — faire en dernier.
 
-- [ ] **5.3** — `VFREEBUSY`
+- ✅ **5.3** — `VFREEBUSY`
   - Endpoint `GET /calendars/{id}/freebusy?start=...&end=...`
   - Agréger les événements `TRANSP=OPAQUE` → générer `VFREEBUSY` avec plages occupées
   - Exposer via `REPORT` CalDAV
@@ -336,14 +336,14 @@ D4                  (pipeline middleware — grosse refactorisation, EN DERNIER)
 | 30 | Ph3   | 3.2 | ORGANIZER                                  | 45min  | ✅   |
 | 31 | Ph3   | 3.3 | iTIP de base (REQUEST/REPLY/CANCEL)        | 1h30   | ✅   |
 | 32 | Ph3   | 3.4 | Email invitation + pièce jointe .ics       | 1h30   | ✅   |
-| 33 | Ph4   | 4.1 | EXDATE                                     | 1h     |      |
-| 34 | Ph4   | 4.2 | RDATE                                      | 1h     |      |
-| 35 | Ph4   | 4.3 | RELATED-TO                                 | 45min  |      |
-| 36 | Ph4   | 4.4 | VALARM export                              | 1h30   |      |
-| 37 | Ph4   | 4.5 | DURATION vs DTEND                          | 1h     |      |
-| 38 | Ph5   | 5.1 | VTODO                                      | 3h     |      |
-| 39 | Ph5   | 5.2 | VJOURNAL                                   | 2h     |      |
-| 40 | Ph5   | 5.3 | VFREEBUSY                                  | 3h     |      |
+| 33 | Ph4   | 4.1 | EXDATE                                     | 1h     | ✅   |
+| 34 | Ph4   | 4.2 | RDATE                                      | 1h     | ✅   |
+| 35 | Ph4   | 4.3 | RELATED-TO                                 | 45min  | ✅   |
+| 36 | Ph4   | 4.4 | VALARM export                              | 1h30   | ✅   |
+| 37 | Ph4   | 4.5 | DURATION vs DTEND                          | 1h     | ✅   |
+| 38 | Ph5   | 5.1 | VTODO                                      | 3h     | ✅   |
+| 39 | Ph5   | 5.2 | VJOURNAL                                   | 2h     | ✅   |
+| 40 | Ph5   | 5.3 | VFREEBUSY                                  | 3h     | ✅   |
 
 ---
 

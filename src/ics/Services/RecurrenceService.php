@@ -465,4 +465,119 @@ class RecurrenceService
             return 1;
         }
     }
+
+    /**
+     * Phase 4.1 — Marque des occurrences comme annulées à partir d'une liste de datetimes EXDATE.
+     *
+     * Appelé à l'import ICS quand EXDATE est présent.
+     * Crée les lignes event_occurrences avec is_cancelled = 1 si elles n'existent pas déjà.
+     *
+     * @param array    $event      Résultat de CalendarEvent::create() (doit contenir id, calendar_id)
+     * @param string[] $datetimes  Liste de datetimes locaux au format 'Y-m-d H:i:s'
+     */
+    public static function cancelOccurrencesByDatetimes(array $event, array $datetimes): void
+    {
+        if (empty($datetimes) || empty($event['id'])) {
+            return;
+        }
+
+        try {
+            $db = EventOccurrence::getDbConnection();
+
+            foreach ($datetimes as $datetime) {
+                $occurrenceDate = substr($datetime, 0, 10);
+
+                // Insérer ou mettre à jour l'occurrence comme annulée
+                $stmt = $db->prepare(
+                    "INSERT INTO event_occurrences
+                        (event_id, calendar_id, occurrence_date, start_datetime, end_datetime,
+                         recurrence_index, is_cancelled)
+                     VALUES (?, ?, ?, ?, ?, 0, 1)
+                     ON DUPLICATE KEY UPDATE is_cancelled = 1"
+                );
+                $stmt->execute([
+                    $event['id'],
+                    $event['calendar_id'],
+                    $occurrenceDate,
+                    $datetime,
+                    $datetime,
+                ]);
+            }
+
+            LogService::info("Occurrences annulées via EXDATE", [
+                'event_id' => $event['id'],
+                'count'    => count($datetimes),
+            ]);
+        } catch (\Exception $e) {
+            LogService::error("Erreur lors de l'annulation des occurrences EXDATE", [
+                'event_id' => $event['id'],
+                'error'    => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Phase 4.2 — Génère les occurrences additionnelles depuis la colonne rdate.
+     *
+     * Appelé après CalendarEvent::create() ou RecurrenceService::generateAllOccurrences().
+     * Les dates RDATE sont stockées en CSV dans event.rdate (ex: '2026-04-15 14:00:00,2026-04-22 14:00:00').
+     *
+     * @param array $event Ligne DB de l'événement (doit contenir id, calendar_id, rdate, start_datetime, end_datetime)
+     * @return int Nombre d'occurrences RDATE insérées
+     */
+    public static function generateRdateOccurrences(array $event): int
+    {
+        if (empty($event['rdate']) || empty($event['id'])) {
+            return 0;
+        }
+
+        try {
+            $rdateParts = array_filter(array_map('trim', explode(',', $event['rdate'])));
+            if (empty($rdateParts)) {
+                return 0;
+            }
+
+            // Calculer la durée de l'événement pour déduire end_datetime des occurrences RDATE
+            $startDt = new \DateTime($event['start_datetime']);
+            $endDt   = new \DateTime($event['end_datetime']);
+            $duration = $startDt->diff($endDt);
+
+            $db = EventOccurrence::getDbConnection();
+            $inserted = 0;
+
+            foreach ($rdateParts as $rdateDatetime) {
+                $occurrenceDate = substr($rdateDatetime, 0, 10);
+                $occurrenceStart = new \DateTime($rdateDatetime);
+                $occurrenceEnd   = (clone $occurrenceStart)->add($duration);
+
+                $stmt = $db->prepare(
+                    "INSERT INTO event_occurrences
+                        (event_id, calendar_id, occurrence_date, start_datetime, end_datetime, recurrence_index)
+                     VALUES (?, ?, ?, ?, ?, -1)
+                     ON DUPLICATE KEY UPDATE id = id"
+                );
+                $stmt->execute([
+                    $event['id'],
+                    $event['calendar_id'],
+                    $occurrenceDate,
+                    $occurrenceStart->format('Y-m-d H:i:s'),
+                    $occurrenceEnd->format('Y-m-d H:i:s'),
+                ]);
+                $inserted++;
+            }
+
+            LogService::info("Occurrences RDATE générées", [
+                'event_id' => $event['id'],
+                'count'    => $inserted,
+            ]);
+
+            return $inserted;
+        } catch (\Exception $e) {
+            LogService::error("Erreur lors de la génération des occurrences RDATE", [
+                'event_id' => $event['id'],
+                'error'    => $e->getMessage(),
+            ]);
+            return 0;
+        }
+    }
 }

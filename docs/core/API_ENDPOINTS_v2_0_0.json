@@ -987,7 +987,7 @@
       ]
     },
     "calendars": {
-      "description": "Plugin ICS — Gestion des calendriers et événements (v2.2.1 — Phase 2 : CATEGORIES, PRIORITY, CLASS, TRANSP, GEO, ATTACH)",
+      "description": "Plugin ICS — Gestion des calendriers et événements (v2.2.1 — Ph2: VEVENT enrichi · Ph3: ATTENDEE/ORGANIZER/iTIP · Ph4: EXDATE/RDATE/VALARM/DURATION · Ph5: VTODO/VJOURNAL/VFREEBUSY)",
       "base_path": "/calendars",
       "auth_required": true,
       "auth_header": "Authorization: Bearer {jwt_token}",
@@ -1155,15 +1155,20 @@
             "categories": "array of strings (optional) — ex: [\"Travail\",\"Réunion\"] — exporté comme CATEGORIES",
             "geo_lat": "decimal (optional) — latitude WGS84 -90..90 — requis si geo_lng fourni",
             "geo_lng": "decimal (optional) — longitude WGS84 -180..180 — requis si geo_lat fourni",
-            "attachments": "array (optional) — [{url: string, mime_type: string}] ou [{data_base64: string, mime_type: string}]"
+            "attachments": "array (optional) — [{url: string, mime_type: string}] ou [{data_base64: string, mime_type: string}]",
+            "rdate": "string (optional) — Phase 4 — RDATE : dates additionnelles (datetimes locales CSV, ex: 2026-10-08 09:00:00,2026-10-15 09:00:00)",
+            "related_to": "string (optional) — Phase 4 — UID RFC 5545 de l'événement parent (RELATED-TO;RELTYPE=PARENT)",
+            "duration": "string (optional) — Phase 4 — durée ISO 8601 ex: PT1H30M — exclusif avec end_datetime"
           },
           "notes": [
             "Phase 3 : un email d'invitation iTIP METHOD:REQUEST est automatiquement envoyé aux attendees à la création",
-            "Mettre à jour le partstat d'un attendee via POST /notifications/attendee-reply"
+            "Mettre à jour le partstat d'un attendee via POST /notifications/attendee-reply",
+            "Phase 4 : VALARM exporté automatiquement depuis le champ notifications existant — aucun champ supplémentaire",
+            "Phase 4 : EXDATE exporté automatiquement depuis les event_occurrences is_cancelled=1"
           ],
           "response": "Event object",
           "errors": {
-            "400": "Validation échouée (end_datetime < start_datetime, priority hors 0–9, class/transp invalide, geo_lat sans geo_lng, attendee sans email, etc.)",
+            "400": "Validation échouée (end_datetime < start_datetime, priority hors 0–9, class/transp invalide, geo_lat sans geo_lng, attendee sans email, duration + end_datetime ensemble, format duration invalide, etc.)",
             "403": "Permission insuffisante sur ce calendrier"
           }
         },
@@ -1218,11 +1223,14 @@
             "categories": "array of strings (optional)",
             "geo_lat": "decimal (optional) — latitude -90..90 — requis si geo_lng fourni",
             "geo_lng": "decimal (optional) — longitude -180..180 — requis si geo_lat fourni",
-            "attachments": "array (optional) — [{url: string, mime_type: string}] ou [{data_base64: string, mime_type: string}]"
+            "attachments": "array (optional) — [{url: string, mime_type: string}] ou [{data_base64: string, mime_type: string}]",
+            "rdate": "string (optional) — Phase 4 — RDATE : dates additionnelles (datetimes locales CSV)",
+            "related_to": "string (optional) — Phase 4 — UID de l'événement parent",
+            "duration": "string (optional) — Phase 4 — durée ISO 8601 ex: PT1H30M — exclusif avec end_datetime"
           },
           "response": "Event object mis à jour",
           "errors": {
-            "400": "Validation échouée (end_datetime < start_datetime, priority hors 0–9, class/transp invalide, geo_lat sans geo_lng, etc.)",
+            "400": "Validation échouée (end_datetime < start_datetime, priority hors 0–9, class/transp invalide, geo_lat sans geo_lng, duration + end_datetime ensemble, etc.)",
             "403": "Permission insuffisante",
             "404": "Événement non trouvé"
           }
@@ -1309,6 +1317,176 @@
           "errors": {
             "400": "Validation échouée",
             "403": "Permission insuffisante"
+          }
+        }
+      ]
+    },
+    "todos": {
+      "description": "Plugin ICS — Tâches CalDAV (VTODO RFC 5545) — Phase 5.1",
+      "base_path": "/calendars/{id}/todos",
+      "auth_required": true,
+      "auth_header": "Authorization: Bearer {jwt_token}",
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/calendars/{id}/todos",
+          "description": "Créer une tâche VTODO dans un calendrier",
+          "params": { "id": "integer (required) — ID du calendrier" },
+          "body": {
+            "title": "string (required) — max 255 caractères",
+            "description": "string (optional)",
+            "due": "date ou datetime (optional) — DUE : échéance ISO 8601",
+            "dtstart": "date ou datetime (optional) — DTSTART optionnel",
+            "status": "string (optional) — NEEDS-ACTION | IN-PROCESS | COMPLETED | CANCELLED (défaut: NEEDS-ACTION)",
+            "priority": "integer (optional) — 0=non défini, 1=haute, 5=normale, 9=basse (défaut: 0)",
+            "percent_complete": "integer (optional) — 0–100 (défaut: 0)",
+            "location": "string (optional)",
+            "categories": "array of strings (optional) — exporté CATEGORIES:",
+            "url": "string (optional) — URL max 2083 caractères",
+            "timezone": "string (optional) — défaut: America/Montreal"
+          },
+          "response": "Todo object",
+          "errors": {
+            "400": "Validation échouée",
+            "403": "Accès non autorisé (ownership requis)"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/calendars/{id}/todos",
+          "description": "Lister les tâches d'un calendrier",
+          "params": { "id": "integer (required)" },
+          "query": {
+            "status": "string (optional) — filtrer par statut",
+            "include_deleted": "boolean (optional) — inclure les tâches supprimées"
+          },
+          "response": "{ todos: Array, count: integer }"
+        },
+        {
+          "method": "GET",
+          "path": "/calendars/{id}/todos/{todoId}",
+          "description": "Obtenir le détail d'une tâche",
+          "params": { "id": "integer (required)", "todoId": "integer (required)" },
+          "response": "Todo object",
+          "errors": { "404": "Tâche non trouvée" }
+        },
+        {
+          "method": "PUT",
+          "path": "/calendars/{id}/todos/{todoId}",
+          "description": "Mettre à jour une tâche — seuls les champs fournis sont modifiés",
+          "params": { "id": "integer (required)", "todoId": "integer (required)" },
+          "body": {
+            "title": "string (optional)",
+            "description": "string (optional)",
+            "due": "date ou datetime (optional)",
+            "status": "string (optional) — NEEDS-ACTION | IN-PROCESS | COMPLETED | CANCELLED",
+            "priority": "integer (optional) — 0–9",
+            "percent_complete": "integer (optional) — 0–100",
+            "location": "string (optional)",
+            "categories": "array of strings (optional)"
+          },
+          "response": "Todo object mis à jour",
+          "errors": { "403": "Permission insuffisante", "404": "Tâche non trouvée" }
+        },
+        {
+          "method": "DELETE",
+          "path": "/calendars/{id}/todos/{todoId}",
+          "description": "Supprimer une tâche (soft delete)",
+          "params": { "id": "integer (required)", "todoId": "integer (required)" },
+          "response": "{ todo_id, deleted_at }",
+          "errors": { "403": "Permission insuffisante", "404": "Tâche non trouvée" }
+        }
+      ]
+    },
+    "journals": {
+      "description": "Plugin ICS — Journaux CalDAV (VJOURNAL RFC 5545) — Phase 5.2",
+      "base_path": "/calendars/{id}/journals",
+      "auth_required": true,
+      "auth_header": "Authorization: Bearer {jwt_token}",
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/calendars/{id}/journals",
+          "description": "Créer une entrée de journal VJOURNAL dans un calendrier",
+          "params": { "id": "integer (required) — ID du calendrier" },
+          "body": {
+            "summary": "string (required) — résumé max 255 caractères",
+            "description": "string (optional) — contenu du journal",
+            "dtstart": "date ou datetime (optional) — date du journal",
+            "status": "string (optional) — DRAFT | FINAL | CANCELLED (défaut: DRAFT)",
+            "categories": "array of strings (optional)",
+            "url": "string (optional) — URL max 2083 caractères",
+            "timezone": "string (optional) — défaut: America/Montreal"
+          },
+          "response": "Journal object",
+          "errors": {
+            "400": "Validation échouée",
+            "403": "Accès non autorisé (ownership requis)"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/calendars/{id}/journals",
+          "description": "Lister les entrées de journal d'un calendrier",
+          "params": { "id": "integer (required)" },
+          "query": {
+            "status": "string (optional) — filtrer par statut (DRAFT | FINAL | CANCELLED)"
+          },
+          "response": "{ journals: Array, count: integer }"
+        },
+        {
+          "method": "GET",
+          "path": "/calendars/{id}/journals/{journalId}",
+          "description": "Obtenir le détail d'une entrée de journal",
+          "params": { "id": "integer (required)", "journalId": "integer (required)" },
+          "response": "Journal object",
+          "errors": { "404": "Journal non trouvé" }
+        },
+        {
+          "method": "PUT",
+          "path": "/calendars/{id}/journals/{journalId}",
+          "description": "Mettre à jour une entrée de journal",
+          "params": { "id": "integer (required)", "journalId": "integer (required)" },
+          "body": {
+            "summary": "string (optional)",
+            "description": "string (optional)",
+            "dtstart": "date ou datetime (optional)",
+            "status": "string (optional) — DRAFT | FINAL | CANCELLED",
+            "categories": "array of strings (optional)"
+          },
+          "response": "Journal object mis à jour",
+          "errors": { "403": "Permission insuffisante", "404": "Journal non trouvé" }
+        },
+        {
+          "method": "DELETE",
+          "path": "/calendars/{id}/journals/{journalId}",
+          "description": "Supprimer une entrée de journal (soft delete)",
+          "params": { "id": "integer (required)", "journalId": "integer (required)" },
+          "response": "{ journal_id, deleted_at }",
+          "errors": { "403": "Permission insuffisante", "404": "Journal non trouvé" }
+        }
+      ]
+    },
+    "freebusy": {
+      "description": "Plugin ICS — Disponibilités CalDAV (VFREEBUSY RFC 5545) — Phase 5.3",
+      "auth_required": true,
+      "auth_header": "Authorization: Bearer {jwt_token}",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/calendars/{id}/freebusy",
+          "description": "Obtenir les plages occupées d'un calendrier sur une période donnée (VFREEBUSY) — agrège les événements TRANSP=OPAQUE",
+          "params": { "id": "integer (required) — ID du calendrier" },
+          "query": {
+            "start": "date (required) — début de la plage YYYY-MM-DD",
+            "end": "date (required) — fin de la plage YYYY-MM-DD"
+          },
+          "response": "{ freebusy: [{ dtstart, dtend }], calendar_id, period: { start, end } }",
+          "notes": "Requiert TRANSP (Phase 2 — 2.4) — seuls les événements OPAQUE sont inclus. Exposé également via REPORT CalDAV.",
+          "errors": {
+            "400": "start ou end manquant/invalide, ou start > end",
+            "403": "Accès non autorisé au calendrier",
+            "404": "Calendrier non trouvé"
           }
         }
       ]
@@ -1459,12 +1637,24 @@
     "file": "src/auth_groups/docs/MIGRATION_JWT.sql",
     "tables_added": [
       "otp_codes — codes OTP à 6 chiffres pour connexion par email",
-      "device_tokens — tokens longue durée par appareil pour renouvellement JWT"
+      "device_tokens — tokens longue durée par appareil pour renouvellement JWT",
+      "calendar_todos — VTODO (Phase 5.1)",
+      "calendar_journals — VJOURNAL (Phase 5.2)"
     ],
-    "tables_modified": [],
+    "tables_modified": [
+      "calendar_events — +priority, +class, +transp, +categories, +geo_lat, +geo_lng, +attachments (Ph2)",
+      "calendar_events — +organizer_email, +organizer_name (Ph3)",
+      "calendar_events — +rdate, +related_to, +duration (Ph4)"
+    ],
     "tables_removed": [
       "api_keys — système de clés API retiré (v2.1.1), remplacé par JWT",
       "user_sessions.api_key_id — colonne retirée (v2.1.1)"
+    ],
+    "migrations": [
+      "docs/docs_ICS/migrations/20260331_ph2_vevent_props.sql",
+      "docs/docs_ICS/migrations/20260401_ph3_organizer.sql",
+      "docs/docs_ICS/migrations/20260401_ph4_recurrence.sql",
+      "docs/docs_ICS/migrations/20260401_ph5_components.sql"
     ]
   }
 }

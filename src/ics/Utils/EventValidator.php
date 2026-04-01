@@ -308,6 +308,43 @@ class EventValidator
     }
 
     /**
+     * Valide la durée ISO 8601 (RFC 5545 §3.3.6 — ex : PT1H30M, P1D, PT30M).
+     * Doit commencer par P, ne peut pas être utilisé en même temps que end_datetime.
+     */
+    public static function validateDuration($duration): array
+    {
+        if ($duration === null || $duration === '') {
+            return ['valid' => true, 'error' => null];
+        }
+        // RFC 5545 §3.3.6 — format P[n]W | P[n]DT[n]H[n]M[n]S | PT[n]H[n]M[n]S
+        if (!preg_match('/^-?P(\d+W|(?:\d+D)?(?:T(?:\d+H)?(?:\d+M)?(?:\d+S)?)?)$/', $duration)) {
+            return [
+                'valid' => false,
+                'error' => "Le champ duration doit être au format ISO 8601 (ex: PT1H30M, P1D, PT30M)"
+            ];
+        }
+        return ['valid' => true, 'error' => null, 'value' => strtoupper($duration)];
+    }
+
+    /**
+     * Valide le champ related_to (UID parent RFC 5545 §3.8.4.5).
+     * Doit être une chaîne non vide de max 255 caractères.
+     */
+    public static function validateRelatedTo($relatedTo): array
+    {
+        if ($relatedTo === null || $relatedTo === '') {
+            return ['valid' => true, 'error' => null];
+        }
+        if (!is_string($relatedTo) || strlen($relatedTo) > 255) {
+            return [
+                'valid' => false,
+                'error' => "Le champ related_to doit être une chaîne de maximum 255 caractères"
+            ];
+        }
+        return ['valid' => true, 'error' => null, 'value' => $relatedTo];
+    }
+
+    /**
      * Valide tous les nouveaux champs d'un événement
      *
      * @param array $data Les données à valider
@@ -413,6 +450,25 @@ class EventValidator
                 $errors['attachments'] = $result['error'];
             } else {
                 $validatedData['attachments'] = $result['data'];
+            }
+        }
+
+        // Phase 4 — nouveaux champs
+        if (isset($data['duration'])) {
+            $result = self::validateDuration($data['duration']);
+            if (!$result['valid']) {
+                $errors['duration'] = $result['error'];
+            } else {
+                $validatedData['duration'] = $result['value'] ?? $data['duration'];
+            }
+        }
+
+        if (isset($data['related_to'])) {
+            $result = self::validateRelatedTo($data['related_to']);
+            if (!$result['valid']) {
+                $errors['related_to'] = $result['error'];
+            } else {
+                $validatedData['related_to'] = $result['value'] ?? $data['related_to'];
             }
         }
 

@@ -4,15 +4,21 @@ namespace ICS\Routing\RouteHandlers;
 
 use AuthGroups\Routing\BaseRouteHandler;
 use ICS\Controllers\CalendarController;
+use ICS\Controllers\TodoController;
+use ICS\Controllers\JournalController;
 use AuthGroups\Utils\Response;
 
-class CalendarRouteHandler extends BaseRouteHandler 
+class CalendarRouteHandler extends BaseRouteHandler
 {
     private CalendarController $controller;
-    
+    private TodoController $todoController;
+    private JournalController $journalController;
+
     public function __construct($authService) {
         parent::__construct($authService);
-        $this->controller = new CalendarController();
+        $this->controller        = new CalendarController();
+        $this->todoController    = new TodoController();
+        $this->journalController = new JournalController();
     }
     
     protected function getSupportedControllers(): array {
@@ -108,7 +114,53 @@ class CalendarRouteHandler extends BaseRouteHandler
             // POST /calendars/import - Importer un fichier ICS
             ($action === 'import' && $method === 'POST') =>
                 $this->controller->importIcsFile($user['user_id']),
-                
+
+            // GET /calendars/{id}/freebusy — Phase 5.3
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'freebusy' && !isset($segments[3]) && $method === 'GET') =>
+                $this->controller->getFreeBusy((int)$action, $user['user_id']),
+
+            // ── Todos — Phase 5.1 ─────────────────────────────────────────
+            // POST /calendars/{id}/todos
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'todos' && !isset($segments[3]) && $method === 'POST') =>
+                $this->todoController->createTodo((int)$action, $user['user_id']),
+
+            // GET /calendars/{id}/todos
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'todos' && !isset($segments[3]) && $method === 'GET') =>
+                $this->todoController->getTodos((int)$action, $user['user_id']),
+
+            // GET /calendars/{id}/todos/{todoId}
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'todos' && isset($segments[3]) && ctype_digit($segments[3]) && !isset($segments[4]) && $method === 'GET') =>
+                $this->todoController->getTodo((int)$action, (int)$segments[3], $user['user_id']),
+
+            // PUT /calendars/{id}/todos/{todoId}
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'todos' && isset($segments[3]) && ctype_digit($segments[3]) && !isset($segments[4]) && $method === 'PUT') =>
+                $this->todoController->updateTodo((int)$action, (int)$segments[3], $user['user_id']),
+
+            // DELETE /calendars/{id}/todos/{todoId}
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'todos' && isset($segments[3]) && ctype_digit($segments[3]) && !isset($segments[4]) && $method === 'DELETE') =>
+                $this->todoController->deleteTodo((int)$action, (int)$segments[3], $user['user_id']),
+
+            // ── Journals — Phase 5.2 ──────────────────────────────────────
+            // POST /calendars/{id}/journals
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'journals' && !isset($segments[3]) && $method === 'POST') =>
+                $this->journalController->createJournal((int)$action, $user['user_id']),
+
+            // GET /calendars/{id}/journals
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'journals' && !isset($segments[3]) && $method === 'GET') =>
+                $this->journalController->getJournals((int)$action, $user['user_id']),
+
+            // GET /calendars/{id}/journals/{journalId}
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'journals' && isset($segments[3]) && ctype_digit($segments[3]) && !isset($segments[4]) && $method === 'GET') =>
+                $this->journalController->getJournal((int)$action, (int)$segments[3], $user['user_id']),
+
+            // PUT /calendars/{id}/journals/{journalId}
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'journals' && isset($segments[3]) && ctype_digit($segments[3]) && !isset($segments[4]) && $method === 'PUT') =>
+                $this->journalController->updateJournal((int)$action, (int)$segments[3], $user['user_id']),
+
+            // DELETE /calendars/{id}/journals/{journalId}
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'journals' && isset($segments[3]) && ctype_digit($segments[3]) && !isset($segments[4]) && $method === 'DELETE') =>
+                $this->journalController->deleteJournal((int)$action, (int)$segments[3], $user['user_id']),
+
             default => Response::error('Endpoint non trouvé', 404)
         };
     }

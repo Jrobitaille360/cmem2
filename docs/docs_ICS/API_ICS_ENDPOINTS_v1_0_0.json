@@ -2,13 +2,13 @@
   "api": {
     "name": "ICS Calendar API",
     "version": "1.0.0",
-    "description": "Module de gestion des calendriers ICS/iCalendar avec support CalDAV RFC 5545 et synchronisation bidirectionnelle",
-    "generated": "2025-11-27",
+    "description": "Module de gestion des calendriers ICS/iCalendar avec support CalDAV RFC 5545 et synchronisation bidirectionnelle. Couvre Ph1 (sabre/vobject) · Ph2 (VEVENT enrichi) · Ph3 (ATTENDEE/ORGANIZER/iTIP) · Ph4 (EXDATE/RDATE/VALARM/DURATION) · Ph5 (VTODO/VJOURNAL/VFREEBUSY)",
+    "generated": "2026-04-01",
     "base_url": "/calendars",
     "authentication": {
-      "types": ["API_KEY"],
-      "api_key_header": "X-API-Key: {key}",
-      "description": "Authentification requise pour la plupart des endpoints, sauf téléchargement ICS public"
+      "types": ["JWT_BEARER"],
+      "header": "Authorization: Bearer {jwt_token}",
+      "description": "Authentification JWT requise pour tous les endpoints sauf téléchargement ICS public"
     }
   },
   "endpoints": {
@@ -160,7 +160,7 @@
           "body": {
             "title": "string (required) - Titre de l'événement",
             "start_datetime": "string (required) - Date/heure de début (ISO 8601 ou YYYY-MM-DD)",
-            "end_datetime": "string (required) - Date/heure de fin (ISO 8601 ou YYYY-MM-DD), doit être après start_datetime",
+            "end_datetime": "string (required*) - Date/heure de fin (* exclusif avec duration)",
             "description": "string (optional) - Description",
             "all_day": "boolean (optional, default: false) - Événement toute la journée",
             "location": "string (optional) - Lieu",
@@ -175,7 +175,18 @@
             "attendees[].cutype": "string (optional) - INDIVIDUAL | GROUP | RESOURCE | ROOM | UNKNOWN",
             "recurrence_rule": "string (optional) - Règle de récurrence RRULE valide",
             "status": "string (optional, default: confirmed) - Statut ('confirmed', 'tentative', 'cancelled')",
-            "timezone": "string (optional) - Timezone de l'événement"
+            "timezone": "string (optional) - Timezone de l'événement",
+            "priority": "integer (optional) - RFC 5545 PRIORITY: 0=non défini, 1=haute, 5=normale, 9=basse (Phase 2)",
+            "class": "string (optional) - PUBLIC | PRIVATE | CONFIDENTIAL (Phase 2)",
+            "transp": "string (optional) - OPAQUE | TRANSPARENT (Phase 2)",
+            "categories": "array of strings (optional) - ex: ['Travail','Réunion'] (Phase 2)",
+            "geo_lat": "decimal (optional) - latitude WGS84 -90..90 — requis si geo_lng fourni (Phase 2)",
+            "geo_lng": "decimal (optional) - longitude WGS84 -180..180 — requis si geo_lat fourni (Phase 2)",
+            "attachments": "array (optional) - [{url, mime_type}] ou [{data_base64, mime_type}] (Phase 2)",
+            "rdate": "string (optional) - Phase 4 — RDATE : dates additionnelles (datetimes locales CSV)",
+            "related_to": "string (optional) - Phase 4 — UID RFC 5545 de l'événement parent (RELATED-TO;RELTYPE=PARENT)",
+            "duration": "string (optional) - Phase 4 — durée ISO 8601 ex: PT1H30M — exclusif avec end_datetime",
+            "notifications": "array (optional) - [{type: EMAIL|DISPLAY, minutes_before: int}] — exportés BEGIN:VALARM (Phase 4)"
           },
           "response": "Événement créé avec ID"
         },
@@ -223,7 +234,17 @@
             "attendees": "array (optional) - Nouveaux participants [{email, name, role, partstat, rsvp, cutype}] (Phase 3)",
             "recurrence_rule": "string (optional) - Nouvelle règle de récurrence",
             "status": "string (optional) - Nouveau statut",
-            "timezone": "string (optional) - Nouveau timezone"
+            "timezone": "string (optional) - Nouveau timezone",
+            "priority": "integer (optional) - 0–9 (Phase 2)",
+            "class": "string (optional) - PUBLIC | PRIVATE | CONFIDENTIAL (Phase 2)",
+            "transp": "string (optional) - OPAQUE | TRANSPARENT (Phase 2)",
+            "categories": "array of strings (optional) (Phase 2)",
+            "geo_lat": "decimal (optional) (Phase 2)",
+            "geo_lng": "decimal (optional) (Phase 2)",
+            "attachments": "array (optional) (Phase 2)",
+            "rdate": "string (optional) - RDATE dates CSV (Phase 4)",
+            "related_to": "string (optional) - UID parent (Phase 4)",
+            "duration": "string (optional) - durée ISO 8601 (Phase 4)"
           },
           "response": "Événement mis à jour"
         },
@@ -300,6 +321,164 @@
             "scope": "optional|string|in:only_this,all_future,all - Portée de la modification"
           },
           "response": "Occurrence modifiée avec succès"
+        }
+      ]
+    },
+    "todos": {
+      "description": "Tâches CalDAV VTODO (RFC 5545 §3.6.2) — Phase 5.1",
+      "base_path": "/calendars/{id}/todos",
+      "auth_required": true,
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/calendars/{id}/todos",
+          "description": "Créer une tâche VTODO dans un calendrier",
+          "params": { "id": "integer (required)" },
+          "body": {
+            "title": "string (required) - Titre de la tâche (SUMMARY)",
+            "description": "string (optional)",
+            "due": "date ou datetime (optional) - Échéance DUE",
+            "dtstart": "date ou datetime (optional) - DTSTART",
+            "status": "string (optional) - NEEDS-ACTION | IN-PROCESS | COMPLETED | CANCELLED (défaut: NEEDS-ACTION)",
+            "priority": "integer (optional) - 0=non défini, 1=haute, 5=normale, 9=basse",
+            "percent_complete": "integer (optional) - 0–100",
+            "location": "string (optional)",
+            "categories": "array of strings (optional)",
+            "url": "string (optional)",
+            "timezone": "string (optional, default: America/Montreal)"
+          },
+          "response": "Todo object avec uid (UUID v4)",
+          "errors": {
+            "400": "title manquant ou invalide",
+            "403": "Accès non autorisé"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/calendars/{id}/todos",
+          "description": "Lister les tâches d'un calendrier",
+          "params": { "id": "integer (required)" },
+          "response": "{ todos: Array, count: integer }"
+        },
+        {
+          "method": "GET",
+          "path": "/calendars/{id}/todos/{todoId}",
+          "description": "Obtenir une tâche spécifique",
+          "params": { "id": "integer (required)", "todoId": "integer (required)" },
+          "response": "Todo object",
+          "errors": { "404": "Tâche non trouvée" }
+        },
+        {
+          "method": "PUT",
+          "path": "/calendars/{id}/todos/{todoId}",
+          "description": "Mettre à jour une tâche",
+          "params": { "id": "integer (required)", "todoId": "integer (required)" },
+          "body": {
+            "title": "string (optional)",
+            "description": "string (optional)",
+            "due": "date ou datetime (optional)",
+            "status": "string (optional)",
+            "priority": "integer (optional)",
+            "percent_complete": "integer (optional)"
+          },
+          "response": "Todo object mis à jour",
+          "errors": { "403": "Permission insuffisante", "404": "Tâche non trouvée" }
+        },
+        {
+          "method": "DELETE",
+          "path": "/calendars/{id}/todos/{todoId}",
+          "description": "Supprimer une tâche (soft delete)",
+          "params": { "id": "integer (required)", "todoId": "integer (required)" },
+          "response": "{ todo_id, deleted_at }",
+          "errors": { "403": "Permission insuffisante", "404": "Non trouvé" }
+        }
+      ]
+    },
+    "journals": {
+      "description": "Journaux CalDAV VJOURNAL (RFC 5545 §3.6.3) — Phase 5.2",
+      "base_path": "/calendars/{id}/journals",
+      "auth_required": true,
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/calendars/{id}/journals",
+          "description": "Créer une entrée de journal VJOURNAL",
+          "params": { "id": "integer (required)" },
+          "body": {
+            "summary": "string (required) - Résumé du journal",
+            "description": "string (optional) - Contenu",
+            "dtstart": "date ou datetime (optional) - Date du journal",
+            "status": "string (optional) - DRAFT | FINAL | CANCELLED (défaut: DRAFT)",
+            "categories": "array of strings (optional)",
+            "url": "string (optional)",
+            "timezone": "string (optional, default: America/Montreal)"
+          },
+          "response": "Journal object avec uid (UUID v4)",
+          "errors": {
+            "400": "summary manquant ou invalide",
+            "403": "Accès non autorisé"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/calendars/{id}/journals",
+          "description": "Lister les entrées de journal",
+          "params": { "id": "integer (required)" },
+          "response": "{ journals: Array, count: integer }"
+        },
+        {
+          "method": "GET",
+          "path": "/calendars/{id}/journals/{journalId}",
+          "description": "Obtenir une entrée de journal spécifique",
+          "params": { "id": "integer (required)", "journalId": "integer (required)" },
+          "response": "Journal object",
+          "errors": { "404": "Journal non trouvé" }
+        },
+        {
+          "method": "PUT",
+          "path": "/calendars/{id}/journals/{journalId}",
+          "description": "Mettre à jour une entrée de journal",
+          "params": { "id": "integer (required)", "journalId": "integer (required)" },
+          "body": {
+            "summary": "string (optional)",
+            "description": "string (optional)",
+            "dtstart": "date ou datetime (optional)",
+            "status": "string (optional) - DRAFT | FINAL | CANCELLED",
+            "categories": "array of strings (optional)"
+          },
+          "response": "Journal object mis à jour",
+          "errors": { "403": "Permission insuffisante", "404": "Non trouvé" }
+        },
+        {
+          "method": "DELETE",
+          "path": "/calendars/{id}/journals/{journalId}",
+          "description": "Supprimer une entrée de journal (soft delete)",
+          "params": { "id": "integer (required)", "journalId": "integer (required)" },
+          "response": "{ journal_id, deleted_at }",
+          "errors": { "403": "Permission insuffisante", "404": "Non trouvé" }
+        }
+      ]
+    },
+    "freebusy": {
+      "description": "Disponibilités CalDAV VFREEBUSY (RFC 5545 §3.6.4) — Phase 5.3",
+      "auth_required": true,
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/calendars/{id}/freebusy",
+          "description": "Obtenir les plages occupées d'un calendrier — agrège les événements TRANSP=OPAQUE",
+          "params": { "id": "integer (required)" },
+          "query": {
+            "start": "date (required) - Début de la période YYYY-MM-DD",
+            "end": "date (required) - Fin de la période YYYY-MM-DD"
+          },
+          "response": "{ freebusy: [{ dtstart, dtend }], calendar_id, period: { start, end } }",
+          "notes": "Requiert TRANSP (Phase 2 — 2.4). Seuls les événements OPAQUE sont inclus. Exposé également via REPORT CalDAV.",
+          "errors": {
+            "400": "start ou end manquant/invalide, ou start > end",
+            "403": "Accès non autorisé",
+            "404": "Calendrier non trouvé"
+          }
         }
       ]
     },

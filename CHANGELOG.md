@@ -7,7 +7,7 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [2.2.1] — 2026-03-31
+## [2.2.1] — 2026-04-01
 
 ### Plugin ICS — Phase 2 (Propriétés VEVENT enrichies)
 
@@ -24,16 +24,64 @@ Tous ces champs sont optionnels, rétrocompatibles, et disponibles sur :
 `POST /calendars/{id}/events`, `PUT /calendars/{id}/events/{eventId}`,
 `GET /calendars/{id}/events/{eventId}`, `GET /calendars/{id}/ics`, import ICS
 
-### Migration DB
+### Plugin ICS — Phase 3 (ATTENDEE, ORGANIZER, iTIP)
 
-Exécuter : `docs/docs_ICS/migrations/20260331_ph2_vevent_props.sql`
-(ajoute 7 colonnes à `calendar_events` : `priority`, `class`, `transp`, `categories`, `geo_lat`, `geo_lng`, `attachments`)
+- **[3.1]** `ATTENDEE` complet — champs `email`, `name`, `role`, `partstat`, `rsvp`, `cutype`
+  - Export : `ATTENDEE;CN=…;ROLE=…;PARTSTAT=…;RSVP=…:mailto:…`
+  - Import sabre/vobject
+- **[3.2]** `ORGANIZER` — colonnes `organizer_email` / `organizer_name`
+  - Export : `ORGANIZER;CN=Nom:mailto:email@ex.com`
+- **[3.3]** iTIP — `METHOD:REQUEST` à la création, `METHOD:CANCEL` pour annulations
+  - Endpoint `POST /notifications/attendee-reply` (PARTSTAT : ACCEPTED / DECLINED / TENTATIVE)
+- **[3.4]** Email d'invitation avec pièce jointe `.ics` (PHPMailer multipart/mixed, `Content-Type: text/calendar; method=REQUEST`)
+
+### Plugin ICS — Phase 4 (Récurrence avancée & VALARM)
+
+- **[4.1]** `EXDATE` — exceptions de récurrence dérivées de `event_occurrences.is_cancelled = 1`
+  - Export : `EXDATE;TZID=…:datetime,datetime`
+  - Import : crée des occurrences annulées correspondantes
+- **[4.2]** `RDATE` — dates additionnelles (colonne `rdate TEXT`, CSV de datetimes locales)
+  - Export / import ; génère des `event_occurrences` supplémentaires
+- **[4.3]** `RELATED-TO` — colonne `related_to VARCHAR(255)` (UID parent)
+  - Export : `RELATED-TO;RELTYPE=PARENT:<uid>`
+- **[4.4]** `VALARM` — export automatique depuis le champ `notifications` existant
+  - `ACTION:DISPLAY` / `ACTION:EMAIL`, `TRIGGER:-PT{n}M`, `DESCRIPTION:Rappel`
+  - Aucune colonne supplémentaire requise
+- **[4.5]** `DURATION` vs `DTEND` — colonne `duration VARCHAR(20)` format ISO 8601 (ex. `PT1H30M`)
+  - Si `duration` défini → export `DURATION:…` (sans `DTEND`)
+  - Import : calcule `end_datetime` depuis `DTSTART + DURATION`
+  - `duration` et `end_datetime` sont mutuellement exclusifs (retourne `400` si les deux sont fournis)
+
+### Plugin ICS — Phase 5 (Composants CalDAV additionnels)
+
+- **[5.1]** `VTODO` — nouvelle table `calendar_todos`
+  - CRUD : `POST/GET/PUT/DELETE /calendars/{id}/todos[/{todoId}]`
+  - Champs : `title`, `description`, `due`, `dtstart`, `status`, `priority`, `percent_complete`,
+    `location`, `categories`, `url`, `timezone`
+  - Export dans `GET /calendars/{id}/ics` comme composant `BEGIN:VTODO`
+- **[5.2]** `VJOURNAL` — nouvelle table `calendar_journals`
+  - CRUD : `POST/GET/PUT/DELETE /calendars/{id}/journals[/{journalId}]`
+  - Champs : `summary`, `description`, `dtstart`, `status` (DRAFT/FINAL/CANCELLED), `categories`, `url`
+  - Export dans `GET /calendars/{id}/ics` comme composant `BEGIN:VJOURNAL`
+- **[5.3]** `VFREEBUSY` — endpoint `GET /calendars/{id}/freebusy?start=…&end=…`
+  - Agrège les événements `TRANSP=OPAQUE` → retourne les plages occupées
+  - Exposé également via `REPORT` CalDAV
+  - Nécessite Phase 2.4 (`TRANSP`) complété
+
+### Migrations DB
+
+Exécuter dans l'ordre :
+1. `docs/docs_ICS/migrations/20260331_ph2_vevent_props.sql` (Ph2 — 7 colonnes `calendar_events`)
+2. `docs/docs_ICS/migrations/20260401_ph3_organizer.sql` (Ph3 — 2 colonnes `calendar_events`)
+3. `docs/docs_ICS/migrations/20260401_ph4_recurrence.sql` (Ph4 — colonnes `rdate`, `related_to`, `duration`)
+4. `docs/docs_ICS/migrations/20260401_ph5_components.sql` (Ph5 — tables `calendar_todos`, `calendar_journals`)
 
 ### Documentation
 
 - `docs/2.2.1_CLIENT.md` — guide migration client (aucun changement cassant)
 - `docs/2.2.1_PRODUCTION.md` — procédure déploiement production
-- `docs/core/API_ENDPOINTS_v2_0_0.json` — mis à jour (version 2.2.1, 10 nouveaux champs sur POST/PUT events)
+- `docs/core/API_ENDPOINTS_v2_0_0.json` — mis à jour (Ph2–Ph5 : nouveaux champs + VTODO/VJOURNAL/VFREEBUSY)
+- `docs/docs_ICS/API_ICS_ENDPOINTS_v1_0_0.json` — mis à jour (Ph3–Ph5 complets)
 
 ---
 

@@ -668,7 +668,7 @@ class CalDAVServer
         $response .= '<d:displayname>' . htmlspecialchars($calendar['title']) . '</d:displayname>';
         $response .= '<c:calendar-description>' . htmlspecialchars($calendar['description'] ?? '') . '</c:calendar-description>';
         $response .= '<c:calendar-timezone>' . htmlspecialchars($calendar['timezone']) . '</c:calendar-timezone>';
-        $response .= '<c:supported-calendar-component-set><c:comp name="VEVENT"/></c:supported-calendar-component-set>';
+        $response .= '<c:supported-calendar-component-set><c:comp name="VEVENT"/><c:comp name="VTODO"/><c:comp name="VJOURNAL"/><c:comp name="VFREEBUSY"/></c:supported-calendar-component-set>';
         $response .= '<cs:getctag>' . htmlspecialchars($calendar['ctag'] ?? '') . '</cs:getctag>';
         $response .= '<d:sync-token>' . htmlspecialchars($calendar['sync_token'] ?? '') . '</d:sync-token>';
         $response .= '<d:owner><d:href>' . $this->principalUrl . '</d:href></d:owner>';

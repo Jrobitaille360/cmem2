@@ -1986,5 +1986,81 @@ class CalendarController
         }
     }
 
+    // ----------------------------------------------------------------
+    // Phase 5.3 — GET /calendars/{id}/freebusy?start=...&end=...
+    // ----------------------------------------------------------------
+    /**
+     * Retourne un VCALENDAR VFREEBUSY pour la période demandée.
+     * Agrège les événements TRANSP=OPAQUE (ou sans TRANSP) comme plages occupées.
+     * Nécessite Phase 2.4 (colonne transp).
+     */
+    public function getFreeBusy(int $calendarId, int $userId): void
+    {
+        LoggingMiddleware::logEntry();
+        $input = Response::getRequestParams();
+
+        $validation = Validator::validate($input, [
+            'start' => 'required|date_or_datetime',
+            'end'   => 'required|date_or_datetime',
+        ]);
+
+        if (!$validation['valid']) {
+            LoggingMiddleware::logExit(400);
+            Response::error('Paramètres start et end requis', $validation['errors'], 400);
+            return;
+        }
+
+        $cal = new Calendar();
+        $permission = $cal->getUserPermissionForCalendar($calendarId, $userId);
+        if (!$permission) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Calendrier non trouvé ou accès non autorisé', null, 404);
+            return;
+        }
+
+        try {
+            $calendar = $cal->getById($calendarId);
+            $tz       = $calendar['timezone'] ?? 'America/Montreal';
+
+            $start = date('Y-m-d H:i:s', strtotime($input['start']));
+            $end   = date('Y-m-d H:i:s', strtotime($input['end']));
+
+            // Récupérer les événements OPAQUE dans la période
+            $eventModel   = new CalendarEvent();
+            $opaqueEvents = $eventModel->getOpaqueEventsForFreeBusy($calendarId, $start, $end);
+
+            $accept = $_SERVER['HTTP_ACCEPT'] ?? '';
+            if (str_contains($accept, 'text/calendar')) {
+                $ics = \ICS\Utils\IcsGenerator::generateFreeBusy($calendar, $opaqueEvents, $start, $end);
+                header('Content-Type: text/calendar; charset=utf-8');
+                header('Content-Disposition: inline; filename="freebusy.ics"');
+                LoggingMiddleware::logExit(200);
+                echo $ics;
+                return;
+            }
+
+            // Réponse JSON par défaut
+            $busySlots = array_map(fn($e) => [
+                'start'   => $e['start_datetime'],
+                'end'     => $e['end_datetime'],
+                'summary' => ($calendar['visibility'] !== 'private' || $permission['access_level'] === 'owner')
+                    ? ($e['title'] ?? null) : null,
+            ], $opaqueEvents);
+
+            LoggingMiddleware::logExit(200);
+            Response::success('Disponibilités récupérées', [
+                'calendar_id' => $calendarId,
+                'start'       => $start,
+                'end'         => $end,
+                'timezone'    => $tz,
+                'busy'        => $busySlots,
+            ]);
+        } catch (\Exception $e) {
+            LogService::error('Erreur freebusy', ['exception' => $e->getMessage()]);
+            LoggingMiddleware::logExit(500);
+            Response::error('Erreur lors du calcul des disponibilités', null, 500);
+        }
+    }
+
 }
 

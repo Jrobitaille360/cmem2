@@ -221,6 +221,24 @@ class EventOccurrence extends BaseModel
     }
 
     /**
+     * Retourne les occurrences annulées d'un événement (source EXDATE — Phase 4.1).
+     *
+     * @param int $eventId
+     * @return array Tableau de ['start_datetime', 'occurrence_date']
+     */
+    public static function getCancelledByEventId(int $eventId): array
+    {
+        $db = self::getDbConnection();
+        $stmt = $db->prepare(
+            "SELECT start_datetime, occurrence_date FROM event_occurrences
+             WHERE event_id = ? AND is_cancelled = 1
+             ORDER BY occurrence_date ASC"
+        );
+        $stmt->execute([$eventId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
      * Récupère les occurrences d'un événement dans une période
      * Génère à la volée si date demandée > 2099-12-31
      */

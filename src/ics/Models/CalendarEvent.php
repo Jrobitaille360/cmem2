@@ -39,6 +39,10 @@ class CalendarEvent extends BaseModel
     // Phase 3 — ATTENDEE & ORGANIZER
     public $organizerEmail; // 3.2 — override email de l'organisateur (déduit de user_id si absent)
     public $organizerName;  // 3.2 — CN de l'organisateur
+    // Phase 4 — Récurrence avancée & VALARM
+    public $rdate;      // 4.2 — TEXT, ISO datetimes locales CSV (ex: 2026-04-15 14:00:00,2026-04-22 14:00:00)
+    public $relatedTo;  // 4.3 — VARCHAR(255), UID de l'événement parent
+    public $duration;   // 4.5 — VARCHAR(20), format ISO 8601 (ex: PT1H30M) — exclusif avec end_datetime
 
     public function __construct() {
         parent::__construct();
@@ -56,8 +60,9 @@ class CalendarEvent extends BaseModel
                     all_day, location, attendees, recurrence_rule, status,
                     timezone, meeting_link, notifications, color, uid,
                     priority, class, transp, categories, geo_lat, geo_lng, attachments,
-                    organizer_email, organizer_name
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    organizer_email, organizer_name,
+                    rdate, related_to, duration
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ";
 
             $stmt = $this->getDb()->prepare($query);
@@ -101,6 +106,10 @@ class CalendarEvent extends BaseModel
                 // Phase 3
                 $this->organizerEmail ?? null,
                 $this->organizerName  ?? null,
+                // Phase 4
+                $this->rdate     ?? null,
+                $this->relatedTo ?? null,
+                $this->duration  ?? null,
             ]);
 
             $eventId = $this->getDb()->lastInsertId();
@@ -419,6 +428,19 @@ class CalendarEvent extends BaseModel
                 $fields[] = "organizer_name = ?";
                 $values[] = $this->organizerName;
             }
+            // Phase 4 — Récurrence avancée
+            if (isset($this->rdate)) {
+                $fields[] = "rdate = ?";
+                $values[] = $this->rdate;
+            }
+            if (isset($this->relatedTo)) {
+                $fields[] = "related_to = ?";
+                $values[] = $this->relatedTo;
+            }
+            if (isset($this->duration)) {
+                $fields[] = "duration = ?";
+                $values[] = $this->duration;
+            }
 
             if (empty($fields)) {
                 return false;
@@ -675,8 +697,27 @@ class CalendarEvent extends BaseModel
                 if (isset($eventData['attendees']))       $event->attendees      = $eventData['attendees'];
                 if (isset($eventData['organizer_email'])) $event->organizerEmail = $eventData['organizer_email'];
                 if (isset($eventData['organizer_name']))  $event->organizerName  = $eventData['organizer_name'];
+                // Phase 4
+                if (isset($eventData['rdate']))       $event->rdate     = $eventData['rdate'];
+                if (isset($eventData['related_to']))  $event->relatedTo = $eventData['related_to'];
+                if (isset($eventData['duration']))    $event->duration  = $eventData['duration'];
+                if (isset($eventData['notifications'])) $event->notifications = $eventData['notifications'];
 
-                $event->create();
+                $result = $event->create();
+
+                // Phase 4.1 — EXDATE : créer les occurrences annulées correspondantes
+                if (!empty($eventData['exdates']) && !empty($result['id'])) {
+                    \ICS\Services\RecurrenceService::cancelOccurrencesByDatetimes(
+                        $result,
+                        $eventData['exdates']
+                    );
+                }
+
+                // Phase 4.2 — RDATE : générer les occurrences additionnelles
+                if (!empty($eventData['rdate']) && !empty($result['id'])) {
+                    \ICS\Services\RecurrenceService::generateRdateOccurrences($result);
+                }
+
                 $importedCount++;
             } catch (\Exception $e) {
                 LogService::error("Erreur lors de l'importation d'un événement depuis ICS", [
@@ -689,6 +730,31 @@ class CalendarEvent extends BaseModel
         }
 
         return $importedCount;
+    }
+
+    /**
+     * Phase 5.3 — Récupère les événements OPAQUE (bloquants) d'un calendrier pour VFREEBUSY.
+     * Les événements sans TRANSP défini sont traités comme OPAQUE (RFC 5545 §3.8.2.7).
+     *
+     * @param int    $calendarId
+     * @param string $startDatetime Format 'Y-m-d H:i:s'
+     * @param string $endDatetime   Format 'Y-m-d H:i:s'
+     */
+    public function getOpaqueEventsForFreeBusy(int $calendarId, string $startDatetime, string $endDatetime): array
+    {
+        $stmt = $this->getDb()->prepare("
+            SELECT id, title, start_datetime, end_datetime, timezone, transp
+            FROM calendar_events
+            WHERE calendar_id = ?
+              AND deleted_at IS NULL
+              AND status != 'cancelled'
+              AND (transp IS NULL OR transp = 'OPAQUE')
+              AND start_datetime < ?
+              AND end_datetime > ?
+            ORDER BY start_datetime ASC
+        ");
+        $stmt->execute([$calendarId, $endDatetime, $startDatetime]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
 }
