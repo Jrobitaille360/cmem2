@@ -200,7 +200,7 @@ class JournalController
         }
 
         try {
-            $this->journalModel->softDelete($journalId);
+            $this->journalModel->softDeleteById($journalId);
             LoggingMiddleware::logExit(200);
             Response::success('Journal supprimé');
         } catch (\Exception $e) {

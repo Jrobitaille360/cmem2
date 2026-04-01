@@ -226,7 +226,7 @@ class TodoController
         }
 
         try {
-            $this->todoModel->softDelete($todoId);
+            $this->todoModel->softDeleteById($todoId);
             LoggingMiddleware::logExit(200);
             Response::success('Tâche supprimée');
         } catch (\Exception $e) {

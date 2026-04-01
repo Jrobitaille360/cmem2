@@ -140,7 +140,7 @@ class CalendarJournal extends BaseModel
         return array_map([$this, 'decode'], $stmt->fetchAll(PDO::FETCH_ASSOC));
     }
 
-    public function softDelete(int $id): bool
+    public function softDeleteById(int $id): bool
     {
         $stmt = $this->getDb()->prepare("
             UPDATE {$this->table} SET deleted_at = NOW(), updated_at = NOW()
