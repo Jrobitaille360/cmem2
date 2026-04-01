@@ -1135,7 +1135,15 @@
             "location": "string (optional)",
             "all_day": "boolean (optional) — défaut: false",
             "timezone": "string (optional) — défaut: timezone du calendrier",
-            "attendees": "array (optional) — liste de participants",
+            "attendees": "array (optional) — liste de participants — [{email, name, role, partstat, rsvp, cutype}] (Phase 3)",
+            "attendees[].email": "string (required) — adresse email du participant",
+            "attendees[].name": "string (optional) — nom affiché (CN) — exporté ATTENDEE;CN=...",
+            "attendees[].role": "string (optional) — CHAIR | REQ-PARTICIPANT | OPT-PARTICIPANT | NON-PARTICIPANT (défaut: REQ-PARTICIPANT)",
+            "attendees[].partstat": "string (optional) — NEEDS-ACTION | ACCEPTED | DECLINED | TENTATIVE | DELEGATED (défaut: NEEDS-ACTION)",
+            "attendees[].rsvp": "boolean (optional) — true = réponse attendue (défaut: false)",
+            "attendees[].cutype": "string (optional) — INDIVIDUAL | GROUP | RESOURCE | ROOM | UNKNOWN (défaut: INDIVIDUAL)",
+            "organizer_email": "string (optional) — email de l'organisateur (Phase 3) — exporté ORGANIZER;mailto:...",
+            "organizer_name": "string (optional) — nom affiché de l'organisateur (CN) (Phase 3)",
             "recurrence_rule": "string (optional) — règle iCal sans préfixe RRULE:, ex: FREQ=WEEKLY;BYDAY=MO;COUNT=4",
             "status": "string (optional) — confirmed | tentative | cancelled (défaut: confirmed)",
             "meeting_link": "string (optional) — URL https valide — exportée comme VEVENT URL:",
@@ -1149,9 +1157,13 @@
             "geo_lng": "decimal (optional) — longitude WGS84 -180..180 — requis si geo_lat fourni",
             "attachments": "array (optional) — [{url: string, mime_type: string}] ou [{data_base64: string, mime_type: string}]"
           },
+          "notes": [
+            "Phase 3 : un email d'invitation iTIP METHOD:REQUEST est automatiquement envoyé aux attendees à la création",
+            "Mettre à jour le partstat d'un attendee via POST /notifications/attendee-reply"
+          ],
           "response": "Event object",
           "errors": {
-            "400": "Validation échouée (end_datetime < start_datetime, priority hors 0–9, class/transp invalide, geo_lat sans geo_lng, etc.)",
+            "400": "Validation échouée (end_datetime < start_datetime, priority hors 0–9, class/transp invalide, geo_lat sans geo_lng, attendee sans email, etc.)",
             "403": "Permission insuffisante sur ce calendrier"
           }
         },
@@ -1197,6 +1209,9 @@
             "status": "string (optional) — confirmed | tentative | cancelled",
             "meeting_link": "string (optional) — URL https valide",
             "notifications": "array (optional) — [{type: notification|email, minutes: integer>=0}]",
+            "attendees": "array (optional) — liste de participants [{email, name, role, partstat, rsvp, cutype}]",
+            "organizer_email": "string (optional) — email de l'organisateur",
+            "organizer_name": "string (optional) — nom affiché de l'organisateur (CN)",
             "priority": "integer (optional) — 0=non défini, 1=haute, 5=normale, 9=basse",
             "class": "string (optional) — PUBLIC | PRIVATE | CONFIDENTIAL",
             "transp": "string (optional) — OPAQUE | TRANSPARENT",
@@ -1364,6 +1379,23 @@
             "occurrence_date": "datetime (required)"
           },
           "response": "Message de confirmation"
+        },
+        {
+          "method": "POST",
+          "path": "/notifications/attendee-reply",
+          "description": "Enregistrer la réponse RSVP d'un participant (iTIP METHOD:REPLY) — met à jour le champ partstat dans calendar_events.attendees",
+          "body": {
+            "event_id": "integer (required) — ID de l'événement",
+            "attendee_email": "string (required) — email du participant à mettre à jour",
+            "partstat": "string (required) — ACCEPTED | DECLINED | TENTATIVE"
+          },
+          "response": "{ event_id, attendee_email, partstat }",
+          "errors": {
+            "400": "Paramètre manquant ou partstat invalide",
+            "403": "L'utilisateur connecté n'est ni propriétaire ni l'attendee concerné",
+            "404": "Événement ou attendee introuvable"
+          },
+          "notes": "Phase 3 — iTIP REPLY. Seul le propriétaire de l'événement ou l'attendee lui-même peut appeler cet endpoint."
         }
       ]
     },

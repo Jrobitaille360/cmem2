@@ -12,20 +12,30 @@ use Sabre\VObject\Reader;
 class IcsParser
 {
     /**
-     * Parse les propriétés d'un VCALENDAR (X-WR-CALNAME, X-WR-CALDESC, X-WR-TIMEZONE).
+     * Parse les propriétés d'un VCALENDAR (X-WR-CALNAME, X-WR-CALDESC, X-WR-TIMEZONE, METHOD).
      */
     public static function parseCalendarProperties(string $icsContent): array
     {
         $vcalendar = Reader::read($icsContent, Reader::OPTION_FORGIVING);
         $properties = [];
 
-        foreach (['X-WR-CALNAME', 'X-WR-CALDESC', 'X-WR-TIMEZONE'] as $prop) {
+        foreach (['X-WR-CALNAME', 'X-WR-CALDESC', 'X-WR-TIMEZONE', 'METHOD'] as $prop) {
             if (isset($vcalendar->{$prop})) {
                 $properties[$prop] = (string)$vcalendar->{$prop};
             }
         }
 
         return $properties;
+    }
+
+    /**
+     * Retourne la valeur de METHOD d'un VCALENDAR iTIP (REQUEST, REPLY, CANCEL…).
+     * Retourne null si absent. — Phase 3.3
+     */
+    public static function getMethod(string $icsContent): ?string
+    {
+        $vcalendar = Reader::read($icsContent, Reader::OPTION_FORGIVING);
+        return isset($vcalendar->METHOD) ? strtoupper((string)$vcalendar->METHOD) : null;
     }
 
     /**
@@ -120,6 +130,49 @@ class IcsParser
         } else {
             $event['geo_lat'] = null;
             $event['geo_lng'] = null;
+        }
+
+        // Phase 3.1 — ATTENDEE → [{email, name, role, partstat, rsvp, cutype}]
+        $attendees = [];
+        if (isset($vevent->ATTENDEE)) {
+            foreach ($vevent->ATTENDEE as $attendeeProp) {
+                $raw   = (string)$attendeeProp;
+                $email = (stripos($raw, 'mailto:') === 0) ? substr($raw, 7) : $raw;
+                if (empty($email)) {
+                    continue;
+                }
+                $entry = ['email' => $email];
+                if (isset($attendeeProp['CN'])) {
+                    $entry['name'] = (string)$attendeeProp['CN'];
+                }
+                if (isset($attendeeProp['ROLE'])) {
+                    $entry['role'] = (string)$attendeeProp['ROLE'];
+                }
+                if (isset($attendeeProp['PARTSTAT'])) {
+                    $entry['partstat'] = (string)$attendeeProp['PARTSTAT'];
+                }
+                if (isset($attendeeProp['RSVP'])) {
+                    $entry['rsvp'] = strtoupper((string)$attendeeProp['RSVP']) === 'TRUE';
+                }
+                if (isset($attendeeProp['CUTYPE'])) {
+                    $entry['cutype'] = (string)$attendeeProp['CUTYPE'];
+                }
+                $attendees[] = $entry;
+            }
+        }
+        $event['attendees'] = empty($attendees) ? null : $attendees;
+
+        // Phase 3.2 — ORGANIZER
+        $event['organizer_email'] = null;
+        $event['organizer_name']  = null;
+        if (isset($vevent->ORGANIZER)) {
+            $orgRaw = (string)$vevent->ORGANIZER;
+            $event['organizer_email'] = (stripos($orgRaw, 'mailto:') === 0)
+                ? substr($orgRaw, 7)
+                : $orgRaw;
+            if (isset($vevent->ORGANIZER['CN'])) {
+                $event['organizer_name'] = (string)$vevent->ORGANIZER['CN'];
+            }
         }
 
         // Phase 2.6 — ATTACH → [{url|data_base64, mime_type}]

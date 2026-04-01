@@ -217,27 +217,27 @@ D4                  (pipeline middleware — grosse refactorisation, EN DERNIER)
 
 > **Prérequis :** Phase 1 complétée.
 
-- [ ] **3.1** — `ATTENDEE` complet
+- ✅ **3.1** — `ATTENDEE` complet
   - Étendre structure JSON existante : `[{ email, name, role, partstat, rsvp, cutype }]`
   - Export : `ATTENDEE;CN=Jean Tremblay;ROLE=REQ-PARTICIPANT;PARTSTAT=ACCEPTED;RSVP=FALSE:mailto:jean@ex.com`
   - Import avec sabre/vobject
 
-- [ ] **3.2** — `ORGANIZER`
+- ✅ **3.2** — `ORGANIZER`
   - Déduire du `user_id` de l'événement
   - Export : `ORGANIZER;CN=Nom:mailto:email@ex.com`
-  - Optionnel : colonne `organizer_email` si override nécessaire
+  - Colonnes `organizer_email` / `organizer_name` ajoutées (migration `20260401_ph3_organizer.sql`)
 
-- [ ] **3.3** — iTIP de base
-  - `METHOD:REQUEST` à l'export d'invitation
-  - Traiter `METHOD:REPLY` à l'import (mettre à jour `PARTSTAT`)
-  - `METHOD:CANCEL` pour annulations
+- ✅ **3.3** — iTIP de base
+  - `METHOD:REQUEST` à l'export d'invitation (`generateInvitationIcs`)
+  - `METHOD:CANCEL` pour annulations (`generateCancelIcs`)
+  - Endpoint `POST /notifications/attendee-reply` pour traiter `PARTSTAT` (ACCEPTED/DECLINED/TENTATIVE)
   - > Standard pour l'interopérabilité avec Outlook, Google Calendar, Apple Calendar.
 
-- [ ] **3.4** — Notification email d'invitation avec pièce jointe `.ics`
-  - Inclure `METHOD:REQUEST` dans le `.ics` joint
+- ✅ **3.4** — Notification email d'invitation avec pièce jointe `.ics`
+  - `EmailNotificationService::sendInvitationEmails()` — PHPMailer multipart/mixed
+  - `.ics` joint avec `Content-Type: text/calendar; method=REQUEST`
   - Compatible Outlook, Gmail, Apple Mail
-  - > ⚠️ Dépend de l'endpoint `/notifications/send-email` déjà implémenté.
-  > La gestion `multipart/mixed` avec pièce jointe `.ics` requiert un test sérieux avec Outlook (client le plus strict). Tester aussi le parsing de la réponse REPLY retournée.
+  - Déclenché automatiquement à la création d'un événement avec attendees
 
 ---
 
@@ -332,10 +332,10 @@ D4                  (pipeline middleware — grosse refactorisation, EN DERNIER)
 | 26 | Ph2   | 2.4 | TRANSP                                     | 30min  | ✅   |
 | 27 | Ph2   | 2.5 | URL + GEO                                  | 45min  | ✅   |
 | 28 | Ph2   | 2.6 | ATTACH                                     | 1h     | ✅   |
-| 29 | Ph3   | 3.1 | ATTENDEE complet                           | 1h30   |      |
-| 30 | Ph3   | 3.2 | ORGANIZER                                  | 45min  |      |
-| 31 | Ph3   | 3.3 | iTIP de base (REQUEST/REPLY/CANCEL)        | 1h30   |      |
-| 32 | Ph3   | 3.4 | Email invitation + pièce jointe .ics       | 1h30   |      |
+| 29 | Ph3   | 3.1 | ATTENDEE complet                           | 1h30   | ✅   |
+| 30 | Ph3   | 3.2 | ORGANIZER                                  | 45min  | ✅   |
+| 31 | Ph3   | 3.3 | iTIP de base (REQUEST/REPLY/CANCEL)        | 1h30   | ✅   |
+| 32 | Ph3   | 3.4 | Email invitation + pièce jointe .ics       | 1h30   | ✅   |
 | 33 | Ph4   | 4.1 | EXDATE                                     | 1h     |      |
 | 34 | Ph4   | 4.2 | RDATE                                      | 1h     |      |
 | 35 | Ph4   | 4.3 | RELATED-TO                                 | 45min  |      |

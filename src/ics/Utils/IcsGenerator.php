@@ -18,10 +18,11 @@ class IcsGenerator
     /**
      * Génère le contenu ICS complet d'un calendrier avec ses événements.
      *
-     * @param array $calendar  Ligne DB du calendrier (title, description, timezone)
-     * @param array $events    Tableau de lignes DB d'événements
+     * @param array       $calendar  Ligne DB du calendrier (title, description, timezone)
+     * @param array       $events    Tableau de lignes DB d'événements
+     * @param string|null $method    iTIP METHOD optionnel (REQUEST, CANCEL…) — Phase 3.3
      */
-    public static function generateCalendar(array $calendar, array $events): string
+    public static function generateCalendar(array $calendar, array $events, ?string $method = null): string
     {
         $timezone = $calendar['timezone'] ?? 'America/Montreal';
 
@@ -30,6 +31,12 @@ class IcsGenerator
         $ics .= "VERSION:2.0\r\n";
         $ics .= "PRODID:-//CMEM Calendar//FR\r\n";
         $ics .= "CALSCALE:GREGORIAN\r\n";
+
+        // Phase 3.3 — METHOD iTIP
+        if ($method !== null) {
+            $ics .= "METHOD:" . strtoupper($method) . "\r\n";
+        }
+
         $ics .= "X-WR-CALNAME:" . TimezoneHelper::escapeIcsText($calendar['title']) . "\r\n";
 
         if (!empty($calendar['description'])) {
@@ -53,20 +60,51 @@ class IcsGenerator
     /**
      * Génère un VCALENDAR à un seul événement (réponse GET CalDAV).
      *
-     * @param array  $event             Ligne DB de l'événement
-     * @param string $calendarTimezone  Timezone du calendrier parent
+     * @param array       $event             Ligne DB de l'événement
+     * @param string      $calendarTimezone  Timezone du calendrier parent
+     * @param string|null $method            iTIP METHOD optionnel — Phase 3.3
      */
-    public static function generateSingleEvent(array $event, string $calendarTimezone): string
+    public static function generateSingleEvent(array $event, string $calendarTimezone, ?string $method = null): string
     {
         $ics  = "BEGIN:VCALENDAR\r\n";
         $ics .= "VERSION:2.0\r\n";
         $ics .= "PRODID:-//CMEM2//CalDAV Server//EN\r\n";
         $ics .= "CALSCALE:GREGORIAN\r\n";
+
+        // Phase 3.3 — METHOD iTIP
+        if ($method !== null) {
+            $ics .= "METHOD:" . strtoupper($method) . "\r\n";
+        }
+
         $ics .= TimezoneHelper::generateVTimezone($calendarTimezone);
         $ics .= self::buildVEvent($event, $calendarTimezone);
         $ics .= "END:VCALENDAR\r\n";
 
         return $ics;
+    }
+
+    /**
+     * Génère un VCALENDAR d'invitation avec METHOD:REQUEST (Phase 3.3 / 3.4).
+     * Utilisé pour l'envoi d'emails d'invitation aux attendees.
+     *
+     * @param array  $event            Ligne DB enrichie (avec organizer_email / organizer_name)
+     * @param string $calendarTimezone Timezone du calendrier parent
+     */
+    public static function generateInvitationIcs(array $event, string $calendarTimezone): string
+    {
+        return self::generateSingleEvent($event, $calendarTimezone, 'REQUEST');
+    }
+
+    /**
+     * Génère un VCALENDAR d'annulation avec METHOD:CANCEL (Phase 3.3).
+     *
+     * @param array  $event            Ligne DB de l'événement à annuler
+     * @param string $calendarTimezone Timezone du calendrier parent
+     */
+    public static function generateCancelIcs(array $event, string $calendarTimezone): string
+    {
+        $cancelEvent = array_merge($event, ['status' => 'CANCELLED']);
+        return self::generateSingleEvent($cancelEvent, $calendarTimezone, 'CANCEL');
     }
 
     /**
@@ -129,19 +167,50 @@ class IcsGenerator
             $vevent->add('LOCATION', $event['location']);
         }
 
-        // Participants
+        // Phase 3.1 — ATTENDEE complet (RFC 5545 §3.8.4.1)
         if (!empty($event['attendees'])) {
-            $attendees = is_string($event['attendees'])
+            $attendees = \is_string($event['attendees'])
                 ? json_decode($event['attendees'], true)
                 : $event['attendees'];
 
-            if (is_array($attendees)) {
+            if (\is_array($attendees)) {
+                $validRoles     = ['CHAIR', 'REQ-PARTICIPANT', 'OPT-PARTICIPANT', 'NON-PARTICIPANT'];
+                $validPartstats = ['NEEDS-ACTION', 'ACCEPTED', 'DECLINED', 'TENTATIVE', 'DELEGATED'];
+                $validCutypes   = ['INDIVIDUAL', 'GROUP', 'RESOURCE', 'ROOM', 'UNKNOWN'];
+
                 foreach ($attendees as $attendee) {
-                    if (!empty($attendee['email'])) {
-                        $vevent->add('ATTENDEE', 'mailto:' . $attendee['email']);
+                    if (empty($attendee['email'])) {
+                        continue;
                     }
+                    $params = [];
+
+                    if (!empty($attendee['name'])) {
+                        $params['CN'] = $attendee['name'];
+                    }
+
+                    $role = strtoupper($attendee['role'] ?? 'REQ-PARTICIPANT');
+                    $params['ROLE'] = \in_array($role, $validRoles, true) ? $role : 'REQ-PARTICIPANT';
+
+                    $partstat = strtoupper($attendee['partstat'] ?? 'NEEDS-ACTION');
+                    $params['PARTSTAT'] = \in_array($partstat, $validPartstats, true) ? $partstat : 'NEEDS-ACTION';
+
+                    $params['RSVP'] = (!empty($attendee['rsvp'])) ? 'TRUE' : 'FALSE';
+
+                    $cutype = strtoupper($attendee['cutype'] ?? 'INDIVIDUAL');
+                    $params['CUTYPE'] = \in_array($cutype, $validCutypes, true) ? $cutype : 'INDIVIDUAL';
+
+                    $vevent->add($tmpCal->createProperty('ATTENDEE', 'mailto:' . $attendee['email'], $params));
                 }
             }
+        }
+
+        // Phase 3.2 — ORGANIZER (RFC 5545 §3.8.4.3)
+        if (!empty($event['organizer_email'])) {
+            $orgParams = [];
+            if (!empty($event['organizer_name'])) {
+                $orgParams['CN'] = $event['organizer_name'];
+            }
+            $vevent->add($tmpCal->createProperty('ORGANIZER', 'mailto:' . $event['organizer_email'], $orgParams));
         }
 
         if (!empty($event['recurrence_rule'])) {

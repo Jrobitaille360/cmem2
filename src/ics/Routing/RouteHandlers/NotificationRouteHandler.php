@@ -12,6 +12,7 @@ use AuthGroups\Utils\Response;
  *   GET    /notifications/email                → listEmailNotifications
  *   POST   /notifications/email/test           → sendTestEmail
  *   DELETE /notifications/email/{id}           → cancelEmailNotification
+ *   POST   /notifications/attendee-reply       → handleAttendeeReply  [Phase 3.3]
  */
 class NotificationRouteHandler extends BaseRouteHandler
 {
@@ -46,6 +47,10 @@ class NotificationRouteHandler extends BaseRouteHandler
             // POST /notifications/send-email
             ($sub === 'send-email' && $method === 'POST') =>
                 $this->controller->sendEmailForOccurrence($user['user_id']),
+
+            // POST /notifications/attendee-reply  — Phase 3.3 iTIP REPLY
+            ($sub === 'attendee-reply' && $method === 'POST') =>
+                $this->controller->handleAttendeeReply($user['user_id']),
 
             // GET /notifications/email
             ($sub === 'email' && $method === 'GET' && $third === '') =>

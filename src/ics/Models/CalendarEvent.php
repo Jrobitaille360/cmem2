@@ -36,6 +36,9 @@ class CalendarEvent extends BaseModel
     public $geoLat;      // 2.5 — DECIMAL(10,7)
     public $geoLng;      // 2.5 — DECIMAL(10,7)
     public $attachments; // 2.6 — JSON array [{url, mime_type}]
+    // Phase 3 — ATTENDEE & ORGANIZER
+    public $organizerEmail; // 3.2 — override email de l'organisateur (déduit de user_id si absent)
+    public $organizerName;  // 3.2 — CN de l'organisateur
 
     public function __construct() {
         parent::__construct();
@@ -52,8 +55,9 @@ class CalendarEvent extends BaseModel
                     calendar_id, user_id, title, description, start_datetime, end_datetime,
                     all_day, location, attendees, recurrence_rule, status,
                     timezone, meeting_link, notifications, color, uid,
-                    priority, class, transp, categories, geo_lat, geo_lng, attachments
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    priority, class, transp, categories, geo_lat, geo_lng, attachments,
+                    organizer_email, organizer_name
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ";
 
             $stmt = $this->getDb()->prepare($query);
@@ -94,6 +98,9 @@ class CalendarEvent extends BaseModel
                 $this->geoLat ?? null,
                 $this->geoLng ?? null,
                 isset($this->attachments) ? json_encode($this->attachments) : null,
+                // Phase 3
+                $this->organizerEmail ?? null,
+                $this->organizerName  ?? null,
             ]);
 
             $eventId = $this->getDb()->lastInsertId();
@@ -117,7 +124,10 @@ class CalendarEvent extends BaseModel
                 'notifications' => $this->notifications ?? null,
                 'color' => $this->color ?? null,
                 'recurrence_rule' => $this->recurrenceRule ?? null,
-                'uid' => $uid
+                'uid' => $uid,
+                'attendees' => $this->attendees ?? null,
+                'organizer_email' => $this->organizerEmail ?? null,
+                'organizer_name'  => $this->organizerName  ?? null,
             ];
             
             // Générer les occurrences si c'est un événement récurrent
@@ -400,6 +410,15 @@ class CalendarEvent extends BaseModel
                     ? json_encode($this->attachments)
                     : $this->attachments;
             }
+            // Phase 3.2 — ORGANIZER
+            if (isset($this->organizerEmail)) {
+                $fields[] = "organizer_email = ?";
+                $values[] = $this->organizerEmail;
+            }
+            if (isset($this->organizerName)) {
+                $fields[] = "organizer_name = ?";
+                $values[] = $this->organizerName;
+            }
 
             if (empty($fields)) {
                 return false;
@@ -652,6 +671,10 @@ class CalendarEvent extends BaseModel
                 if (isset($eventData['geo_lat']))      $event->geoLat      = $eventData['geo_lat'];
                 if (isset($eventData['geo_lng']))      $event->geoLng      = $eventData['geo_lng'];
                 if (isset($eventData['attachments']))  $event->attachments = $eventData['attachments'];
+                // Phase 3
+                if (isset($eventData['attendees']))       $event->attendees      = $eventData['attendees'];
+                if (isset($eventData['organizer_email'])) $event->organizerEmail = $eventData['organizer_email'];
+                if (isset($eventData['organizer_name']))  $event->organizerName  = $eventData['organizer_name'];
 
                 $event->create();
                 $importedCount++;

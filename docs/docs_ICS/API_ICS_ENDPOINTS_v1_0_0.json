@@ -164,8 +164,15 @@
             "description": "string (optional) - Description",
             "all_day": "boolean (optional, default: false) - Événement toute la journée",
             "location": "string (optional) - Lieu",
-            "organizer_email": "string (optional) - Email de l'organisateur, doit être un email valide",
-            "attendees": "array (optional) - Liste des participants",
+            "organizer_email": "string (optional) - Email de l'organisateur — exporté ORGANIZER;mailto:... (Phase 3)",
+            "organizer_name": "string (optional) - Nom affiché de l'organisateur (CN) (Phase 3)",
+            "attendees": "array (optional) - [{email, name, role, partstat, rsvp, cutype}] (Phase 3)",
+            "attendees[].email": "string (required) - Adresse email du participant",
+            "attendees[].name": "string (optional) - Nom affiché (CN) — exporté ATTENDEE;CN=...",
+            "attendees[].role": "string (optional) - CHAIR | REQ-PARTICIPANT | OPT-PARTICIPANT | NON-PARTICIPANT",
+            "attendees[].partstat": "string (optional) - NEEDS-ACTION | ACCEPTED | DECLINED | TENTATIVE | DELEGATED",
+            "attendees[].rsvp": "boolean (optional) - true = réponse attendue",
+            "attendees[].cutype": "string (optional) - INDIVIDUAL | GROUP | RESOURCE | ROOM | UNKNOWN",
             "recurrence_rule": "string (optional) - Règle de récurrence RRULE valide",
             "status": "string (optional, default: confirmed) - Statut ('confirmed', 'tentative', 'cancelled')",
             "timezone": "string (optional) - Timezone de l'événement"
@@ -211,8 +218,9 @@
             "description": "string (optional) - Nouvelle description",
             "all_day": "boolean (optional) - Nouveau flag toute la journée",
             "location": "string (optional) - Nouveau lieu",
-            "organizer_email": "string (optional) - Nouvel email organisateur",
-            "attendees": "array (optional) - Nouveaux participants",
+            "organizer_email": "string (optional) - Nouvel email organisateur (Phase 3)",
+            "organizer_name": "string (optional) - Nouveau nom organisateur (Phase 3)",
+            "attendees": "array (optional) - Nouveaux participants [{email, name, role, partstat, rsvp, cutype}] (Phase 3)",
             "recurrence_rule": "string (optional) - Nouvelle règle de récurrence",
             "status": "string (optional) - Nouveau statut",
             "timezone": "string (optional) - Nouveau timezone"
@@ -292,6 +300,52 @@
             "scope": "optional|string|in:only_this,all_future,all - Portée de la modification"
           },
           "response": "Occurrence modifiée avec succès"
+        }
+      ]
+    },
+    "notifications": {
+      "description": "Gestion des notifications email et réponses RSVP (iTIP)",
+      "base_path": "/notifications",
+      "auth_required": true,
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/notifications/email",
+          "description": "Lister les notifications email planifiées de l'utilisateur"
+        },
+        {
+          "method": "POST",
+          "path": "/notifications/email/test",
+          "description": "Envoyer un email de test SMTP",
+          "body": { "email": "string (optional) — destinataire (défaut: email du compte)" }
+        },
+        {
+          "method": "DELETE",
+          "path": "/notifications/email/{id}",
+          "description": "Annuler une notification email planifiée",
+          "params": { "id": "integer (required)" }
+        },
+        {
+          "method": "POST",
+          "path": "/notifications/send-email",
+          "description": "Envoyer immédiatement un rappel email pour une occurrence",
+          "body": { "event_id": "integer (required)", "occurrence_date": "string YYYY-MM-DD (required)" }
+        },
+        {
+          "method": "POST",
+          "path": "/notifications/attendee-reply",
+          "description": "Enregistrer la réponse RSVP d'un participant — iTIP METHOD:REPLY (Phase 3)",
+          "body": {
+            "event_id": "integer (required)",
+            "attendee_email": "string (required) — email du participant",
+            "partstat": "string (required) — ACCEPTED | DECLINED | TENTATIVE"
+          },
+          "response": "{ event_id, attendee_email, partstat }",
+          "errors": {
+            "400": "Paramètre manquant ou partstat invalide",
+            "403": "Accès refusé (ni propriétaire ni l'attendee concerné)",
+            "404": "Événement ou attendee introuvable"
+          }
         }
       ]
     },

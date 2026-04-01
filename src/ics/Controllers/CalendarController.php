@@ -1106,6 +1106,31 @@ class CalendarController
                 ]);
             }
 
+            // Phase 3.4 — Invitations email aux attendees (iTIP METHOD:REQUEST)
+            if (!empty($result['attendees'])) {
+                try {
+                    $calRow = (new Calendar())->getById($calendarId);
+                    $calTz  = $calRow['timezone'] ?? 'America/Montreal';
+
+                    // Enrichir avec les infos organisateur depuis l'utilisateur courant si non surchargées
+                    if (empty($result['organizer_email'])) {
+                        $userModel = new User();
+                        $user = $userModel->findById($userId);
+                        if ($user) {
+                            $result['organizer_email'] = $user['email'] ?? null;
+                            $result['organizer_name']  = $user['name']  ?? null;
+                        }
+                    }
+
+                    EmailNotificationService::sendInvitationEmails($result, $calTz);
+                } catch (\Exception $invitEx) {
+                    LogService::warning("Échec envoi invitations email (création)", [
+                        'event_id' => $result['id'] ?? null,
+                        'error'    => $invitEx->getMessage(),
+                    ]);
+                }
+            }
+
 
             LoggingMiddleware::logExit(201);
             Response::success('Événement créé avec succès', $result, 201);
