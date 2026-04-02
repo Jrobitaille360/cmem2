@@ -22,7 +22,7 @@ class IcsGenerator
      * @param array       $events    Tableau de lignes DB d'événements
      * @param string|null $method    iTIP METHOD optionnel (REQUEST, CANCEL…) — Phase 3.3
      */
-    public static function generateCalendar(array $calendar, array $events, ?string $method = null): string
+    public static function generateCalendar(array $calendar, array $events, ?string $method = null, array $todos = [], array $journals = []): string
     {
         $timezone = $calendar['timezone'] ?? 'America/Montreal';
 
@@ -54,6 +54,16 @@ class IcsGenerator
             }
             // sabre/vobject génère le VEVENT avec TZID + folding
             $ics .= self::buildVEvent($event, $timezone);
+        }
+
+        // Phase 5 — VTODO
+        foreach ($todos as $todo) {
+            $ics .= self::buildVTodo($todo, $timezone);
+        }
+
+        // Phase 5 — VJOURNAL
+        foreach ($journals as $journal) {
+            $ics .= self::buildVJournal($journal, $timezone);
         }
 
         $ics .= "END:VCALENDAR\r\n";
@@ -205,9 +215,8 @@ class IcsGenerator
                     }
                     $params = [];
 
-                    if (!empty($attendee['name'])) {
-                        $params['CN'] = $attendee['name'];
-                    }
+                    // RSVP, ROLE, PARTSTAT en premier pour tenir dans les 75 chars (RFC 5545 fold)
+                    $params['RSVP'] = (!empty($attendee['rsvp'])) ? 'TRUE' : 'FALSE';
 
                     $role = strtoupper($attendee['role'] ?? 'REQ-PARTICIPANT');
                     $params['ROLE'] = \in_array($role, $validRoles, true) ? $role : 'REQ-PARTICIPANT';
@@ -215,10 +224,12 @@ class IcsGenerator
                     $partstat = strtoupper($attendee['partstat'] ?? 'NEEDS-ACTION');
                     $params['PARTSTAT'] = \in_array($partstat, $validPartstats, true) ? $partstat : 'NEEDS-ACTION';
 
-                    $params['RSVP'] = (!empty($attendee['rsvp'])) ? 'TRUE' : 'FALSE';
-
                     $cutype = strtoupper($attendee['cutype'] ?? 'INDIVIDUAL');
                     $params['CUTYPE'] = \in_array($cutype, $validCutypes, true) ? $cutype : 'INDIVIDUAL';
+
+                    if (!empty($attendee['name'])) {
+                        $params['CN'] = $attendee['name'];
+                    }
 
                     $vevent->add($tmpCal->createProperty('ATTENDEE', 'mailto:' . $attendee['email'], $params));
                 }
@@ -372,12 +383,15 @@ class IcsGenerator
 
             if (is_array($notifications)) {
                 foreach ($notifications as $notif) {
-                    if (!isset($notif['minutes'])) {
+                    // Accepte 'minutes' ou 'minutes_before' (normalization input)
+                    $minutes = isset($notif['minutes']) ? (int)$notif['minutes']
+                        : (isset($notif['minutes_before']) ? (int)$notif['minutes_before'] : null);
+                    if ($minutes === null) {
                         continue;
                     }
-                    $minutes = (int)$notif['minutes'];
                     $trigger = ($minutes > 0) ? '-PT' . $minutes . 'M' : 'PT0S';
-                    $action  = (isset($notif['type']) && $notif['type'] === 'email') ? 'EMAIL' : 'DISPLAY';
+                    $typeRaw = strtoupper($notif['type'] ?? 'DISPLAY');
+                    $action  = ($typeRaw === 'EMAIL') ? 'EMAIL' : 'DISPLAY';
 
                     /** @var \Sabre\VObject\Component $valarm */
                     $valarm = $tmpCal->createComponent('VALARM');

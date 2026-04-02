@@ -149,26 +149,28 @@ class EventValidator
                 ];
             }
 
-            // Vérifier la présence des champs requis
-            if (!isset($notification['type']) || !isset($notification['minutes'])) {
+            // Vérifier la présence des champs requis (accepte minutes ou minutes_before)
+            $minutes = $notification['minutes'] ?? $notification['minutes_before'] ?? null;
+            if (!isset($notification['type']) || $minutes === null) {
                 return [
                     'valid' => false,
-                    'error' => "La notification #{$index} doit contenir les champs 'type' et 'minutes'",
+                    'error' => "La notification #{$index} doit contenir les champs 'type' et 'minutes' (ou 'minutes_before')",
                     'data' => null
                 ];
             }
 
-            // Valider le type
-            if (!in_array($notification['type'], ['notification', 'email'])) {
+            // Valider le type (types internes et types RFC 5545)
+            $allowedTypes = ['notification', 'email', 'EMAIL', 'DISPLAY', 'AUDIO'];
+            if (!in_array($notification['type'], $allowedTypes, true)) {
                 return [
                     'valid' => false,
-                    'error' => "Le type de notification #{$index} doit être 'notification' ou 'email'",
+                    'error' => "Le type de notification #{$index} doit être 'notification', 'email', 'EMAIL', 'DISPLAY' ou 'AUDIO'",
                     'data' => null
                 ];
             }
 
             // Valider les minutes
-            if (!is_numeric($notification['minutes']) || $notification['minutes'] < 0) {
+            if (!is_numeric($minutes) || $minutes < 0) {
                 return [
                     'valid' => false,
                     'error' => "La durée de notification #{$index} doit être un nombre positif ou zéro",
@@ -454,7 +456,10 @@ class EventValidator
         }
 
         // Phase 4 — nouveaux champs
-        if (isset($data['duration'])) {
+        // RFC 5545 : DURATION et DTEND sont mutuellement exclusifs
+        if (isset($data['duration']) && isset($data['end_datetime']) && $data['end_datetime'] !== '') {
+            $errors['duration'] = 'Les champs duration et end_datetime sont mutuellement exclusifs (RFC 5545).';
+        } elseif (isset($data['duration'])) {
             $result = self::validateDuration($data['duration']);
             if (!$result['valid']) {
                 $errors['duration'] = $result['error'];
@@ -469,6 +474,29 @@ class EventValidator
                 $errors['related_to'] = $result['error'];
             } else {
                 $validatedData['related_to'] = $result['value'] ?? $data['related_to'];
+            }
+        }
+
+        if (isset($data['rdate'])) {
+            // RDATE : CSV de datetimes locales — validation minimale
+            if (!is_string($data['rdate'])) {
+                $errors['rdate'] = 'Le champ rdate doit être une chaîne de dates séparées par des virgules.';
+            } else {
+                $validatedData['rdate'] = $data['rdate'];
+            }
+        }
+
+        // Phase 3 — validation attendees (chaque entrée doit avoir un email)
+        if (isset($data['attendees']) && is_array($data['attendees'])) {
+            foreach ($data['attendees'] as $i => $att) {
+                if (empty($att['email'])) {
+                    $errors['attendees'] = "L'entrée attendees[$i] doit contenir un champ 'email'.";
+                    break;
+                }
+                if (!filter_var($att['email'], FILTER_VALIDATE_EMAIL)) {
+                    $errors['attendees'] = "L'adresse email de attendees[$i] est invalide.";
+                    break;
+                }
             }
         }
 

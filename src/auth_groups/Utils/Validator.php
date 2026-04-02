@@ -73,7 +73,7 @@ class Validator {
                 break;
 
             case 'integer':
-                if ($value !== null && !filter_var($value, FILTER_VALIDATE_INT)) {
+                if ($value !== null && filter_var($value, FILTER_VALIDATE_INT) === false) {
                     self::addError($field, "Le champ {$field} doit être un entier", $errors);
                 }
                 break;

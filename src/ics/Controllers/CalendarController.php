@@ -312,8 +312,10 @@ class CalendarController
                 return;
             }
             
-            $events = $cal->getEventsForCalendar($calendarId);
-            $icsContent = $cal->generateIcsContent($permission, $events);
+            $events   = $cal->getEventsForCalendar($calendarId);
+            $todos    = (new \ICS\Models\CalendarTodo())->getByCalendarId($calendarId);
+            $journals = (new \ICS\Models\CalendarJournal())->getByCalendarId($calendarId);
+            $icsContent = \ICS\Utils\IcsGenerator::generateCalendar($permission, $events, null, $todos, $journals);
 
             LogService::info("ICS généré pour le calendrier", [
                 'calendar_id' => $calendarId,
@@ -996,7 +998,7 @@ class CalendarController
             'title' => 'required|string',
             'user_id' => 'optional|integer',
             'start_datetime' => 'required|date_or_datetime',
-            'end_datetime' => 'required|date_or_datetime',
+            'end_datetime' => 'optional|date_or_datetime',  // optionnel si duration fourni (Ph4)
             'description' => 'optional|string',
             'all_day' => 'optional|boolean',
             'location' => 'optional|string',
@@ -1033,8 +1035,14 @@ class CalendarController
             return;
         }
 
-        // Vérifier que la date de fin est après la date de début
-        if (strtotime($input['end_datetime']) < strtotime($input['start_datetime'])) {
+        // Vérifier que la date de fin est après la date de début (sauf si duration fourni)
+        $hasDuration = !empty($input['duration']);
+        if (!$hasDuration && empty($input['end_datetime'])) {
+            LoggingMiddleware::logExit(400);
+            Response::error('end_datetime est requis quand duration n\'est pas fourni', null, 400);
+            return;
+        }
+        if (!$hasDuration && isset($input['end_datetime']) && strtotime($input['end_datetime']) < strtotime($input['start_datetime'])) {
             LogService::warning("Dates d'événement invalides", [
                 'start_datetime' => $input['start_datetime'],
                 'end_datetime' => $input['end_datetime']
@@ -1042,6 +1050,9 @@ class CalendarController
             LoggingMiddleware::logExit(400);
             Response::error('La date de fin doit être après la date de début', null, 400);
             return;
+        }
+        if (!$hasDuration && $input['end_datetime'] === $input['start_datetime'] && empty($input['all_day'])) {
+            // autoriser quand même — certains clients envoient dtstart=dtend pour un instant
         }
 
         // Vérifier validité de la récurrence s'il y en a une
@@ -1072,11 +1083,26 @@ class CalendarController
             $event->userId = $userId;
             $event->title = $input['title'];
             $event->startDatetime = $input['start_datetime'];
-            $event->endDatetime = $input['end_datetime'];
+
+            // Phase 4.5 — si duration fourni sans end_datetime, calculer end_datetime
+            if (!empty($input['duration']) && empty($input['end_datetime'])) {
+                try {
+                    $dtStart = new \DateTime($input['start_datetime']);
+                    $dtStart->add(new \DateInterval($input['duration']));
+                    $event->endDatetime = $dtStart->format('Y-m-d H:i:s');
+                } catch (\Exception $dtEx) {
+                    $event->endDatetime = $input['start_datetime']; // fallback
+                }
+            } else {
+                $event->endDatetime = $input['end_datetime'];
+            }
+
             $event->description = $input['description'] ?? null;
             $event->allDay = $input['all_day'] ?? false;
             $event->location = $input['location'] ?? null;
             $event->attendees = $input['attendees'] ?? null;
+            $event->organizerEmail = $input['organizer_email'] ?? null;
+            $event->organizerName  = $input['organizer_name']  ?? null;
             $event->recurrenceRule = $input['recurrence_rule'] ?? null;
             $event->status = $input['status'] ?? 'confirmed';
             
@@ -1093,6 +1119,10 @@ class CalendarController
             if (isset($eventValidation['data']['geo_lat']))     $event->geoLat      = $eventValidation['data']['geo_lat'];
             if (isset($eventValidation['data']['geo_lng']))     $event->geoLng      = $eventValidation['data']['geo_lng'];
             if (isset($eventValidation['data']['attachments'])) $event->attachments = $eventValidation['data']['attachments'];
+            // Phase 4
+            if (isset($eventValidation['data']['duration']))   $event->duration  = $eventValidation['data']['duration'];
+            if (isset($eventValidation['data']['related_to'])) $event->relatedTo = $eventValidation['data']['related_to'];
+            if (isset($eventValidation['data']['rdate']))      $event->rdate     = $eventValidation['data']['rdate'];
 
             $result = $event->create();
 
@@ -1330,6 +1360,19 @@ class CalendarController
             if (isset($eventValidation['data']['attachments'])) {
                 $event->attachments = $eventValidation['data']['attachments'];
                 $updatedFields[] = 'attachments';
+            }
+            // Phase 4
+            if (isset($eventValidation['data']['duration'])) {
+                $event->duration = $eventValidation['data']['duration'];
+                $updatedFields[] = 'duration';
+            }
+            if (isset($eventValidation['data']['related_to'])) {
+                $event->relatedTo = $eventValidation['data']['related_to'];
+                $updatedFields[] = 'related_to';
+            }
+            if (isset($eventValidation['data']['rdate'])) {
+                $event->rdate = $eventValidation['data']['rdate'];
+                $updatedFields[] = 'rdate';
             }
             
             LogService::info("Champs à mettre à jour", [
@@ -2024,6 +2067,12 @@ class CalendarController
 
             $start = date('Y-m-d H:i:s', strtotime($input['start']));
             $end   = date('Y-m-d H:i:s', strtotime($input['end']));
+
+            if ($end <= $start) {
+                LoggingMiddleware::logExit(400);
+                Response::error('La date de fin doit être postérieure à la date de début', null, 400);
+                return;
+            }
 
             // Récupérer les événements OPAQUE dans la période
             $eventModel   = new CalendarEvent();

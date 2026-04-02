@@ -70,7 +70,7 @@ class JournalController
 
             $result = $journal->create();
             LoggingMiddleware::logExit(201);
-            Response::success('Journal créé avec succès', $result, 201);
+            Response::success('Journal créé avec succès', ['journal' => $result], 201);
         } catch (\Exception $e) {
             LogService::error('Erreur création journal', ['exception' => $e->getMessage()]);
             LoggingMiddleware::logExit(500);

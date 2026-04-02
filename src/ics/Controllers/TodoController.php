@@ -77,7 +77,7 @@ class TodoController
 
             $result = $todo->create();
             LoggingMiddleware::logExit(201);
-            Response::success('Tâche créée avec succès', $result, 201);
+            Response::success('Tâche créée avec succès', ['todo' => $result], 201);
         } catch (\Exception $e) {
             LogService::error('Erreur création todo', ['exception' => $e->getMessage()]);
             LoggingMiddleware::logExit(500);
