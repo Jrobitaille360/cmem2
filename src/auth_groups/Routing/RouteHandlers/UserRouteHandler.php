@@ -7,14 +7,13 @@ use AuthGroups\Controllers\UserController;
 use AuthGroups\Controllers\UserSessionController;
 use AuthGroups\Controllers\PlanController;
 use AuthGroups\Utils\Response;
-use ICS\Controllers\NotificationController;
 
 class UserRouteHandler extends BaseRouteHandler
 {
     private UserController $controller;
     private UserSessionController $sessionController;
     private PlanController $planController;
-    private ?NotificationController $notificationController = null;
+    private ?object $notificationController = null;
 
     public function __construct($authService) {
         parent::__construct($authService);
@@ -23,10 +22,13 @@ class UserRouteHandler extends BaseRouteHandler
         $this->planController = new PlanController();
     }
 
-    private function getNotificationController(): NotificationController
+    private function getNotificationController(): ?object
     {
         if ($this->notificationController === null) {
-            $this->notificationController = new NotificationController();
+            if (!class_exists('ICS\\Controllers\\NotificationController')) {
+                return null;
+            }
+            $this->notificationController = new \ICS\Controllers\NotificationController();
         }
         return $this->notificationController;
     }
@@ -122,11 +124,15 @@ class UserRouteHandler extends BaseRouteHandler
 
             // GET /users/me/notification-preferences
             ($action === 'me' && isset($segments[2]) && $segments[2] === 'notification-preferences' && $method === 'GET') =>
-                $this->getNotificationController()->getPreferences($user['user_id']),
+                ($ctrl = $this->getNotificationController())
+                    ? $ctrl->getPreferences($user['user_id'])
+                    : Response::error('Plugin de notifications non disponible', null, 503),
 
             // PUT /users/me/notification-preferences
             ($action === 'me' && isset($segments[2]) && $segments[2] === 'notification-preferences' && $method === 'PUT') =>
-                $this->getNotificationController()->updatePreferences($user['user_id']),
+                ($ctrl = $this->getNotificationController())
+                    ? $ctrl->updatePreferences($user['user_id'])
+                    : Response::error('Plugin de notifications non disponible', null, 503),
 
             // POST /users/app/
             ($action === 'app' && $method === 'POST' && !$id) =>
