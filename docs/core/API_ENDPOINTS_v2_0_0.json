@@ -2,7 +2,7 @@
   "api": {
     "name": "AuthGroups API",
     "version": "2.2.1",
-    "description": "API REST complète pour la gestion d'authentification, groupes, fichiers, tags, calendriers ICS et CalDAV",
+    "description": "API REST complète pour la gestion d'authentification, groupes, fichiers et tags",
     "generated": "2026-03-31",
     "base_url": "/",
     "authentication": {
@@ -41,7 +41,12 @@
             "token": "string — JWT Bearer",
             "token_type": "Bearer",
             "expires_at": "datetime",
-            "user": { "id": "integer", "name": "string", "email": "string", "role": "string" },
+            "user": {
+              "id": "integer",
+              "name": "string",
+              "email": "string",
+              "role": "string"
+            },
             "device_token": "string (présent uniquement si device_id fourni)",
             "device_id": "string (présent uniquement si device_id fourni)"
           },
@@ -84,7 +89,12 @@
             "token": "string — JWT Bearer",
             "token_type": "Bearer",
             "expires_at": "datetime",
-            "user": { "id": "integer", "name": "string", "email": "string", "role": "string" },
+            "user": {
+              "id": "integer",
+              "name": "string",
+              "email": "string",
+              "role": "string"
+            },
             "device_token": "string (présent uniquement si device_id fourni)",
             "device_id": "string (présent uniquement si device_id fourni)"
           },
@@ -106,7 +116,12 @@
             "token": "string — nouveau JWT Bearer",
             "token_type": "Bearer",
             "expires_at": "datetime",
-            "user": { "id": "integer", "name": "string", "email": "string", "role": "string" },
+            "user": {
+              "id": "integer",
+              "name": "string",
+              "email": "string",
+              "role": "string"
+            },
             "device_token": "string — nouveau device token (l'ancien est révoqué, remplacer côté client)",
             "device_id": "string"
           },
@@ -124,7 +139,12 @@
             "Authorization": "Bearer {jwt_token}"
           },
           "response": {
-            "user": { "id": "integer", "name": "string", "email": "string", "role": "string" }
+            "user": {
+              "id": "integer",
+              "name": "string",
+              "email": "string",
+              "role": "string"
+            }
           },
           "errors": {
             "401": "JWT manquant ou invalide"
@@ -223,7 +243,11 @@
             "password": "string (required, min 8 caractères)"
           },
           "response": {
-            "user": { "id": "integer", "name": "string", "email": "string" },
+            "user": {
+              "id": "integer",
+              "name": "string",
+              "email": "string"
+            },
             "next_steps": {
               "verify_email": "POST /users/verify-email avec le token reçu par email",
               "login": "POST /auth/login après vérification"
@@ -345,8 +369,12 @@
           "method": "GET",
           "path": "/users",
           "description": "Liste de tous les utilisateurs",
-          "roles": ["ADMINISTRATEUR"],
-          "query": { "email": "string (optional)" },
+          "roles": [
+            "ADMINISTRATEUR"
+          ],
+          "query": {
+            "email": "string (optional)"
+          },
           "response": "Array d'utilisateurs"
         },
         {
@@ -370,38 +398,31 @@
           "method": "DELETE",
           "path": "/users/me",
           "description": "Supprimer son propre compte",
-          "body": { "password": "string (required)" },
-          "response": "{ deleted: true }"
-        },
-        {
-          "method": "GET",
-          "path": "/users/me/notification-preferences",
-          "description": "Obtenir ses préférences de notifications",
-          "response": "Notification preferences object"
-        },
-        {
-          "method": "PUT",
-          "path": "/users/me/notification-preferences",
-          "description": "Mettre à jour ses préférences de notifications",
           "body": {
-            "email_enabled": "boolean (optional)",
-            "reminder_minutes": "integer (optional)"
+            "password": "string (required)"
           },
-          "response": "Notification preferences object mis à jour"
+          "response": "{ deleted: true }"
         },
         {
           "method": "GET",
           "path": "/users/{id}",
           "description": "Obtenir les détails d'un utilisateur",
-          "params": { "id": "integer (required)" },
+          "params": {
+            "id": "integer (required)"
+          },
           "response": "{ user: User object }"
         },
         {
           "method": "PUT",
           "path": "/users/{id}",
           "description": "Modifier un utilisateur",
-          "params": { "id": "integer (required)" },
-          "roles": ["ADMINISTRATEUR", "MODERATEUR"],
+          "params": {
+            "id": "integer (required)"
+          },
+          "roles": [
+            "ADMINISTRATEUR",
+            "MODERATEUR"
+          ],
           "body": {
             "name": "string (optional)",
             "email": "string (optional)",
@@ -413,40 +434,63 @@
           "method": "DELETE",
           "path": "/users/{id}",
           "description": "Supprimer un utilisateur (soft delete)",
-          "params": { "id": "integer (required)" },
-          "roles": ["ADMINISTRATEUR"],
+          "params": {
+            "id": "integer (required)"
+          },
+          "roles": [
+            "ADMINISTRATEUR"
+          ],
           "response": "{ deleted: true }"
         },
         {
           "method": "POST",
           "path": "/users/{id}/restore",
           "description": "Restaurer un utilisateur supprimé",
-          "params": { "id": "integer (required)" },
-          "roles": ["ADMINISTRATEUR"],
+          "params": {
+            "id": "integer (required)"
+          },
+          "roles": [
+            "ADMINISTRATEUR"
+          ],
           "response": "{ restored: true }"
         },
         {
           "method": "GET",
           "path": "/users/{id}/sessions",
           "description": "Lister les sessions actives d'un utilisateur",
-          "params": { "id": "integer (required)" },
-          "roles": ["ADMINISTRATEUR", "self"],
+          "params": {
+            "id": "integer (required)"
+          },
+          "roles": [
+            "ADMINISTRATEUR",
+            "self"
+          ],
           "response": "Array de sessions actives + total"
         },
         {
           "method": "DELETE",
           "path": "/users/{id}/sessions",
           "description": "Terminer toutes les sessions actives d'un utilisateur",
-          "params": { "id": "integer (required)" },
-          "roles": ["ADMINISTRATEUR", "self"],
+          "params": {
+            "id": "integer (required)"
+          },
+          "roles": [
+            "ADMINISTRATEUR",
+            "self"
+          ],
           "response": "Nombre de sessions terminées"
         },
         {
           "method": "GET",
           "path": "/users/{id}/session-status",
           "description": "Vérifier si un utilisateur a une session active",
-          "params": { "id": "integer (required)" },
-          "roles": ["ADMINISTRATEUR", "self"],
+          "params": {
+            "id": "integer (required)"
+          },
+          "roles": [
+            "ADMINISTRATEUR",
+            "self"
+          ],
           "response": "{ has_active_session, active_sessions_count, last_activity }"
         },
         {
@@ -460,8 +504,12 @@
           "method": "POST",
           "path": "/users/{id}/avatar",
           "description": "Uploader l'avatar d'un utilisateur",
-          "params": { "id": "integer (required)" },
-          "roles": ["ADMINISTRATEUR"],
+          "params": {
+            "id": "integer (required)"
+          },
+          "roles": [
+            "ADMINISTRATEUR"
+          ],
           "body": "multipart/form-data avec fichier image",
           "response": "URL de l'avatar"
         },
@@ -479,9 +527,15 @@
           "method": "PUT",
           "path": "/users/{id}/password",
           "description": "Changer le mot de passe d'un utilisateur",
-          "params": { "id": "integer (required)" },
-          "roles": ["ADMINISTRATEUR"],
-          "body": { "new_password": "string (required)" },
+          "params": {
+            "id": "integer (required)"
+          },
+          "roles": [
+            "ADMINISTRATEUR"
+          ],
+          "body": {
+            "new_password": "string (required)"
+          },
           "response": "Message de confirmation"
         },
         {
@@ -504,22 +558,30 @@
           "method": "GET",
           "path": "/users/app/{app_id}",
           "description": "Récupérer une configuration d'application",
-          "params": { "app_id": "string (required)" },
+          "params": {
+            "app_id": "string (required)"
+          },
           "response": "App setup object"
         },
         {
           "method": "PUT",
           "path": "/users/app/{app_id}",
           "description": "Mettre à jour une configuration d'application",
-          "params": { "app_id": "string (required)" },
-          "body": { "json_data": "object (optional)" },
+          "params": {
+            "app_id": "string (required)"
+          },
+          "body": {
+            "json_data": "object (optional)"
+          },
           "response": "App setup object mis à jour"
         },
         {
           "method": "DELETE",
           "path": "/users/app/{app_id}",
           "description": "Supprimer une configuration d'application (soft delete)",
-          "params": { "app_id": "string (required)" },
+          "params": {
+            "app_id": "string (required)"
+          },
           "response": "{ deleted: true }"
         }
       ]
@@ -567,21 +629,27 @@
           "method": "GET",
           "path": "/groups/user/{user_id}",
           "description": "Obtenir les groupes d'un utilisateur",
-          "params": { "user_id": "integer (required)" },
+          "params": {
+            "user_id": "integer (required)"
+          },
           "response": "Array de groupes"
         },
         {
           "method": "GET",
           "path": "/groups/{id}",
           "description": "Obtenir les détails d'un groupe",
-          "params": { "id": "integer (required)" },
+          "params": {
+            "id": "integer (required)"
+          },
           "response": "Group object"
         },
         {
           "method": "PUT",
           "path": "/groups/{id}",
           "description": "Modifier un groupe",
-          "params": { "id": "integer (required)" },
+          "params": {
+            "id": "integer (required)"
+          },
           "body": {
             "name": "string (optional)",
             "description": "string (optional)",
@@ -594,22 +662,30 @@
           "method": "DELETE",
           "path": "/groups/{id}",
           "description": "Supprimer un groupe (soft delete par défaut)",
-          "params": { "id": "integer (required)" },
-          "body": { "force_delete": "boolean (optional, default: false)" },
+          "params": {
+            "id": "integer (required)"
+          },
+          "body": {
+            "force_delete": "boolean (optional, default: false)"
+          },
           "response": "{ group_id: integer }"
         },
         {
           "method": "POST",
           "path": "/groups/{id}/restore",
           "description": "Restaurer un groupe supprimé",
-          "params": { "id": "integer (required)" },
+          "params": {
+            "id": "integer (required)"
+          },
           "response": "{ group_id: integer }"
         },
         {
           "method": "POST",
           "path": "/groups/{id}/invite",
           "description": "Inviter un utilisateur au groupe",
-          "params": { "id": "integer (required)" },
+          "params": {
+            "id": "integer (required)"
+          },
           "body": {
             "email": "string (required)",
             "role": "string (optional, in: admin|moderator|member, default: member)"
@@ -620,14 +696,18 @@
           "method": "POST",
           "path": "/groups/{id}/leave",
           "description": "Quitter un groupe",
-          "params": { "id": "integer (required)" },
+          "params": {
+            "id": "integer (required)"
+          },
           "response": "{ group_id: integer }"
         },
         {
           "method": "GET",
           "path": "/groups/{id}/members",
           "description": "Obtenir les membres d'un groupe",
-          "params": { "id": "integer (required)" },
+          "params": {
+            "id": "integer (required)"
+          },
           "response": "Array de membres"
         },
         {
@@ -638,7 +718,9 @@
             "group_id": "integer (required)",
             "user_id": "integer (required)"
           },
-          "body": { "role": "string (optional, in: admin|moderator|member, default: member)" },
+          "body": {
+            "role": "string (optional, in: admin|moderator|member, default: member)"
+          },
           "response": "{ group_id: integer, user_id: integer, role: string }"
         },
         {
@@ -649,7 +731,9 @@
             "group_id": "integer (required)",
             "user_id": "integer (required)"
           },
-          "body": { "role": "string (required, in: admin|moderator|member)" },
+          "body": {
+            "role": "string (required, in: admin|moderator|member)"
+          },
           "response": "{ group_id: integer, user_id: integer }"
         }
       ]
@@ -692,21 +776,34 @@
               }
             }
           },
-          "http_codes": { "201": "succès", "400": "fichier manquant/invalide", "401": "non authentifié" }
+          "http_codes": {
+            "201": "succès",
+            "400": "fichier manquant/invalide",
+            "401": "non authentifié"
+          }
         },
         {
           "method": "GET",
           "path": "/files/{id}",
           "description": "Télécharger un fichier (contenu binaire)",
-          "params": { "id": "integer (required)" },
+          "params": {
+            "id": "integer (required)"
+          },
           "response": "Fichier binaire avec headers Content-Type / Content-Disposition",
-          "http_codes": { "200": "succès", "401": "non authentifié", "403": "accès refusé", "404": "introuvable" }
+          "http_codes": {
+            "200": "succès",
+            "401": "non authentifié",
+            "403": "accès refusé",
+            "404": "introuvable"
+          }
         },
         {
           "method": "GET",
           "path": "/files/{id}/info",
           "description": "Obtenir les métadonnées d'un fichier",
-          "params": { "id": "integer (required)" },
+          "params": {
+            "id": "integer (required)"
+          },
           "response": {
             "data": {
               "file": {
@@ -724,13 +821,19 @@
               }
             }
           },
-          "http_codes": { "200": "succès", "401": "non authentifié", "404": "introuvable" }
+          "http_codes": {
+            "200": "succès",
+            "401": "non authentifié",
+            "404": "introuvable"
+          }
         },
         {
           "method": "DELETE",
           "path": "/files/{id}",
           "description": "Supprimer un fichier (soft delete par défaut)",
-          "params": { "id": "integer (required)" },
+          "params": {
+            "id": "integer (required)"
+          },
           "body": {
             "force_delete": "boolean (optional, default false — suppression physique si true)"
           },
@@ -743,24 +846,41 @@
             }
           },
           "permissions": "propriétaire ou administrateur",
-          "http_codes": { "200": "succès", "401": "non authentifié", "403": "accès refusé", "404": "introuvable" }
+          "http_codes": {
+            "200": "succès",
+            "401": "non authentifié",
+            "403": "accès refusé",
+            "404": "introuvable"
+          }
         },
         {
           "method": "POST",
           "path": "/files/{id}/restore",
           "description": "Restaurer un fichier soft-deleted",
-          "params": { "id": "integer (required)" },
+          "params": {
+            "id": "integer (required)"
+          },
           "response": {
-            "data": { "file_id": "integer" }
+            "data": {
+              "file_id": "integer"
+            }
           },
           "permissions": "propriétaire ou administrateur",
-          "http_codes": { "200": "succès", "400": "fichier non supprimé", "401": "non authentifié", "403": "accès refusé", "404": "introuvable" }
+          "http_codes": {
+            "200": "succès",
+            "400": "fichier non supprimé",
+            "401": "non authentifié",
+            "403": "accès refusé",
+            "404": "introuvable"
+          }
         },
         {
           "method": "GET",
           "path": "/files/user/{user_id}",
           "description": "Lister les fichiers d'un utilisateur (paginé)",
-          "params": { "user_id": "integer (required)" },
+          "params": {
+            "user_id": "integer (required)"
+          },
           "query": {
             "page": "integer (optional, default 1)",
             "limit": "integer (optional, default 20, max 100)"
@@ -798,7 +918,11 @@
             }
           },
           "permissions": "propriétaire ou administrateur",
-          "http_codes": { "200": "succès", "401": "non authentifié", "403": "accès refusé" }
+          "http_codes": {
+            "200": "succès",
+            "401": "non authentifié",
+            "403": "accès refusé"
+          }
         }
       ]
     },
@@ -836,14 +960,18 @@
           "method": "GET",
           "path": "/tags/{id}",
           "description": "Obtenir les détails d'un tag",
-          "params": { "id": "integer (required)" },
+          "params": {
+            "id": "integer (required)"
+          },
           "response": "Tag object"
         },
         {
           "method": "PUT",
           "path": "/tags/{id}",
           "description": "Modifier un tag",
-          "params": { "id": "integer (required)" },
+          "params": {
+            "id": "integer (required)"
+          },
           "body": {
             "name": "string (optional)",
             "color": "string (optional)",
@@ -855,14 +983,18 @@
           "method": "DELETE",
           "path": "/tags/{id}",
           "description": "Supprimer un tag (soft delete)",
-          "params": { "id": "integer (required)" },
+          "params": {
+            "id": "integer (required)"
+          },
           "response": "{ tag_id: integer }"
         },
         {
           "method": "POST",
           "path": "/tags/{id}/restore",
           "description": "Restaurer un tag supprimé",
-          "params": { "id": "integer (required)" },
+          "params": {
+            "id": "integer (required)"
+          },
           "response": "{ tag_id: integer }"
         },
         {
@@ -875,7 +1007,9 @@
           "method": "GET",
           "path": "/tags/by-table/{table}",
           "description": "Obtenir les tags par table d'association",
-          "params": { "table": "string (required) — groups | files | all" },
+          "params": {
+            "table": "string (required) — groups | files | all"
+          },
           "response": "Array de tags"
         },
         {
@@ -903,7 +1037,9 @@
           "method": "GET",
           "path": "/tags/user/{user_id}",
           "description": "Obtenir les tags d'un utilisateur",
-          "params": { "user_id": "integer (required)" },
+          "params": {
+            "user_id": "integer (required)"
+          },
           "response": "Array de tags"
         },
         {
@@ -931,649 +1067,81 @@
           "method": "POST",
           "path": "/stats/build",
           "description": "Générer toutes les statistiques",
-          "roles": ["ADMINISTRATEUR"],
+          "roles": [
+            "ADMINISTRATEUR"
+          ],
           "response": "Message de confirmation"
         },
         {
           "method": "GET",
           "path": "/stats/platform",
           "description": "Statistiques globales de la plateforme",
-          "roles": ["ADMINISTRATEUR", "MODERATEUR"],
+          "roles": [
+            "ADMINISTRATEUR",
+            "MODERATEUR"
+          ],
           "response": "Object avec statistiques globales"
         },
         {
           "method": "GET",
           "path": "/stats/groups",
           "description": "Statistiques par groupe",
-          "roles": ["ADMINISTRATEUR", "MODERATEUR"],
+          "roles": [
+            "ADMINISTRATEUR",
+            "MODERATEUR"
+          ],
           "response": "Array de statistiques par groupe"
         },
         {
           "method": "GET",
           "path": "/stats/users",
           "description": "Statistiques de tous les utilisateurs",
-          "roles": ["ADMINISTRATEUR", "MODERATEUR"],
+          "roles": [
+            "ADMINISTRATEUR",
+            "MODERATEUR"
+          ],
           "response": "Array de statistiques par utilisateur"
         },
         {
           "method": "GET",
           "path": "/stats/users/{id}",
           "description": "Statistiques d'un utilisateur spécifique",
-          "params": { "id": "integer (required)" },
-          "roles": ["ADMINISTRATEUR"],
+          "params": {
+            "id": "integer (required)"
+          },
+          "roles": [
+            "ADMINISTRATEUR"
+          ],
           "response": "Object avec statistiques utilisateur"
         },
         {
           "method": "GET",
           "path": "/stats/my-stats",
           "description": "Obtenir ses propres statistiques",
-          "roles": ["ADMINISTRATEUR", "MODERATEUR", "UTILISATEUR"],
+          "roles": [
+            "ADMINISTRATEUR",
+            "MODERATEUR",
+            "UTILISATEUR"
+          ],
           "response": "Object avec statistiques utilisateur"
         },
         {
           "method": "GET",
           "path": "/stats/online",
           "description": "Sessions actives en cours sur la plateforme",
-          "roles": ["ADMINISTRATEUR"],
+          "roles": [
+            "ADMINISTRATEUR"
+          ],
           "response": "Statistiques des sessions actives"
         },
         {
           "method": "POST",
           "path": "/stats/cleanup-sessions",
           "description": "Nettoyer les sessions expirées",
-          "roles": ["ADMINISTRATEUR"],
-          "response": "Nombre de sessions nettoyées"
-        }
-      ]
-    },
-    "calendars": {
-      "description": "Plugin ICS — Gestion des calendriers et événements (v2.2.1 — Ph2: VEVENT enrichi · Ph3: ATTENDEE/ORGANIZER/iTIP · Ph4: EXDATE/RDATE/VALARM/DURATION · Ph5: VTODO/VJOURNAL/VFREEBUSY)",
-      "base_path": "/calendars",
-      "auth_required": true,
-      "auth_header": "Authorization: Bearer {jwt_token}",
-      "routes": [
-        {
-          "method": "POST",
-          "path": "/calendars",
-          "description": "Créer un calendrier",
-          "body": {
-            "title": "string (required)",
-            "description": "string (optional)",
-            "timezone": "string (optional) — défaut: America/Montreal",
-            "color": "string (optional) — hex #RRGGBB ou nom CSS",
-            "visibility": "string (optional) — private | public (défaut: private)",
-            "max_members": "integer (optional) — défaut: 1000"
-          },
-          "response": {
-            "id": "integer",
-            "title": "string",
-            "share_token": "string",
-            "ics_url": "string",
-            "ctag": "string",
-            "sync_token": "string"
-          },
-          "errors": {
-            "400": "Validation échouée (title manquant, timezone invalide, etc.)"
-          }
-        },
-        {
-          "method": "GET",
-          "path": "/calendars",
-          "description": "Lister les calendriers de l'utilisateur (propriétaire + partagés)",
-          "response": "Array de Calendar objects"
-        },
-        {
-          "method": "PUT",
-          "path": "/calendars/{id}",
-          "description": "Mettre à jour un calendrier",
-          "params": { "id": "integer (required)" },
-          "body": {
-            "title": "string (optional)",
-            "description": "string (optional)",
-            "timezone": "string (optional)",
-            "color": "string (optional) — hex #RRGGBB ou nom CSS",
-            "visibility": "string (optional) — private | public",
-            "max_members": "integer (optional)"
-          },
-          "response": "Calendar object mis à jour",
-          "errors": {
-            "400": "Validation échouée (timezone invalide, etc.)",
-            "403": "Permission insuffisante (pas propriétaire ni accès write)",
-            "404": "Calendrier non trouvé"
-          }
-        },
-        {
-          "method": "DELETE",
-          "path": "/calendars/{id}",
-          "description": "Supprimer un calendrier (soft delete)",
-          "params": { "id": "integer (required)" },
-          "response": "{ calendar_id, deleted_at }",
-          "errors": {
-            "403": "Permission insuffisante",
-            "404": "Calendrier non trouvé"
-          }
-        },
-        {
-          "method": "DELETE",
-          "path": "/calendars/{id}/hard",
-          "description": "Supprimer définitivement un calendrier — propriétaire uniquement, fonctionne aussi sur soft-deleted",
-          "params": { "id": "integer (required)" },
-          "response": "{ calendar_id }",
-          "errors": {
-            "403": "Non propriétaire",
-            "404": "Calendrier introuvable (ni actif ni soft-deleted)"
-          }
-        },
-        {
-          "method": "GET",
-          "path": "/calendars/{id}/ics",
-          "description": "Télécharger le calendrier au format ICS (RFC 5545) — inclut CATEGORIES, PRIORITY, CLASS, TRANSP, URL, GEO, ATTACH si renseignés",
-          "params": { "id": "integer (required)" },
-          "response": "Fichier .ics (text/calendar) — VCALENDAR avec VTIMEZONE + VEVENTs",
-          "errors": {
-            "403": "Accès non autorisé",
-            "404": "Calendrier non trouvé"
-          }
-        },
-        {
-          "method": "POST",
-          "path": "/calendars/import",
-          "description": "Importer un fichier ICS pour créer un calendrier avec ses événements",
-          "body": "multipart/form-data — champ: icsfile (.ics)",
-          "response": "Calendar object avec nombre d'événements importés"
-        },
-        {
-          "method": "GET",
-          "path": "/calendars/{id}/share",
-          "description": "Lister les partages d'un calendrier",
-          "params": { "id": "integer (required)" },
-          "response": "Array de share objects"
-        },
-        {
-          "method": "POST",
-          "path": "/calendars/{id}/share",
-          "description": "Partager un calendrier avec un autre utilisateur — au moins user_id ou email requis",
-          "params": { "id": "integer (required)" },
-          "body": {
-            "user_id": "integer (optional) — requis si email absent",
-            "email": "string (optional) — requis si user_id absent",
-            "permission": "string (optional) — read | write (défaut: read)"
-          },
-          "response": "Share object",
-          "errors": {
-            "400": "user_id et email tous les deux absents, ou données invalides",
-            "403": "Pas propriétaire du calendrier",
-            "404": "Utilisateur cible introuvable"
-          }
-        },
-        {
-          "method": "DELETE",
-          "path": "/calendars/{id}/share",
-          "description": "Retirer un partage de calendrier — au moins user_id ou email requis",
-          "params": { "id": "integer (required)" },
-          "body": {
-            "user_id": "integer (optional) — requis si email absent",
-            "email": "string (optional) — requis si user_id absent"
-          },
-          "response": "Message de confirmation",
-          "errors": {
-            "400": "user_id et email tous les deux absents",
-            "403": "Pas propriétaire du calendrier",
-            "404": "Partage non trouvé"
-          }
-        },
-        {
-          "method": "POST",
-          "path": "/calendars/{id}/events",
-          "description": "Créer un événement dans un calendrier",
-          "params": { "id": "integer (required)" },
-          "body": {
-            "title": "string (required)",
-            "start_datetime": "date ou datetime (required) — ISO 8601, ex: 2026-06-01T09:00:00 ou 2026-06-01",
-            "end_datetime": "date ou datetime (required) — doit être >= start_datetime",
-            "description": "string (optional)",
-            "location": "string (optional)",
-            "all_day": "boolean (optional) — défaut: false",
-            "timezone": "string (optional) — défaut: timezone du calendrier",
-            "attendees": "array (optional) — liste de participants — [{email, name, role, partstat, rsvp, cutype}] (Phase 3)",
-            "attendees[].email": "string (required) — adresse email du participant",
-            "attendees[].name": "string (optional) — nom affiché (CN) — exporté ATTENDEE;CN=...",
-            "attendees[].role": "string (optional) — CHAIR | REQ-PARTICIPANT | OPT-PARTICIPANT | NON-PARTICIPANT (défaut: REQ-PARTICIPANT)",
-            "attendees[].partstat": "string (optional) — NEEDS-ACTION | ACCEPTED | DECLINED | TENTATIVE | DELEGATED (défaut: NEEDS-ACTION)",
-            "attendees[].rsvp": "boolean (optional) — true = réponse attendue (défaut: false)",
-            "attendees[].cutype": "string (optional) — INDIVIDUAL | GROUP | RESOURCE | ROOM | UNKNOWN (défaut: INDIVIDUAL)",
-            "organizer_email": "string (optional) — email de l'organisateur (Phase 3) — exporté ORGANIZER;mailto:...",
-            "organizer_name": "string (optional) — nom affiché de l'organisateur (CN) (Phase 3)",
-            "recurrence_rule": "string (optional) — règle iCal sans préfixe RRULE:, ex: FREQ=WEEKLY;BYDAY=MO;COUNT=4",
-            "status": "string (optional) — confirmed | tentative | cancelled (défaut: confirmed)",
-            "meeting_link": "string (optional) — URL https valide — exportée comme VEVENT URL:",
-            "color": "string (optional) — hex #RRGGBB",
-            "notifications": "array (optional) — [{type: notification|email, minutes: integer>=0}]",
-            "priority": "integer (optional) — RFC 5545 PRIORITY: 0=non défini, 1=haute, 5=normale, 9=basse (défaut: 0)",
-            "class": "string (optional) — PUBLIC | PRIVATE | CONFIDENTIAL (défaut: PUBLIC)",
-            "transp": "string (optional) — OPAQUE | TRANSPARENT (défaut: OPAQUE) — OPAQUE bloque le temps libre",
-            "categories": "array of strings (optional) — ex: [\"Travail\",\"Réunion\"] — exporté comme CATEGORIES",
-            "geo_lat": "decimal (optional) — latitude WGS84 -90..90 — requis si geo_lng fourni",
-            "geo_lng": "decimal (optional) — longitude WGS84 -180..180 — requis si geo_lat fourni",
-            "attachments": "array (optional) — [{url: string, mime_type: string}] ou [{data_base64: string, mime_type: string}]",
-            "rdate": "string (optional) — Phase 4 — RDATE : dates additionnelles (datetimes locales CSV, ex: 2026-10-08 09:00:00,2026-10-15 09:00:00)",
-            "related_to": "string (optional) — Phase 4 — UID RFC 5545 de l'événement parent (RELATED-TO;RELTYPE=PARENT)",
-            "duration": "string (optional) — Phase 4 — durée ISO 8601 ex: PT1H30M — exclusif avec end_datetime"
-          },
-          "notes": [
-            "Phase 3 : un email d'invitation iTIP METHOD:REQUEST est automatiquement envoyé aux attendees à la création",
-            "Mettre à jour le partstat d'un attendee via POST /notifications/attendee-reply",
-            "Phase 4 : VALARM exporté automatiquement depuis le champ notifications existant — aucun champ supplémentaire",
-            "Phase 4 : EXDATE exporté automatiquement depuis les event_occurrences is_cancelled=1"
+          "roles": [
+            "ADMINISTRATEUR"
           ],
-          "response": "Event object",
-          "errors": {
-            "400": "Validation échouée (end_datetime < start_datetime, priority hors 0–9, class/transp invalide, geo_lat sans geo_lng, attendee sans email, duration + end_datetime ensemble, format duration invalide, etc.)",
-            "403": "Permission insuffisante sur ce calendrier"
-          }
-        },
-        {
-          "method": "GET",
-          "path": "/calendars/{id}/events",
-          "description": "Lister les événements d'un calendrier",
-          "params": { "id": "integer (required)" },
-          "query": {
-            "start": "date ou datetime (optional) — filtre début de plage",
-            "end": "date ou datetime (optional) — filtre fin de plage",
-            "last_update_after": "datetime (optional) — retourner uniquement les événements modifiés après cette date",
-            "expand_recurrence": "boolean (optional) — développer les récurrences (défaut: true)",
-            "expand_multi_jour": "boolean (optional) — développer les événements multi-jours (défaut: true)",
-            "limit": "integer (optional) — nombre max de résultats (défaut: 10000)"
-          },
-          "response": "Array de Event objects"
-        },
-        {
-          "method": "GET",
-          "path": "/calendars/{id}/events/{eventId}",
-          "description": "Obtenir le détail d'un événement",
-          "params": { "id": "integer (required)", "eventId": "integer (required)" },
-          "response": "Event object",
-          "errors": {
-            "404": "Événement non trouvé ou n'appartient pas à ce calendrier"
-          }
-        },
-        {
-          "method": "PUT",
-          "path": "/calendars/{id}/events/{eventId}",
-          "description": "Mettre à jour un événement — seuls les champs fournis sont modifiés",
-          "params": { "id": "integer (required)", "eventId": "integer (required)" },
-          "body": {
-            "title": "string (optional)",
-            "start_datetime": "date ou datetime (optional)",
-            "end_datetime": "date ou datetime (optional)",
-            "description": "string (optional)",
-            "location": "string (optional)",
-            "all_day": "boolean (optional)",
-            "color": "string (optional) — hex #RRGGBB",
-            "recurrence_rule": "string (optional)",
-            "status": "string (optional) — confirmed | tentative | cancelled",
-            "meeting_link": "string (optional) — URL https valide",
-            "notifications": "array (optional) — [{type: notification|email, minutes: integer>=0}]",
-            "attendees": "array (optional) — liste de participants [{email, name, role, partstat, rsvp, cutype}]",
-            "organizer_email": "string (optional) — email de l'organisateur",
-            "organizer_name": "string (optional) — nom affiché de l'organisateur (CN)",
-            "priority": "integer (optional) — 0=non défini, 1=haute, 5=normale, 9=basse",
-            "class": "string (optional) — PUBLIC | PRIVATE | CONFIDENTIAL",
-            "transp": "string (optional) — OPAQUE | TRANSPARENT",
-            "categories": "array of strings (optional)",
-            "geo_lat": "decimal (optional) — latitude -90..90 — requis si geo_lng fourni",
-            "geo_lng": "decimal (optional) — longitude -180..180 — requis si geo_lat fourni",
-            "attachments": "array (optional) — [{url: string, mime_type: string}] ou [{data_base64: string, mime_type: string}]",
-            "rdate": "string (optional) — Phase 4 — RDATE : dates additionnelles (datetimes locales CSV)",
-            "related_to": "string (optional) — Phase 4 — UID de l'événement parent",
-            "duration": "string (optional) — Phase 4 — durée ISO 8601 ex: PT1H30M — exclusif avec end_datetime"
-          },
-          "response": "Event object mis à jour",
-          "errors": {
-            "400": "Validation échouée (end_datetime < start_datetime, priority hors 0–9, class/transp invalide, geo_lat sans geo_lng, duration + end_datetime ensemble, etc.)",
-            "403": "Permission insuffisante",
-            "404": "Événement non trouvé"
-          }
-        },
-        {
-          "method": "DELETE",
-          "path": "/calendars/{id}/events/{eventId}",
-          "description": "Supprimer un événement (soft delete)",
-          "params": { "id": "integer (required)", "eventId": "integer (required)" },
-          "response": "{ event_id, deleted_at }",
-          "errors": {
-            "403": "Permission insuffisante",
-            "404": "Événement non trouvé"
-          }
-        },
-        {
-          "method": "DELETE",
-          "path": "/calendars/{id}/events/{eventId}/hard",
-          "description": "Supprimer définitivement un événement",
-          "params": { "id": "integer (required)", "eventId": "integer (required)" },
-          "response": "{ event_id }",
-          "errors": {
-            "403": "Permission insuffisante",
-            "404": "Événement non trouvé"
-          }
-        },
-        {
-          "method": "GET",
-          "path": "/calendars/{id}/events/occurrences",
-          "description": "Lister toutes les occurrences des événements du calendrier (récurrences développées)",
-          "params": { "id": "integer (required)" },
-          "query": {
-            "start_date": "date ou datetime (optional) — début de plage",
-            "end_date": "date ou datetime (optional) — fin de plage",
-            "expand_multi_jour": "boolean (optional) — développer les événements multi-jours (défaut: true)"
-          },
-          "response": "{ occurrences: Array, count: integer }"
-        },
-        {
-          "method": "GET",
-          "path": "/calendars/{id}/events/{eventId}/occurrences",
-          "description": "Lister les occurrences pré-calculées d'un événement récurrent spécifique",
-          "params": { "id": "integer (required)", "eventId": "integer (required)" },
-          "query": {
-            "start_date": "date ou datetime (optional)",
-            "end_date": "date ou datetime (optional)"
-          },
-          "response": "{ occurrences: Array, count: integer }",
-          "errors": {
-            "404": "Événement non trouvé"
-          }
-        },
-        {
-          "method": "PUT",
-          "path": "/calendars/{id}/events/{eventId}/occurrences",
-          "description": "Modifier une occurrence spécifique d'un événement récurrent",
-          "params": { "id": "integer (required)", "eventId": "integer (required)" },
-          "body": {
-            "occurrence_id": "string (required) — identifiant de l'occurrence (date ISO de l'occurrence originale)",
-            "scope": "string (optional) — only_this | all_future | all (défaut: only_this)",
-            "title": "string (optional)",
-            "description": "string (optional)",
-            "location": "string (optional)",
-            "start_datetime": "datetime (optional)",
-            "end_datetime": "datetime (optional)"
-          },
-          "response": "Occurrence modifiée",
-          "errors": {
-            "400": "Validation échouée",
-            "403": "Permission insuffisante",
-            "404": "Occurrence non trouvée"
-          }
-        },
-        {
-          "method": "DELETE",
-          "path": "/calendars/{id}/events/{eventId}/occurrences",
-          "description": "Annuler/supprimer une occurrence spécifique d'un événement récurrent",
-          "params": { "id": "integer (required)", "eventId": "integer (required)" },
-          "body": {
-            "occurrence_id": "integer (required) — identifiant de l'occurrence",
-            "scope": "string (optional) — only_this | all_future | all (défaut: only_this)"
-          },
-          "response": "Message de confirmation",
-          "errors": {
-            "400": "Validation échouée",
-            "403": "Permission insuffisante"
-          }
-        }
-      ]
-    },
-    "todos": {
-      "description": "Plugin ICS — Tâches CalDAV (VTODO RFC 5545) — Phase 5.1",
-      "base_path": "/calendars/{id}/todos",
-      "auth_required": true,
-      "auth_header": "Authorization: Bearer {jwt_token}",
-      "routes": [
-        {
-          "method": "POST",
-          "path": "/calendars/{id}/todos",
-          "description": "Créer une tâche VTODO dans un calendrier",
-          "params": { "id": "integer (required) — ID du calendrier" },
-          "body": {
-            "title": "string (required) — max 255 caractères",
-            "description": "string (optional)",
-            "due": "date ou datetime (optional) — DUE : échéance ISO 8601",
-            "dtstart": "date ou datetime (optional) — DTSTART optionnel",
-            "status": "string (optional) — NEEDS-ACTION | IN-PROCESS | COMPLETED | CANCELLED (défaut: NEEDS-ACTION)",
-            "priority": "integer (optional) — 0=non défini, 1=haute, 5=normale, 9=basse (défaut: 0)",
-            "percent_complete": "integer (optional) — 0–100 (défaut: 0)",
-            "location": "string (optional)",
-            "categories": "array of strings (optional) — exporté CATEGORIES:",
-            "url": "string (optional) — URL max 2083 caractères",
-            "timezone": "string (optional) — défaut: America/Montreal"
-          },
-          "response": "Todo object",
-          "errors": {
-            "400": "Validation échouée",
-            "403": "Accès non autorisé (ownership requis)"
-          }
-        },
-        {
-          "method": "GET",
-          "path": "/calendars/{id}/todos",
-          "description": "Lister les tâches d'un calendrier",
-          "params": { "id": "integer (required)" },
-          "query": {
-            "status": "string (optional) — filtrer par statut",
-            "include_deleted": "boolean (optional) — inclure les tâches supprimées"
-          },
-          "response": "{ todos: Array, count: integer }"
-        },
-        {
-          "method": "GET",
-          "path": "/calendars/{id}/todos/{todoId}",
-          "description": "Obtenir le détail d'une tâche",
-          "params": { "id": "integer (required)", "todoId": "integer (required)" },
-          "response": "Todo object",
-          "errors": { "404": "Tâche non trouvée" }
-        },
-        {
-          "method": "PUT",
-          "path": "/calendars/{id}/todos/{todoId}",
-          "description": "Mettre à jour une tâche — seuls les champs fournis sont modifiés",
-          "params": { "id": "integer (required)", "todoId": "integer (required)" },
-          "body": {
-            "title": "string (optional)",
-            "description": "string (optional)",
-            "due": "date ou datetime (optional)",
-            "status": "string (optional) — NEEDS-ACTION | IN-PROCESS | COMPLETED | CANCELLED",
-            "priority": "integer (optional) — 0–9",
-            "percent_complete": "integer (optional) — 0–100",
-            "location": "string (optional)",
-            "categories": "array of strings (optional)"
-          },
-          "response": "Todo object mis à jour",
-          "errors": { "403": "Permission insuffisante", "404": "Tâche non trouvée" }
-        },
-        {
-          "method": "DELETE",
-          "path": "/calendars/{id}/todos/{todoId}",
-          "description": "Supprimer une tâche (soft delete)",
-          "params": { "id": "integer (required)", "todoId": "integer (required)" },
-          "response": "{ todo_id, deleted_at }",
-          "errors": { "403": "Permission insuffisante", "404": "Tâche non trouvée" }
-        }
-      ]
-    },
-    "journals": {
-      "description": "Plugin ICS — Journaux CalDAV (VJOURNAL RFC 5545) — Phase 5.2",
-      "base_path": "/calendars/{id}/journals",
-      "auth_required": true,
-      "auth_header": "Authorization: Bearer {jwt_token}",
-      "routes": [
-        {
-          "method": "POST",
-          "path": "/calendars/{id}/journals",
-          "description": "Créer une entrée de journal VJOURNAL dans un calendrier",
-          "params": { "id": "integer (required) — ID du calendrier" },
-          "body": {
-            "summary": "string (required) — résumé max 255 caractères",
-            "description": "string (optional) — contenu du journal",
-            "dtstart": "date ou datetime (optional) — date du journal",
-            "status": "string (optional) — DRAFT | FINAL | CANCELLED (défaut: DRAFT)",
-            "categories": "array of strings (optional)",
-            "url": "string (optional) — URL max 2083 caractères",
-            "timezone": "string (optional) — défaut: America/Montreal"
-          },
-          "response": "Journal object",
-          "errors": {
-            "400": "Validation échouée",
-            "403": "Accès non autorisé (ownership requis)"
-          }
-        },
-        {
-          "method": "GET",
-          "path": "/calendars/{id}/journals",
-          "description": "Lister les entrées de journal d'un calendrier",
-          "params": { "id": "integer (required)" },
-          "query": {
-            "status": "string (optional) — filtrer par statut (DRAFT | FINAL | CANCELLED)"
-          },
-          "response": "{ journals: Array, count: integer }"
-        },
-        {
-          "method": "GET",
-          "path": "/calendars/{id}/journals/{journalId}",
-          "description": "Obtenir le détail d'une entrée de journal",
-          "params": { "id": "integer (required)", "journalId": "integer (required)" },
-          "response": "Journal object",
-          "errors": { "404": "Journal non trouvé" }
-        },
-        {
-          "method": "PUT",
-          "path": "/calendars/{id}/journals/{journalId}",
-          "description": "Mettre à jour une entrée de journal",
-          "params": { "id": "integer (required)", "journalId": "integer (required)" },
-          "body": {
-            "summary": "string (optional)",
-            "description": "string (optional)",
-            "dtstart": "date ou datetime (optional)",
-            "status": "string (optional) — DRAFT | FINAL | CANCELLED",
-            "categories": "array of strings (optional)"
-          },
-          "response": "Journal object mis à jour",
-          "errors": { "403": "Permission insuffisante", "404": "Journal non trouvé" }
-        },
-        {
-          "method": "DELETE",
-          "path": "/calendars/{id}/journals/{journalId}",
-          "description": "Supprimer une entrée de journal (soft delete)",
-          "params": { "id": "integer (required)", "journalId": "integer (required)" },
-          "response": "{ journal_id, deleted_at }",
-          "errors": { "403": "Permission insuffisante", "404": "Journal non trouvé" }
-        }
-      ]
-    },
-    "freebusy": {
-      "description": "Plugin ICS — Disponibilités CalDAV (VFREEBUSY RFC 5545) — Phase 5.3",
-      "auth_required": true,
-      "auth_header": "Authorization: Bearer {jwt_token}",
-      "routes": [
-        {
-          "method": "GET",
-          "path": "/calendars/{id}/freebusy",
-          "description": "Obtenir les plages occupées d'un calendrier sur une période donnée (VFREEBUSY) — agrège les événements TRANSP=OPAQUE",
-          "params": { "id": "integer (required) — ID du calendrier" },
-          "query": {
-            "start": "date (required) — début de la plage YYYY-MM-DD",
-            "end": "date (required) — fin de la plage YYYY-MM-DD"
-          },
-          "response": "{ freebusy: [{ dtstart, dtend }], calendar_id, period: { start, end } }",
-          "notes": "Requiert TRANSP (Phase 2 — 2.4) — seuls les événements OPAQUE sont inclus. Exposé également via REPORT CalDAV.",
-          "errors": {
-            "400": "start ou end manquant/invalide, ou start > end",
-            "403": "Accès non autorisé au calendrier",
-            "404": "Calendrier non trouvé"
-          }
-        }
-      ]
-    },
-    "caldav": {
-      "description": "Plugin ICS — Interface CalDAV/WebDAV pour synchronisation avec clients natifs (iOS, Android, Thunderbird…)",
-      "base_path": "/caldav",
-      "auth_required": "JWT ou Basic Auth (user:password encodé base64)",
-      "notes": "Implémente le protocole CalDAV (RFC 4791). Compatible avec les clients CalDAV standards.",
-      "routes": [
-        {
-          "method": "OPTIONS",
-          "path": "/caldav/...",
-          "description": "Discovery CalDAV — réponse aux requêtes OPTIONS/PROPFIND pour la négociation de capacités",
-          "auth_required": false,
-          "response": "Headers CalDAV (DAV, Allow, etc.)"
-        },
-        {
-          "method": "GET",
-          "path": "/caldav/service-info",
-          "description": "Informations du service CalDAV",
-          "auth_required": true,
-          "response": "URLs de service, capacités, version"
-        },
-        {
-          "method": "GET",
-          "path": "/caldav/mobile-config",
-          "description": "Profil de configuration mobile pour iOS/Android",
-          "auth_required": true,
-          "response": "Fichier .mobileconfig ou instructions de configuration"
-        }
-      ]
-    },
-    "notifications": {
-      "description": "Plugin ICS — Gestion des notifications par email pour les événements",
-      "base_path": "/notifications",
-      "auth_required": true,
-      "auth_header": "Authorization: Bearer {jwt_token}",
-      "routes": [
-        {
-          "method": "GET",
-          "path": "/notifications/email",
-          "description": "Lister les notifications email planifiées",
-          "response": "Array de notification objects"
-        },
-        {
-          "method": "POST",
-          "path": "/notifications/email/test",
-          "description": "Envoyer un email de test",
-          "body": {
-            "email": "string (optional) — destinataire (défaut: email de l'utilisateur connecté)"
-          },
-          "response": "Message de confirmation"
-        },
-        {
-          "method": "DELETE",
-          "path": "/notifications/email/{id}",
-          "description": "Annuler une notification email planifiée",
-          "params": { "id": "integer (required)" },
-          "response": "Message de confirmation"
-        },
-        {
-          "method": "POST",
-          "path": "/notifications/send-email",
-          "description": "Envoyer un email de rappel pour une occurrence d'événement",
-          "body": {
-            "event_id": "integer (required)",
-            "occurrence_date": "datetime (required)"
-          },
-          "response": "Message de confirmation"
-        },
-        {
-          "method": "POST",
-          "path": "/notifications/attendee-reply",
-          "description": "Enregistrer la réponse RSVP d'un participant (iTIP METHOD:REPLY) — met à jour le champ partstat dans calendar_events.attendees",
-          "body": {
-            "event_id": "integer (required) — ID de l'événement",
-            "attendee_email": "string (required) — email du participant à mettre à jour",
-            "partstat": "string (required) — ACCEPTED | DECLINED | TENTATIVE"
-          },
-          "response": "{ event_id, attendee_email, partstat }",
-          "errors": {
-            "400": "Paramètre manquant ou partstat invalide",
-            "403": "L'utilisateur connecté n'est ni propriétaire ni l'attendee concerné",
-            "404": "Événement ou attendee introuvable"
-          },
-          "notes": "Phase 3 — iTIP REPLY. Seul le propriétaire de l'événement ou l'attendee lui-même peut appeler cet endpoint."
+          "response": "Nombre de sessions nettoyées"
         }
       ]
     },
@@ -1582,7 +1150,9 @@
       "base_path": "/secret-admin",
       "auth_required": true,
       "auth_header": "Authorization: Bearer {jwt_token}",
-      "roles": ["ADMINISTRATEUR"],
+      "roles": [
+        "ADMINISTRATEUR"
+      ],
       "additional_security": "ADMIN_SECRET_KEY obligatoire — body JSON (POST) ou query param admin_secret (GET)",
       "routes": [
         {
@@ -1614,7 +1184,9 @@
           "method": "GET",
           "path": "/secret-admin/procedures",
           "description": "Lister les procédures disponibles avec leur description et niveau de danger",
-          "query": { "admin_secret": "string (required) — ADMIN_SECRET_KEY" },
+          "query": {
+            "admin_secret": "string (required) — ADMIN_SECRET_KEY"
+          },
           "response": "{ count, procedures: Array, authentication_info, usage }",
           "errors": {
             "403": "admin_secret invalide ou absent"
@@ -1624,7 +1196,9 @@
           "method": "GET",
           "path": "/secret-admin/plugins",
           "description": "Lister les plugins chargés",
-          "query": { "admin_secret": "string (required) — ADMIN_SECRET_KEY" },
+          "query": {
+            "admin_secret": "string (required) — ADMIN_SECRET_KEY"
+          },
           "response": "{ plugins: object, count: integer }",
           "errors": {
             "403": "admin_secret invalide ou absent"
@@ -1637,24 +1211,11 @@
     "file": "src/auth_groups/docs/MIGRATION_JWT.sql",
     "tables_added": [
       "otp_codes — codes OTP à 6 chiffres pour connexion par email",
-      "device_tokens — tokens longue durée par appareil pour renouvellement JWT",
-      "calendar_todos — VTODO (Phase 5.1)",
-      "calendar_journals — VJOURNAL (Phase 5.2)"
-    ],
-    "tables_modified": [
-      "calendar_events — +priority, +class, +transp, +categories, +geo_lat, +geo_lng, +attachments (Ph2)",
-      "calendar_events — +organizer_email, +organizer_name (Ph3)",
-      "calendar_events — +rdate, +related_to, +duration (Ph4)"
+      "device_tokens — tokens longue durée par appareil pour renouvellement JWT"
     ],
     "tables_removed": [
       "api_keys — système de clés API retiré (v2.1.1), remplacé par JWT",
       "user_sessions.api_key_id — colonne retirée (v2.1.1)"
-    ],
-    "migrations": [
-      "docs/docs_ICS/migrations/20260331_ph2_vevent_props.sql",
-      "docs/docs_ICS/migrations/20260401_ph3_organizer.sql",
-      "docs/docs_ICS/migrations/20260401_ph4_recurrence.sql",
-      "docs/docs_ICS/migrations/20260401_ph5_components.sql"
     ]
   }
 }
