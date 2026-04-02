@@ -14,7 +14,8 @@
     },
     "autoload": {
         "psr-4": {
-            "AuthGroups\\": "src/auth_groups/"
+            "AuthGroups\\": "src/auth_groups/",
+            "Pomo\\": "src/pomo/"
         },
         "files": [
             "src/auth_groups/database.php"

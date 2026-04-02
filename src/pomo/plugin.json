@@ -1,0 +1,35 @@
+{
+    "name": "Pomo",
+    "version": "1.0.0",
+    "description": "Plugin Pomodoro — engagement MVP (Phase 1A), support (Phase 1B), sync cloud Premium (Phase 2), abonnement Stripe (Phase 3)",
+    "author": "CMEM Team",
+    "namespace": "Pomo",
+    "main_class": "Pomo\\PomoPlugin",
+    "min_cmem_version": "2.2.2",
+    "status": "active",
+    "dependencies": {
+        "cmem2_core": ">=2.2.2"
+    },
+    "routes": {
+        "prefix": "/pomo",
+        "public_routes": [
+            "/pomo/engagement"
+        ],
+        "auth_routes": [
+            "/pomo/support",
+            "/pomo/sync/sessions",
+            "/pomo/sync/tasks",
+            "/pomo/sync/projects",
+            "/pomo/sync/stats"
+        ]
+    },
+    "database": {
+        "migrations": [
+            "001_pomo_engagement.sql",
+            "002_pomo_support.sql",
+            "003_pomo_sync.sql",
+            "004_pomo_subscriptions.sql"
+        ],
+        "migrations_path": "docs/pomo/migrations/"
+    }
+}

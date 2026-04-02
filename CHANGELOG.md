@@ -7,6 +7,47 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [2.2.2] — 2026-04-02
+
+### Nouveau plugin — Pomo Phase 0 (prérequis système)
+
+- **`src/Core/AbstractPlugin.php`** — classe de base pour tous les plugins
+  - Centralise `safeLog()` (supprimé de `PluginManager` et `CalendarPlugin`)
+  - Defaults : `deactivate(): void {}`, `getDependencies(): array { return []; }`
+  - Hook `runMigrations(string $path): void` (vide — à surcharger)
+- **`src/ics/CalendarPlugin.php`** — hérite désormais de `AbstractPlugin`
+- **`src/Core/PluginManager.php`** — `scanPluginDirectories()` utilise uniquement la présence de `plugin.json` comme critère
+
+### Nouveau plugin — Pomo Phase 1A (engagement MVP)
+
+Endpoint public `POST /pomo/engagement` — waitlist (courriel) et sondage (5 questions).
+
+- **`src/pomo/plugin.json`** — déclaration du plugin (namespace `Pomo`, main_class `Pomo\PomoPlugin`)
+- **`src/pomo/autoloader.php`** — chargeur PSR-4 pour le namespace `Pomo\`
+- **`composer.json`** — ajout `"Pomo\\": "src/pomo/"` dans l'autoload PSR-4
+- **`src/pomo/PomoPlugin.php`** — hérite `AbstractPlugin`, enregistre `pomo` → `PomoRouteHandler`
+- **`src/pomo/Routing/PomoRouteHandler.php`** — handler unique `/pomo/*`, auth conditionnelle par sous-route
+- **`src/pomo/Controllers/EngagementController.php`** — dispatch interne par `type` (waitlist / survey)
+- **`src/pomo/Models/Engagement.php`** — accès table `pomo_engagements` (emailExists, createWaitlist, createSurvey)
+- **`src/pomo/Validators/EngagementValidator.php`** — validation courriel (waitlist) + 5 réponses yes|no|maybe (survey)
+- **`src/pomo/migrations/001_pomo_engagement.sql`** — table `pomo_engagements`
+
+#### Comportement
+
+| Cas | HTTP |
+| --- | ---- |
+| `type=waitlist` — succès | 201 `{success: true, data: {reference_id}}` |
+| `type=waitlist` — doublon courriel | 409 |
+| `type=survey` — succès | 201 `{success: true, data: {reference_id}}` |
+| Validation échouée | 422 `{success: false, errors: [{field, code, message}]}` |
+| `GET /health` | 200 (non impacté — core) |
+
+### Documentation
+
+- **`docs/pomo/API_POMO_ENDPOINTS_v1_0_0.json`** — documentation complète des endpoints Pomo (Ph1A–Ph3)
+
+---
+
 ## [2.2.1] — 2026-04-01
 
 ### Plugin ICS — Phase 2 (Propriétés VEVENT enrichies)
