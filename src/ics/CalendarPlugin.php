@@ -2,46 +2,20 @@
 
 namespace ICS;
 
-use Core\PluginInterface;
+use Core\AbstractPlugin;
 use Core\PluginManager;
 use ICS\Routing\RouteHandlers\CalendarRouteHandler;
 use ICS\Routing\RouteHandlers\CalendarPublicRoute;
-use AuthGroups\Services\LogService;
 use ICS\Routing\RouteHandlers\CalDAVRouteHandler;
 use ICS\Routing\RouteHandlers\NotificationRouteHandler;
 
-class CalendarPlugin implements PluginInterface
+class CalendarPlugin extends AbstractPlugin
 {
     private array $config;
     private ?CalendarRouteHandler     $routeHandler = null;
     private ?CalendarPublicRoute      $publicRouteHandler = null;
     private ?CalDAVRouteHandler       $caldavRouteHandler = null;
     private ?NotificationRouteHandler $notificationRouteHandler = null;
-
-    /**
-     * Logging sûr qui vérifie si LogService est disponible
-     */
-    private function safeLog(string $level, string $message, array $context = []): void
-    {
-        // Vérifier si LogService est disponible et chargé
-        if (class_exists('\AuthGroups\Services\LogService')) {
-            try {
-                switch ($level) {
-                    case 'info':
-                        LogService::info($message, $context);
-                        break;
-                    case 'warning':
-                        LogService::warning($message, $context);
-                        break;
-                    case 'error':
-                        LogService::error($message, $context);
-                        break;
-                }
-            } catch (\Exception $e) {
-                // Si LogService échoue, ne rien faire pour éviter les boucles
-            }
-        }
-    }
 
     public function initialize(): void
     {
@@ -52,38 +26,9 @@ class CalendarPlugin implements PluginInterface
         $defaultTimezone = $this->config['config']['default_timezone'] ?? 'America/Montreal';
         date_default_timezone_set($defaultTimezone);
         
-        // Enregistrer les route handlers dans le PluginManager (sans les instancier immédiatement)
-        PluginManager::getInstance()->registerPluginRoutes('ics', [
-            'calendars' => function($authService) {
-                if ($this->routeHandler === null) {
-                    $this->routeHandler = new CalendarRouteHandler($authService);
-                }
-                return $this->routeHandler;
-            },
-            'caldav' => function($authService) {
-                if ($this->caldavRouteHandler === null) {
-                    $this->caldavRouteHandler = new CalDAVRouteHandler($authService);
-                }
-                return $this->caldavRouteHandler;
-            },
-            'calendar' => function($authService) {
-                // Route publique pour les fichiers ICS
-                if ($this->publicRouteHandler === null) {
-                    $this->publicRouteHandler = new CalendarPublicRoute();
-                }
-                return $this->publicRouteHandler;
-            },
-            'notifications' => function($authService) {
-                if ($this->notificationRouteHandler === null) {
-                    $this->notificationRouteHandler = new NotificationRouteHandler($authService);
-                }
-                return $this->notificationRouteHandler;
-            }
-        ]);
+        PluginManager::getInstance()->registerPluginRoutes('ics', $this->getRouteHandlers());
 
-
-        // Exécuter les migrations si nécessaire
-        $this->runMigrations();
+        $this->runMigrations(__DIR__ . '/../../docs/docs_ICS/migrations/');
         
         // Log seulement si les constantes de log sont définies
         if (defined('LOG_ENABLED') && LOG_ENABLED) {
@@ -153,15 +98,6 @@ class CalendarPlugin implements PluginInterface
         $configFile = __DIR__ . '/plugin.json';
         if (file_exists($configFile)) {
             $this->config = json_decode(file_get_contents($configFile), true);
-        }
-    }
-
-    private function runMigrations(): void
-    {
-        $migrationsPath = __DIR__ . '/../../docs/docs_ICS/migrations/';
-        if (is_dir($migrationsPath)) {
-            // Logique de migration
-            LogService::info("Migrations ICS exécutées");
         }
     }
 }

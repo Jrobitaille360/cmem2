@@ -300,7 +300,7 @@ class PluginManager
         $directories = scandir($this->pluginsPath);
         
         foreach ($directories as $dir) {
-            if ($dir === '.' || $dir === '..' || $dir === 'auth_groups' || $dir === 'Core') {
+            if ($dir === '.' || $dir === '..') {
                 continue;
             }
             
