@@ -42,9 +42,20 @@ class CalendarJournal extends BaseModel
         return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
     }
 
+    private static function isValidUid(string $uid): bool
+    {
+        return (bool) preg_match(
+            '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/',
+            $uid
+        );
+    }
+
     public function create(): array
     {
-        $this->uid = self::generateUuidV4() . '@cmem2';
+        // Préserver l'UID ICS si valide (import), sinon en générer un nouveau conforme RFC 5545 §3.8.4.7
+        if (empty($this->uid) || !self::isValidUid($this->uid)) {
+            $this->uid = self::generateUuidV4();
+        }
 
         $stmt = $this->getDb()->prepare("
             INSERT INTO calendar_journals

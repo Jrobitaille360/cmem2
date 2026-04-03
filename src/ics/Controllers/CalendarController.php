@@ -725,6 +725,40 @@ class CalendarController
             Response::error('Erreur lors de l\'importation du fichier ICS: ' . $e->getMessage(), null, 500);
         }
     }
+
+    /**
+     * Met à jour un calendrier existant depuis un fichier ICS uploadé.
+     * Les événements sont upsertés par UID : mise à jour si connu, création sinon.
+     * Nécessite un accès en écriture sur le calendrier.
+     */
+    public function importIcsFileToCalendar(int $calendarId, int $userId): void
+    {
+        LoggingMiddleware::logEntry();
+
+        if (!isset($_FILES['icsfile']) || $_FILES['icsfile']['error'] !== UPLOAD_ERR_OK) {
+            LogService::warning("Aucun fichier ICS envoyé ou erreur d'upload.", []);
+            LoggingMiddleware::logExit(400);
+            Response::error('Aucun fichier ICS n\'a été envoyé ou une erreur s\'est produite.', null, 400);
+            return;
+        }
+
+        $icsContent = file_get_contents($_FILES['icsfile']['tmp_name']);
+
+        try {
+            $calendarModel = new Calendar();
+            $result = $calendarModel->updateFromIcs($calendarId, $userId, $icsContent);
+
+            LoggingMiddleware::logExit(200);
+            Response::success("Calendrier mis à jour depuis le fichier ICS.", $result, 200);
+        } catch (\Exception $e) {
+            LogService::error("Erreur lors de la mise à jour du calendrier depuis ICS", [
+                'calendar_id' => $calendarId,
+                'exception'   => $e->getMessage()
+            ]);
+            LoggingMiddleware::logExit(500);
+            Response::error('Erreur lors de la mise à jour depuis ICS: ' . $e->getMessage(), null, 500);
+        }
+    }
     
     /**
      * Récupère le contenu d'un calendrier au format ICS via un token de partage.

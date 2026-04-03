@@ -54,8 +54,12 @@ class CalendarRouteHandler extends BaseRouteHandler
                 $this->controller->hardDeleteCalendar((int)$action, $user['user_id']),
                 
             // GET /calendars/{id}/ics - Télécharger fichier ICS (authentifié)
-            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'ics' && $method === 'GET') => 
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'ics' && !isset($segments[3]) && $method === 'GET') => 
                 $this->controller->getCalendarIcsByIdAndUserId((int)$action, $user['user_id']),
+
+            // POST /calendars/{id}/ics/import - Mettre à jour un calendrier depuis un fichier ICS (upsert par UID)
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'ics' && isset($segments[3]) && $segments[3] === 'import' && $method === 'POST') =>
+                $this->controller->importIcsFileToCalendar((int)$action, $user['user_id']),
                 
             // POST /calendars/{id}/events - Créer un événement
             ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && !isset($segments[3]) && $method === 'POST') => 

@@ -458,4 +458,69 @@ class Calendar extends BaseModel
     {
         return IcsParser::parseCalendarProperties($icsContent);
     }
+
+    /**
+     * Met à jour un calendrier existant et ses événements depuis un fichier ICS.
+     * Les événements sont upsertés par UID : mise à jour si connu, création sinon.
+     *
+     * @param int    $calendarId  ID du calendrier cible.
+     * @param int    $userId      ID de l'utilisateur (doit être propriétaire ou avoir accès en écriture).
+     * @param string $icsContent  Contenu du fichier ICS.
+     * @return array Calendrier mis à jour + statistiques d'import.
+     */
+    public function updateFromIcs(int $calendarId, int $userId, string $icsContent): array
+    {
+        $this->getDb()->beginTransaction();
+
+        try {
+            // 1. Vérifier que l'utilisateur a les droits en écriture
+            if (!$this->canUserWrite($calendarId, $userId)) {
+                throw new \Exception("Accès non autorisé au calendrier.");
+            }
+
+            // 2. Parser les propriétés du VCALENDAR et mettre à jour les métadonnées
+            $calendarProperties = self::parseIcsCalendarProperties($icsContent);
+
+            $updateFields = [];
+            $updateValues = [];
+
+            if (!empty($calendarProperties['X-WR-CALNAME'])) {
+                $updateFields[] = 'title = ?';
+                $updateValues[] = $calendarProperties['X-WR-CALNAME'];
+            }
+            if (!empty($calendarProperties['X-WR-CALDESC'])) {
+                $updateFields[] = 'description = ?';
+                $updateValues[] = $calendarProperties['X-WR-CALDESC'];
+            }
+            if (!empty($calendarProperties['X-WR-TIMEZONE'])) {
+                $updateFields[] = 'timezone = ?';
+                $updateValues[] = $calendarProperties['X-WR-TIMEZONE'];
+            }
+
+            if (!empty($updateFields)) {
+                $updateFields[] = 'updated_at = CURRENT_TIMESTAMP';
+                $updateValues[] = $calendarId;
+                $stmt = $this->getDb()->prepare(
+                    "UPDATE calendars SET " . implode(', ', $updateFields) . " WHERE id = ?"
+                );
+                $stmt->execute($updateValues);
+            }
+
+            // 3. Upsert des événements par UID
+            $eventModel = new CalendarEvent();
+            $stats = $eventModel->upsertEventsFromIcsContent($calendarId, $icsContent, $userId);
+
+            $this->getDb()->commit();
+
+            $calendar = $this->getById($calendarId);
+            $calendar['events_created'] = $stats['created'];
+            $calendar['events_updated'] = $stats['updated'];
+
+            return $calendar;
+
+        } catch (\Exception $e) {
+            $this->getDb()->rollBack();
+            throw new \Exception("Échec de la mise à jour du calendrier depuis ICS: " . $e->getMessage());
+        }
+    }
 }

@@ -43,6 +43,7 @@ class CalendarEvent extends BaseModel
     public $rdate;      // 4.2 — TEXT, ISO datetimes locales CSV (ex: 2026-04-15 14:00:00,2026-04-22 14:00:00)
     public $relatedTo;  // 4.3 — VARCHAR(255), UID de l'événement parent
     public $duration;   // 4.5 — VARCHAR(20), format ISO 8601 (ex: PT1H30M) — exclusif avec end_datetime
+    public $uid;        // UID ICS optionnel (RFC 5545 §3.8.4.7) — préservé lors de l'import
 
     public function __construct() {
         parent::__construct();
@@ -76,7 +77,10 @@ class CalendarEvent extends BaseModel
             }
 
             // UID stable RFC-conforme (RFC 5545 §3.8.4.7) — item 1.3
-            $uid = self::generateUuidV4();
+            // Si un uid ICS valide a été fourni (import), on le préserve ; sinon on génère un UUID v4
+            $uid = (!empty($this->uid) && self::isValidUid($this->uid))
+                ? $this->uid
+                : self::generateUuidV4();
 
             $stmt->execute([
                 $this->calendarId,
@@ -486,6 +490,14 @@ class CalendarEvent extends BaseModel
         return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
     }
 
+    private static function isValidUid(string $uid): bool
+    {
+        return (bool) preg_match(
+            '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/',
+            $uid
+        );
+    }
+
     public static function isValidRecurrenceRule($rule): bool
     {
         // ref : https://icalendar.org/iCalendar-RFC-5545/3-3-10-recurrence-rule.html
@@ -730,6 +742,118 @@ class CalendarEvent extends BaseModel
         }
 
         return $importedCount;
+    }
+
+    /**
+     * Recherche un événement dans un calendrier par son UID ICS.
+     */
+    public function getByUidAndCalendarId(string $uid, int $calendarId): ?array
+    {
+        $stmt = $this->getDb()->prepare(
+            "SELECT * FROM calendar_events WHERE uid = ? AND calendar_id = ? AND deleted_at IS NULL LIMIT 1"
+        );
+        $stmt->execute([$uid, $calendarId]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    /**
+     * Importe (upsert) les événements d'un fichier ICS dans un calendrier existant.
+     * Si l'UID existe déjà dans ce calendrier → mise à jour.
+     * Si l'UID est absent ou nouveau → création (en préservant l'UID ICS).
+     *
+     * @return array ['created' => int, 'updated' => int]
+     */
+    public function upsertEventsFromIcsContent(int $calendarId, string $icsContent, string $userId): array
+    {
+        $eventsData = \ICS\Utils\IcsParser::parseEvents($icsContent);
+        $created = 0;
+        $updated = 0;
+
+        foreach ($eventsData as $eventData) {
+            try {
+                $existing = null;
+                if (!empty($eventData['uid'])) {
+                    $existing = $this->getByUidAndCalendarId($eventData['uid'], $calendarId);
+                }
+
+                if ($existing) {
+                    // Mise à jour de l'événement existant
+                    $event = new self();
+                    $event->id             = $existing['id'];
+                    $event->title          = $eventData['title'];
+                    $event->description    = $eventData['description'];
+                    $event->location       = $eventData['location'];
+                    $event->allDay         = $eventData['all_day'];
+                    $event->startDatetime  = $eventData['start_datetime'];
+                    $event->endDatetime    = $eventData['end_datetime'];
+                    $event->recurrenceRule = $eventData['rrule'];
+                    $event->status         = $eventData['status'];
+                    if (isset($eventData['categories']))     $event->categories     = $eventData['categories'];
+                    if (isset($eventData['priority']))       $event->priority       = $eventData['priority'];
+                    if (isset($eventData['class']))          $event->class          = $eventData['class'];
+                    if (isset($eventData['transp']))         $event->transp         = $eventData['transp'];
+                    if (isset($eventData['url']))            $event->meetingLink    = $eventData['url'];
+                    if (isset($eventData['geo_lat']))        $event->geoLat         = $eventData['geo_lat'];
+                    if (isset($eventData['geo_lng']))        $event->geoLng         = $eventData['geo_lng'];
+                    if (isset($eventData['attachments']))    $event->attachments    = $eventData['attachments'];
+                    if (isset($eventData['attendees']))      $event->attendees      = $eventData['attendees'];
+                    if (isset($eventData['organizer_email'])) $event->organizerEmail = $eventData['organizer_email'];
+                    if (isset($eventData['organizer_name']))  $event->organizerName  = $eventData['organizer_name'];
+                    if (isset($eventData['rdate']))          $event->rdate          = $eventData['rdate'];
+                    if (isset($eventData['related_to']))     $event->relatedTo      = $eventData['related_to'];
+                    if (isset($eventData['duration']))       $event->duration       = $eventData['duration'];
+                    if (isset($eventData['notifications']))  $event->notifications  = $eventData['notifications'];
+                    $event->update();
+                    $updated++;
+                } else {
+                    // Création — on préserve l'UID du fichier ICS si disponible
+                    $event = new self();
+                    $event->calendarId     = $calendarId;
+                    $event->userId         = $userId;
+                    $event->uid            = $eventData['uid'] ?? null;
+                    $event->title          = $eventData['title'];
+                    $event->description    = $eventData['description'];
+                    $event->location       = $eventData['location'];
+                    $event->allDay         = $eventData['all_day'];
+                    $event->startDatetime  = $eventData['start_datetime'];
+                    $event->endDatetime    = $eventData['end_datetime'];
+                    $event->recurrenceRule = $eventData['rrule'];
+                    $event->status         = $eventData['status'];
+                    if (isset($eventData['categories']))     $event->categories     = $eventData['categories'];
+                    if (isset($eventData['priority']))       $event->priority       = $eventData['priority'];
+                    if (isset($eventData['class']))          $event->class          = $eventData['class'];
+                    if (isset($eventData['transp']))         $event->transp         = $eventData['transp'];
+                    if (isset($eventData['url']))            $event->meetingLink    = $eventData['url'];
+                    if (isset($eventData['geo_lat']))        $event->geoLat         = $eventData['geo_lat'];
+                    if (isset($eventData['geo_lng']))        $event->geoLng         = $eventData['geo_lng'];
+                    if (isset($eventData['attachments']))    $event->attachments    = $eventData['attachments'];
+                    if (isset($eventData['attendees']))      $event->attendees      = $eventData['attendees'];
+                    if (isset($eventData['organizer_email'])) $event->organizerEmail = $eventData['organizer_email'];
+                    if (isset($eventData['organizer_name']))  $event->organizerName  = $eventData['organizer_name'];
+                    if (isset($eventData['rdate']))          $event->rdate          = $eventData['rdate'];
+                    if (isset($eventData['related_to']))     $event->relatedTo      = $eventData['related_to'];
+                    if (isset($eventData['duration']))       $event->duration       = $eventData['duration'];
+                    if (isset($eventData['notifications']))  $event->notifications  = $eventData['notifications'];
+                    $result = $event->create();
+
+                    if (!empty($eventData['exdates']) && !empty($result['id'])) {
+                        \ICS\Services\RecurrenceService::cancelOccurrencesByDatetimes($result, $eventData['exdates']);
+                    }
+                    if (!empty($eventData['rdate']) && !empty($result['id'])) {
+                        \ICS\Services\RecurrenceService::generateRdateOccurrences($result);
+                    }
+                    $created++;
+                }
+            } catch (\Exception $e) {
+                LogService::error("Erreur lors de l'upsert d'un événement depuis ICS", [
+                    'calendar_id' => $calendarId,
+                    'uid'         => $eventData['uid'] ?? null,
+                    'error'       => $e->getMessage()
+                ]);
+            }
+        }
+
+        return ['created' => $created, 'updated' => $updated];
     }
 
     /**
