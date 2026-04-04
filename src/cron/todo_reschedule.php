@@ -82,19 +82,31 @@ try {
                 : 0;
 
             $rule        = new Rule('RRULE:' . $todo['recurrence_rule'], $anchorDt);
-            $occurrences = $transformer->transform($rule, $now, $horizon);
+            $occurrences = $transformer->transform($rule);
 
-            if (empty($occurrences)) {
+            // Première occurrence strictement après maintenant, dans la limite de 2 ans
+            $nextStart = null;
+            foreach ($occurrences as $occ) {
+                $start = $occ->getStart();
+                if ($start > $horizon) {
+                    break;
+                }
+                if ($start > $now) {
+                    $nextStart = $start;
+                    break;
+                }
+            }
+
+            if ($nextStart === null) {
                 // RRULE épuisée (COUNT/UNTIL atteint) — aucune prochaine occurrence
                 LogService::info('todo_reschedule: RRULE épuisée, tâche ignorée', ['todo_id' => $todo['id']]);
                 $skipped++;
                 continue;
             }
 
-            $next    = $occurrences[0]->getStart();
-            $newDue  = (new \DateTime('@' . $next->getTimestamp()))->setTimezone($tz)->format('Y-m-d H:i:s');
+            $newDue  = (new \DateTime('@' . $nextStart->getTimestamp()))->setTimezone($tz)->format('Y-m-d H:i:s');
             $newDtstart = $hasDtstart
-                ? (new \DateTime('@' . ($next->getTimestamp() + $offsetSeconds)))->setTimezone($tz)->format('Y-m-d H:i:s')
+                ? (new \DateTime('@' . ($nextStart->getTimestamp() + $offsetSeconds)))->setTimezone($tz)->format('Y-m-d H:i:s')
                 : null;
 
             $update->execute([$newDue, $newDtstart, $todo['id']]);
