@@ -92,9 +92,9 @@ try {
             }
 
             $next    = $occurrences[0]->getStart();
-            $newDue  = (clone $next)->setTimezone($tz)->format('Y-m-d H:i:s');
+            $newDue  = (new \DateTime('@' . $next->getTimestamp()))->setTimezone($tz)->format('Y-m-d H:i:s');
             $newDtstart = $hasDtstart
-                ? (clone $next)->modify("{$offsetSeconds} seconds")->setTimezone($tz)->format('Y-m-d H:i:s')
+                ? (new \DateTime('@' . ($next->getTimestamp() + $offsetSeconds)))->setTimezone($tz)->format('Y-m-d H:i:s')
                 : null;
 
             $update->execute([$newDue, $newDtstart, $todo['id']]);
