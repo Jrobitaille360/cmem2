@@ -7,6 +7,28 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [2.2.3] — 2026-04-03
+
+### Plugin ICS — VTODO : support RRULE (RFC 5545 §3.8.5.4)
+
+- **`docs/build_cmem2_DB.sql`** — colonne `recurrence_rule VARCHAR(255)` ajoutée à `calendar_todos`
+- **`src/ics/Models/CalendarTodo.php`** — propriété `$recurrenceRule`, INSERT et UPDATE mapping
+- **`src/ics/Controllers/TodoController.php`** — validation `optional|string|max:255` + `isValidRecurrenceRule()` dans `createTodo` et `updateTodo`
+- **`src/ics/Utils/IcsGenerator.php`** — propriété `RRULE` émise dans `buildVTodo()` si présente
+- **`src/ics/Utils/IcsParser.php`** — `recurrence_rule` parsé dans `normalizeVTodo()` lors de l'import ICS
+- **`docs/docs_ICS/API_ICS_ENDPOINTS_v1_0_0.json`** — champ `recurrence_rule` documenté sur `POST` et `PUT /calendars/{id}/todos`
+
+#### Migration DB
+
+```sql
+ALTER TABLE calendar_todos
+  ADD COLUMN recurrence_rule VARCHAR(255) DEFAULT NULL
+  COMMENT 'RRULE RFC 5545 §3.8.5.4'
+  AFTER related_to;
+```
+
+---
+
 ## [2.2.2] — 2026-04-02
 
 ### Nouveau plugin — Pomo Phase 0 (prérequis système)
