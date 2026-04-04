@@ -543,6 +543,10 @@ class IcsGenerator
             }
         }
 
+        if (!empty($todo['recurrence_rule'])) {
+            $vtodo->add('RRULE', $todo['recurrence_rule']);
+        }
+
         $vtodo->add('SEQUENCE', (string)($todo['sequence'] ?? 0));
 
         if (!empty($todo['created_at'])) {

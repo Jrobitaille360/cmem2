@@ -29,6 +29,7 @@ class CalendarTodo extends BaseModel
     public $categories;
     public $url;
     public $relatedTo;
+    public $recurrenceRule;
     public $organizerEmail;
     public $organizerName;
     public $attendees;
@@ -67,8 +68,8 @@ class CalendarTodo extends BaseModel
             INSERT INTO calendar_todos
                 (calendar_id, user_id, uid, title, description, due, dtstart, completed,
                  status, priority, percent_complete, location, categories, url,
-                 related_to, organizer_email, organizer_name, attendees, sequence, timezone)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                 related_to, recurrence_rule, organizer_email, organizer_name, attendees, sequence, timezone)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ");
 
         $stmt->execute([
@@ -87,6 +88,7 @@ class CalendarTodo extends BaseModel
             isset($this->categories) ? json_encode($this->categories) : null,
             $this->url ?? null,
             $this->relatedTo ?? null,
+            $this->recurrenceRule ?? null,
             $this->organizerEmail ?? null,
             $this->organizerName ?? null,
             isset($this->attendees) ? json_encode($this->attendees) : null,
@@ -115,6 +117,7 @@ class CalendarTodo extends BaseModel
             'location'         => 'location',
             'url'              => 'url',
             'relatedTo'        => 'related_to',
+            'recurrenceRule'   => 'recurrence_rule',
             'organizerEmail'   => 'organizer_email',
             'organizerName'    => 'organizer_name',
             'timezone'         => 'timezone',

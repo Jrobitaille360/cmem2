@@ -363,7 +363,8 @@ class IcsParser
             : 0;
         $todo['sequence']    = isset($vtodo->SEQUENCE)    ? (int)(string)$vtodo->SEQUENCE : 0;
         $todo['url']         = isset($vtodo->URL)         ? (string)$vtodo->URL          : null;
-        $todo['related_to']  = isset($vtodo->{'RELATED-TO'}) ? (string)$vtodo->{'RELATED-TO'} : null;
+        $todo['related_to']     = isset($vtodo->{'RELATED-TO'}) ? (string)$vtodo->{'RELATED-TO'} : null;
+        $todo['recurrence_rule'] = isset($vtodo->RRULE) ? (string)$vtodo->RRULE : null;
 
         if (isset($vtodo->CATEGORIES)) {
             $raw = (string)$vtodo->CATEGORIES;

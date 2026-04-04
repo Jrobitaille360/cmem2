@@ -1,9 +1,9 @@
 {
   "api": {
     "name": "ICS Calendar API",
-    "version": "1.0.0",
-    "description": "Module de gestion des calendriers ICS/iCalendar avec support CalDAV RFC 5545 et synchronisation bidirectionnelle. Couvre Ph1 (sabre/vobject) · Ph2 (VEVENT enrichi) · Ph3 (ATTENDEE/ORGANIZER/iTIP) · Ph4 (EXDATE/RDATE/VALARM/DURATION) · Ph5 (VTODO/VJOURNAL/VFREEBUSY)",
-    "generated": "2026-04-01",
+    "version": "2.0.0",
+    "description": "Module de gestion des calendriers ICS/iCalendar avec support CalDAV RFC 5545 et synchronisation bidirectionnelle. Couvre Ph1 (sabre/vobject) · Ph2 (VEVENT enrichi) · Ph3 (ATTENDEE/ORGANIZER/iTIP) · Ph4 (EXDATE/RDATE/VALARM/DURATION) · Ph5 (VTODO/VJOURNAL/VFREEBUSY) · Import ICS upsert par UID",
+    "generated": "2026-04-03",
     "base_url": "/calendars",
     "authentication": {
       "types": ["JWT_BEARER"],
@@ -105,6 +105,25 @@
         },
         {
           "method": "POST",
+          "path": "/calendars/{id}/ics/import",
+          "description": "Mettre à jour un calendrier existant depuis un fichier ICS (upsert par UID RFC 5545 §3.8.4.7). Met à jour les métadonnées (X-WR-CALNAME, X-WR-CALDESC, X-WR-TIMEZONE) et upserte les VEVENT : mise à jour si l'UID existe déjà, création sinon.",
+          "params": {
+            "id": "integer (required) - ID du calendrier cible"
+          },
+          "body": {
+            "icsfile": "file (required) - Fichier ICS multipart/form-data"
+          },
+          "response": "{ id, title, timezone, events_created: integer, events_updated: integer }",
+          "errors": {
+            "400": "Aucun fichier ICS envoyé ou erreur d'upload",
+            "403": "Accès non autorisé (lecture seule ou non membre)",
+            "404": "Calendrier non trouvé",
+            "500": "Erreur lors de la mise à jour"
+          },
+          "notes": "Nécessite accès en écriture (propriétaire ou partage write). UID fourni et conforme UUID v4 préservé ; UID absent ou non conforme remplacé par un nouveau UUID v4."
+        },
+        {
+          "method": "POST",
           "path": "/calendars/{id}/share",
           "description": "Partager un calendrier avec un token public",
           "params": {
@@ -138,12 +157,12 @@
         {
           "method": "POST",
           "path": "/calendars/import",
-          "description": "Importer un fichier ICS",
+          "description": "Créer un nouveau calendrier complet depuis un fichier ICS (import initial)",
           "body": {
-            "ics_file": "file (required) - Fichier ICS à importer",
-            "calendar_title": "string (optional) - Titre du nouveau calendrier"
+            "icsfile": "file (required) - Fichier ICS multipart/form-data"
           },
-          "response": "Calendrier créé avec événements importés"
+          "response": "Calendrier créé avec événements importés",
+          "notes": "Crée un nouveau calendrier. Pour mettre à jour un calendrier existant, utiliser POST /calendars/{id}/ics/import"
         }
       ]
     },
@@ -345,7 +364,8 @@
             "location": "string (optional)",
             "categories": "array of strings (optional)",
             "url": "string (optional)",
-            "timezone": "string (optional, default: America/Montreal)"
+            "timezone": "string (optional, default: America/Montreal)",
+            "recurrence_rule": "string (optional) - Règle de récurrence RRULE valide (RFC 5545 §3.8.5.4) ex: FREQ=WEEKLY;BYDAY=MO,WE"
           },
           "response": "Todo object avec uid (UUID v4)",
           "errors": {
@@ -379,7 +399,8 @@
             "due": "date ou datetime (optional)",
             "status": "string (optional)",
             "priority": "integer (optional)",
-            "percent_complete": "integer (optional)"
+            "percent_complete": "integer (optional)",
+            "recurrence_rule": "string (optional) - Règle de récurrence RRULE valide (RFC 5545 §3.8.5.4)"
           },
           "response": "Todo object mis à jour",
           "errors": { "403": "Permission insuffisante", "404": "Tâche non trouvée" }

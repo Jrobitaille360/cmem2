@@ -4,6 +4,7 @@ namespace ICS\Controllers;
 
 use ICS\Models\Calendar;
 use ICS\Models\CalendarTodo;
+use ICS\Models\CalendarEvent;
 use ICS\Utils\IcsGenerator;
 use AuthGroups\Utils\Response;
 use AuthGroups\Utils\Validator;
@@ -45,11 +46,18 @@ class TodoController
             'categories'       => 'optional|array',
             'url'              => 'optional|string|max:2083',
             'timezone'         => 'optional|string|max:100',
+            'recurrence_rule'  => 'optional|string|max:255',
         ]);
 
         if (!$validation['valid']) {
             LoggingMiddleware::logExit(400);
             Response::error('Données invalides', $validation['errors'], 400);
+            return;
+        }
+
+        if (isset($input['recurrence_rule']) && !CalendarEvent::isValidRecurrenceRule($input['recurrence_rule'])) {
+            LoggingMiddleware::logExit(400);
+            Response::error('Règle de récurrence invalide', null, 400);
             return;
         }
 
@@ -74,6 +82,7 @@ class TodoController
             $todo->categories      = $input['categories'] ?? null;
             $todo->url             = $input['url'] ?? null;
             $todo->timezone        = $input['timezone'] ?? 'America/Montreal';
+            $todo->recurrenceRule  = $input['recurrence_rule'] ?? null;
 
             $result = $todo->create();
             LoggingMiddleware::logExit(201);
@@ -158,11 +167,18 @@ class TodoController
             'categories'       => 'optional|array',
             'url'              => 'optional|string|max:2083',
             'timezone'         => 'optional|string|max:100',
+            'recurrence_rule'  => 'optional|string|max:255',
         ]);
 
         if (!$validation['valid']) {
             LoggingMiddleware::logExit(400);
             Response::error('Données invalides', $validation['errors'], 400);
+            return;
+        }
+
+        if (isset($input['recurrence_rule']) && !CalendarEvent::isValidRecurrenceRule($input['recurrence_rule'])) {
+            LoggingMiddleware::logExit(400);
+            Response::error('Règle de récurrence invalide', null, 400);
             return;
         }
 
@@ -198,6 +214,9 @@ class TodoController
             }
             if (isset($input['categories'])) {
                 $todo->categories = $input['categories'];
+            }
+            if (isset($input['recurrence_rule'])) {
+                $todo->recurrenceRule = $input['recurrence_rule'];
             }
 
             $todo->update();

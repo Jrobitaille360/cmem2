@@ -1160,6 +1160,7 @@ CREATE TABLE IF NOT EXISTS calendar_todos (
     categories      JSON          DEFAULT NULL,
     url             VARCHAR(2083) DEFAULT NULL,
     related_to      VARCHAR(255)  DEFAULT NULL COMMENT 'UID parent',
+    recurrence_rule VARCHAR(255)  DEFAULT NULL COMMENT 'RRULE RFC 5545 §3.8.5.4',
     organizer_email VARCHAR(255)  DEFAULT NULL,
     organizer_name  VARCHAR(255)  DEFAULT NULL,
     attendees       JSON          DEFAULT NULL,
