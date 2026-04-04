@@ -47,6 +47,7 @@ class TodoController
             'url'              => 'optional|string|max:2083',
             'timezone'         => 'optional|string|max:100',
             'recurrence_rule'  => 'optional|string|max:255',
+            'is_all_day'       => 'optional|boolean',
         ]);
 
         if (!$validation['valid']) {
@@ -68,6 +69,8 @@ class TodoController
         }
 
         try {
+            $isAllDay = !empty($input['is_all_day']);
+
             $todo = new CalendarTodo();
             $todo->calendarId      = $calendarId;
             $todo->userId          = $userId;
@@ -75,6 +78,7 @@ class TodoController
             $todo->description     = $input['description'] ?? null;
             $todo->due             = isset($input['due']) ? date('Y-m-d H:i:s', strtotime($input['due'])) : null;
             $todo->dtstart         = isset($input['dtstart']) ? date('Y-m-d H:i:s', strtotime($input['dtstart'])) : null;
+            $todo->isAllDay        = $isAllDay;
             $todo->status          = $input['status'] ?? 'NEEDS-ACTION';
             $todo->priority        = $input['priority'] ?? 0;
             $todo->percentComplete = $input['percent_complete'] ?? 0;
@@ -168,6 +172,7 @@ class TodoController
             'url'              => 'optional|string|max:2083',
             'timezone'         => 'optional|string|max:100',
             'recurrence_rule'  => 'optional|string|max:255',
+            'is_all_day'       => 'optional|boolean',
         ]);
 
         if (!$validation['valid']) {
@@ -217,6 +222,9 @@ class TodoController
             }
             if (isset($input['recurrence_rule'])) {
                 $todo->recurrenceRule = $input['recurrence_rule'];
+            }
+            if (array_key_exists('is_all_day', $input)) {
+                $todo->isAllDay = !empty($input['is_all_day']);
             }
 
             $todo->update();

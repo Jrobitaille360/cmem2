@@ -35,6 +35,7 @@ class CalendarTodo extends BaseModel
     public $attendees;
     public $sequence;
     public $timezone;
+    public $isAllDay;
 
     public function __construct()
     {
@@ -68,8 +69,8 @@ class CalendarTodo extends BaseModel
             INSERT INTO calendar_todos
                 (calendar_id, user_id, uid, title, description, due, dtstart, completed,
                  status, priority, percent_complete, location, categories, url,
-                 related_to, recurrence_rule, organizer_email, organizer_name, attendees, sequence, timezone)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                 related_to, recurrence_rule, organizer_email, organizer_name, attendees, sequence, timezone, is_all_day)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ");
 
         $stmt->execute([
@@ -94,6 +95,7 @@ class CalendarTodo extends BaseModel
             isset($this->attendees) ? json_encode($this->attendees) : null,
             $this->sequence ?? 0,
             $this->timezone ?? 'America/Montreal',
+            isset($this->isAllDay) ? (int)(bool)$this->isAllDay : 0,
         ]);
 
         $id = (int)$this->getDb()->lastInsertId();
@@ -121,6 +123,7 @@ class CalendarTodo extends BaseModel
             'organizerEmail'   => 'organizer_email',
             'organizerName'    => 'organizer_name',
             'timezone'         => 'timezone',
+            'isAllDay'         => 'is_all_day',
         ];
 
         foreach ($map as $prop => $col) {
@@ -215,6 +218,9 @@ class CalendarTodo extends BaseModel
         }
         if (isset($row['attendees']) && is_string($row['attendees'])) {
             $row['attendees'] = json_decode($row['attendees'], true) ?? [];
+        }
+        if (isset($row['is_all_day'])) {
+            $row['is_all_day'] = (bool) $row['is_all_day'];
         }
         return $row;
     }

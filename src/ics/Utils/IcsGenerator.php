@@ -462,13 +462,26 @@ class IcsGenerator
         $vtodo->add('DTSTAMP', new \DateTime('now', new \DateTimeZone('UTC')));
 
         $tz = new \DateTimeZone(!empty($todo['timezone']) ? $todo['timezone'] : $timezone);
+        $isAllDay = !empty($todo['is_all_day']);
 
         if (!empty($todo['dtstart'])) {
-            $vtodo->add('DTSTART', new \DateTime($todo['dtstart'], $tz));
+            if ($isAllDay) {
+                $dt = new \DateTime(substr($todo['dtstart'], 0, 10));
+                $vtodo->add('DTSTART', $dt);
+                $vtodo->DTSTART['VALUE'] = 'DATE';
+            } else {
+                $vtodo->add('DTSTART', new \DateTime($todo['dtstart'], $tz));
+            }
         }
 
         if (!empty($todo['due'])) {
-            $vtodo->add('DUE', new \DateTime($todo['due'], $tz));
+            if ($isAllDay) {
+                $dt = new \DateTime(substr($todo['due'], 0, 10));
+                $vtodo->add('DUE', $dt);
+                $vtodo->DUE['VALUE'] = 'DATE';
+            } else {
+                $vtodo->add('DUE', new \DateTime($todo['due'], $tz));
+            }
         }
 
         if (!empty($todo['completed'])) {
