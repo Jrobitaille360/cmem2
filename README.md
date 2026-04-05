@@ -1,347 +1,163 @@
-# AuthGroups API
+﻿# cmem2 API
 
-![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.2.3-blue.svg)
 ![PHP](https://img.shields.io/badge/PHP-8.0+-purple.svg)
 ![Status](https://img.shields.io/badge/status-production%20ready-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 
-API REST moderne pour la gestion d'authentification, de groupes et de fichiers avec support de tags et statistiques.
+API REST modulaire pour la plateforme **Memories v2**. Elle regroupe quatre modules : authentification/groupes (core), calendriers ICS/CalDAV, Pomodoro et Quiz interactif.
 
-**🆕 v2.0.0** : Authentification **JWT** (Bearer token, 15 jours) — plus d'API Keys.
-Deux méthodes de connexion : **email + mot de passe** ou **email + code OTP**.
+Authentification **JWT** HS256 (Bearer, 15 jours). Deux méthodes de connexion : **email + mot de passe** ou **email + code OTP**.
 
-**⚠️ BREAKING CHANGE v2.0.0** : Les API Keys sont supprimées. Toutes les requêtes authentifiées utilisent désormais `Authorization: Bearer <jwt_token>`.
+## Table des matières
 
-## 📋 Table des matières
+- [Vue d'ensemble](#vue-densemble)
+- [Technologies](#technologies)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Architecture](#architecture)
+- [Authentification](#authentification)
+- [Modules et endpoints](#modules-et-endpoints)
+- [Documentation](#documentation)
+- [Tests](#tests)
+- [Conventions](#conventions)
+- [Roadmap](#roadmap)
+- [Licence](#licence)
 
-- [Vue d'ensemble](#-vue-densemble)
-- [Fonctionnalités](#-fonctionnalités)
-- [Technologies](#%EF%B8%8F-technologies)
-- [Installation](#-installation)
-- [Configuration](#%EF%B8%8F-configuration)
-- [Architecture](#%EF%B8%8F-architecture)
-- [Endpoints API](#-endpoints-api)
-- [Authentification](#-authentification)
-- [Documentation](#-documentation)
-- [Tests](#-tests)
-- [Licence](#-licence)
+## Vue d'ensemble
 
-## 🎯 Vue d'ensemble
+cmem2 API fournit :
 
-AuthGroups API est une solution complète pour gérer :
+- **Core (auth_groups)** : JWT, utilisateurs, groupes, fichiers, tags, statistiques, webhooks
+- **ICS/CalDAV** : Calendriers iCalendar, export `.ics`, synchronisation CalDAV RFC 5545
+- **Pomo** : Plugin Pomodoro — engagement waitlist/sondage, support, sync cloud
+- **Quiz** : Quiz interactifs en temps réel (style Kahoot) — sessions, scoring dégressif, leaderboard
 
-- **Authentification** : JWT HS256, valide 15 jours (email/password ou OTP)
-- **Utilisateurs** : Inscription, connexion, profils, avatars
-- **Groupes** : Création, gestion des membres, invitations
-- **Fichiers** : Upload, stockage, gestion avec validation
-- **Tags** : Système de catégorisation flexible
-- **Statistiques** : Analytics et rapports d'utilisation
-- **Synchronisation** : Support hors-ligne
+## Technologies
 
-## ✨ Fonctionnalités
+- **PHP 8.0+** — langage principal
+- **MySQL / MariaDB** — base de données
+- **PHPMailer** — envoi d'emails (inscription, OTP, support)
+- **sabre/vobject** — génération et parsage iCalendar
+- **simshaun/recurr** — moteur de récurrence RRULE
+- **PHPUnit** — tests unitaires
+- **Composer** — gestion des dépendances
 
-### Gestion des utilisateurs
+## Installation
 
-- 🔐 Inscription et authentification **JWT** (email/password ou code OTP)
-- 👤 Profils utilisateurs personnalisables
-- 🖼️ Upload d'avatars
-- 🔑 Réinitialisation de mot de passe
-- 📧 Notifications par email (vérification, OTP)
-- 🔒 Gestion des rôles (UTILISATEUR, MODERATEUR, ADMINISTRATEUR)
-
-### Gestion des groupes
-
-- 👥 Création et administration de groupes
-- 📨 Système d'invitations par email
-- 🏷️ Images de groupe
-- 🔐 Gestion des permissions
-- 🔍 Recherche avancée
-
-### Système de fichiers
-
-- 📁 Upload de fichiers multiples
-- 🖼️ Support images, vidéos, documents, audio
-- ✅ Validation et sécurité
-- 🗑️ Soft delete avec restauration
-- 📊 Gestion du stockage
-
-### Tags et catégorisation
-
-- 🏷️ Tags personnalisables avec couleurs
-- 🔗 Association à groupes et fichiers
-- 📊 Tags les plus utilisés
-- 🔍 Recherche par tags
-
-### Statistiques
-
-- 📈 Statistiques utilisateurs
-- 📊 Analytics groupes
-- 💾 Utilisation du stockage
-- 👥 Utilisateurs en ligne
-
-## 🛠️ Technologies
-
-- **PHP 8.x** - Langage principal
-- **MySQL/MariaDB** - Base de données
-- **PHPMailer** - Envoi d'emails
-- **Composer** - Gestion des dépendances
-- **PHPUnit** - Tests unitaires
-
-## 📦 Installation
-
-### Prérequis
-
-- PHP >= 8.0
-- MySQL >= 5.7 ou MariaDB >= 10.3
-- Composer
-- Extension PHP : PDO, mbstring, openssl, fileinfo
-
-### Installation
-
-1. **Cloner le projet**
+**Prérequis** : PHP >= 8.0, MySQL >= 5.7 ou MariaDB >= 10.3, Composer, extensions PDO / mbstring / openssl / fileinfo.
 
 ```bash
 git clone https://github.com/Jrobitaille360/cmem2.git
 cd cmem2_API
-```
-
-1. **Installer les dépendances**
-
-```bash
 composer install
 ```
 
-1. **Créer la base de données**
+Créer la base de données :
 
 ```bash
-mysql -u root -p < src/auth_groups/docs/create_database.sql
+mysql -u root -p < docs/build_cmem2_DB.sql
 ```
 
-1. **Configurer l'environnement**
+Configurer l'environnement :
 
 ```bash
 cp .env.auth_groups.example .env.auth_groups
+# éditer .env.auth_groups avec vos valeurs
 ```
 
-Éditer `.env.auth_groups` avec vos paramètres :
-
-```env
-# Base de données
-DB_HOST=localhost
-DB_NAME=cmem2_db
-DB_USER=your_user
-DB_PASS=your_password
-
-# Emails
-MAIL_HOST=smtp.example.com
-MAIL_PORT=587
-MAIL_USERNAME=your-email@example.com
-MAIL_PASSWORD=your-password
-```
-
-1. **Configurer les permissions**
+Permissions :
 
 ```bash
-chmod -R 755 uploads/
-chmod -R 755 tmp_assets/
+chmod -R 755 uploads/ tmp_assets/
 ```
 
-## ⚙️ Configuration
+Lancer le serveur de développement :
 
-### Structure des fichiers de configuration
-
-```text
-src/auth_groups/
-├── database.php          # Configuration base de données
-├── environment.php       # Variables d'environnement
-├── loader.php           # Chargeur de configuration
-└── uploads/             # Dossier uploads
-    ├── avatars/         # Avatars utilisateurs
-    ├── groups/          # Images de groupes
-    └── temp/            # Fichiers temporaires
+```bash
+composer serve
+# écoute sur http://localhost:8080
 ```
 
-### Variables d'environnement
+## Configuration
 
-Le fichier `.env.auth_groups` à la racine contient toutes les variables d'environnement.
+Toutes les variables sont dans `.env.auth_groups` (ne pas versionner).
 
-| Variable | Description | Défaut |
-|----------|-------------|--------|
-| `DB_HOST` | Hôte de la base de données | localhost |
-| `DB_NAME` | Nom de la base de données | cmem2_db |
-| `DB_USER` | Utilisateur de la base | - |
-| `DB_PASS` | Mot de passe de la base | - |
-| `ADMIN_SECRET_KEY` | **🔑 Clé secrète pour gestion API keys (OBLIGATOIRE)** | - |
-| `MAIL_HOST` | Serveur SMTP | - |
-| `MAIL_PORT` | Port SMTP | 587 |
-| `MAIL_USERNAME` | Email SMTP | - |
-| `MAIL_PASSWORD` | Mot de passe SMTP | - |
+| Variable | Description | Exemple |
+| --- | --- | --- |
+| `DB_HOST` | Hôte MySQL | `localhost` |
+| `DB_NAME` | Nom de la base | `cmem2_db` |
+| `DB_USER` | Utilisateur | `root` |
+| `DB_PASS` | Mot de passe | — |
+| `JWT_SECRET` | Clé HMAC ≥ 32 chars **(obligatoire)** | — |
+| `JWT_EXPIRY_DAYS` | Durée JWT | `15` |
+| `OTP_EXPIRY_MINUTES` | Durée code OTP | `15` |
+| `MAIL_HOST` | Serveur SMTP | `smtp.example.com` |
+| `MAIL_PORT` | Port SMTP | `587` |
+| `MAIL_USERNAME` | Courriel SMTP | — |
+| `MAIL_PASSWORD` | Mot de passe SMTP | — |
+| `MAIL_FROM` | Expéditeur | `no_reply@journauxdebord.com` |
+| `MAINTENANCE_MODE` | Mode maintenance | `false` |
 
-## 🏗️ Architecture
-
-### Structure du projet
+## Architecture
 
 ```text
 cmem2_API/
+├── index.php                  # Point d'entrée unique
+├── composer.json
 ├── src/
-│   ├── auth_groups/     # Module principal d'authentification
-│   │   ├── Controllers/ # Contrôleurs
-│   │   ├── Models/      # Modèles de données
-│   │   ├── Services/    # Services métier
-│   │   ├── Routing/     # Routeur et handlers
-│   │   ├── Middleware/  # Middlewares
-│   │   ├── Utils/       # Utilitaires
-│   │   ├── docs/        # Documentation API
-│   │   ├── database.php # Configuration DB
-│   │   ├── environment.php # Chargeur .env
-│   │   └── loader.php   # Chargeur principal
-│   ├── ics/             # Module calendrier ICS/CalDAV
-│   │   ├── Controllers/ # Contrôleurs calendrier
-│   │   ├── Models/      # Modèles calendrier
-│   │   ├── Services/    # Services CalDAV
-│   │   └── docs_ICS/    # Documentation calendrier
-│   └── logs/            # Logs applicatifs
-├── tests/               # Tests unitaires et d'intégration
-├── uploads/             # Fichiers uploadés
-├── tmp_assets/          # Fichiers temporaires
-├── vendor/              # Dépendances Composer
-├── .env.auth_groups     # Configuration (ne pas versionner)
-├── index.php            # Point d'entrée
-└── composer.json        # Configuration Composer
+│   ├── auth_groups/           # Module core (auth, groupes, fichiers, tags)
+│   │   ├── Controllers/
+│   │   ├── Models/
+│   │   ├── Services/          # AuthService, MailService, LogService
+│   │   ├── Routing/           # Router + RouteHandlers
+│   │   ├── Middleware/        # LoggingMiddleware
+│   │   ├── Utils/             # Response, Validator, helpers
+│   │   ├── database.php
+│   │   ├── environment.php
+│   │   └── loader.php
+│   ├── ics/                   # Module calendriers ICS/CalDAV
+│   │   ├── Controllers/
+│   │   ├── Models/
+│   │   ├── Services/          # ICSService, CalDAVService, RecurrenceService
+│   │   └── Routing/
+│   ├── pomo/                  # Plugin Pomodoro
+│   │   ├── Controllers/
+│   │   ├── Models/
+│   │   └── Routing/
+│   ├── quiz/                  # Plugin Quiz interactif
+│   │   ├── Controllers/       # QuizController, SessionController, ParticipantController
+│   │   ├── Models/
+│   │   ├── Validators/        # QuizValidator
+│   │   └── Routing/
+│   └── logs/
+├── docs/
+│   ├── core/                  # Documentation module core
+│   ├── ics/                   # Documentation module ICS
+│   ├── pomo/                  # Documentation plugin Pomo
+│   └── quiz/                  # Documentation plugin Quiz
+├── uploads/                   # Fichiers uploadés (avatars, groupes)
+├── tmp_assets/                # Fichiers temporaires / exports
+└── private/                   # Scripts maintenance (non exposés)
 ```
 
-### Architecture modulaire
+Namespaces PSR-4 :
 
-L'API utilise une architecture modulaire avec séparation des responsabilités :
+- `AuthGroups\` → `src/auth_groups/`
+- `Pomo\` → `src/pomo/`
+- `Quiz\` → `src/quiz/`
 
-- **Controllers** : Gestion des requêtes HTTP
-- **Models** : Logique métier et accès données
-- **Services** : Services partagés (Auth, Email, Logs)
-- **Routing** : Routage et handlers spécialisés
-- **Middleware** : Logging et interception
-- **Utils** : Validation, réponses, helpers
+## Authentification
 
-## 🔌 Endpoints API
+Toutes les requêtes protégées utilisent `Authorization: Bearer <jwt_token>`.
 
-### ⚠️ Important - Sécurité v1.3.0
-
-**BREAKING CHANGES** - Cette version introduit des changements de sécurité majeurs :
-
-1. **API Keys obligatoires** : Tous les logins (`/users/login`) nécessitent maintenant une API key valide
-2. **Gestion centralisée** : Les API keys ne peuvent être gérées que via `/secret-admin/api-keys/*`
-3. **Script bootstrap** : Utilisez `bootstrap_create_first_api_key.php` pour créer votre première API key
-
-📖 **Guide de migration** : Voir [MIGRATION_v1.3.0.md](src/auth_groups/docs/MIGRATION_v1.3.0.md)
-
-### Public
-
-| Méthode | Endpoint | Description |
-|---------|----------|-------------|
-| GET | `/` | Informations API |
-| GET | `/help` | Liste des endpoints |
-| GET | `/health` | Statut de l'API |
-
-### Utilisateurs
-
-| Méthode | Endpoint | Description | Auth |
-|---------|----------|-------------|------|
-| POST | `/users/register` | Inscription | **API Key** |
-| POST | `/users/login` | Connexion | **API Key** ⚠️ |
-| GET | `/users/me` | Profil actuel |  API Key |
-| PUT | `/users/me` | Modifier profil |  API Key |
-| DELETE | `/users/me` | Supprimer compte | API Key |
-| POST | `/users/avatar` | Upload avatar | Oui |
-| GET | `/users/{id}` | Détails utilisateur | Oui |
-
-### Groupes
-
-| Méthode | Endpoint | Description | Auth |
-|---------|----------|-------------|------|
-| GET | `/groups` | Liste des groupes | Oui |
-| POST | `/groups` | Créer un groupe | Oui |
-| GET | `/groups/{id}` | Détails d'un groupe | Oui |
-| PUT | `/groups/{id}` | Modifier un groupe | Oui |
-| DELETE | `/groups/{id}` | Supprimer un groupe | Oui |
-| POST | `/groups/{id}/invite` | Inviter un membre | Oui |
-| GET | `/groups/search` | Rechercher des groupes | Oui |
-
-### Fichiers
-
-| Méthode | Endpoint | Description | Auth |
-|---------|----------|-------------|------|
-| POST | `/files/upload` | Upload fichier(s) | Oui |
-| GET | `/files` | Liste des fichiers | Oui |
-| GET | `/files/{id}` | Détails d'un fichier | Oui |
-| DELETE | `/files/{id}` | Supprimer un fichier | Oui |
-| PUT | `/files/{id}/restore` | Restaurer un fichier | Oui |
-
-### Tags
-
-| Méthode | Endpoint | Description | Auth |
-|---------|----------|-------------|------|
-| GET | `/tags` | Liste des tags | Oui |
-| POST | `/tags` | Créer un tag | Oui |
-| GET | `/tags/{id}` | Détails d'un tag | Oui |
-| PUT | `/tags/{id}` | Modifier un tag | Oui |
-| DELETE | `/tags/{id}` | Supprimer un tag | Oui |
-| GET | `/tags/by-table/{table}` | Tags par table | Oui |
-| GET | `/tags/most-used` | Tags populaires | Oui |
-
-### Calendriers
-
-| Méthode | Endpoint | Description | Auth |
-|---------|----------|-------------|------|
-| GET | `/calendars` | Liste des calendriers | Oui |
-| POST | `/calendars` | Créer un calendrier | Oui |
-| GET | `/calendars/{id}` | Détails d'un calendrier | Oui |
-| PUT | `/calendars/{id}` | Modifier un calendrier | Oui |
-| DELETE | `/calendars/{id}` | Supprimer un calendrier | Oui |
-| GET | `/calendar/{token}.ics` | Export ICS public | Non |
-| * | `/caldav/` | Support CalDAV | Oui |
-
-### Webhooks
-
-| Méthode | Endpoint | Description | Auth |
-|---------|----------|-------------|------|
-| POST | `/webhooks` | Créer un webhook | Oui |
-| GET | `/webhooks` | Liste des webhooks | Oui |
-| PUT | `/webhooks/{id}` | Modifier un webhook | Oui |
-| DELETE | `/webhooks/{id}` | Supprimer un webhook | Oui |
-
-### API Keys
-
-**✅ NOUVEAUX** - Endpoints sécurisés (secret-admin uniquement) :
-
-| Méthode | Endpoint | Description | Auth |
-|---------|----------|-------------|------|
-| POST | `/secret-admin/api-keys` | Créer une clé | APIKey Admin + Secret |
-| GET | `/secret-admin/api-keys` | Lister les clés | APIKey Admin + Secret |
-| GET | `/secret-admin/api-keys/{id}` | Détails d'une clé | APIKey Admin + Secret |
-| DELETE | `/secret-admin/api-keys/{id}` | Révoquer une clé | APIKey Admin + Secret |
-| PUT | `/secret-admin/api-keys/{id}/regenerate` | Régénérer une clé | APIKey Admin + Secret |
-| PUT | `/secret-admin/api-keys/{id}` | Modifier une clé | APIKey Admin + Secret |
-
-### Analytics et statistiques
-
-| Méthode | Endpoint | Description | Auth |
-|---------|----------|-------------|------|
-| GET | `/stats/user/{id}` | Stats utilisateur | Oui |
-| GET | `/stats/online` | Utilisateurs en ligne | Oui |
-
-Voir la [documentation complète](src/auth_groups/docs/README.md) pour plus de détails.
-
-## 🔐 Authentification
-
-Depuis **v2.0.0**, l'authentification utilise des **JWT Bearer tokens** (HS256, valides 15 jours).
-Les API Keys sont supprimées.
-
-### Méthode 1 — Email + Mot de passe
+### Obtenir un token — email + mot de passe
 
 ```http
 POST /auth/login
 Content-Type: application/json
 
-{ "email": "user@example.com", "password": "monMotDePasse" }
+{"email": "user@example.com", "password": "monMotDePasse"}
 ```
 
 Réponse :
@@ -350,32 +166,21 @@ Réponse :
 {
   "token": "eyJhbGci...",
   "token_type": "Bearer",
-  "expires_at": "2026-04-06 12:00:00",
-  "user": { "id": 1, "name": "Alice", "email": "...", "role": "UTILISATEUR" }
+  "expires_at": "2026-04-20 12:00:00",
+  "user": {"id": 1, "name": "Alice", "email": "...", "role": "UTILISATEUR"}
 }
 ```
 
-### Méthode 2 — Email + Code OTP
+### Obtenir un token — code OTP
 
 ```http
-# Étape 1 : demander le code (envoyé par email)
 POST /auth/send-code
 Content-Type: application/json
-{ "email": "user@example.com" }
+{"email": "user@example.com"}
 
-# Étape 2 : vérifier le code → JWT
 POST /auth/verify-code
 Content-Type: application/json
-{ "email": "user@example.com", "code": "482917" }
-```
-
-### Utiliser le token JWT
-
-Incluez le token dans **toutes** les requêtes authentifiées :
-
-```http
-GET /users/me
-Authorization: Bearer eyJhbGci...
+{"email": "user@example.com", "code": "482917"}
 ```
 
 ### Déconnexion
@@ -385,141 +190,162 @@ POST /auth/logout
 Authorization: Bearer eyJhbGci...
 ```
 
-### Configuration requise dans `.env.auth_groups`
+### Protection anti-brute-force
 
-```env
-JWT_SECRET=votre_cle_secrete_min_32_caracteres
-JWT_EXPIRY_DAYS=15
-OTP_EXPIRY_MINUTES=15
-OTP_MAX_ATTEMPTS=5
-```
+5 tentatives max toutes les 10 minutes par email+IP (table `login_attempts`). Retourne HTTP 429 au dépassement.
 
-### Migration depuis v1.x (API Keys)
+## Modules et endpoints
 
-Voir [MIGRATION_JWT.sql](src/auth_groups/docs/MIGRATION_JWT.sql) pour les changements de schéma.
+### Core — Auth
 
-## 📚 Documentation
+| Méthode | Endpoint | Description | Auth |
+| --- | --- | --- | --- |
+| POST | `/auth/login` | Connexion email + mot de passe | Non |
+| POST | `/auth/send-code` | Demander un code OTP | Non |
+| POST | `/auth/verify-code` | Vérifier OTP → JWT | Non |
+| POST | `/auth/logout` | Invalider le JWT | JWT |
+| POST | `/auth/refresh` | Renouveler via device token | Non |
 
-### Documentation complète
+### Core — Utilisateurs
 
-➡️ **[Documentation principale](src/auth_groups/docs/README.md)** - Point d'entrée de toute la documentation
+| Méthode | Endpoint | Description | Auth |
+| --- | --- | --- | --- |
+| POST | `/users/register` | Inscription | Non |
+| GET | `/users/me` | Profil courant | JWT |
+| PUT | `/users/me` | Modifier profil | JWT |
+| DELETE | `/users/me` | Supprimer compte | JWT |
+| POST | `/users/avatar` | Upload avatar | JWT |
+| GET | `/users/{id}` | Détails utilisateur | JWT |
+| POST | `/users/verify-email` | Vérifier email | Non |
+| POST | `/users/reset-password` | Réinitialiser mot de passe | Non |
 
-### Documentation des endpoints
+### Core — Groupes
 
-- [Endpoints utilisateurs](src/auth_groups/docs/ENDPOINTS_USERS.md)
-- [Endpoints groupes](src/auth_groups/docs/ENDPOINTS_GROUPS.md)
-- [Endpoints fichiers](src/auth_groups/docs/ENDPOINTS_FILES.md)
-- [Endpoints tags](src/auth_groups/docs/ENDPOINTS_TAGS.md)
-- [Endpoints API Keys](src/auth_groups/docs/ENDPOINTS_API_KEYS.md) 🆕
-- [Endpoints statistiques](src/auth_groups/docs/ENDPOINTS_STATS.md)
-- [Endpoints publics](src/auth_groups/docs/ENDPOINTS_PUBLIC.md)
+| Méthode | Endpoint | Description | Auth |
+| --- | --- | --- | --- |
+| GET | `/groups` | Liste des groupes | JWT |
+| POST | `/groups` | Créer un groupe | JWT |
+| GET | `/groups/{id}` | Détails d'un groupe | JWT |
+| PUT | `/groups/{id}` | Modifier un groupe | JWT |
+| DELETE | `/groups/{id}` | Supprimer un groupe | JWT |
+| POST | `/groups/{id}/invite` | Inviter un membre | JWT |
+| GET | `/groups/search` | Rechercher des groupes | JWT |
 
-### Modules spécialisés
+### Core — Fichiers, Tags, Stats, Webhooks
 
-- [Module ICS/CalDAV](src/ics/docs_ICS/README.md) - Calendriers et synchronisation CalDAV
-- [Webhooks](src/auth_groups/docs/WEBHOOKS_README.md) - Configuration et utilisation des webhooks
-- [Système de licences](src/auth_groups/docs/FLUTTER_LICENSE_SYSTEM.md) - Gestion des abonnements
+| Méthode | Endpoint | Description | Auth |
+| --- | --- | --- | --- |
+| POST | `/files/upload` | Upload fichier(s) | JWT |
+| GET | `/files` | Liste des fichiers | JWT |
+| DELETE | `/files/{id}` | Supprimer (soft) | JWT |
+| PUT | `/files/{id}/restore` | Restaurer | JWT |
+| GET/POST/PUT/DELETE | `/tags/*` | CRUD tags | JWT |
+| GET | `/stats/user/{id}` | Stats utilisateur | JWT |
+| GET | `/stats/online` | Utilisateurs en ligne | JWT |
+| GET/POST/PUT/DELETE | `/webhooks/*` | CRUD webhooks | JWT |
 
-### Guides techniques
+### ICS / CalDAV
 
-- [Démarrage rapide](src/auth_groups/docs/QUICKSTART.md)
-- [Vue d'ensemble de l'API](src/auth_groups/docs/API_OVERVIEW.md)
-- [Référence API complète](src/auth_groups/docs/API_REFERENCE.md)
-- [Structure base de données](src/auth_groups/docs/create_database.sql)
-- [Migrations](src/auth_groups/docs/MIGRATION_v1.3.0.md)
+| Méthode | Endpoint | Description | Auth |
+| --- | --- | --- | --- |
+| GET | `/calendar/{token}.ics` | Téléchargement ICS public | Non |
+| OPTIONS | `/caldav/` | Discovery CalDAV | Non |
+| GET/POST/PUT/DELETE | `/calendars/*` | CRUD calendriers | JWT |
+| GET/POST/PUT/DELETE | `/events/*` | CRUD événements | JWT |
+| GET/POST/PUT/DELETE | `/attendees/*` | Participants (Ph3) | JWT |
+| POST | `/calendars/import` | Import ICS (upsert par UID) | JWT |
+| * | `/caldav/*` | Protocole CalDAV complet | JWT |
 
-## 🧪 Tests
+Voir [docs/ics/GUIDE.md](docs/ics/GUIDE.md) pour la référence complète.
 
-### Exécuter les tests
+### Pomo
+
+| Méthode | Endpoint | Description | Auth |
+| --- | --- | --- | --- |
+| POST | `/pomo/engagement` | Waitlist ou sondage MVP | Non |
+| POST | `/pomo/support` | Formulaire de support | JWT |
+| POST | `/pomo/stripe/webhook` | Webhook Stripe (Ph3) | Signature Stripe |
+
+Voir [docs/pomo/GUIDE.md](docs/pomo/GUIDE.md) pour la référence complète.
+
+### Quiz
+
+| Méthode | Endpoint | Description | Auth |
+| --- | --- | --- | --- |
+| POST | `/quiz/join` | Rejoindre une session (code) | Non |
+| GET | `/quiz/session/{id}` | État de la session | participant_token |
+| POST | `/quiz/session/{id}/answer` | Soumettre une réponse | participant_token |
+| GET | `/quiz/session/{id}/leaderboard` | Classement en direct | participant_token |
+| GET/POST | `/quiz` et `/quiz/{id}` | CRUD quiz | JWT |
+| POST/PUT/DELETE | `/quiz/{id}/questions[/{q_id}]` | CRUD questions | JWT |
+| POST | `/quiz/{id}/sessions` | Créer une session | JWT |
+| POST | `/quiz/sessions/{sid}/next` | Question suivante | JWT |
+| POST | `/quiz/sessions/{sid}/end` | Terminer la session | JWT |
+| GET | `/quiz/sessions/{sid}/results` | Résultats finaux | JWT |
+| GET | `/quiz/history` | Historique des sessions | JWT |
+
+Voir [docs/quiz/GUIDE.md](docs/quiz/GUIDE.md) pour la référence complète.
+
+### Public
+
+| Méthode | Endpoint | Description |
+| --- | --- | --- |
+| GET | `/` | Informations API |
+| GET | `/health` | Statut de l'API |
+
+## Documentation
+
+| Module | Référence JSON | Guide |
+| --- | --- | --- |
+| Core (auth_groups) | [docs/core/API_ENDPOINTS.json](docs/core/API_ENDPOINTS.json) | [docs/core/GUIDE.md](docs/core/GUIDE.md) |
+| ICS / CalDAV | [docs/ics/API_ICS_ENDPOINTS.json](docs/ics/API_ICS_ENDPOINTS.json) | [docs/ics/GUIDE.md](docs/ics/GUIDE.md) |
+| Pomo | [docs/pomo/API_POMO_ENDPOINTS_v1_0_0.json](docs/pomo/API_POMO_ENDPOINTS_v1_0_0.json) | [docs/pomo/GUIDE.md](docs/pomo/GUIDE.md) |
+| Quiz | [docs/quiz/API_QUIZ_ENDPOINTS_v1_0_0.json](docs/quiz/API_QUIZ_ENDPOINTS_v1_0_0.json) | [docs/quiz/GUIDE.md](docs/quiz/GUIDE.md) |
+
+Migrations : [docs/core/](docs/core/) · Schéma initial : [docs/build_cmem2_DB.sql](docs/build_cmem2_DB.sql)
+
+## Tests
 
 ```bash
-# Tous les tests
-composer test
+# Plugin Quiz (104 tests)
+php private/tests_mine/test_quiz.php
 
-# Tests spécifiques
-php tests/test_users_entrypoints.php
-php tests/test_group_entrypoints.php
-php tests/test_files_entrypoints.php
-php tests/test_tags_entrypoints.php
+# Module ICS
+php private/tests_mine/test_new_calendar_entrypoints_1.php
+
+# Module Pomo
+php private/tests_mine/test_pomo.php
 ```
 
-### Structure des tests
+Les scripts de test utilisent les helpers de `private/tests_mine/test_new_base.php` (`callApiWithJWT`, `testNewResult`, `printNewSection`).
 
-```text
-tests/
-├── users/              # Tests utilisateurs
-├── groups/             # Tests groupes
-├── files/              # Tests fichiers
-├── tags/               # Tests tags
-├── webhooks/           # Tests webhooks
-└── test_base.php       # Fonctions communes
-```
+## Conventions
 
-## 🔧 Développement
-
-### Logs
-
-Les logs sont enregistrés dans `src/logs/` :
-
-- `app.log` - Logs applicatifs
-- `error.log` - Erreurs
-- Rotation automatique quotidienne
-
-### Base de données
-
-Réinitialiser les données de test :
-
-```sql
-CALL reset_auth_groups_data();
-```
-
-### Conventions
-
-- **Namespaces** : `AuthGroups\{Module}`
+- **Namespaces** : `AuthGroups\`, `Pomo\`, `Quiz\`
 - **Classes** : PascalCase
 - **Méthodes** : camelCase
-- **Variables** : snake_case (DB) / camelCase (PHP)
-- **Constantes** : UPPER_CASE
+- **Colonnes DB** : snake_case
+- **Réponses** : `{ success: bool, message?: string, data?: object, errors?: array }`
+- **Codes HTTP** : 200 succès · 201 créé · 401 non authentifié · 403 interdit · 404 introuvable · 409 conflit · 422 validation · 429 rate limit
 
-## 📄 Licence
+## Roadmap
 
-Ce projet utilise plusieurs dépendances open-source. Voir [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) pour les détails.
+- [x] Core auth/groupes/fichiers/tags (v2.0)
+- [x] JWT + OTP + blacklist + anti-brute-force (v2.2)
+- [x] Module ICS/CalDAV (Ph1–Ph5) (v2.2)
+- [x] Plugin Pomo Ph1 (v2.2)
+- [x] Plugin Quiz Ph1 — MVP REST (v2.2.3)
+- [ ] Plugin Quiz Ph2 — Variables dynamiques
+- [ ] Plugin Quiz Ph3 — Moteur math (mossadal/math-executor)
+- [ ] Plugin Quiz Ph4 — WebSocket Node.js (temps réel)
+- [ ] Plugin Quiz Ph5 — Export CSV
+- [ ] Rate limiting Redis
+- [ ] Notifications push
 
-## 🤝 Contribution
+## Licence
 
-Les contributions sont les bienvenues !
-
-1. Fork le projet
-2. Créer une branche (`git checkout -b feature/AmazingFeature`)
-3. Commit les changements (`git commit -m 'Add some AmazingFeature'`)
-4. Push vers la branche (`git push origin feature/AmazingFeature`)
-5. Ouvrir une Pull Request
-
-## 📞 Support
-
-Pour toute question ou problème :
-
-- Email : <support@authgroups.local>
-- Issues : [GitHub Issues](https://github.com/Jrobitaille360/cmem2/issues)
-
-## 🗺️ Roadmap
-
-- [x] Système d'API Keys ✅
-- [x] Module calendrier ICS/CalDAV ✅
-- [x] Webhooks ✅
-- [x] Système de licences ✅
-- [ ] Administration dynamique
-  - [ ] Création de tables via admin
-  - [ ] Génération d'endpoints PHP
-- [ ] Rate limiting avancé
-- [ ] Cache layer (Redis)
-- [ ] WebSockets pour notifications temps réel
-- [ ] Export de données (CSV, JSON)
-- [ ] Audit logs détaillés
-- [ ] Support multi-tenant
+MIT — voir [LICENSE](LICENSE). Dépendances tierces : [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
 
 ---
 
-**Version** : 1.3.0  
-**Dernière mise à jour** : Octobre 2025  
-**Auteur** : [Jrobitaille360](https://github.com/Jrobitaille360)
+**Version** : 2.2.3 · **Mis à jour** : 2026-04-05 · **Auteur** : [Jrobitaille360](https://github.com/Jrobitaille360)

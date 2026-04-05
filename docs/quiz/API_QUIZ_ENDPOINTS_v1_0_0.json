@@ -1,0 +1,427 @@
+{
+  "api": {
+    "name": "Quiz API",
+    "version": "1.0.0",
+    "description": "Plugin de quiz interactifs en temps réel (style Kahoot). Ph1 : MVP REST — création de quiz, gestion de sessions, participation en direct, scoring dégressif.",
+    "generated": "2026-04-05",
+    "reviewed": "2026-04-05",
+    "review_notes": "Relecture lors de la planification du client Flutter (quiz_client). Ajout section client_integration, précisions sur next/end, comportement polling et reconnexion.",
+    "base_url": "/quiz",
+    "authentication": {
+      "types": ["JWT_BEARER", "PARTICIPANT_TOKEN", "NONE"],
+      "jwt": {
+        "header": "Authorization: Bearer {jwt_token}",
+        "description": "Requis pour toutes les routes hôte (créer/modifier quiz, gérer sessions)"
+      },
+      "participant_token": {
+        "header": "Authorization: Bearer {participant_token}",
+        "description": "Token HMAC-SHA256 obtenu après POST /quiz/join. Requis pour les routes participant."
+      },
+      "none": {
+        "description": "POST /quiz/join est accessible sans authentification"
+      }
+    }
+  },
+  "endpoints": {
+    "participant_public": {
+      "description": "Endpoint d'entrée pour les participants — sans authentification",
+      "auth_required": false,
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/quiz/join",
+          "description": "Rejoindre une session de quiz via son code. Retourne un participant_token à conserver pour toutes les requêtes participant suivantes. Si le même device_id s'est déjà inscrit à cette session, retourne le token existant (reconnexion).",
+          "body": {
+            "session_code": "string (required) - Code de session 6–8 caractères alphanumérique (ex. AB34KZ)",
+            "display_name": "string (required) - Nom affiché du participant, max 50 caractères",
+            "device_id": "string (required) - Identifiant unique de l'appareil, max 128 caractères"
+          },
+          "responses": {
+            "201": "{ success: true, message: 'Participant inscrit', data: { participant_token: string, session_id: integer, display_name: string } }",
+            "200": "{ success: true, message: 'Reconnexion à la session', data: { participant_token: string, session_id: integer, display_name: string } } — si device_id déjà inscrit",
+            "404": "Code de session invalide",
+            "409": "Session n'accepte plus de nouveaux participants (status: ended ou terminated)",
+            "422": "Données invalides — détail dans errors[]"
+          }
+        }
+      ]
+    },
+    "participant_authenticated": {
+      "description": "Routes participant — requièrent participant_token (Bearer). La session doit être non terminée et le token doit correspondre à la session.",
+      "auth_required": true,
+      "auth_type": "PARTICIPANT_TOKEN",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/quiz/session/{session_id}",
+          "description": "Obtenir l'état courant de la session : status, index de la question courante, contenu de la question (sans is_correct sur les choix). Retourne current_question: null si la session est en attente (status: waiting) ou terminée (status: ended).",
+          "params": {
+            "session_id": "integer (required) - ID de la session"
+          },
+          "responses": {
+            "200": "{ success: true, data: { session_id: integer, status: 'waiting'|'active'|'ended', current_question_idx: integer, current_question: { id, type, content: { text, latex?, image_url? }, points, time_limit_sec, choices: [{ id, content }], total, index } | null } }",
+            "401": "Aucun token fourni (header Authorization absent)",
+            "403": "participant_token invalide ou introuvable | Session terminée",
+            "404": "Session introuvable"
+          },
+          "notes": "Le champ is_correct est retiré des choix — non transmis avant fin de session. current_question_idx vaut -1 avant le premier appel à /next.",
+          "client_notes": "Endpoint de polling joueur (intervalle recommandé : 2s). Transitions à surveiller : status 'waiting'→'active' (démarrage de la partie), changement de current_question_idx (nouvelle question, reset timer côté client), status 'active'→'ended' (session terminée → redirect leaderboard)."
+        },
+        {
+          "method": "POST",
+          "path": "/quiz/session/{session_id}/answer",
+          "description": "Soumettre une réponse à la question courante. Une seule réponse acceptée par (participant, question). Évalue immédiatement la correction et retourne les points gagnés.",
+          "params": {
+            "session_id": "integer (required) - ID de la session"
+          },
+          "body": {
+            "question_id": "integer (required) - ID de la question courante",
+            "value": "string (required) - ID du choix sélectionné (mcq/truefalse) ou valeur numérique (numerical, Phase 3)",
+            "response_time_ms": "integer (required) - Temps de réponse en millisecondes (>= 0)"
+          },
+          "responses": {
+            "200": "{ success: true, message: 'Réponse enregistrée', data: { is_correct: boolean, points_earned: integer } }",
+            "401": "Aucun token fourni",
+            "403": "participant_token invalide ou introuvable | Session terminée",
+            "404": "Question introuvable dans cette session",
+            "409": "Session non active | Déjà répondu à cette question | question_id n'est pas la question courante",
+            "422": "Données invalides"
+          },
+          "notes": "Scoring dégressif : floor(points * max(0, 1 - response_time_ms / (time_limit_sec * 1000))). type=numerical réservé à la Phase 3.",
+          "client_notes": "response_time_ms est mesuré côté client dès l'affichage de la question. Erreur 409 'Déjà répondu' peut survenir lors d'une reconnexion — le client doit l'ignorer silencieusement et afficher l'état 'en attente'."
+        },
+        {
+          "method": "GET",
+          "path": "/quiz/session/{session_id}/leaderboard",
+          "description": "Obtenir le classement en temps réel de la session. Inclut le rang du participant courant.",
+          "params": {
+            "session_id": "integer (required) - ID de la session"
+          },
+          "responses": {
+            "200": "{ success: true, data: { leaderboard: [{ id, display_name, score: integer, rank: integer | null }], total_participants: integer, my_rank: integer | null } }",
+            "401": "Aucun token fourni",
+            "403": "participant_token invalide ou introuvable | Session terminée",
+            "404": "Session introuvable"
+          },
+          "notes": "rank et my_rank sont null tant que la session n'est pas terminée (RANK() calculé au moment du end). score dans les items de leaderboard correspond à total_score du participant.",
+          "client_notes": "Peut être pollingé par le maître (2s) pendant la session pour afficher le classement en direct. Pour le joueur, appeler une fois après status: ended pour afficher le classement final."
+        }
+      ]
+    },
+    "quiz_management": {
+      "description": "CRUD des quiz — hôte uniquement (JWT requis)",
+      "auth_required": true,
+      "auth_type": "JWT_BEARER",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/quiz",
+          "description": "Lister tous les quiz de l'utilisateur connecté.",
+          "responses": {
+            "200": "{ success: true, data: { quizzes: [{ id, title, description, status, created_at, updated_at }] } }",
+            "401": "JWT manquant ou invalide"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/quiz",
+          "description": "Créer un nouveau quiz.",
+          "body": {
+            "title": "string (required) - Titre du quiz, max 255 caractères",
+            "description": "string (optional) - Description libre",
+            "status": "string (optional, default: draft) - 'draft' | 'active' | 'archived'"
+          },
+          "responses": {
+            "201": "{ success: true, message: 'Quiz créé', data: { id: integer } }",
+            "401": "JWT invalide",
+            "422": "Données invalides — détail dans errors[]"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/quiz/{id}",
+          "description": "Obtenir un quiz avec toutes ses questions et leurs choix.",
+          "params": {
+            "id": "integer (required) - ID du quiz"
+          },
+          "responses": {
+            "200": "{ success: true, data: { quiz: { id, title, description, status, questions: [{ id, type, content, points, time_limit_sec, position, choices: [{ id, content, is_correct }] }] } } }",
+            "401": "JWT invalide",
+            "404": "Quiz introuvable"
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/quiz/{id}",
+          "description": "Mettre à jour les métadonnées d'un quiz (titre, description, status).",
+          "params": {
+            "id": "integer (required) - ID du quiz"
+          },
+          "body": {
+            "title": "string (optional) - Nouveau titre, max 255 caractères",
+            "description": "string (optional) - Nouvelle description",
+            "status": "string (optional) - 'draft' | 'active' | 'archived'"
+          },
+          "responses": {
+            "200": "{ success: true, message: 'Quiz mis à jour' }",
+            "401": "JWT invalide",
+            "404": "Quiz introuvable",
+            "422": "Données invalides"
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/quiz/{id}",
+          "description": "Supprimer un quiz (soft delete).",
+          "params": {
+            "id": "integer (required) - ID du quiz"
+          },
+          "responses": {
+            "200": "{ success: true, message: 'Quiz supprimé' }",
+            "401": "JWT invalide",
+            "404": "Quiz introuvable"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/quiz/history",
+          "description": "Historique des sessions passées de l'utilisateur connecté.",
+          "responses": {
+            "200": "{ success: true, data: { sessions: [{ id, quiz_id, quiz_title, session_code, status, current_question_idx, started_at, ended_at, created_at }] } }",
+            "401": "JWT invalide"
+          }
+        }
+      ]
+    },
+    "question_management": {
+      "description": "CRUD des questions et choix d'un quiz — JWT requis",
+      "auth_required": true,
+      "auth_type": "JWT_BEARER",
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/quiz/{id}/questions",
+          "description": "Ajouter une question à un quiz. La position est calculée automatiquement (dernière position + 1). Les choix sont insérés en même temps.",
+          "params": {
+            "id": "integer (required) - ID du quiz"
+          },
+          "body": {
+            "type": "string (required) - 'mcq' | 'truefalse' | 'numerical'",
+            "content": "object (required) - { text: string (required), latex: string (optional), image_url: string (optional) }",
+            "points": "integer (optional, default: 100) - Points max, >= 0",
+            "time_limit_sec": "integer (optional, default: 30) - Durée en secondes (5–300)",
+            "choices": "array (required pour mcq/truefalse) - Tableau de { content: object, is_correct: boolean }. mcq : 2–8 choix, au moins 1 correct. truefalse : exactement 2 choix."
+          },
+          "responses": {
+            "201": "{ success: true, message: 'Question ajoutée', data: { id: integer } }",
+            "401": "JWT invalide",
+            "404": "Quiz introuvable",
+            "422": "Données invalides — détail dans errors[]"
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/quiz/{id}/questions/{q_id}",
+          "description": "Mettre à jour une question. Si choices est fourni, les anciens choix sont remplacés intégralement.",
+          "params": {
+            "id": "integer (required) - ID du quiz",
+            "q_id": "integer (required) - ID de la question"
+          },
+          "body": {
+            "type": "string (optional) - 'mcq' | 'truefalse' | 'numerical'",
+            "content": "object (optional) - { text, latex?, image_url? }",
+            "points": "integer (optional) - >= 0",
+            "time_limit_sec": "integer (optional) - 5–300",
+            "choices": "array (optional) - Si fourni, remplace tous les choix existants. Mêmes règles que POST. Si absent, les choix existants sont conservés inchangés."
+          },
+          "responses": {
+            "200": "{ success: true, message: 'Question mise à jour' }",
+            "401": "JWT invalide",
+            "404": "Quiz ou question introuvable",
+            "422": "Données invalides"
+          },
+          "notes": "Mise à jour partielle supportée : seuls les champs présents dans le body sont modifiés. La validation des choix (count, is_correct) n'est déclenchée que si choices est explicitement fourni."
+        },
+        {
+          "method": "DELETE",
+          "path": "/quiz/{id}/questions/{q_id}",
+          "description": "Supprimer une question et ses choix associés.",
+          "params": {
+            "id": "integer (required) - ID du quiz",
+            "q_id": "integer (required) - ID de la question"
+          },
+          "responses": {
+            "200": "{ success: true, message: 'Question supprimée' }",
+            "401": "JWT invalide",
+            "404": "Quiz ou question introuvable"
+          }
+        }
+      ]
+    },
+    "session_management": {
+      "description": "Gestion du cycle de vie d'une session de quiz — JWT requis (hôte uniquement)",
+      "auth_required": true,
+      "auth_type": "JWT_BEARER",
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/quiz/{id}/sessions",
+          "description": "Créer une nouvelle session de quiz. Génère un code de session aléatoire 6 caractères (alphabet sans ambiguïté : sans I, O, 0, 1). La session démarre en statut 'waiting' — les participants peuvent rejoindre avant le lancement.",
+          "params": {
+            "id": "integer (required) - ID du quiz"
+          },
+          "responses": {
+            "201": "{ success: true, message: 'Session créée', data: { session_id: integer, session_code: string } }",
+            "401": "JWT invalide",
+            "404": "Quiz introuvable",
+            "422": "Le quiz ne contient aucune question"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/quiz/sessions/{sid}/next",
+          "description": "Avancer à la question suivante. Premier appel : passe le statut de 'waiting' à 'active' et positionne current_question_idx à 0. Appels suivants : incrémente current_question_idx. Si plus aucune question n'est disponible, clôture automatiquement la session (status: ended) et calcule les classements finaux.",
+          "params": {
+            "sid": "integer (required) - ID de la session"
+          },
+          "responses": {
+            "200_active": "{ success: true, data: { current_question_idx: integer, total_questions: integer } }",
+            "200_ended": "{ success: true, data: { status: 'ended' } } — fin automatique après la dernière question ; le client doit détecter ce cas et rediriger vers les résultats",
+            "401": "JWT invalide",
+            "404": "Session introuvable",
+            "409": "La session est déjà terminée"
+          },
+          "client_notes": "Le client maître doit inspecter data.status === 'ended' dans la réponse 200 pour distinguer 'question suivante' de 'fin automatique'."
+        },
+        {
+          "method": "POST",
+          "path": "/quiz/sessions/{sid}/end",
+          "description": "Terminer manuellement une session. Met le statut à 'ended', enregistre ended_at et calcule les classements finaux via RANK() OVER.",
+          "params": {
+            "sid": "integer (required) - ID de la session"
+          },
+          "responses": {
+            "200": "{ success: true, message: 'Session terminée' }",
+            "401": "JWT invalide",
+            "404": "Session introuvable",
+            "409": "La session est déjà terminée"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/quiz/sessions/{sid}/results",
+          "description": "Obtenir les résultats complets d'une session : classement final, statistiques par question (taux de bonne réponse, temps moyen), nombre de participants.",
+          "params": {
+            "sid": "integer (required) - ID de la session"
+          },
+          "responses": {
+            "200": "{ success: true, data: { session: { id, quiz_id, session_code, status, started_at, ended_at }, total_participants: integer, leaderboard: [{ id, display_name, score: integer, rank: integer }], question_stats: [{ question_id, total_answers, correct_answers, avg_response_time_ms }] } }",
+            "401": "JWT invalide",
+            "404": "Session introuvable"
+          }
+        }
+      ]
+    }
+  },
+  "client_integration": {
+    "description": "Notes d'intégration pour le client Flutter (quiz_client) — Phase 1 sans WebSocket",
+    "polling": {
+      "interval_ms": 2000,
+      "endpoints_polled": [
+        "GET /quiz/session/{session_id} — joueur (attente démarrage + question courante + détection fin)",
+        "GET /quiz/session/{session_id}/leaderboard — maître (classement en direct pendant session)"
+      ],
+      "stop_conditions": "Arrêter le polling quand status === 'ended' ou sur destroy du widget."
+    },
+    "token_storage": {
+      "jwt": "SharedPreferences — clé 'jwt_token'. Expiry 15 jours (voir /auth/login).",
+      "participant_token": "SharedPreferences — clé 'participant_token'. Valide pour la durée de la session.",
+      "device_id": "SharedPreferences — UUID v4 généré une seule fois à l'installation, stable entre sessions."
+    },
+    "reconnection_joueur": {
+      "description": "Si le joueur rouvre l'app pendant une partie, POST /quiz/join avec le même device_id retourne HTTP 200 avec le token existant. Le client doit stocker session_id et participant_token pour reprendre le polling GameScreen sans re-saisir le code.",
+      "409_answer": "Erreur 409 sur POST /answer après reconnexion (déjà répondu) → ignorer silencieusement, afficher état 'en attente prochaine question'."
+    },
+    "session_lifecycle": {
+      "waiting": "Participants rejoignent. current_question_idx = -1. current_question = null.",
+      "active": "Déclenchée par POST /next. current_question_idx passe à 0 puis s'incrémente à chaque /next.",
+      "ended": "Via POST /end (manuel) ou POST /next quand plus aucune question (automatique). data.status === 'ended' dans la réponse de /next signale la fin automatique."
+    },
+    "error_handling": {
+      "401_joueur": "participant_token absent → redirect JoinScreen",
+      "403_joueur": "participant_token invalide ou session terminée → afficher message et redirect HomeScreen",
+      "401_maitre": "JWT expiré ou absent → redirect LoginScreen",
+      "network_retry": "Retry automatique 3× (backoff 1s) avant affichage message utilisateur"
+    }
+  },
+  "models": {
+    "quiz": {
+      "id": "integer",
+      "user_id": "integer - Propriétaire du quiz",
+      "title": "string (max 255)",
+      "description": "string | null",
+      "status": "'draft' | 'active' | 'archived'",
+      "created_at": "datetime",
+      "updated_at": "datetime"
+    },
+    "question": {
+      "id": "integer",
+      "quiz_id": "integer",
+      "type": "'mcq' | 'truefalse' | 'numerical'",
+      "content": "{ text: string, latex?: string, image_url?: string } — stocké JSON",
+      "points": "integer (default: 100)",
+      "time_limit_sec": "integer (default: 30, min: 5, max: 300)",
+      "position": "integer - Ordre dans le quiz (auto-incrémenté)"
+    },
+    "choice": {
+      "id": "integer",
+      "question_id": "integer",
+      "content": "{ text: string, latex?: string, image_url?: string } — stocké JSON",
+      "is_correct": "boolean"
+    },
+    "session": {
+      "id": "integer",
+      "quiz_id": "integer",
+      "host_user_id": "integer",
+      "session_code": "string (6 chars, UNIQUE)",
+      "status": "'waiting' | 'active' | 'ended'",
+      "current_question_idx": "integer (default: -1, -1 = avant le début)",
+      "started_at": "datetime | null",
+      "ended_at": "datetime | null",
+      "created_at": "datetime"
+    },
+    "participant": {
+      "id": "integer",
+      "session_id": "integer",
+      "display_name": "string (max 50)",
+      "device_id": "string (max 128)",
+      "participant_token": "string HMAC-SHA256(session_id|participant_id|device_id, JWT_SECRET)",
+      "score": "integer (default: 0) — cumul des points gagnés",
+      "final_rank": "integer | null - Calculé à la fin de session via RANK() OVER (null tant que la session est active)",
+      "joined_at": "datetime"
+    },
+    "participant_answer": {
+      "id": "integer",
+      "participant_id": "integer",
+      "session_id": "integer",
+      "question_id": "integer",
+      "value": "string - ID du choix sélectionné ou valeur numérique",
+      "is_correct": "boolean",
+      "points_earned": "integer",
+      "response_time_ms": "integer",
+      "answered_at": "datetime",
+      "UNIQUE": "(participant_id, question_id)"
+    }
+  },
+  "scoring": {
+    "formula": "floor(points * max(0, 1 - response_time_ms / (time_limit_sec * 1000)))",
+    "description": "Scoring dégressif linéaire : réponse immédiate = points max, réponse à la limite = 0 point. Réponse incorrecte = 0 point.",
+    "example": "100 pts · 30s · réponse à 10s → floor(100 * (1 - 10000/30000)) = floor(66.66) = 66 pts"
+  },
+  "roadmap": {
+    "phase_2": "Variables dynamiques — colonnes has_variables, variables_config, expression dans quiz_questions ; table quiz_session_questions pour stocker les valeurs tirées au sort",
+    "phase_3": "Moteur math mossadal/math-executor — VariableService.php, évaluation expressions, type=numerical",
+    "phase_4": "Microservice Node.js WebSocket — push temps réel (question_started, session_ended, leaderboard_updated)",
+    "phase_5": "Export CSV résultats — ExportService.php, GET /quiz/sessions/{sid}/export?format=csv"
+  }
+}

@@ -1,0 +1,30 @@
+{
+    "name": "Quiz",
+    "version": "1.0.0",
+    "description": "Module de quiz interactifs en temps réel (type Kahoot)",
+    "author": "CMEM Team",
+    "namespace": "Quiz",
+    "main_class": "Quiz\\QuizPlugin",
+    "min_cmem_version": "1.3.0",
+    "status": "active",
+    "dependencies": {
+        "cmem2_core": ">=1.3.0"
+    },
+    "routes": {
+        "prefix": "/quiz"
+    },
+    "route_handlers": {
+        "quiz": "Quiz\\Routing\\QuizRouteHandler"
+    },
+    "database": {
+        "tables": [
+            "quiz_quizzes",
+            "quiz_questions",
+            "quiz_choices",
+            "quiz_sessions",
+            "quiz_participants",
+            "quiz_participant_answers"
+        ],
+        "migrations_path": "quiz/migrations/"
+    }
+}

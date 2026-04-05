@@ -1,4 +1,4 @@
-# cmem2 — Plan de travail complet
+﻿# cmem2 — Plan de travail complet
 
 > Phase 0 : Couche auth_groups · Phases 1–5 : Plugin ICS / iCal complet
 > Document de travail Claude Code · Mars 2026 · cmem2 v2.0
@@ -7,14 +7,14 @@
 
 ## Vue d'ensemble des phases
 
-| Phase   | Secteur          | Objectif principal                                            | Items | Priorité  | Effort  |
-|---------|------------------|---------------------------------------------------------------|-------|-----------|---------|
-| Phase 0 | auth_groups      | Sécurité (JWT, rate limit), qualité code, validation, router  | 18    | CRITIQUE  | ~11h    |
-| Phase 1 | ICS — Base       | Intégrer sabre/vobject, UID RFC, TZID, line folding           | 4     | HAUTE     | ~4h     |
-| Phase 2 | ICS — VEVENT     | Propriétés manquantes : CATEGORIES, PRIORITY, CLASS, TRANSP…  | 6     | HAUTE     | ~5h15   |
-| Phase 3 | ICS — Attendee   | ATTENDEE complet, ORGANIZER, iTIP, email .ics                 | 4     | MOYENNE   | ~6h     |
-| Phase 4 | ICS — Récurrence | EXDATE, RDATE, RELATED-TO, VALARM, DURATION                   | 5     | MOYENNE   | ~6h45   |
-| Phase 5 | ICS — Composants | VTODO, VJOURNAL, VFREEBUSY                                    | 3     | BASSE     | ~9h     |
+| Phase | Secteur | Objectif principal | Items | Priorité | Effort |
+| --- | --- | ---- | ---- | ------ | ---- |
+| Phase 0 | auth_groups | Sécurité (JWT, rate limit), qualité code, validation, router | 18 | CRITIQUE | ~11h |
+| Phase 1 | ICS — Base | Intégrer sabre/vobject, UID RFC, TZID, line folding | 4 | HAUTE | ~4h |
+| Phase 2 | ICS — VEVENT | Propriétés manquantes : CATEGORIES, PRIORITY, CLASS, TRANSP… | 6 | HAUTE | ~5h15 |
+| Phase 3 | ICS — Attendee | ATTENDEE complet, ORGANIZER, iTIP, email .ics | 4 | MOYENNE | ~6h |
+| Phase 4 | ICS — Récurrence | EXDATE, RDATE, RELATED-TO, VALARM, DURATION | 5 | MOYENNE | ~6h45 |
+| Phase 5 | ICS — Composants | VTODO, VJOURNAL, VFREEBUSY | 3 | BASSE | ~9h |
 
 > **Ordre impératif :** Ph0 → Ph1 → Ph2–5 (Ph2–5 peuvent s'exécuter indépendamment après Ph1)
 >
@@ -302,48 +302,48 @@ D4                  (pipeline middleware — grosse refactorisation, EN DERNIER)
 
 > Tableau de suivi global. Cocher ici une fois l'item terminé et testé.
 
-| #  | Phase | ID  | Description courte                         | Effort | Fait |
-|----|-------|-----|--------------------------------------------|--------|------|
-| 1  | Ph0   | A1  | Blacklist JWT (jti + table)                | 1h30   | ✅   |
-| 2  | Ph0   | A2  | Rate limiting login / send-code            | 1h     | ✅   |
-| 3  | Ph0   | A3  | Rotation device token au refresh           | 45min  | ✅   |
-| 4  | Ph0   | A4  | Fix CORS (PATCH, HEAD, X-API-Key)          | 20min  | ✅   |
-| 5  | Ph0   | C1  | Reset `$errors` dans Validator             | 15min  | ✅   |
-| 6  | Ph0   | C2  | Fix règle `required` (empty → isset)       | 15min  | ✅   |
-| 7  | Ph0   | C3  | Fix `Response::error(array, 429)`          | 10min  | ✅   |
-| 8  | Ph0   | B1  | `static $db` → instance dans BaseModel     | 1h     | ✅   |
-| 9  | Ph0   | B2  | Refactor `User::findById/findByEmail`      | 30min  | ✅   |
-| 10 | Ph0   | B3  | Fusionner `Group::create()` + `create2()`  | 45min  | ✅   |
-| 11 | Ph0   | B4  | Retirer `htmlspecialchars` des modèles     | 20min  | ✅   |
-| 12 | Ph0   | C4  | `countFiltered()` + pagination enrichie    | 1h     | ✅   |
-| 13 | Ph0   | E1  | Endpoint `GET /auth/me`                    | 45min  | ✅   |
-| 14 | Ph0   | E2  | Cron nettoyage OTP                         | 30min  | ✅   |
-| 15 | Ph0   | D1  | Lazy-load handlers (factory closures)      | 45min  | ✅   |
-| 16 | Ph0   | D2  | Externaliser `BASE_PATH`                   | 20min  | ✅   |
-| 17 | Ph0   | D3  | Supprimer fallback `$GLOBALS`              | 15min  | ✅   |
-| 18 | Ph0   | D4  | Pipeline middleware dans `runMiddleware()` | 1h30   | ✅   |
-| 19 | Ph1   | 1.1 | Intégrer sabre/vobject (wrappers)          | 2h     | ✅   |
-| 20 | Ph1   | 1.3 | UID stable UUID v4                         | 45min  | ✅   |
-| 21 | Ph1   | 1.4 | DTSTART;TZID=...                           | 45min  | ✅   |
-| 22 | Ph1   | 1.2 | Line folding RFC 5545                      | 30min  | ✅   |
-| 23 | Ph2   | 2.1 | CATEGORIES                                 | 1h     | ✅   |
-| 24 | Ph2   | 2.2 | PRIORITY                                   | 45min  | ✅   |
-| 25 | Ph2   | 2.3 | CLASS                                      | 30min  | ✅   |
-| 26 | Ph2   | 2.4 | TRANSP                                     | 30min  | ✅   |
-| 27 | Ph2   | 2.5 | URL + GEO                                  | 45min  | ✅   |
-| 28 | Ph2   | 2.6 | ATTACH                                     | 1h     | ✅   |
-| 29 | Ph3   | 3.1 | ATTENDEE complet                           | 1h30   | ✅   |
-| 30 | Ph3   | 3.2 | ORGANIZER                                  | 45min  | ✅   |
-| 31 | Ph3   | 3.3 | iTIP de base (REQUEST/REPLY/CANCEL)        | 1h30   | ✅   |
-| 32 | Ph3   | 3.4 | Email invitation + pièce jointe .ics       | 1h30   | ✅   |
-| 33 | Ph4   | 4.1 | EXDATE                                     | 1h     | ✅   |
-| 34 | Ph4   | 4.2 | RDATE                                      | 1h     | ✅   |
-| 35 | Ph4   | 4.3 | RELATED-TO                                 | 45min  | ✅   |
-| 36 | Ph4   | 4.4 | VALARM export                              | 1h30   | ✅   |
-| 37 | Ph4   | 4.5 | DURATION vs DTEND                          | 1h     | ✅   |
-| 38 | Ph5   | 5.1 | VTODO                                      | 3h     | ✅   |
-| 39 | Ph5   | 5.2 | VJOURNAL                                   | 2h     | ✅   |
-| 40 | Ph5   | 5.3 | VFREEBUSY                                  | 3h     | ✅   |
+| # | Phase | ID | Description courte | Effort | Fait |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Ph0 | A1 | Blacklist JWT (jti + table) | 1h30 | ✅ |
+| 2 | Ph0 | A2 | Rate limiting login / send-code | 1h | ✅ |
+| 3 | Ph0 | A3 | Rotation device token au refresh | 45min | ✅ |
+| 4 | Ph0 | A4 | Fix CORS (PATCH, HEAD, X-API-Key) | 20min | ✅ |
+| 5 | Ph0 | C1 | Reset `$errors` dans Validator | 15min | ✅ |
+| 6 | Ph0 | C2 | Fix règle `required` (empty → isset) | 15min | ✅ |
+| 7 | Ph0 | C3 | Fix `Response::error(array, 429)` | 10min | ✅ |
+| 8 | Ph0 | B1 | `static $db` → instance dans BaseModel | 1h | ✅ |
+| 9 | Ph0 | B2 | Refactor `User::findById/findByEmail` | 30min | ✅ |
+| 10 | Ph0 | B3 | Fusionner `Group::create()` + `create2()` | 45min | ✅ |
+| 11 | Ph0 | B4 | Retirer `htmlspecialchars` des modèles | 20min | ✅ |
+| 12 | Ph0 | C4 | `countFiltered()` + pagination enrichie | 1h | ✅ |
+| 13 | Ph0 | E1 | Endpoint `GET /auth/me` | 45min | ✅ |
+| 14 | Ph0 | E2 | Cron nettoyage OTP | 30min | ✅ |
+| 15 | Ph0 | D1 | Lazy-load handlers (factory closures) | 45min | ✅ |
+| 16 | Ph0 | D2 | Externaliser `BASE_PATH` | 20min | ✅ |
+| 17 | Ph0 | D3 | Supprimer fallback `$GLOBALS` | 15min | ✅ |
+| 18 | Ph0 | D4 | Pipeline middleware dans `runMiddleware()` | 1h30 | ✅ |
+| 19 | Ph1 | 1.1 | Intégrer sabre/vobject (wrappers) | 2h | ✅ |
+| 20 | Ph1 | 1.3 | UID stable UUID v4 | 45min | ✅ |
+| 21 | Ph1 | 1.4 | DTSTART;TZID=... | 45min | ✅ |
+| 22 | Ph1 | 1.2 | Line folding RFC 5545 | 30min | ✅ |
+| 23 | Ph2 | 2.1 | CATEGORIES | 1h | ✅ |
+| 24 | Ph2 | 2.2 | PRIORITY | 45min | ✅ |
+| 25 | Ph2 | 2.3 | CLASS | 30min | ✅ |
+| 26 | Ph2 | 2.4 | TRANSP | 30min | ✅ |
+| 27 | Ph2 | 2.5 | URL + GEO | 45min | ✅ |
+| 28 | Ph2 | 2.6 | ATTACH | 1h | ✅ |
+| 29 | Ph3 | 3.1 | ATTENDEE complet | 1h30 | ✅ |
+| 30 | Ph3 | 3.2 | ORGANIZER | 45min | ✅ |
+| 31 | Ph3 | 3.3 | iTIP de base (REQUEST/REPLY/CANCEL) | 1h30 | ✅ |
+| 32 | Ph3 | 3.4 | Email invitation + pièce jointe .ics | 1h30 | ✅ |
+| 33 | Ph4 | 4.1 | EXDATE | 1h | ✅ |
+| 34 | Ph4 | 4.2 | RDATE | 1h | ✅ |
+| 35 | Ph4 | 4.3 | RELATED-TO | 45min | ✅ |
+| 36 | Ph4 | 4.4 | VALARM export | 1h30 | ✅ |
+| 37 | Ph4 | 4.5 | DURATION vs DTEND | 1h | ✅ |
+| 38 | Ph5 | 5.1 | VTODO | 3h | ✅ |
+| 39 | Ph5 | 5.2 | VJOURNAL | 2h | ✅ |
+| 40 | Ph5 | 5.3 | VFREEBUSY | 3h | ✅ |
 
 ---
 

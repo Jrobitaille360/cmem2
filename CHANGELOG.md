@@ -1,9 +1,81 @@
-# Changelog
+﻿# Changelog
 
 Toutes les modifications notables de ce projet sont documentées ici.
 
 Format : [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/)
 Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
+
+---
+
+## [Unreleased] — 2026-04-05
+
+### Nouveau plugin — Quiz Phase 0 (prérequis)
+
+Phase 0 déjà satisfaite par les prérequis Pomo (voir [2.2.2]) :
+`AbstractPlugin`, `PluginManager`, `CalendarPlugin` conformes — aucun fichier créé.
+
+### Nouveau plugin — Quiz Phase 1 (MVP REST)
+
+Plugin de quiz interactifs en temps réel (type Kahoot). Endpoint prefix `/quiz`.
+
+#### Infrastructure
+
+- **`src/quiz/plugin.json`** — déclaration du plugin (namespace `Quiz`, main_class `Quiz\QuizPlugin`, tables, migrations)
+- **`src/quiz/autoloader.php`** — chargeur PSR-4 pour le namespace `Quiz\`
+- **`composer.json`** — ajout `"Quiz\\": "src/quiz/"` dans l'autoload PSR-4
+- **`src/quiz/QuizPlugin.php`** — hérite `AbstractPlugin`, enregistre `quiz` → `QuizRouteHandler`
+
+#### Routing
+
+- **`src/quiz/Routing/QuizRouteHandler.php`** — handler unique `/quiz/*`, `requiresAuth=false`,
+  auth conditionnelle : JWT pour routes hôte, `participant_token` (Bearer HMAC-SHA256) pour routes participant
+
+#### Modèles
+
+- **`src/quiz/Models/Quiz.php`** — CRUD table `quiz_quizzes`
+- **`src/quiz/Models/Question.php`** — CRUD table `quiz_questions` (auto-position)
+- **`src/quiz/Models/Choice.php`** — CRUD table `quiz_choices` + `findByQuestionIds()` batch
+- **`src/quiz/Models/Session.php`** — table `quiz_sessions` — `advanceQuestion()`, `end()`, `listByHost()`
+- **`src/quiz/Models/Participant.php`** — table `quiz_participants` — `addScore()`, `updateRanks()`, `updateToken()`, `getLeaderboard()`
+- **`src/quiz/Models/ParticipantAnswer.php`** — table `quiz_participant_answers` — contrainte unicité `(participant_id, question_id)`, agrégations résultats
+
+#### Services & Validators
+
+- **`src/quiz/Services/SessionService.php`** — génération `session_code` 6 chars (alphabet sans ambiguïté, `random_int`), `participant_token` HMAC-SHA256(`session_id|participant_id|device_id`, `JWT_SECRET`), scoring décroissant `floor(points * max(0, 1 - elapsed_ms / (time_limit_sec * 1000)))`
+- **`src/quiz/Validators/QuizValidator.php`** — validation CRUD quiz et questions/choix
+- **`src/quiz/Validators/SessionValidator.php`** — validation `join` et `answer`
+
+#### Controllers
+
+- **`src/quiz/Controllers/QuizController.php`** — CRUD quiz, CRUD questions/choix, historique sessions
+- **`src/quiz/Controllers/SessionController.php`** — `createSession`, `nextQuestion`, `endSession`, `getResults`
+- **`src/quiz/Controllers/ParticipantController.php`** — `join` (reconnexion device supportée), `getSession` (question courante sans `is_correct`), `submitAnswer` (vérif question courante + unicité), `getLeaderboard`
+
+#### Migration DB
+
+- **`src/quiz/migrations/001_quiz_base.sql`** — 6 tables : `quiz_quizzes`, `quiz_questions`, `quiz_choices`, `quiz_sessions`, `quiz_participants`, `quiz_participant_answers` avec FK CASCADE et index
+
+#### Routes créées
+
+| Méthode | Route | Auth |
+| --- | --- | --- |
+| POST | `/quiz/join` | `device_id` + body |
+| GET | `/quiz/session/{id}` | `participant_token` |
+| POST | `/quiz/session/{id}/answer` | `participant_token` |
+| GET | `/quiz/session/{id}/leaderboard` | `participant_token` |
+| GET | `/quiz` | JWT |
+| POST | `/quiz` | JWT |
+| GET | `/quiz/{id}` | JWT |
+| PUT | `/quiz/{id}` | JWT |
+| DELETE | `/quiz/{id}` | JWT |
+| POST | `/quiz/{id}/questions` | JWT |
+| PUT | `/quiz/{id}/questions/{q_id}` | JWT |
+| DELETE | `/quiz/{id}/questions/{q_id}` | JWT |
+| POST | `/quiz/{id}/sessions` | JWT |
+| POST | `/quiz/sessions/{sid}/next` | JWT |
+| POST | `/quiz/sessions/{sid}/end` | JWT |
+| GET | `/quiz/sessions/{sid}/results` | JWT |
+| GET | `/quiz/history` | JWT |
 
 ---
 

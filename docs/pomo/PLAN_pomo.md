@@ -1,4 +1,4 @@
-
+﻿
 # Plan : Plugin Pomodoro dans cmem2_API
 
 > Basé sur la documentation client `C:\code\pomodoro\docs` — 1 avril 2026
@@ -135,7 +135,7 @@ Stratégie de résolution de conflits : **last-write-wins** sur `updated_at`.
 ### Routes
 
 | Method            | Route                    | Auth | Description                        |
-|-------------------|--------------------------|------|------------------------------------|
+| ------------------- | -------------------------- | ------ | ------------------------------------ |
 | GET / POST        | `/pomo/sync/sessions`    | JWT  | Sessions Pomodoro                  |
 | GET / POST        | `/pomo/sync/tasks`       | JWT  | Tâches                             |
 | GET / POST        | `/pomo/sync/projects`    | JWT  | Projets (Phase 1B client)          |
