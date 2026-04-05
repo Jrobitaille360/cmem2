@@ -14,6 +14,9 @@ class Quiz extends BaseModel
     public $title;
     public $description;
     public $status;
+    public $result_visibility;
+    public $time_mode;
+    public $total_time_sec;
     public $created_at;
     public $updated_at;
 
@@ -31,13 +34,16 @@ class Quiz extends BaseModel
     public function createFromData(array $data): int
     {
         $stmt = $this->getDb()->prepare("
-            INSERT INTO quiz_quizzes (user_id, title, description, status)
-            VALUES (?, ?, ?, 'draft')
+            INSERT INTO quiz_quizzes (user_id, title, description, status, result_visibility, time_mode, total_time_sec)
+            VALUES (?, ?, ?, 'draft', ?, ?, ?)
         ");
         $stmt->execute([
             $data['user_id'],
             $data['title'],
             $data['description'] ?? null,
+            $data['result_visibility'] ?? 'immediate',
+            $data['time_mode'] ?? 'per_question',
+            $data['total_time_sec'] ?? null,
         ]);
         return (int) $this->getDb()->lastInsertId();
     }
@@ -58,6 +64,18 @@ class Quiz extends BaseModel
         if (isset($data['status'])) {
             $fields[] = 'status = ?';
             $params[]  = $data['status'];
+        }
+        if (isset($data['result_visibility'])) {
+            $fields[] = 'result_visibility = ?';
+            $params[]  = $data['result_visibility'];
+        }
+        if (isset($data['time_mode'])) {
+            $fields[] = 'time_mode = ?';
+            $params[]  = $data['time_mode'];
+        }
+        if (array_key_exists('total_time_sec', $data)) {
+            $fields[] = 'total_time_sec = ?';
+            $params[]  = $data['total_time_sec'];
         }
 
         if (empty($fields)) {

@@ -10,7 +10,9 @@ namespace Quiz\Validators;
  */
 class QuizValidator
 {
-    private const VALID_QUIZ_STATUSES     = ['draft', 'active', 'archived'];
+    private const VALID_QUIZ_STATUSES         = ['draft', 'active', 'archived'];
+    private const VALID_RESULT_VISIBILITY     = ['immediate', 'simultaneous', 'end_only'];
+    private const VALID_TIME_MODES            = ['per_question', 'total', 'unlimited'];
     private const VALID_QUESTION_TYPES    = ['mcq', 'truefalse', 'numerical'];
     private const MAX_TITLE_LENGTH        = 255;
     private const MAX_CHOICES_PER_QUESTION = 8;
@@ -31,6 +33,19 @@ class QuizValidator
             $errors[] = ['field' => 'status', 'code' => 'invalid_value',
                 'message' => "status doit être l'un de : " . implode(', ', self::VALID_QUIZ_STATUSES)];
         }
+        if (isset($data['result_visibility']) && !in_array($data['result_visibility'], self::VALID_RESULT_VISIBILITY, true)) {
+            $errors[] = ['field' => 'result_visibility', 'code' => 'invalid_value',
+                'message' => "result_visibility doit être l'un de : " . implode(', ', self::VALID_RESULT_VISIBILITY)];
+        }
+        if (isset($data['time_mode']) && !in_array($data['time_mode'], self::VALID_TIME_MODES, true)) {
+            $errors[] = ['field' => 'time_mode', 'code' => 'invalid_value',
+                'message' => "time_mode doit être l'un de : " . implode(', ', self::VALID_TIME_MODES)];
+        }
+        if (isset($data['total_time_sec']) && $data['total_time_sec'] !== null
+            && (!is_int($data['total_time_sec']) || $data['total_time_sec'] < 10)) {
+            $errors[] = ['field' => 'total_time_sec', 'code' => 'invalid_value',
+                'message' => 'total_time_sec doit être un entier >= 10'];
+        }
 
         return ['valid' => empty($errors), 'errors' => $errors];
     }
@@ -47,10 +62,22 @@ class QuizValidator
                     'message' => 'Le titre ne doit pas dépasser ' . self::MAX_TITLE_LENGTH . ' caractères'];
             }
         }
-
         if (isset($data['status']) && !in_array($data['status'], self::VALID_QUIZ_STATUSES, true)) {
             $errors[] = ['field' => 'status', 'code' => 'invalid_value',
                 'message' => "status doit être l'un de : " . implode(', ', self::VALID_QUIZ_STATUSES)];
+        }
+        if (isset($data['result_visibility']) && !in_array($data['result_visibility'], self::VALID_RESULT_VISIBILITY, true)) {
+            $errors[] = ['field' => 'result_visibility', 'code' => 'invalid_value',
+                'message' => "result_visibility doit être l'un de : " . implode(', ', self::VALID_RESULT_VISIBILITY)];
+        }
+        if (isset($data['time_mode']) && !in_array($data['time_mode'], self::VALID_TIME_MODES, true)) {
+            $errors[] = ['field' => 'time_mode', 'code' => 'invalid_value',
+                'message' => "time_mode doit être l'un de : " . implode(', ', self::VALID_TIME_MODES)];
+        }
+        if (isset($data['total_time_sec']) && $data['total_time_sec'] !== null
+            && (!is_int($data['total_time_sec']) || $data['total_time_sec'] < 10)) {
+            $errors[] = ['field' => 'total_time_sec', 'code' => 'invalid_value',
+                'message' => 'total_time_sec doit être un entier >= 10'];
         }
 
         return ['valid' => empty($errors), 'errors' => $errors];

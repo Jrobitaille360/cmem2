@@ -9,6 +9,7 @@ use Quiz\Models\Question;
 use Quiz\Models\Choice;
 use Quiz\Models\Participant;
 use Quiz\Models\ParticipantAnswer;
+use Quiz\Models\Quiz;
 use Quiz\Services\SessionService;
 use Quiz\Validators\SessionValidator;
 
@@ -110,11 +111,19 @@ class ParticipantController
             return;
         }
 
+        $quiz = (new Quiz())->findById((int) $session['quiz_id']);
+        $quizSettings = [
+            'result_visibility' => $quiz['result_visibility'] ?? 'immediate',
+            'time_mode'         => $quiz['time_mode']         ?? 'per_question',
+            'total_time_sec'    => isset($quiz['total_time_sec']) ? (int) $quiz['total_time_sec'] : null,
+        ];
+
         $data = [
             'session_id'           => (int) $session['id'],
             'status'               => $session['status'],
             'current_question_idx' => (int) $session['current_question_idx'],
             'current_question'     => null,
+            'quiz_settings'        => $quizSettings,
         ];
 
         // Retourner la question courante si la session est active
