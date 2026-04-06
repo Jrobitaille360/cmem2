@@ -19,10 +19,10 @@ class GooglePlayService
     public function __construct()
     {
         $this->package            = defined('PUZZLE_GOOGLE_PLAY_PACKAGE')
-            ? PUZZLE_GOOGLE_PLAY_PACKAGE
+            ? \PUZZLE_GOOGLE_PLAY_PACKAGE
             : '';
         $this->serviceAccountJson = defined('PUZZLE_GOOGLE_SERVICE_ACCOUNT_JSON')
-            ? PUZZLE_GOOGLE_SERVICE_ACCOUNT_JSON
+            ? \PUZZLE_GOOGLE_SERVICE_ACCOUNT_JSON
             : '';
     }
 

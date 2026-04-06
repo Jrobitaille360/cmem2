@@ -42,7 +42,7 @@ class PuzzleTheme extends BaseModel
         $stmt->execute([$lang]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        $apiBase = defined('API_BASE_URL') ? rtrim(API_BASE_URL, '/') : '';
+        $apiBase = defined('API_BASE_URL') ? rtrim(\API_BASE_URL, '/') : '';
 
         return array_map(fn($r) => [
             'slug'        => $r['slug'],

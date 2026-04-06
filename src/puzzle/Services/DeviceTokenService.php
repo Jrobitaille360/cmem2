@@ -17,7 +17,7 @@ class DeviceTokenService
      */
     public function expiresAt(): string
     {
-        $days = (int) (defined('PUZZLE_DEVICE_TOKEN_DAYS') ? PUZZLE_DEVICE_TOKEN_DAYS : 365);
+        $days = (int) (defined('PUZZLE_DEVICE_TOKEN_DAYS') ? \PUZZLE_DEVICE_TOKEN_DAYS : 365);
         return date('Y-m-d H:i:s', strtotime("+{$days} days"));
     }
 }

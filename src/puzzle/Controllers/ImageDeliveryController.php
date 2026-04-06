@@ -19,7 +19,7 @@ class ImageDeliveryController
     public function __construct()
     {
         $this->uploadDir = defined('PUZZLE_UPLOAD_DIR')
-            ? rtrim(PUZZLE_UPLOAD_DIR, '/')
+            ? rtrim(\PUZZLE_UPLOAD_DIR, '/')
             : rtrim(__DIR__ . '/../../../uploads/puzzle', '/');
     }
 

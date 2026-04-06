@@ -34,3 +34,9 @@ spl_autoload_register(function ($className) {
         require_once $classFile;
     }
 });
+
+// Charger la configuration du module Puzzle
+$puzzleConfigFile = __DIR__ . '/config/puzzle_config.php';
+if (file_exists($puzzleConfigFile)) {
+    require_once $puzzleConfigFile;
+}

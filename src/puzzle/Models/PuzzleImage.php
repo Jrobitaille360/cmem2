@@ -174,7 +174,7 @@ class PuzzleImage extends BaseModel
 
     private function formatImage(array $row): array
     {
-        $apiBase = defined('API_BASE_URL') ? rtrim(API_BASE_URL, '/') : '';
+        $apiBase = defined('API_BASE_URL') ? rtrim(\API_BASE_URL, '/') : '';
         $uid     = $row['uid'];
         $themes  = $this->getThemeSlugsForImage($uid);
 

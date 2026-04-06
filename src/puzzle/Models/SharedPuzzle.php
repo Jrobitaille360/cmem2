@@ -80,7 +80,7 @@ class SharedPuzzle extends BaseModel
             ORDER BY ps.last_activity_at DESC
         ");
         $stmt->execute([$deviceId, $deviceId, $deviceId]);
-        $apiBase = defined('API_BASE_URL') ? rtrim(API_BASE_URL, '/') : '';
+        $apiBase = defined('API_BASE_URL') ? rtrim(\API_BASE_URL, '/') : '';
 
         return array_map(function ($r) use ($apiBase) {
             return [

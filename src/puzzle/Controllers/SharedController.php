@@ -19,8 +19,8 @@ class SharedController
 
     public function __construct()
     {
-        $this->pollActiveWindow    = (int) (defined('PUZZLE_POLL_ACTIVE_WINDOW_SECONDS') ? PUZZLE_POLL_ACTIVE_WINDOW_SECONDS : 10);
-        $this->eventRetentionHours = (int) (defined('PUZZLE_EVENT_RETENTION_HOURS')      ? PUZZLE_EVENT_RETENTION_HOURS      : 24);
+        $this->pollActiveWindow    = (int) (defined('PUZZLE_POLL_ACTIVE_WINDOW_SECONDS') ? \PUZZLE_POLL_ACTIVE_WINDOW_SECONDS : 10);
+        $this->eventRetentionHours = (int) (defined('PUZZLE_EVENT_RETENTION_HOURS')      ? \PUZZLE_EVENT_RETENTION_HOURS      : 24);
     }
 
     // -----------------------------------------------------------------------
