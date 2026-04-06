@@ -7,6 +7,78 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased] — 2026-04-06
+
+### Nouveau plugin — Puzzle (Phases 1–4)
+
+Plugin puzzle sans compte : carrousel d'images, remplacement quotidien, thèmes premium, sauvegarde en ligne et casse-têtes partagés en temps réel. Authentification par token d'appareil opaque, abonnement Google Play. Endpoint prefix `/puzzle`.
+
+#### Infrastructure
+
+- **`src/puzzle/plugin.json`** — déclaration du plugin (namespace `Puzzle`, main_class `Puzzle\PuzzlePlugin`, 9 tables, migrations)
+- **`src/puzzle/autoloader.php`** — chargeur PSR-4 pour le namespace `Puzzle\`
+- **`composer.json`** — ajout `"Puzzle\\": "src/puzzle/"` dans l'autoload PSR-4
+- **`src/puzzle/PuzzlePlugin.php`** — hérite `AbstractPlugin`, enregistre `puzzle` → `PuzzleRouteHandler`
+- **`uploads/puzzle/.htaccess`** — `Deny from all` : images servies uniquement via PHP
+
+#### Routing
+
+- **`src/puzzle/Routing/PuzzleRouteHandler.php`** — handler unique `/puzzle/*`, `requiresAuth=false`,
+  auth via `requireDeviceToken()` (Bearer 64-char hex) et `requirePremium()` (is_premium + premium_expires_at)
+
+#### Modèles
+
+- **`src/puzzle/Models/PuzzleDevice.php`** — upsert appareil, `findByValidToken()`, upgrade abonnement, sauvegarde blob, `touchLastSeen()`, `setLastReplacedAt()`
+- **`src/puzzle/Models/PuzzleImage.php`** — carrousel (30 images), remplacement aléatoire, images par thème, chemins thumb/full, traductions i18n COALESCE fr/en/es
+- **`src/puzzle/Models/PuzzleTheme.php`** — thèmes actifs avec image_count, chemin thumbnail
+- **`src/puzzle/Models/SharedPuzzle.php`** — création, état pièces, `movePiece()` transactionnel + recalcul completion, événements polling, purge auto
+
+#### Services
+
+- **`src/puzzle/Services/DeviceTokenService.php`** — `generateToken()` = `bin2hex(random_bytes(32))`, `expiresAt()` = NOW + 365 j
+- **`src/puzzle/Services/GooglePlayService.php`** — OAuth2 service-account JWT → `androidpublisher.googleapis.com` ; vérifie `expiryTimeMillis`
+- **`src/puzzle/Services/SharedPuzzleService.php`** — `generateSeed()`, UUID v4, `generatePiecesFromSeed()` (LCG reproductible)
+
+#### Controllers
+
+- **`src/puzzle/Controllers/AuthController.php`** — `registerDevice` (public), `verifySubscription` (Google Play), `setPseudonym` (unicité 409)
+- **`src/puzzle/Controllers/CarouselController.php`** — `getCarousel`, `replaceOne` (limite 1/jour, 429 ALREADY_REPLACED_TODAY), `replaceAll` (premium)
+- **`src/puzzle/Controllers/ThemeController.php`** — `getThemes`, `getThemeImages` — Accept-Language → fr/en/es
+- **`src/puzzle/Controllers/ImageDeliveryController.php`** — `serveThumb`, `serveImage`, `serveThemeThumb` via `readfile()` — protection path traversal `realpath()`
+- **`src/puzzle/Controllers/SyncController.php`** — `saveBackup` (max 512 Ko), `getBackup`
+- **`src/puzzle/Controllers/SharedController.php`** — cycle de vie complet partagé : créer, lister, état, mouvement, polling, quitter, supprimer
+
+#### Migration DB
+
+- **`docs/puzzle/migrations/001_puzzle_base.sql`** — 9 tables : `puzzle_devices`, `puzzle_images`, `puzzle_image_translations`, `puzzle_themes`, `puzzle_theme_translations`, `puzzle_image_themes`, `puzzle_shared`, `puzzle_shared_pieces`, `puzzle_shared_events`
+
+#### Routes créées
+
+| Méthode | Route | Auth |
+| --- | --- | --- |
+| POST | `/puzzle/auth/register-device` | aucune |
+| POST | `/puzzle/auth/verify-subscription` | device_token |
+| POST | `/puzzle/auth/pseudonym` | device_token |
+| GET | `/puzzle/carousel` | device_token |
+| POST | `/puzzle/carousel/replace-one` | device_token |
+| POST | `/puzzle/carousel/replace-all` | device_token + premium |
+| GET | `/puzzle/themes` | device_token + premium |
+| GET | `/puzzle/themes/{slug}/images` | device_token + premium |
+| GET | `/puzzle/thumb/{uid}` | device_token |
+| GET | `/puzzle/image/{uid}` | device_token |
+| GET | `/puzzle/thumb/theme/{slug}` | device_token |
+| POST | `/puzzle/backup` | device_token + premium |
+| GET | `/puzzle/backup` | device_token + premium |
+| POST | `/puzzle/shared` | device_token + premium |
+| GET | `/puzzle/shared` | device_token + premium |
+| GET | `/puzzle/shared/{shared_uid}/state` | device_token + premium |
+| POST | `/puzzle/shared/{shared_uid}/move` | device_token + premium |
+| GET | `/puzzle/shared/{shared_uid}/events` | device_token + premium |
+| POST | `/puzzle/shared/{shared_uid}/leave` | device_token + premium |
+| DELETE | `/puzzle/shared/{shared_uid}` | device_token + premium (créateur) |
+
+---
+
 ## [Unreleased] — 2026-04-05
 
 ### Nouveau plugin — Quiz Phase 0 (prérequis)

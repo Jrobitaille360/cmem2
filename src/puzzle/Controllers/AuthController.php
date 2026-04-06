@@ -1,0 +1,129 @@
+<?php
+
+namespace Puzzle\Controllers;
+
+use AuthGroups\Middleware\LoggingMiddleware;
+use AuthGroups\Utils\Response;
+use Puzzle\Models\PuzzleDevice;
+use Puzzle\Services\DeviceTokenService;
+use Puzzle\Services\GooglePlayService;
+
+/**
+ * AuthController — enregistrement appareil, validation abonnement, pseudonyme
+ */
+class AuthController
+{
+    // -----------------------------------------------------------------------
+    // POST /puzzle/auth/register-device  (sans auth)
+    // -----------------------------------------------------------------------
+
+    public function registerDevice(): void
+    {
+        LoggingMiddleware::logEntry();
+        $input = Response::getRequestParams();
+
+        $deviceUuid = trim($input['device_uuid'] ?? '');
+        if ($deviceUuid === '') {
+            LoggingMiddleware::logExit(422);
+            Response::error('device_uuid requis', ['field' => 'device_uuid'], 422);
+            return;
+        }
+
+        $svc        = new DeviceTokenService();
+        $token      = $svc->generateToken();
+        $expiresAt  = $svc->expiresAt();
+
+        $deviceModel = new PuzzleDevice();
+        $deviceModel->upsert($deviceUuid, $token, $expiresAt);
+
+        LoggingMiddleware::logExit(200);
+        Response::success('Appareil enregistré', [
+            'device_token' => $token,
+            'expires_at'   => date('c', strtotime($expiresAt)),
+        ]);
+    }
+
+    // -----------------------------------------------------------------------
+    // POST /puzzle/auth/verify-subscription  (device_token)
+    // -----------------------------------------------------------------------
+
+    public function verifySubscription(array $device): void
+    {
+        LoggingMiddleware::logEntry();
+        $input = Response::getRequestParams();
+
+        $purchaseToken = trim($input['purchase_token'] ?? '');
+        $productId     = trim($input['product_id'] ?? '');
+
+        if ($purchaseToken === '' || $productId === '') {
+            LoggingMiddleware::logExit(422);
+            Response::error('purchase_token et product_id requis', null, 422);
+            return;
+        }
+
+        $validProducts = ['premium_monthly', 'premium_yearly'];
+        if (!in_array($productId, $validProducts, true)) {
+            LoggingMiddleware::logExit(422);
+            Response::error('product_id invalide', ['field' => 'product_id'], 422);
+            return;
+        }
+
+        $result = (new GooglePlayService())->validateSubscription($purchaseToken, $productId);
+
+        if ($result === null) {
+            LoggingMiddleware::logExit(422);
+            Response::error('Reçu Google Play invalide ou abonnement expiré', ['code' => 'SUBSCRIPTION_INVALID'], 422);
+            return;
+        }
+
+        (new PuzzleDevice())->updateSubscription((int) $device['id'], [
+            'is_premium'     => $result['is_premium'],
+            'purchase_token' => $result['purchase_token'],
+            'product_id'     => $result['product_id'],
+            'premium_expires_at' => $result['expires_at'],
+        ]);
+
+        LoggingMiddleware::logExit(200);
+        Response::success(
+            $result['is_premium'] ? 'Abonnement actif' : 'Abonnement expiré',
+            [
+                'is_premium' => (bool) $result['is_premium'],
+                'product_id' => $result['product_id'],
+                'expires_at' => date('c', strtotime($result['expires_at'])),
+            ]
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // POST /puzzle/auth/pseudonym  (device_token)
+    // -----------------------------------------------------------------------
+
+    public function setPseudonym(array $device): void
+    {
+        LoggingMiddleware::logEntry();
+        $input = Response::getRequestParams();
+
+        $pseudonym = trim($input['pseudonym'] ?? '');
+
+        if ($pseudonym === '' || mb_strlen($pseudonym) < 3 || mb_strlen($pseudonym) > 50) {
+            LoggingMiddleware::logExit(422);
+            Response::error('Pseudonyme invalide (3–50 caractères)', ['field' => 'pseudonym'], 422);
+            return;
+        }
+
+        $deviceModel = new PuzzleDevice();
+
+        // Vérifier unicité
+        $existing = $deviceModel->findByPseudonym($pseudonym);
+        if ($existing && (int) $existing['id'] !== (int) $device['id']) {
+            LoggingMiddleware::logExit(409);
+            Response::error('Pseudonyme déjà utilisé', ['code' => 'PSEUDONYM_TAKEN'], 409);
+            return;
+        }
+
+        $deviceModel->setPseudonym((int) $device['id'], $pseudonym);
+
+        LoggingMiddleware::logExit(200);
+        Response::success('Pseudonyme enregistré', ['pseudonym' => $pseudonym]);
+    }
+}

@@ -16,7 +16,8 @@
         "psr-4": {
             "AuthGroups\\": "src/auth_groups/",
             "Pomo\\": "src/pomo/",
-            "Quiz\\": "src/quiz/"
+            "Quiz\\": "src/quiz/",
+            "Puzzle\\": "src/puzzle/"
         },
         "files": [
             "src/auth_groups/database.php"

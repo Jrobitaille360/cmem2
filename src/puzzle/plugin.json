@@ -1,0 +1,33 @@
+{
+    "name": "Puzzle",
+    "version": "1.0.0",
+    "description": "Plugin puzzle : carrousel, thèmes, sauvegarde en ligne, casse-têtes partagés",
+    "author": "CMEM Team",
+    "namespace": "Puzzle",
+    "main_class": "Puzzle\\PuzzlePlugin",
+    "min_cmem_version": "1.3.0",
+    "status": "active",
+    "dependencies": {
+        "cmem2_core": ">=1.3.0"
+    },
+    "routes": {
+        "prefix": "/puzzle"
+    },
+    "route_handlers": {
+        "puzzle": "Puzzle\\Routing\\PuzzleRouteHandler"
+    },
+    "database": {
+        "tables": [
+            "puzzle_devices",
+            "puzzle_images",
+            "puzzle_image_translations",
+            "puzzle_themes",
+            "puzzle_theme_translations",
+            "puzzle_image_themes",
+            "puzzle_shared",
+            "puzzle_shared_pieces",
+            "puzzle_shared_events"
+        ],
+        "migrations_path": "puzzle/migrations/"
+    }
+}
