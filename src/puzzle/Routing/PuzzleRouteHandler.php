@@ -4,6 +4,7 @@ namespace Puzzle\Routing;
 
 use AuthGroups\Routing\BaseRouteHandler;
 use AuthGroups\Utils\Response;
+use Puzzle\Controllers\AdminController;
 use Puzzle\Controllers\AuthController;
 use Puzzle\Controllers\CarouselController;
 use Puzzle\Controllers\ThemeController;
@@ -52,6 +53,14 @@ class PuzzleRouteHandler extends BaseRouteHandler
         $s2 = $segments[2] ?? '';   // sous-route
         $s3 = $segments[3] ?? '';   // sous-ressource
         $s4 = $segments[4] ?? '';   // action
+
+        // -------------------------------------------------------------------
+        // /puzzle/admin/*  (JWT cmem2 + rôle ADMINISTRATEUR)
+        // -------------------------------------------------------------------
+        if ($s1 === 'admin') {
+            $this->handleAdminRoute($segments, $method);
+            return;
+        }
 
         // -------------------------------------------------------------------
         // /puzzle/auth/*
@@ -199,6 +208,52 @@ class PuzzleRouteHandler extends BaseRouteHandler
         }
 
         Response::error('Endpoint non trouvé', null, 404);
+    }
+
+    // -----------------------------------------------------------------------
+    // Admin — dispatch et middleware JWT
+    // -----------------------------------------------------------------------
+
+    /**
+     * Dispatch des routes /puzzle/admin/*
+     * L'authentification JWT est vérifiée dans requireAdminJwt().
+     */
+    private function handleAdminRoute(array $segments, string $method): void
+    {
+        $user = $this->requireAdminJwt();
+        if ($user === null) return;
+
+        $s2 = $segments[2] ?? ''; // 'images' | 'themes'
+        $s3 = $segments[3] ?? ''; // uid | slug | 'reorder' | 'generate'
+        $s4 = $segments[4] ?? ''; // 'images' (themes/{slug}/images)
+
+        if ($s2 === 'images') {
+            (new AdminController())->handleImages($s3, $s4, $method, $user);
+            return;
+        }
+        if ($s2 === 'themes') {
+            (new AdminController())->handleThemes($s3, $s4, $method, $user);
+            return;
+        }
+        Response::error('Endpoint non trouvé', null, 404);
+    }
+
+    /**
+     * Valide le JWT cmem2 et vérifie le rôle ADMINISTRATEUR.
+     * Retourne le tableau $user ou envoie HTTP 401/403.
+     */
+    private function requireAdminJwt(): ?array
+    {
+        $user = $this->authService?->authenticate();
+        if (!$user) {
+            Response::error('Authentification requise', null, 401);
+            return null;
+        }
+        if ($user['role'] !== 'ADMINISTRATEUR') {
+            Response::error('Accès refusé : rôle ADMINISTRATEUR requis', null, 403);
+            return null;
+        }
+        return $user;
     }
 
     // -----------------------------------------------------------------------

@@ -77,6 +77,32 @@ Plugin puzzle sans compte : carrousel d'images, remplacement quotidien, thèmes 
 | POST | `/puzzle/shared/{shared_uid}/leave` | device_token + premium |
 | DELETE | `/puzzle/shared/{shared_uid}` | device_token + premium (créateur) |
 
+### Endpoints Admin — Plugin Puzzle (puzzle_images_manager)
+
+Interface d'administration REST destinée au SPA React **puzzle_images_manager**. Toutes les routes requièrent un JWT cmem2 avec rôle `ADMINISTRATEUR`. Upload GD : JPEG/PNG → JPEG (pleine résolution ≤ 2000 px + miniature 400 px).
+
+#### Fichiers créés / modifiés
+
+- **`src/puzzle/Controllers/AdminController.php`** — CRUD complet images et thèmes (list, create, update, delete, reorder, setThemeImages) avec guard 409 sur sessions actives
+- **`src/puzzle/Services/AdminImageService.php`** — pipeline GD : validation MIME/taille, flatten alpha PNG, resize pleine résolution, génération miniature
+- **`src/puzzle/Routing/PuzzleRouteHandler.php`** — ajout du bloc admin (`$s1 === 'admin'`), méthode `handleAdminRoute()`, méthode `requireAdminJwt()` (JWT + rôle `ADMINISTRATEUR`)
+- **`.env.example`** — `ALLOWED_ORIGINS` étendu : ajout `http://localhost:5173` et `https://images_manager.journauxdebord.com`
+
+#### Routes créées
+
+| Méthode | Route | Auth |
+| --- | --- | --- |
+| GET | `/puzzle/admin/images` | JWT + ADMINISTRATEUR |
+| POST | `/puzzle/admin/images` | JWT + ADMINISTRATEUR |
+| PUT | `/puzzle/admin/images/reorder` | JWT + ADMINISTRATEUR |
+| PUT | `/puzzle/admin/images/{uid}` | JWT + ADMINISTRATEUR |
+| DELETE | `/puzzle/admin/images/{uid}` | JWT + ADMINISTRATEUR |
+| GET | `/puzzle/admin/themes` | JWT + ADMINISTRATEUR |
+| POST | `/puzzle/admin/themes` | JWT + ADMINISTRATEUR |
+| PUT | `/puzzle/admin/themes/{slug}` | JWT + ADMINISTRATEUR |
+| DELETE | `/puzzle/admin/themes/{slug}` | JWT + ADMINISTRATEUR |
+| PUT | `/puzzle/admin/themes/{slug}/images` | JWT + ADMINISTRATEUR |
+
 ---
 
 ## [Unreleased] — 2026-04-05

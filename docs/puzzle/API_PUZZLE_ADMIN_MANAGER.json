@@ -1,0 +1,199 @@
+{
+  "api": {
+    "name": "Puzzle Admin API",
+    "version": "1.0.0",
+    "description": "API d'administration du plugin Puzzle. Destinée au SPA React puzzle_images_manager. Permet la gestion complète des images du carrousel et des thèmes premium (CRUD, upload GD, tri, association image-thème).",
+    "generated": "2026-04-06",
+    "reviewed": "2026-04-06",
+    "review_notes": "Implémentation initiale — AdminController + AdminImageService. Toutes les routes requièrent un JWT cmem2 avec rôle ADMINISTRATEUR.",
+    "base_url": "/puzzle/admin",
+    "authentication": {
+      "types": ["JWT_BEARER"],
+      "jwt": {
+        "header": "Authorization: Bearer {jwt_token}",
+        "description": "JWT cmem2 obtenu via POST /auth/login. Le payload doit contenir le rôle ADMINISTRATEUR. Token invalide ou rôle insuffisant → 401/403."
+      }
+    }
+  },
+  "endpoints": {
+    "images": {
+      "description": "Gestion du carrousel d'images — création, modification, tri, suppression. Upload traité par GD (JPEG/PNG → JPEG pleine résolution ≤2000px + miniature 400px).",
+      "auth_required": true,
+      "auth_type": "JWT_BEARER",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/puzzle/admin/images",
+          "description": "Lister les images du carrousel, paginé. Supporte un filtre par statut.",
+          "query_params": {
+            "page": "integer (optional, default: 1) - Numéro de page",
+            "per_page": "integer (optional, default: 20) - Résultats par page",
+            "status": "string (optional, default: 'all') - Filtre : 'active' | 'inactive' | 'all'"
+          },
+          "responses": {
+            "200": "{ success: true, data: [ { uid: string, full_path: string, thumb_path: string, sort_order: integer, status: 'active'|'inactive', label_fr: string, label_en: string|null, label_es: string|null, created_at: string } ], meta: { total: integer, page: integer, per_page: integer, total_pages: integer } }",
+            "401": "Token absent ou invalide",
+            "403": "Rôle insuffisant"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/puzzle/admin/images",
+          "description": "Ajouter une nouvelle image au carrousel. Corps multipart/form-data. Le serveur génère un UUID v4. L'image est convertie en JPEG et une miniature 400px est créée automatiquement.",
+          "body": {
+            "image": "file (required) - Fichier JPEG ou PNG, max 10 Mo",
+            "label_fr": "string (required) - Label en français",
+            "label_en": "string (optional) - Label en anglais",
+            "label_es": "string (optional) - Label en espagnol",
+            "status": "string (optional, default: 'active') - 'active' ou 'inactive'"
+          },
+          "responses": {
+            "201": "{ success: true, message: 'Image créée', data: { uid: string, full_path: string, thumb_path: string, sort_order: integer, status: string, label_fr: string } }",
+            "401": "Token absent ou invalide",
+            "403": "Rôle insuffisant",
+            "422": "Données invalides — label_fr manquant, fichier absent ou type non supporté"
+          },
+          "notes": "Les chemins full_path et thumb_path sont relatifs à PUZZLE_UPLOAD_DIR. Utilisez GET /puzzle/image/{uid} et GET /puzzle/thumb/{uid} pour servir les fichiers."
+        },
+        {
+          "method": "PUT",
+          "path": "/puzzle/admin/images/reorder",
+          "description": "Réordonner les images du carrousel. Fournir un tableau d'UIDs dans le nouvel ordre désiré. Les sort_order sont mis à jour en lot.",
+          "body": {
+            "order": "string[] (required) - Tableau d'UIDs dans l'ordre souhaité"
+          },
+          "responses": {
+            "200": "{ success: true, message: 'Ordre mis à jour' }",
+            "401": "Token absent ou invalide",
+            "403": "Rôle insuffisant",
+            "422": "Champ order manquant ou vide"
+          },
+          "notes": "Les UIDs non reconnus sont ignorés silencieusement."
+        },
+        {
+          "method": "PUT",
+          "path": "/puzzle/admin/images/{uid}",
+          "description": "Modifier les métadonnées d'une image (labels i18n, statut). Tous les champs sont optionnels — seuls les champs fournis sont mis à jour.",
+          "params": {
+            "uid": "string (required) - UUID v4 de l'image"
+          },
+          "body": {
+            "label_fr": "string (optional) - Nouveau label français",
+            "label_en": "string (optional) - Nouveau label anglais",
+            "label_es": "string (optional) - Nouveau label espagnol",
+            "status": "string (optional) - 'active' ou 'inactive'"
+          },
+          "responses": {
+            "200": "{ success: true, message: 'Image mise à jour' }",
+            "401": "Token absent ou invalide",
+            "403": "Rôle insuffisant",
+            "404": "UID introuvable"
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/puzzle/admin/images/{uid}",
+          "description": "Supprimer une image du carrousel. Supprime l'enregistrement DB (CASCADE sur traductions et associations), ainsi que les fichiers physiques (full + thumb). Refusé si l'image est utilisée dans une session partagée active.",
+          "params": {
+            "uid": "string (required) - UUID v4 de l'image"
+          },
+          "responses": {
+            "200": "{ success: true, message: 'Image supprimée' }",
+            "401": "Token absent ou invalide",
+            "403": "Rôle insuffisant",
+            "404": "UID introuvable",
+            "409": "Image utilisée dans une session partagée active — suppression impossible"
+          }
+        }
+      ]
+    },
+    "themes": {
+      "description": "Gestion des thèmes premium — création avec miniature, modification, association d'images, suppression. Le slug sert d'identifiant stable (^[a-z0-9_-]+$).",
+      "auth_required": true,
+      "auth_type": "JWT_BEARER",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/puzzle/admin/themes",
+          "description": "Lister tous les thèmes avec le nombre d'images associées et leurs traductions.",
+          "responses": {
+            "200": "{ success: true, data: [ { slug: string, thumb_path: string, label_fr: string, label_en: string|null, label_es: string|null, image_count: integer, created_at: string } ] }",
+            "401": "Token absent ou invalide",
+            "403": "Rôle insuffisant"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/puzzle/admin/themes",
+          "description": "Créer un nouveau thème. Corps multipart/form-data. La miniature est redimensionnée à 400px de large (JPEG 85).",
+          "body": {
+            "thumb": "file (required) - Miniature JPEG ou PNG, max 5 Mo",
+            "slug": "string (required) - Identifiant unique — regex ^[a-z0-9_-]+$",
+            "label_fr": "string (required) - Label en français",
+            "label_en": "string (optional) - Label en anglais",
+            "label_es": "string (optional) - Label en espagnol"
+          },
+          "responses": {
+            "201": "{ success: true, message: 'Thème créé', data: { slug: string, thumb_path: string, label_fr: string, label_en: string|null, label_es: string|null, image_count: 0 } }",
+            "401": "Token absent ou invalide",
+            "403": "Rôle insuffisant",
+            "409": "Slug déjà existant",
+            "422": "Slug invalide, label_fr manquant ou fichier absent/invalide"
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/puzzle/admin/themes/{slug}",
+          "description": "Modifier un thème existant. Corps multipart/form-data. Tous les champs sont optionnels — seuls les champs fournis sont mis à jour. Si thumb est fournie, elle remplace la miniature existante.",
+          "params": {
+            "slug": "string (required) - Identifiant du thème"
+          },
+          "body": {
+            "thumb": "file (optional) - Nouvelle miniature (remplace l'ancienne)",
+            "label_fr": "string (optional) - Nouveau label français",
+            "label_en": "string (optional) - Nouveau label anglais",
+            "label_es": "string (optional) - Nouveau label espagnol"
+          },
+          "responses": {
+            "200": "{ success: true, message: 'Thème mis à jour' }",
+            "401": "Token absent ou invalide",
+            "403": "Rôle insuffisant",
+            "404": "Slug introuvable"
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/puzzle/admin/themes/{slug}",
+          "description": "Supprimer un thème. Supprime l'enregistrement DB (CASCADE sur traductions et associations image-thème) et le fichier miniature physique.",
+          "params": {
+            "slug": "string (required) - Identifiant du thème"
+          },
+          "responses": {
+            "200": "{ success: true, message: 'Thème supprimé' }",
+            "401": "Token absent ou invalide",
+            "403": "Rôle insuffisant",
+            "404": "Slug introuvable"
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/puzzle/admin/themes/{slug}/images",
+          "description": "Remplacer complètement la liste d'images associées à un thème. Toutes les associations existantes sont supprimées puis les nouvelles sont insérées. Fournir un tableau vide désassocie toutes les images.",
+          "params": {
+            "slug": "string (required) - Identifiant du thème"
+          },
+          "body": {
+            "image_uids": "string[] (required) - Tableau d'UIDs d'images à associer (peut être vide [])"
+          },
+          "responses": {
+            "200": "{ success: true, message: 'Images du thème mises à jour' }",
+            "401": "Token absent ou invalide",
+            "403": "Rôle insuffisant",
+            "404": "Slug introuvable",
+            "422": "Champ image_uids manquant ou non-tableau"
+          }
+        }
+      ]
+    }
+  }
+}
