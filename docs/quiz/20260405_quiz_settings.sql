@@ -10,3 +10,7 @@ ALTER TABLE `quiz_quizzes`
         COMMENT 'Mode de gestion du temps : par question, total quiz, ou illimité',
     ADD COLUMN `total_time_sec` INT NULL DEFAULT NULL
         COMMENT 'Durée totale du quiz en secondes (time_mode=total uniquement)';
+
+ALTER TABLE `quiz_quizzes`
+    ADD COLUMN `show_leaderboard` TINYINT(1) NOT NULL DEFAULT 1
+        COMMENT '1 = afficher classement aux joueurs en fin de partie';

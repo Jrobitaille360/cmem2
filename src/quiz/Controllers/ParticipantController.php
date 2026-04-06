@@ -116,6 +116,7 @@ class ParticipantController
             'result_visibility' => $quiz['result_visibility'] ?? 'immediate',
             'time_mode'         => $quiz['time_mode']         ?? 'per_question',
             'total_time_sec'    => isset($quiz['total_time_sec']) ? (int) $quiz['total_time_sec'] : null,
+            'show_leaderboard'  => (bool) ($quiz['show_leaderboard'] ?? true),
         ];
 
         $data = [

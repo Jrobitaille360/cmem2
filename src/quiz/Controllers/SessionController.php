@@ -147,12 +147,25 @@ class SessionController
         $questionStats = (new ParticipantAnswer())->getResultsBySession($sessionId);
         $totalPart     = (new Participant())->countBySession($sessionId);
 
+        // IDs des participants ayant répondu à la question courante (pour le maître)
+        $answeredCurrentIds = [];
+        if ($session['status'] === 'active') {
+            $questions = (new Question())->findByQuizId((int) $session['quiz_id']);
+            $idx       = (int) $session['current_question_idx'];
+            if (isset($questions[$idx])) {
+                $currentQuestionId = (int) $questions[$idx]['id'];
+                $answers = (new ParticipantAnswer())->findBySessionAndQuestion($sessionId, $currentQuestionId);
+                $answeredCurrentIds = array_map(fn($a) => (int) $a['participant_id'], $answers);
+            }
+        }
+
         LoggingMiddleware::logExit(200);
         Response::success('Résultats', [
-            'session'        => $session,
+            'session'            => $session,
             'total_participants' => $totalPart,
-            'leaderboard'    => $leaderboard,
-            'question_stats' => $questionStats,
+            'leaderboard'        => $leaderboard,
+            'question_stats'     => $questionStats,
+            'answered_current'   => $answeredCurrentIds,
         ]);
     }
 }
