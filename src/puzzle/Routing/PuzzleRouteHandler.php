@@ -226,15 +226,36 @@ class PuzzleRouteHandler extends BaseRouteHandler
         $s2 = $segments[2] ?? ''; // 'images' | 'themes'
         $s3 = $segments[3] ?? ''; // uid | slug | 'reorder' | 'generate'
         $s4 = $segments[4] ?? ''; // 'images' (themes/{slug}/images)
+        $s5 = $segments[5] ?? ''; // uid (themes/{slug}/images/{uid})
 
         if ($s2 === 'images') {
             (new AdminController())->handleImages($s3, $s4, $method, $user);
             return;
         }
         if ($s2 === 'themes') {
-            (new AdminController())->handleThemes($s3, $s4, $method, $user);
+            (new AdminController())->handleThemes($s3, $s4, $s5, $method, $user);
             return;
         }
+
+        // GET /puzzle/admin/thumb/{uid}
+        // GET /puzzle/admin/thumb/theme/{slug}
+        if ($s2 === 'thumb' && $method === 'GET') {
+            if ($s3 === 'theme' && $s4 !== '') {
+                (new ImageDeliveryController())->serveThemeThumb($s4);
+            } elseif ($s3 !== '') {
+                (new ImageDeliveryController())->serveThumb($s3);
+            } else {
+                Response::error('Endpoint non trouvé', null, 404);
+            }
+            return;
+        }
+
+        // GET /puzzle/admin/image/{uid}
+        if ($s2 === 'image' && $s3 !== '' && $method === 'GET') {
+            (new ImageDeliveryController())->serveImage($s3);
+            return;
+        }
+
         Response::error('Endpoint non trouvé', null, 404);
     }
 

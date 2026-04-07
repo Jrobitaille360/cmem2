@@ -22,11 +22,14 @@ use PDO;
  *   DELETE /puzzle/admin/images/{uid}          → deleteImage()
  *
  * Routes thèmes :
- *   GET    /puzzle/admin/themes                → listThemes()
- *   POST   /puzzle/admin/themes                → createTheme()
- *   PUT    /puzzle/admin/themes/{slug}         → updateTheme()
- *   DELETE /puzzle/admin/themes/{slug}         → deleteTheme()
- *   PUT    /puzzle/admin/themes/{slug}/images  → setThemeImages()
+ *   GET    /puzzle/admin/themes                         → listThemes()
+ *   POST   /puzzle/admin/themes                         → createTheme()
+ *   GET    /puzzle/admin/themes/{slug}                  → getTheme()
+ *   PUT    /puzzle/admin/themes/{slug}                  → updateTheme()
+ *   DELETE /puzzle/admin/themes/{slug}                  → deleteTheme()
+ *   PUT    /puzzle/admin/themes/{slug}/images           → setThemeImages()
+ *   POST   /puzzle/admin/themes/{slug}/images/{uid}     → addThemeImage()
+ *   DELETE /puzzle/admin/themes/{slug}/images/{uid}     → removeThemeImage()
  */
 class AdminController
 {
@@ -80,7 +83,7 @@ class AdminController
     // Dispatch thèmes
     // -----------------------------------------------------------------------
 
-    public function handleThemes(string $s3, string $s4, string $method, array $user): void
+    public function handleThemes(string $s3, string $s4, string $s5, string $method, array $user): void
     {
         // GET /puzzle/admin/themes
         if ($s3 === '' && $method === 'GET') {
@@ -95,10 +98,30 @@ class AdminController
         }
 
         if ($s3 !== '') {
-            // PUT /puzzle/admin/themes/{slug}/images
-            if ($s4 === 'images' && $method === 'PUT') {
-                $this->setThemeImages($s3);
+            // GET /puzzle/admin/themes/{slug}  (4.6)
+            if ($s4 === '' && $method === 'GET') {
+                $this->getTheme($s3);
                 return;
+            }
+
+            if ($s4 === 'images') {
+                // POST /puzzle/admin/themes/{slug}/images/{uid}  (4.7)
+                if ($s5 !== '' && $method === 'POST') {
+                    $this->addThemeImage($s3, $s5);
+                    return;
+                }
+
+                // DELETE /puzzle/admin/themes/{slug}/images/{uid}  (4.8)
+                if ($s5 !== '' && $method === 'DELETE') {
+                    $this->removeThemeImage($s3, $s5);
+                    return;
+                }
+
+                // PUT /puzzle/admin/themes/{slug}/images  (4.5)
+                if ($s5 === '' && $method === 'PUT') {
+                    $this->setThemeImages($s3);
+                    return;
+                }
             }
 
             // PUT /puzzle/admin/themes/{slug}
@@ -184,8 +207,8 @@ class AdminController
             $uid = $img['uid'];
             return [
                 'uid'          => $uid,
-                'thumb_url'    => "{$apiBase}/puzzle/thumb/{$uid}",
-                'full_url'     => "{$apiBase}/puzzle/image/{$uid}",
+                'thumb_url'    => "{$apiBase}/puzzle/admin/thumb/{$uid}",
+                'full_url'     => "{$apiBase}/puzzle/admin/image/{$uid}",
                 'is_carousel'  => (bool) $img['is_carousel'],
                 'sort_order'   => (int)  $img['sort_order'],
                 'status'       => $img['status'],
@@ -264,8 +287,8 @@ class AdminController
         LoggingMiddleware::logExit(201);
         Response::success('Image créée', [
             'uid'          => $uid,
-            'thumb_url'    => "{$apiBase}/puzzle/thumb/{$uid}",
-            'full_url'     => "{$apiBase}/puzzle/image/{$uid}",
+            'thumb_url'    => "{$apiBase}/puzzle/admin/thumb/{$uid}",
+            'full_url'     => "{$apiBase}/puzzle/admin/image/{$uid}",
             'status'       => $status,
             'translations' => [
                 'fr' => $labelFr,
@@ -524,7 +547,7 @@ class AdminController
         LoggingMiddleware::logExit(201);
         Response::success('Thème créé', [
             'slug'        => $slug,
-            'thumb_url'   => "{$apiBase}/puzzle/thumb/theme/{$slug}",
+            'thumb_url'   => "{$apiBase}/puzzle/admin/thumb/theme/{$slug}",
             'sort_order'  => $sortOrder,
             'status'      => $status,
             'image_count' => 0,
@@ -633,6 +656,138 @@ class AdminController
         Response::success('Thème supprimé.');
     }
 
+    private function getTheme(string $slug): void
+    {
+        LoggingMiddleware::logEntry();
+
+        if (!preg_match('/^[a-z0-9_-]+$/', $slug)) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Thème introuvable', null, 404);
+            return;
+        }
+
+        $theme = $this->findThemeBySlug($slug);
+        if (!$theme) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Thème introuvable', null, 404);
+            return;
+        }
+
+        $stmt = $this->db->prepare("
+            SELECT pi.uid
+            FROM puzzle_image_themes pit
+            JOIN puzzle_images pi ON pi.id = pit.image_id
+            WHERE pit.theme_id = :theme_id
+            ORDER BY pi.sort_order ASC, pi.id ASC
+        ");
+        $stmt->execute([':theme_id' => $theme['id']]);
+        $imageUids = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+        $apiBase = defined('API_BASE_URL') ? rtrim(\API_BASE_URL, '/') : '';
+        $data = $this->formatThemeForAdmin($theme, $apiBase);
+        $data['image_uids'] = $imageUids;
+
+        LoggingMiddleware::logExit(200);
+        Response::success('Thème chargé', $data);
+    }
+
+    private function addThemeImage(string $slug, string $uid): void
+    {
+        LoggingMiddleware::logEntry();
+
+        if (!preg_match('/^[a-z0-9_-]+$/', $slug)) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Thème introuvable', null, 404);
+            return;
+        }
+
+        $theme = $this->findThemeBySlug($slug);
+        if (!$theme) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Thème introuvable', null, 404);
+            return;
+        }
+
+        if (!$this->isValidUuid($uid)) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Image introuvable', null, 404);
+            return;
+        }
+
+        $row = $this->db->prepare('SELECT id FROM puzzle_images WHERE uid = :uid');
+        $row->execute([':uid' => $uid]);
+        $imageId = $row->fetchColumn();
+        if ($imageId === false) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Image introuvable', null, 404);
+            return;
+        }
+
+        $check = $this->db->prepare(
+            'SELECT COUNT(*) FROM puzzle_image_themes WHERE image_id = :image_id AND theme_id = :theme_id'
+        );
+        $check->execute([':image_id' => $imageId, ':theme_id' => $theme['id']]);
+        if ((int) $check->fetchColumn() > 0) {
+            LoggingMiddleware::logExit(409);
+            Response::error('Image déjà dans le thème', null, 409);
+            return;
+        }
+
+        $this->db->prepare(
+            'INSERT INTO puzzle_image_themes (image_id, theme_id) VALUES (:image_id, :theme_id)'
+        )->execute([':image_id' => $imageId, ':theme_id' => $theme['id']]);
+
+        LoggingMiddleware::logExit(200);
+        Response::success('Image ajoutée au thème.');
+    }
+
+    private function removeThemeImage(string $slug, string $uid): void
+    {
+        LoggingMiddleware::logEntry();
+
+        if (!preg_match('/^[a-z0-9_-]+$/', $slug)) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Thème introuvable', null, 404);
+            return;
+        }
+
+        $theme = $this->findThemeBySlug($slug);
+        if (!$theme) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Thème introuvable', null, 404);
+            return;
+        }
+
+        if (!$this->isValidUuid($uid)) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Image ou association introuvable', null, 404);
+            return;
+        }
+
+        $row = $this->db->prepare('SELECT id FROM puzzle_images WHERE uid = :uid');
+        $row->execute([':uid' => $uid]);
+        $imageId = $row->fetchColumn();
+        if ($imageId === false) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Image ou association introuvable', null, 404);
+            return;
+        }
+
+        $stmt = $this->db->prepare(
+            'DELETE FROM puzzle_image_themes WHERE image_id = :image_id AND theme_id = :theme_id'
+        );
+        $stmt->execute([':image_id' => $imageId, ':theme_id' => $theme['id']]);
+
+        if ($stmt->rowCount() === 0) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Image ou association introuvable', null, 404);
+            return;
+        }
+
+        LoggingMiddleware::logExit(200);
+        Response::success('Image retirée du thème.');
+    }
+
     private function setThemeImages(string $slug): void
     {
         LoggingMiddleware::logEntry();
@@ -735,8 +890,8 @@ class AdminController
         $uid = $row['uid'];
         return [
             'uid'          => $uid,
-            'thumb_url'    => "{$apiBase}/puzzle/thumb/{$uid}",
-            'full_url'     => "{$apiBase}/puzzle/image/{$uid}",
+            'thumb_url'    => "{$apiBase}/puzzle/admin/thumb/{$uid}",
+            'full_url'     => "{$apiBase}/puzzle/admin/image/{$uid}",
             'is_carousel'  => (bool) $row['is_carousel'],
             'sort_order'   => (int)  $row['sort_order'],
             'status'       => $row['status'],

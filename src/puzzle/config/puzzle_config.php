@@ -9,8 +9,7 @@
 // ============================================================================
 
 if (!defined('API_BASE_URL')) {
-    $apiBaseUrl = (defined('BASE_URL') ? \BASE_URL : '') . (defined('BASE_PATH') ? \BASE_PATH : '');
-    define('API_BASE_URL', $apiBaseUrl);
+    define('API_BASE_URL', defined('BASE_URL') ? \BASE_URL : '');
 }
 
 // ============================================================================

@@ -1,11 +1,11 @@
 {
   "api": {
     "name": "Puzzle Admin API",
-    "version": "1.0.0",
+    "version": "1.0.3",
     "description": "API d'administration du plugin Puzzle. Destinée au SPA React puzzle_images_manager. Permet la gestion complète des images du carrousel et des thèmes premium (CRUD, upload GD, tri, association image-thème).",
     "generated": "2026-04-06",
     "reviewed": "2026-04-06",
-    "review_notes": "Implémentation initiale — AdminController + AdminImageService. Toutes les routes requièrent un JWT cmem2 avec rôle ADMINISTRATEUR.",
+    "review_notes": "v1.0.3 — livraison images admin via /puzzle/admin/thumb|image (JWT) au lieu de /puzzle/thumb|image (device_token). v1.0.2 — per_page default 50 (min 10), PUT reorder attend [{uid,sort_order}] et retourne {updated}, PUT image/{uid} retourne l'objet complet + champs sort_order/is_carousel acceptés, DELETE messages avec point final, GET/POST themes incluent sort_order+status (pas created_at), PUT theme/{slug} retourne objet complet, PUT themes/{slug}/images retourne {count}.",
     "base_url": "/puzzle/admin",
     "authentication": {
       "types": ["JWT_BEARER"],
@@ -27,11 +27,34 @@
           "description": "Lister les images du carrousel, paginé. Supporte un filtre par statut.",
           "query_params": {
             "page": "integer (optional, default: 1) - Numéro de page",
-            "per_page": "integer (optional, default: 20) - Résultats par page",
+            "per_page": "integer (optional, default: 50, min: 10, max: 100) - Résultats par page",
             "status": "string (optional, default: 'all') - Filtre : 'active' | 'inactive' | 'all'"
           },
+          "response_example": {
+            "success": true,
+            "message": "Images chargées",
+            "data": [
+              {
+                "uid": "43d17dab-cf26-47ec-a419-dca1b93bf7ce",
+                "thumb_url": "http://localhost/cmem2_API/puzzle/admin/thumb/43d17dab-cf26-47ec-a419-dca1b93bf7ce",
+                "full_url": "http://localhost/cmem2_API/puzzle/admin/image/43d17dab-cf26-47ec-a419-dca1b93bf7ce",
+                "is_carousel": true,
+                "sort_order": 1,
+                "status": "active",
+                "translations": { "fr": "coyote", "en": null, "es": null },
+                "created_at": "2026-04-06 23:56:00"
+              }
+            ],
+            "pagination": {
+              "total": 1,
+              "page": 1,
+              "per_page": 50,
+              "last_page": 1
+            },
+            "timestamp": "2026-04-06 20:00:14"
+          },
+          "notes": "Les labels i18n sont sous l'objet 'translations' (clés 'fr', 'en', 'es' — seules les langues renseignées sont présentes). Les URLs sont complètes. La pagination est sous la clé 'pagination' (pas 'meta').",
           "responses": {
-            "200": "{ success: true, data: [ { uid: string, full_path: string, thumb_path: string, sort_order: integer, status: 'active'|'inactive', label_fr: string, label_en: string|null, label_es: string|null, created_at: string } ], meta: { total: integer, page: integer, per_page: integer, total_pages: integer } }",
             "401": "Token absent ou invalide",
             "403": "Rôle insuffisant"
           }
@@ -45,35 +68,41 @@
             "label_fr": "string (required) - Label en français",
             "label_en": "string (optional) - Label en anglais",
             "label_es": "string (optional) - Label en espagnol",
-            "status": "string (optional, default: 'active') - 'active' ou 'inactive'"
+            "status": "string (optional, default: 'active') - 'active' ou 'inactive'",
+            "sort_order": "integer (optional) - Position dans le carrousel ; auto-calculé si absent"
           },
           "responses": {
-            "201": "{ success: true, message: 'Image créée', data: { uid: string, full_path: string, thumb_path: string, sort_order: integer, status: string, label_fr: string } }",
+            "201": "{ success: true, message: 'Image créée', data: { uid: string, thumb_url: string (/puzzle/admin/thumb/{uid}), full_url: string (/puzzle/admin/image/{uid}), status: string, translations: { fr: string, en: string|null, es: string|null } } }",
             "401": "Token absent ou invalide",
             "403": "Rôle insuffisant",
-            "422": "Données invalides — label_fr manquant, fichier absent ou type non supporté"
-          },
-          "notes": "Les chemins full_path et thumb_path sont relatifs à PUZZLE_UPLOAD_DIR. Utilisez GET /puzzle/image/{uid} et GET /puzzle/thumb/{uid} pour servir les fichiers."
+            "422": "{ success: false, message: string, errors: [ { field: string, code: string, message: string } ] } — label_fr manquant, fichier absent ou type non supporté"
+          }
         },
         {
           "method": "PUT",
           "path": "/puzzle/admin/images/reorder",
-          "description": "Réordonner les images du carrousel. Fournir un tableau d'UIDs dans le nouvel ordre désiré. Les sort_order sont mis à jour en lot.",
+          "description": "Réordonner les images du carrousel. Fournir un tableau d'objets {uid, sort_order}. Les sort_order sont mis à jour en lot.",
           "body": {
-            "order": "string[] (required) - Tableau d'UIDs dans l'ordre souhaité"
+            "order": "array of objects (required) - Tableau d'objets { uid: string, sort_order: integer } dans l'ordre souhaité"
+          },
+          "body_example": {
+            "order": [
+              { "uid": "43d17dab-cf26-47ec-a419-dca1b93bf7ce", "sort_order": 1 },
+              { "uid": "7a2e9f3b-1234-4abc-8def-000000000001", "sort_order": 2 }
+            ]
           },
           "responses": {
-            "200": "{ success: true, message: 'Ordre mis à jour' }",
+            "200": "{ success: true, message: 'Ordre mis à jour', data: { updated: integer } }",
             "401": "Token absent ou invalide",
             "403": "Rôle insuffisant",
-            "422": "Champ order manquant ou vide"
+            "422": "{ success: false, message: string, errors: [ { field: 'order', code: 'required', message: string } ] } — champ order manquant ou vide"
           },
-          "notes": "Les UIDs non reconnus sont ignorés silencieusement."
+          "notes": "Les UIDs non reconnus ou sans sort_order sont ignorés silencieusement. 'updated' indique le nombre de lignes effectivement mises à jour."
         },
         {
           "method": "PUT",
           "path": "/puzzle/admin/images/{uid}",
-          "description": "Modifier les métadonnées d'une image (labels i18n, statut). Tous les champs sont optionnels — seuls les champs fournis sont mis à jour.",
+          "description": "Modifier les métadonnées d'une image (labels i18n, statut, ordre, carrousel). Tous les champs sont optionnels — seuls les champs fournis sont mis à jour. Retourne l'objet image complet après modification.",
           "params": {
             "uid": "string (required) - UUID v4 de l'image"
           },
@@ -81,13 +110,16 @@
             "label_fr": "string (optional) - Nouveau label français",
             "label_en": "string (optional) - Nouveau label anglais",
             "label_es": "string (optional) - Nouveau label espagnol",
-            "status": "string (optional) - 'active' ou 'inactive'"
+            "status": "string (optional) - 'active' ou 'inactive'",
+            "sort_order": "integer (optional) - Nouvelle position dans le carrousel",
+            "is_carousel": "boolean (optional) - Inclure ou exclure du carrousel"
           },
           "responses": {
-            "200": "{ success: true, message: 'Image mise à jour' }",
+            "200": "{ success: true, message: 'Image mise à jour', data: { uid: string, thumb_url: string, full_url: string, is_carousel: boolean, sort_order: integer, status: string, translations: object, created_at: string } }",
             "401": "Token absent ou invalide",
             "403": "Rôle insuffisant",
-            "404": "UID introuvable"
+            "404": "UID introuvable",
+            "422": "{ success: false, message: string, errors: [ { field: 'status', code: 'invalid', message: string } ] } — status invalide"
           }
         },
         {
@@ -98,7 +130,7 @@
             "uid": "string (required) - UUID v4 de l'image"
           },
           "responses": {
-            "200": "{ success: true, message: 'Image supprimée' }",
+            "200": "{ success: true, message: 'Image supprimée.' }",
             "401": "Token absent ou invalide",
             "403": "Rôle insuffisant",
             "404": "UID introuvable",
@@ -116,8 +148,23 @@
           "method": "GET",
           "path": "/puzzle/admin/themes",
           "description": "Lister tous les thèmes avec le nombre d'images associées et leurs traductions.",
+          "response_example": {
+            "success": true,
+            "message": "Thèmes chargés",
+            "data": [
+              {
+                "slug": "animaux",
+                "thumb_url": "http://localhost/cmem2_API/puzzle/admin/thumb/theme/animaux",
+                "sort_order": 1,
+                "status": "active",
+                "image_count": 5,
+                "translations": { "fr": "Animaux", "en": "Animals" }
+              }
+            ],
+            "timestamp": "2026-04-06 20:00:14"
+          },
           "responses": {
-            "200": "{ success: true, data: [ { slug: string, thumb_path: string, label_fr: string, label_en: string|null, label_es: string|null, image_count: integer, created_at: string } ] }",
+            "200": "{ success: true, message: 'Thèmes chargés', data: [ { slug: string, thumb_url: string, sort_order: integer, status: string, image_count: integer, translations: object } ] }",
             "401": "Token absent ou invalide",
             "403": "Rôle insuffisant"
           }
@@ -127,38 +174,43 @@
           "path": "/puzzle/admin/themes",
           "description": "Créer un nouveau thème. Corps multipart/form-data. La miniature est redimensionnée à 400px de large (JPEG 85).",
           "body": {
-            "thumb": "file (required) - Miniature JPEG ou PNG, max 5 Mo",
+            "thumb": "file (required) - Miniature JPEG ou PNG, max 5 Mo — champ nommé 'thumb'",
             "slug": "string (required) - Identifiant unique — regex ^[a-z0-9_-]+$",
             "label_fr": "string (required) - Label en français",
             "label_en": "string (optional) - Label en anglais",
-            "label_es": "string (optional) - Label en espagnol"
+            "label_es": "string (optional) - Label en espagnol",
+            "status": "string (optional, default: 'active') - 'active' ou 'inactive'",
+            "sort_order": "integer (optional) - Position ; auto-calculé si absent"
           },
           "responses": {
-            "201": "{ success: true, message: 'Thème créé', data: { slug: string, thumb_path: string, label_fr: string, label_en: string|null, label_es: string|null, image_count: 0 } }",
+            "201": "{ success: true, message: 'Thème créé', data: { slug: string, thumb_url: string, sort_order: integer, status: string, image_count: 0, translations: { fr: string, en: string|null, es: string|null } } }",
             "401": "Token absent ou invalide",
             "403": "Rôle insuffisant",
-            "409": "Slug déjà existant",
-            "422": "Slug invalide, label_fr manquant ou fichier absent/invalide"
+            "409": "{ success: false, message: 'Ce slug existe déjà', errors: [ { field: 'slug', code: 'duplicate', message: string } ] }",
+            "422": "{ success: false, message: string, errors: [ { field: string, code: string, message: string } ] } — slug invalide, label_fr manquant ou fichier absent/invalide"
           }
         },
         {
           "method": "PUT",
           "path": "/puzzle/admin/themes/{slug}",
-          "description": "Modifier un thème existant. Corps multipart/form-data. Tous les champs sont optionnels — seuls les champs fournis sont mis à jour. Si thumb est fournie, elle remplace la miniature existante.",
+          "description": "Modifier un thème existant. Corps multipart/form-data. Tous les champs sont optionnels — seuls les champs fournis sont mis à jour. Si thumb est fournie, elle remplace la miniature existante. Retourne l'objet thème complet après modification.",
           "params": {
             "slug": "string (required) - Identifiant du thème"
           },
           "body": {
-            "thumb": "file (optional) - Nouvelle miniature (remplace l'ancienne)",
+            "thumb": "file (optional) - Nouvelle miniature (remplace l'ancienne) — champ nommé 'thumb'",
             "label_fr": "string (optional) - Nouveau label français",
             "label_en": "string (optional) - Nouveau label anglais",
-            "label_es": "string (optional) - Nouveau label espagnol"
+            "label_es": "string (optional) - Nouveau label espagnol",
+            "status": "string (optional) - 'active' ou 'inactive'",
+            "sort_order": "integer (optional) - Nouvelle position"
           },
           "responses": {
-            "200": "{ success: true, message: 'Thème mis à jour' }",
+            "200": "{ success: true, message: 'Thème mis à jour', data: { slug: string, thumb_url: string, sort_order: integer, status: string, image_count: integer, translations: object } }",
             "401": "Token absent ou invalide",
             "403": "Rôle insuffisant",
-            "404": "Slug introuvable"
+            "404": "Slug introuvable",
+            "422": "{ success: false, message: string, errors: [ { field: 'status', code: 'invalid', message: string } ] } — status invalide"
           }
         },
         {
@@ -169,7 +221,7 @@
             "slug": "string (required) - Identifiant du thème"
           },
           "responses": {
-            "200": "{ success: true, message: 'Thème supprimé' }",
+            "200": "{ success: true, message: 'Thème supprimé.' }",
             "401": "Token absent ou invalide",
             "403": "Rôle insuffisant",
             "404": "Slug introuvable"
@@ -186,12 +238,13 @@
             "image_uids": "string[] (required) - Tableau d'UIDs d'images à associer (peut être vide [])"
           },
           "responses": {
-            "200": "{ success: true, message: 'Images du thème mises à jour' }",
+            "200": "{ success: true, message: 'Images du thème mises à jour', data: { count: integer } }",
             "401": "Token absent ou invalide",
             "403": "Rôle insuffisant",
             "404": "Slug introuvable",
             "422": "Champ image_uids manquant ou non-tableau"
-          }
+          },
+          "notes": "'count' indique le nombre d'images effectivement associées (UIDs invalides ou introuvables sont ignorés silencieusement)."
         }
       ]
     }
