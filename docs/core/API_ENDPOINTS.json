@@ -1,9 +1,9 @@
 {
   "api": {
     "name": "AuthGroups API",
-    "version": "2.2.1",
-    "description": "API REST complète pour la gestion d'authentification, groupes, fichiers et tags",
-    "generated": "2026-03-31",
+    "version": "2.2.4",
+    "description": "API REST complète pour la gestion d'authentification, groupes, fichiers, tags et abonnements Premium",
+    "generated": "2026-04-09",
     "base_url": "/",
     "authentication": {
       "type": "JWT_BEARER",
@@ -1202,6 +1202,116 @@
           "response": "{ plugins: object, count: integer }",
           "errors": {
             "403": "admin_secret invalide ou absent"
+          }
+        }
+      ]
+    },
+    "plans": {
+      "description": "Plans d'abonnement disponibles — accès public sans auth",
+      "base_path": "/plans",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/plans",
+          "description": "Lister tous les plans actifs",
+          "auth_required": false,
+          "response": {
+            "plans": "array — liste des plans disponibles"
+          },
+          "errors": {
+            "500": "Erreur serveur"
+          }
+        }
+      ]
+    },
+    "subscription": {
+      "description": "Abonnements Premium par utilisateur et par application",
+      "base_path": "/subscription",
+      "auth_required": true,
+      "auth_note": "Toutes les routes nécessitent Authorization: Bearer <jwt_token>",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/subscription/status",
+          "description": "Statut Premium de toutes les applications de l'utilisateur",
+          "auth_required": true,
+          "response": {
+            "subscriptions": {
+              "<app_id>": {
+                "is_premium": "boolean",
+                "show_ads": "boolean",
+                "expires_at": "datetime|null",
+                "provider": "string|null",
+                "plan": "string|null"
+              }
+            }
+          },
+          "errors": {
+            "401": "JWT absent ou invalide"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/subscription/status?app_id={app_id}",
+          "description": "Statut Premium d'une application précise",
+          "auth_required": true,
+          "query": {
+            "app_id": "string (required) — identifiant de l'application (puzzle, pomo, quiz, …)"
+          },
+          "response": {
+            "app_id": "string",
+            "is_premium": "boolean",
+            "show_ads": "boolean",
+            "expires_at": "datetime|null",
+            "provider": "string|null",
+            "plan": "string|null"
+          },
+          "errors": {
+            "401": "JWT absent ou invalide"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/subscription/verify",
+          "description": "Valider un achat provider et activer (ou renouveler) le Premium",
+          "auth_required": true,
+          "body": {
+            "app_id": "string (required) — identifiant de l'application",
+            "provider": "string (required) — stripe | google_play | apple | microsoft",
+            "product_id": "string (required) — identifiant du produit côté provider",
+            "plan": "string (required) — monthly | yearly",
+            "purchase_token": "string (optional) — token Google Play / Apple",
+            "stripe_sub_id": "string (optional) — ID souscription Stripe"
+          },
+          "response": {
+            "app_id": "string",
+            "is_premium": "boolean — true",
+            "show_ads": "boolean — false",
+            "expires_at": "datetime",
+            "provider": "string",
+            "plan": "string"
+          },
+          "errors": {
+            "400": "Champ requis manquant, provider ou plan invalide",
+            "401": "JWT absent ou invalide",
+            "500": "Erreur lors de l'activation"
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/subscription/cancel",
+          "description": "Annuler un abonnement — l'accès Premium reste actif jusqu'à expires_at",
+          "auth_required": true,
+          "body": {
+            "app_id": "string (required) — identifiant de l'application à annuler"
+          },
+          "response": {
+            "message": "string — confirmation d'annulation"
+          },
+          "errors": {
+            "400": "app_id manquant",
+            "401": "JWT absent ou invalide",
+            "500": "Erreur lors de l'annulation"
           }
         }
       ]

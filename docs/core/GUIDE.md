@@ -1,6 +1,6 @@
 # Guide — Module Core (auth_groups)
 
-Version 2.2.3 · Base URL : `/`
+Version 2.2.4 · Base URL : `/`
 
 > Référence complète : [API_ENDPOINTS.json](API_ENDPOINTS.json)
 
@@ -17,6 +17,7 @@ Version 2.2.3 · Base URL : `/`
 - [Endpoints — Statistiques](#endpoints--statistiques)
 - [Endpoints — Webhooks](#endpoints--webhooks)
 - [Endpoints — Public](#endpoints--public)
+- [Abonnements Premium](#abonnements-premium)
 - [Erreurs](#erreurs)
 - [Migrations](#migrations)
 
@@ -304,3 +305,48 @@ Format standard de toutes les réponses d'erreur :
 | [MIGRATION_JWT.sql](MIGRATION_JWT.sql) | Migration API Keys → JWT (v2.0) |
 | [MIGRATION_CLIENT_v2_0_0.md](MIGRATION_CLIENT_v2_0_0.md) | Guide client v2.0 |
 | [create_proc_reset_auth_groups.sql](create_proc_reset_auth_groups.sql) | Procédure reset données test |
+| [migrations/20260409_subscriptions.sql](migrations/20260409_subscriptions.sql) | Table `subscriptions` (v2.2.4) |
+
+---
+
+## Abonnements Premium
+
+Les endpoints `/subscription/*` permettent de gérer les abonnements Premium **par application** (`app_id`). L'accès Premium est indépendant pour chaque app : un utilisateur peut être Premium pour `puzzle` mais pas pour `quiz`.
+
+### Endpoints
+
+| Méthode | Endpoint | Auth | Description |
+| --- | --- | --- | --- |
+| GET | `/subscription/status` | JWT | Statut Premium de toutes les apps |
+| GET | `/subscription/status?app_id={app}` | JWT | Statut Premium d'une app spécifique |
+| POST | `/subscription/verify` | JWT | Valider un achat et activer le Premium |
+| DELETE | `/subscription/cancel` | JWT | Annuler un abonnement |
+
+### Structure de réponse
+
+Chaque entrée `app_id` dans `subscriptions{}` retourne :
+
+| Champ | Type | Description |
+| --- | --- | --- |
+| `is_premium` | boolean | `true` si l'abonnement est actif |
+| `show_ads` | boolean | `true` si les publicités doivent être affichées (= `!is_premium`) |
+| `expires_at` | datetime\|null | Date d'expiration UTC (`Y-m-d H:i:s`) |
+| `provider` | string\|null | `stripe`, `google_play`, `apple`, `microsoft` |
+| `plan` | string\|null | `monthly` (+31 j) ou `yearly` (+365 j) |
+
+> Utiliser `show_ads` (et non `is_premium`) pour décider d'afficher les publicités.
+
+### Providers supportés
+
+| Provider | Plateforme |
+| --- | --- |
+| `stripe` | Web, Windows |
+| `google_play` | Android |
+| `apple` | iOS / macOS |
+| `microsoft` | Microsoft Store |
+
+### CRON
+
+Le script `src/cron/expire_subscriptions.php` (planifié à 03:00) expire automatiquement les abonnements dépassés et envoie un email de notification aux utilisateurs concernés.
+
+> Documentation complète : [docs/v 2.2.4/2.2.4_CLIENT.md](../v%202.2.4/2.2.4_CLIENT.md)

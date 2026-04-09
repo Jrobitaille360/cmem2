@@ -7,7 +7,7 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased] — 2026-04-09
+## [2.2.4] — 2026-04-09
 
 ### Correctif
 
@@ -64,7 +64,7 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased] — 2026-04-06
+## [2.2.3] — 2026-04-06
 
 ### Nouveau plugin — Puzzle (Phases 1–4)
 
@@ -162,7 +162,7 @@ Interface d'administration REST destinée au SPA React **puzzle_images_manager**
 
 ---
 
-## [Unreleased] — 2026-04-05
+## [2.2.2] — 2026-04-05
 
 ### Nouveau plugin — Quiz Phase 0 (prérequis)
 
