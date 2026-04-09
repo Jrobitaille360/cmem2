@@ -1704,4 +1704,52 @@ class EmailService {
 
         return $this->sendEmail($email, $subject, $body);
     }
+
+    /**
+     * Notifie un utilisateur que son abonnement Premium pour une application a expiré.
+     *
+     * @param int    $userId  ID de l'utilisateur
+     * @param string $appId   Identifiant de l'application (ex : 'puzzle', 'pomo', 'quiz')
+     */
+    public function sendSubscriptionExpired(int $userId, string $appId): bool
+    {
+        $appName = defined('APP_NAME') ? APP_NAME : 'CMEM2';
+
+        // Récupérer email et nom depuis la base
+        try {
+            $userModel = new \AuthGroups\Models\User();
+            $userData  = $userModel->findById($userId);
+        } catch (\Throwable $e) {
+            LogService::error('sendSubscriptionExpired: impossible de charger l\'utilisateur', [
+                'user_id' => $userId,
+                'error'   => $e->getMessage(),
+            ]);
+            return false;
+        }
+
+        if (!$userData) {
+            return false;
+        }
+
+        $email    = $userData['email'];
+        $username = htmlspecialchars($userData['name'] ?? 'Utilisateur');
+        $appLabel = htmlspecialchars(ucfirst($appId));
+
+        $subject = "[{$appName}] Votre abonnement Premium {$appLabel} a expiré";
+        $body    = "
+        <html><body style='font-family:Arial,sans-serif;background:#f4f4f4;padding:20px'>
+        <div style='max-width:520px;margin:auto;background:#fff;border-radius:8px;padding:32px'>
+            <h2 style='color:#333'>Abonnement Premium expiré</h2>
+            <p>Bonjour <strong>{$username}</strong>,</p>
+            <p>Votre abonnement Premium pour l'application <strong>{$appLabel}</strong>
+               sur <strong>{$appName}</strong> a expiré.</p>
+            <p>Vous repassez automatiquement en version gratuite avec publicités.</p>
+            <p>Pour continuer à profiter de l'expérience sans publicité, renouvelez votre abonnement
+               directement depuis l'application.</p>
+            <p style='color:#999;font-size:12px'>Merci de votre confiance.</p>
+        </div>
+        </body></html>";
+
+        return $this->sendEmail($email, $subject, $body);
+    }
 }

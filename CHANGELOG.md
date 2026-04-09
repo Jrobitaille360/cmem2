@@ -7,6 +7,63 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased] — 2026-04-09
+
+### Correctif
+
+- **`src/auth_groups/Controllers/SubscriptionController.php`** — `getStatus()` : lecture du query param `app_id` via `$_GET` au lieu de `$request['query']` (non peuplé par `Router::parseRequest()`)
+
+### Tests
+
+- **`private/tests_mine/test_subscriptions.php`** — suite complète 79/79 : auth 401, `GET /subscription/status` (all + par app), `POST /subscription/verify` (validations 400 + activation monthly/yearly), `DELETE /subscription/cancel`, vérification `subscriptions{}` dans `/auth/login` et `/users/me`
+
+### Nouveau — Gestion des abonnements Premium (par application)
+
+#### Base de données
+
+- **`docs/core/migrations/20260409_subscriptions.sql`** — nouvelle table `subscriptions` avec colonne `app_id` ; contrainte `UNIQUE (user_id, app_id, provider)` ; index sur `expires_at` + `status` ; `users` non modifiée
+
+#### Modèles
+
+- **`src/auth_groups/Models/Subscription.php`** — `upsert()` (INSERT … ON DUPLICATE KEY UPDATE), `findActive()`, `findAllActive()`, `findExpired()`, `markExpired()`, `cancel()`, `setStripeSubId()`
+
+#### Services
+
+- **`src/auth_groups/Services/SubscriptionService.php`** — `activatePremium()`, `deactivatePremium()`, `getStatus()`, `getAllStatuses()`, `checkAndExpireSubscriptions()` (CRON)
+
+#### Contrôleurs
+
+- **`src/auth_groups/Controllers/SubscriptionController.php`** — `getStatus()`, `verify()`, `cancel()`
+
+#### Routing
+
+- **`src/auth_groups/Routing/RouteHandlers/SubscriptionRouteHandler.php`** — routes `/subscription/status`, `/subscription/verify`, `/subscription/cancel` (JWT requis)
+- **`src/auth_groups/Routing/Router.php`** — enregistrement de la route `subscription`
+
+#### Intégration
+
+- **`src/auth_groups/Controllers/AuthController.php`** — `issueToken()` : ajout de `subscriptions{}` dans la réponse `/auth/login`
+- **`src/auth_groups/Controllers/UserListController.php`** — ajout de `subscriptions{}` dans la réponse `GET /users/me`
+
+#### CRON
+
+- **`src/cron/expire_subscriptions.php`** — expiration automatique des abonnements dépassés + notification email ; à planifier à 03:00 (`0 3 * * *`)
+
+#### Documentation
+
+- **`docs/core/pub_web_windows.md`** — réécriture complète : modèle économique, guides Web/Windows, plan d'implantation en 5 phases
+
+---
+
+### Documentation
+
+- **`docs/core/pub_web_windows.md`** — réécriture complète : modèle économique (gratuit avec publicité / Premium mensuel ou annuel), guides d'installation Web et Windows, flux utilisateur, plan d'implantation dans l'API CMEM2
+  - Modèle Premium **par application** : statut stocké dans une table `subscriptions` avec colonne `app_id` (pas de modification de la table `users`)
+  - Plan d'implantation en 5 phases : migration SQL, `SubscriptionService`, endpoints `/subscription/*`, intégration dans `/auth/login` et `/users/me`, CRON d'expiration
+  - Providers supportés : Stripe (Web/Windows), Google Play, Apple App Store, Microsoft Store
+
+---
+
 ## [Unreleased] — 2026-04-06
 
 ### Nouveau plugin — Puzzle (Phases 1–4)
