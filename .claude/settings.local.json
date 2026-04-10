@@ -2,7 +2,12 @@
   "permissions": {
     "allow": [
       "Bash(xargs grep:*)",
-      "Bash(diff \"src/auth_groups/Routing/RouteHandlers/UserRouteHandler.php\" \"src/auth_groups/Routing/RouteHandlers/UserRouteHandler \\(# Name clash 2026-03-23 38yjbiC #\\).php\")"
+      "Bash(diff \"src/auth_groups/Routing/RouteHandlers/UserRouteHandler.php\" \"src/auth_groups/Routing/RouteHandlers/UserRouteHandler \\(# Name clash 2026-03-23 38yjbiC #\\).php\")",
+      "Bash(php -r ':*)",
+      "Bash(php src/cron/backup/cleanup_logs.php)",
+      "Bash(php -d display_errors=1 -d error_reporting=E_ALL src/cron/backup/backup_uploads.php)",
+      "Bash(php -d display_errors=1 src/cron/backup/run_all.php)",
+      "Bash(jobs)"
     ]
   }
 }
