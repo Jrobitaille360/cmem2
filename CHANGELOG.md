@@ -7,6 +7,15 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [2.2.4] — 2026-04-10
+
+### Maintenance
+
+- **`docs/build_cmem2_DB.sql`** — renommé en **`docs/v 2.2.4/build_DB-v-2.2.4.sql`** pour respecter la convention de nommage `CLAUDE.md`
+- **`docs/pour claude.md`** — supprimé ; contenu migré dans `~/.claude/CLAUDE.md` (instructions globales Claude Code)
+
+---
+
 ## [2.2.4] — 2026-04-09
 
 ### Correctif
