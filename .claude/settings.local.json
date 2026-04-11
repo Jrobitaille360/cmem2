@@ -7,7 +7,8 @@
       "Bash(php src/cron/backup/cleanup_logs.php)",
       "Bash(php -d display_errors=1 -d error_reporting=E_ALL src/cron/backup/backup_uploads.php)",
       "Bash(php -d display_errors=1 src/cron/backup/run_all.php)",
-      "Bash(jobs)"
+      "Bash(jobs)",
+      "Bash(powershell -ExecutionPolicy Bypass -File /c/code/cmem2_API/private/sync.ps1)"
     ]
   }
 }

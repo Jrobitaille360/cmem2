@@ -7,6 +7,37 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [2.2.5] — 2026-04-11
+
+### Maintenance
+
+- **`src/puzzle/Routing/PuzzleRouteHandler.php`** — `requirePremium()` : bypass debug via constante `PUZZLE_DEBUG_PREMIUM` (désactivé en production)
+- **`src/puzzle/config/puzzle_config.php`** — ajout constante `PUZZLE_DEBUG_PREMIUM` lue depuis `$_ENV`
+- **`src/puzzle/Controllers/ThemeController.php`** — suppression import mort `LogService` et ligne de log commentée
+
+### Nouveau — Système de backup modulaire
+
+- **`src/cron/backup/run_all.php`** — orchestrateur : exécute tous les scripts de backup dans l'ordre
+- **`src/cron/backup/_bootstrap.php`** — initialisation partagée (connexion DB, config, helpers)
+- **`src/cron/backup/_export.php`** — utilitaire export SQL/JSON partagé par tous les modules
+- **`src/cron/backup/backup_core.php`** — backup module auth_groups (users, groups, tokens…)
+- **`src/cron/backup/backup_puzzle.php`** — backup module Puzzle (devices, images, thèmes, shared)
+- **`src/cron/backup/backup_ics.php`** — backup module ICS (calendriers, événements)
+- **`src/cron/backup/backup_pomo.php`** — backup module Pomodoro / Journal
+- **`src/cron/backup/backup_quiz.php`** — backup module Quiz
+- **`src/cron/backup/backup_uploads.php`** — archivage des fichiers uploadés
+- **`src/cron/backup/cleanup_backups.php`** — nettoyage des backups expirés
+- **`src/cron/backup/cleanup_logs.php`** — nettoyage des logs expirés
+- Suppression des anciens scripts monolithiques : `src/backup_data.php`, `src/backup_to_json.php`, `src/restore_data.php`
+
+### Documentation
+
+- **`docs/cron/PLAN_backup_system.md`** — plan complet du système de backup : stratégie, modules, planification CRON, rétention
+- **`docs/v 2.2.5/2.2.5_CLIENT.md`** — guide migration client v2.2.4 → v2.2.5
+- **`docs/v 2.2.5/2.2.5_PRODUCTION.md`** — checklist déploiement production v2.2.5
+
+---
+
 ## [2.2.4] — 2026-04-10
 
 ### Maintenance

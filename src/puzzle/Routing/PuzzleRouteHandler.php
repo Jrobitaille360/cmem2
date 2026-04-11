@@ -314,6 +314,10 @@ class PuzzleRouteHandler extends BaseRouteHandler
      */
     private function requirePremium(array $device): bool
     {
+        if (defined('PUZZLE_DEBUG_PREMIUM') && \PUZZLE_DEBUG_PREMIUM) {
+            return true;
+        }
+
         if (!$device['is_premium'] || strtotime($device['premium_expires_at'] ?? '0') < time()) {
             Response::error('Abonnement requis', ['code' => 'SUBSCRIPTION_REQUIRED'], 403);
             return false;

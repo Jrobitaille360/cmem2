@@ -41,6 +41,14 @@ if (!defined('PUZZLE_EVENT_RETENTION_HOURS')) {
 }
 
 // ============================================================================
+// DEBUG — Bypass abonnement (dev uniquement)
+// ============================================================================
+
+if (!defined('PUZZLE_DEBUG_PREMIUM')) {
+    define('PUZZLE_DEBUG_PREMIUM', filter_var($_ENV['PUZZLE_DEBUG_PREMIUM'] ?? 'false', FILTER_VALIDATE_BOOLEAN));
+}
+
+// ============================================================================
 // CONFIGURATION GOOGLE PLAY
 // ============================================================================
 

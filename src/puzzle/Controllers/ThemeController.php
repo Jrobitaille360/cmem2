@@ -22,7 +22,6 @@ class ThemeController
 
         $lang   = $this->resolveLang();
         $themes = (new PuzzleTheme())->getActiveThemes($lang);
-
         LoggingMiddleware::logExit(200);
         Response::success('Thèmes chargés', ['themes' => $themes]);
     }
