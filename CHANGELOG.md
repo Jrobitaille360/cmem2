@@ -7,6 +7,14 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-04-12 22h]
+
+### Correctif — POST /puzzle/backup/claim (plugin Puzzle)
+
+- **`src/puzzle/Controllers/SyncController.php`** — ajout `claimBackup()` : retrouve le device propriétaire par pseudonyme (insensible à la casse), copie son `backup_json` sur le device courant, transfère l'ownership du pseudonyme, retourne le backup
+- **`src/puzzle/Routing/PuzzleRouteHandler.php`** — `POST /puzzle/backup/claim` dispatché vers `claimBackup()` avant le `match` ; corrige le bug où la route tombait sur `saveBackup()` (qui exigeait un champ `backup` côté client)
+- **`private/tests_mine/test_pseudo.php`** — suite de tests pseudonyme : 85/85 (enregistrement device, 401, GET/check/POST/DELETE, unicité insensible à la casse, idempotence, libération et réattribution)
+
 ## [Unreleased 2026-04-12 21h]
 
 ### Nouveau — Endpoints pseudonyme complétés (plugin Puzzle)

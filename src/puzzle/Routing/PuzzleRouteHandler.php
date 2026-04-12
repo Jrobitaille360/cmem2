@@ -86,7 +86,7 @@ class PuzzleRouteHandler extends BaseRouteHandler
             } elseif ($s2 === 'pseudonym' && $method === 'DELETE') {
                 (new AuthController())->deletePseudonym($device);
             } elseif ($s2 === 'check-pseudonym' && $s3 !== '' && $method === 'GET') {
-                (new AuthController())->checkPseudonym($s3, $device);
+                (new AuthController())->checkPseudonym(rawurldecode($s3), $device);
             } else {
                 Response::error('Endpoint non trouvé', null, 404);
             }
@@ -164,17 +164,22 @@ class PuzzleRouteHandler extends BaseRouteHandler
         }
 
         // -------------------------------------------------------------------
-        // /puzzle/backup
+        // /puzzle/backup[/claim]
         // -------------------------------------------------------------------
         if ($s1 === 'backup') {
             $device = $this->requireDeviceToken();
             if ($device === null) return;
             if (!$this->requirePremium($device)) return;
 
+            if ($s2 === 'claim' && $method === 'POST') {
+                (new SyncController())->claimBackup($device);
+                return;
+            }
+
             match ($method) {
                 'POST' => (new SyncController())->saveBackup($device),
                 'GET'  => (new SyncController())->getBackup($device),
-                default => Response::error('Méthode non autorisée', null, 405),
+                default => Response::error('Endpoint non trouvé', null, 404),
             };
             return;
         }

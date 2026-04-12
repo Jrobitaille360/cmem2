@@ -45,6 +45,53 @@ class SyncController
     }
 
     // -----------------------------------------------------------------------
+    // POST /puzzle/backup/claim  (device_token + premium)
+    // -----------------------------------------------------------------------
+
+    public function claimBackup(array $device): void
+    {
+        LoggingMiddleware::logEntry();
+        $input     = Response::getRequestParams();
+        $pseudonym = trim($input['pseudonym'] ?? '');
+
+        if ($pseudonym === '') {
+            LoggingMiddleware::logExit(422);
+            Response::error('Champ pseudonym requis', ['code' => 'PSEUDONYM_REQUIRED'], 422);
+            return;
+        }
+
+        $deviceModel = new PuzzleDevice();
+        $owner = $deviceModel->findByPseudonymCI($pseudonym);
+
+        if (!$owner) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Pseudonyme introuvable', ['code' => 'PSEUDONYM_NOT_FOUND'], 404);
+            return;
+        }
+
+        if ($owner['backup_json'] === null) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Aucune sauvegarde pour ce pseudonyme', ['code' => 'BACKUP_NOT_FOUND'], 404);
+            return;
+        }
+
+        // Copier le backup sur le device courant
+        $deviceModel->saveBackup((int) $device['id'], $owner['backup_json']);
+
+        // Transférer l'ownership du pseudonyme
+        $deviceModel->clearPseudonym((int) $owner['id']);
+        $deviceModel->setPseudonym((int) $device['id'], $owner['pseudonym']);
+
+        $backup = json_decode($owner['backup_json'], true);
+
+        LoggingMiddleware::logExit(200);
+        Response::success('Progression récupérée', [
+            'pseudonym' => $owner['pseudonym'],
+            'backup'    => $backup,
+        ]);
+    }
+
+    // -----------------------------------------------------------------------
     // GET /puzzle/backup  (device_token + premium)
     // -----------------------------------------------------------------------
 
