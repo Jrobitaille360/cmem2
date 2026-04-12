@@ -7,6 +7,8 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased]
+
 ## [2.2.5] — 2026-04-11
 
 ### Maintenance
