@@ -61,10 +61,11 @@ class PuzzleDevice extends BaseModel
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
-    public function findByPseudonym(string $pseudonym): ?array
+    /** Recherche insensible à la casse (unicité). */
+    public function findByPseudonymCI(string $pseudonym): ?array
     {
         $stmt = $this->getDb()->prepare(
-            "SELECT * FROM puzzle_devices WHERE pseudonym = ?"
+            "SELECT * FROM puzzle_devices WHERE LOWER(pseudonym) = LOWER(?)"
         );
         $stmt->execute([$pseudonym]);
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
@@ -76,6 +77,14 @@ class PuzzleDevice extends BaseModel
             "UPDATE puzzle_devices SET pseudonym = ?, updated_at = NOW() WHERE id = ?"
         );
         $stmt->execute([$pseudonym, $id]);
+    }
+
+    public function clearPseudonym(int $id): void
+    {
+        $stmt = $this->getDb()->prepare(
+            "UPDATE puzzle_devices SET pseudonym = NULL, updated_at = NOW() WHERE id = ?"
+        );
+        $stmt->execute([$id]);
     }
 
     public function updateSubscription(int $id, array $data): void

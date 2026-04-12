@@ -19,7 +19,10 @@ use Puzzle\Models\PuzzleDevice;
  * Auth conditionnelle :
  *  - POST /puzzle/auth/register-device              → sans auth
  *  - POST /puzzle/auth/verify-subscription          → device_token (Bearer)
+ *  - GET  /puzzle/auth/pseudonym                    → device_token (Bearer)
+ *  - GET  /puzzle/auth/check-pseudonym/{pseudonym}  → device_token (Bearer)
  *  - POST /puzzle/auth/pseudonym                    → device_token (Bearer)
+ *  - DELETE /puzzle/auth/pseudonym                  → device_token (Bearer)
  *  - GET  /puzzle/carousel                          → device_token
  *  - POST /puzzle/carousel/replace-one              → device_token
  *  - POST /puzzle/carousel/replace-all              → device_token + premium
@@ -76,8 +79,14 @@ class PuzzleRouteHandler extends BaseRouteHandler
 
             if ($s2 === 'verify-subscription' && $method === 'POST') {
                 (new AuthController())->verifySubscription($device);
+            } elseif ($s2 === 'pseudonym' && $method === 'GET') {
+                (new AuthController())->getPseudonym($device);
             } elseif ($s2 === 'pseudonym' && $method === 'POST') {
                 (new AuthController())->setPseudonym($device);
+            } elseif ($s2 === 'pseudonym' && $method === 'DELETE') {
+                (new AuthController())->deletePseudonym($device);
+            } elseif ($s2 === 'check-pseudonym' && $s3 !== '' && $method === 'GET') {
+                (new AuthController())->checkPseudonym($s3, $device);
             } else {
                 Response::error('Endpoint non trouvé', null, 404);
             }

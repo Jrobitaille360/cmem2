@@ -7,7 +7,13 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased]
+## [Unreleased 2026-04-12 21h]
+
+### Nouveau — Endpoints pseudonyme complétés (plugin Puzzle)
+
+- **`src/puzzle/Controllers/AuthController.php`** — ajout `getPseudonym()`, `checkPseudonym()`, `deletePseudonym()` ; validation centralisée `isValidPseudonym()` (3–20 chars, regex Unicode, pas d'espaces) ; `setPseudonym()` migré vers recherche insensible à la casse
+- **`src/puzzle/Models/PuzzleDevice.php`** — ajout `findByPseudonymCI()` (recherche `LOWER()` pour unicité insensible à la casse) ; ajout `clearPseudonym()` (met `pseudonym = NULL`)
+- **`src/puzzle/Routing/PuzzleRouteHandler.php`** — branchement des routes `GET /puzzle/auth/pseudonym`, `GET /puzzle/auth/check-pseudonym/{pseudonym}`, `DELETE /puzzle/auth/pseudonym`
 
 ## [2.2.5] — 2026-04-11
 

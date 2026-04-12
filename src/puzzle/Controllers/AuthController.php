@@ -95,6 +95,48 @@ class AuthController
     }
 
     // -----------------------------------------------------------------------
+    // GET /puzzle/auth/pseudonym  (device_token)
+    // -----------------------------------------------------------------------
+
+    public function getPseudonym(array $device): void
+    {
+        LoggingMiddleware::logEntry();
+
+        $pseudonym = $device['pseudonym'] ?? null;
+
+        LoggingMiddleware::logExit(200);
+        if ($pseudonym !== null) {
+            Response::success('Pseudonyme récupéré', ['pseudonym' => $pseudonym]);
+        } else {
+            Response::success('Aucun pseudonyme défini', ['pseudonym' => null]);
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // GET /puzzle/auth/check-pseudonym/{pseudonym}  (device_token)
+    // -----------------------------------------------------------------------
+
+    public function checkPseudonym(string $pseudonym, array $device): void
+    {
+        LoggingMiddleware::logEntry();
+
+        if (!$this->isValidPseudonym($pseudonym)) {
+            LoggingMiddleware::logExit(422);
+            Response::error('Pseudonyme invalide', ['code' => 'PSEUDONYM_INVALID'], 422);
+            return;
+        }
+
+        $existing = (new PuzzleDevice())->findByPseudonymCI($pseudonym);
+        $available = !$existing || (int) $existing['id'] === (int) $device['id'];
+
+        LoggingMiddleware::logExit(200);
+        Response::success(
+            $available ? 'Pseudonyme disponible' : 'Pseudonyme déjà utilisé',
+            ['available' => $available]
+        );
+    }
+
+    // -----------------------------------------------------------------------
     // POST /puzzle/auth/pseudonym  (device_token)
     // -----------------------------------------------------------------------
 
@@ -105,16 +147,15 @@ class AuthController
 
         $pseudonym = trim($input['pseudonym'] ?? '');
 
-        if ($pseudonym === '' || mb_strlen($pseudonym) < 3 || mb_strlen($pseudonym) > 50) {
+        if (!$this->isValidPseudonym($pseudonym)) {
             LoggingMiddleware::logExit(422);
-            Response::error('Pseudonyme invalide (3–50 caractères)', ['field' => 'pseudonym'], 422);
+            Response::error('Pseudonyme invalide', ['code' => 'PSEUDONYM_INVALID'], 422);
             return;
         }
 
         $deviceModel = new PuzzleDevice();
 
-        // Vérifier unicité
-        $existing = $deviceModel->findByPseudonym($pseudonym);
+        $existing = $deviceModel->findByPseudonymCI($pseudonym);
         if ($existing && (int) $existing['id'] !== (int) $device['id']) {
             LoggingMiddleware::logExit(409);
             Response::error('Pseudonyme déjà utilisé', ['code' => 'PSEUDONYM_TAKEN'], 409);
@@ -125,5 +166,32 @@ class AuthController
 
         LoggingMiddleware::logExit(200);
         Response::success('Pseudonyme enregistré', ['pseudonym' => $pseudonym]);
+    }
+
+    // -----------------------------------------------------------------------
+    // DELETE /puzzle/auth/pseudonym  (device_token)
+    // -----------------------------------------------------------------------
+
+    public function deletePseudonym(array $device): void
+    {
+        LoggingMiddleware::logEntry();
+
+        (new PuzzleDevice())->clearPseudonym((int) $device['id']);
+
+        LoggingMiddleware::logExit(200);
+        Response::success('Pseudonyme libéré', []);
+    }
+
+    // -----------------------------------------------------------------------
+    // Helpers
+    // -----------------------------------------------------------------------
+
+    private function isValidPseudonym(string $pseudonym): bool
+    {
+        if ($pseudonym === '') return false;
+        $len = mb_strlen($pseudonym);
+        if ($len < 3 || $len > 20) return false;
+        // Lettres (avec accents), chiffres, tirets, tirets bas — pas d'espaces
+        return (bool) preg_match('/^[\p{L}\p{N}_-]+$/u', $pseudonym);
     }
 }

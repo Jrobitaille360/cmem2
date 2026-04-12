@@ -174,9 +174,48 @@
 
 ### Améliorations secondaires
 
-- **Pagination enrichie** : sur tous les endpoints listant des ressources
-- **Normalisation des réponses** : format JSON, codes HTTP, schémas de validation
-- **Tests de régression** : systématiser après chaque refactorisation majeure
+- **Pagination enrichie**
+  - **En place :** Certains endpoints retournent déjà des listes avec métadonnées partielles.
+  - **Améliorations à faire :**
+    - Implémenter la pagination curseur ou offset sur tous les endpoints listant des ressources
+    - Uniformiser les paramètres (`page`, `limit`, `cursor`, `total`) dans toutes les réponses paginées
+    - Documenter le format de réponse paginé dans chaque guide de module
+    - Ajouter des tests sur les cas limites (page vide, dépassement, tri)
+  - **Maintenance à prévoir :**
+    - Vérification à chaque ajout d'endpoint liste que la pagination est bien présente
+    - Mise à jour de la doc à chaque changement de format
+
+- **Normalisation des réponses**
+  - **En place :** Structure JSON partiellement normalisée (`data`, `error`, `message`).
+  - **Améliorations à faire :**
+    - Définir et appliquer un schéma de réponse unique pour tout l'API (`success`, `data`, `error`, `meta`)
+    - Uniformiser les codes HTTP (201 pour création, 204 pour suppression sans corps, 422 pour validation…)
+    - Ajouter des schémas JSON de validation pour toutes les réponses publiques
+    - Documenter le format de réponse standard dans le guide core
+  - **Maintenance à prévoir :**
+    - Audit à chaque release pour vérifier la conformité des réponses au schéma
+
+- **Gestion globale des erreurs et exceptions**
+  - **En place :** Gestion locale des erreurs dans chaque handler, quelques réponses d'erreur standardisées.
+  - **Améliorations à faire :**
+    - Implémenter un handler global d'exceptions (catchall) dans le pipeline principal
+    - Mapper toutes les exceptions PHP en réponses HTTP appropriées (500, 503, 404…)
+    - Journaliser toutes les erreurs non gérées avec contexte (route, méthode, payload partiel)
+    - Distinguer les erreurs utilisateur (4xx) des erreurs système (5xx) dans les réponses
+  - **Maintenance à prévoir :**
+    - Audit régulier des logs d'erreurs non gérées
+    - Mise à jour du mapping exception → code HTTP à chaque nouveau type d'erreur
+
+- **Tests de régression**
+  - **En place :** Tests unitaires sur certains modèles et validateurs ; quelques tests d'intégration manuels.
+  - **Améliorations à faire :**
+    - Systématiser les tests de régression après chaque refactorisation majeure
+    - Atteindre une couverture minimale cible de 70 % sur les chemins critiques
+    - Ajouter des tests d'intégration end-to-end sur les flux complets (auth → action → réponse)
+    - Documenter les cas de test couverts et les cas intentionnellement non couverts
+  - **Maintenance à prévoir :**
+    - Exécution automatique des tests avant chaque merge ou release
+    - Revue de la suite de tests à chaque release mineure
 
 ---
 
@@ -467,124 +506,283 @@
   - Audit périodique de la couverture et de la pertinence des analyses.
   - Correction continue des bugs et incohérences détectés.
 
+### simshaun/recurr : calcul avancé des règles de récurrence (déjà dans vendor/)
+
+- **En place :**
+  - Librairie présente dans `vendor/simshaun/recurr`, utilisée pour le calcul des occurrences d'événements récurrents (RRULE iCalendar).
+  - Intégration dans le module ICS pour la gestion des événements répétitifs (hebdomadaire, mensuel, exceptions…).
+  - Quelques helpers pour convertir les règles RRULE en listes d'occurrences PHP.
+- **Améliorations à faire :**
+  - Uniformiser l'utilisation de simshaun/recurr dans tous les modules manipulant des récurrences (éviter le code custom ou legacy RRULE).
+  - Ajouter des tests sur les cas complexes (EXDATE, COUNT, UNTIL, intervalles non standards).
+  - Documenter les formats attendus et les cas limites dans les guides concernés.
+  - Vérifier la compatibilité avec sabre/vobject pour les flux complets calendrier → récurrence.
+- **Maintenance à prévoir :**
+  - Suivi des mises à jour de simshaun/recurr (correctifs, évolutions du standard iCalendar RRULE).
+  - Audit régulier des cas de récurrence couverts par les tests.
+  - Vérification de la compatibilité avec les clients externes (Google, Apple Calendar, Outlook).
+
+### phpmailer/phpmailer : envoi d'emails transactionnels (déjà dans vendor/)
+
+- **En place :**
+  - Librairie présente dans `vendor/phpmailer`, utilisée pour les envois d'emails (confirmations, notifications, OTP, invitations).
+  - Configuration SMTP via `.env` (serveur, port, auth, TLS).
+  - Quelques templates d'emails intégrés dans les modules concernés (auth, notifications).
+- **Améliorations à faire :**
+  - Centraliser toute la logique d'envoi dans un service `EmailService` réutilisable (éviter les appels directs éparpillés).
+  - Uniformiser et versionner les templates d'emails (HTML + texte, variables dynamiques).
+  - Ajouter des logs pour tout envoi (succès, échec, destinataire, type de message).
+  - Mettre en place des tests pour les scénarios d'envoi (mock SMTP, vérification du contenu).
+  - Documenter la configuration SMTP et les cas d'usage dans le guide core.
+- **Maintenance à prévoir :**
+  - Suivi des mises à jour de phpmailer (correctifs de sécurité).
+  - Vérification régulière de la délivrabilité (SPF, DKIM, blacklists).
+  - Mise à jour des templates à chaque évolution du produit.
+
 ---
 
 ## 5. Phases détaillées pour l'application du plan
+
+> **Lecture du tableau de phases :** chaque phase liste ses actions concrètes, ses risques/dépendances, et ses **critères de fin** — soit les conditions minimales pour considérer la phase terminée avant de passer à la suivante.
 
 ### Phase 0 — Sécurité, validation et modèles critiques (PRIORITÉ ABSOLUE)
 
 - **Sécurisation JWT et authentification**
   - Auditer la gestion actuelle des JWT (blacklist, refresh, device token, algorithme, stockage clé secrète)
-  - Mettre en place la purge automatique de la blacklist (cron/script)
+  - Vérifier que la rotation du device token est bien appliquée à chaque refresh
+  - Mettre en place la purge automatique de la blacklist (cron/script dédié)
   - Ajouter la journalisation des accès refusés (JWT invalide/expiré) et alertes sécurité
-  - Créer un endpoint pour lister/révoquer toutes les sessions d'un utilisateur
-  - Implémenter le refresh token rotatif et l'invalidation automatique
-  - Préparer l'option 2FA sur endpoints critiques (spécification, POC)
-  - Écrire des tests automatisés de sécurité (fuzzing, injection, replay)
-  - Mettre en place le monitoring du taux d'échec d'authentification
+  - Créer un endpoint pour lister/révoquer toutes les sessions actives d'un utilisateur
+  - Implémenter le refresh token rotatif (invalidation automatique des anciens refresh)
+  - Préparer la spécification et le POC de l'option 2FA sur les endpoints critiques
+  - Écrire des tests automatisés de sécurité (fuzzing, injection, replay attack)
+  - Mettre en place le monitoring du taux d'échec d'authentification (alerte brute force)
   - Documenter tous les flux d'authentification et cas d'erreur
 
 - **Validation centralisée**
-  - Unifier la gestion des erreurs de validation sur tous les modules (audit, refactoring)
+  - Auditer chaque module pour identifier les bypass locaux de validation
+  - Unifier la gestion des erreurs de validation (tout passe par la classe Validator centrale)
   - Ajouter la validation côté modèle (BaseModel) pour les entrées critiques
   - Enrichir les messages d'erreur (champ, règle violée, valeur reçue)
-  - Mettre en place la validation conditionnelle et des types complexes
+  - Mettre en place la validation conditionnelle et des types complexes (dates, listes, objets imbriqués)
   - Ajouter des schémas de validation JSON pour les endpoints publics
-  - Centraliser la documentation des règles de validation (auto-génération si possible)
-  - Couvrir tous les cas de validation par des tests automatisés
+  - Centraliser la documentation des règles de validation
+  - Couvrir tous les cas de validation par des tests automatisés (y compris cas limites)
 
 - **Refactorisation des modèles critiques**
-  - Supprimer toutes les propriétés statiques inutiles dans les modèles
+  - Inventorier toutes les propriétés statiques inutiles et les supprimer
   - Uniformiser la structure des modèles (constructeur, mapping, validation)
   - Factoriser les méthodes redondantes (mapping, validation, save/update)
   - Ajouter des getters/setters typés pour chaque champ critique
   - Documenter chaque modèle (propriétés, méthodes, contraintes)
-  - Préparer la compatibilité avec un ORM (doctrine/orm ou illuminate/database)
+  - Préparer la compatibilité avec un ORM (doctrine/orm ou illuminate/database) — évaluation et spécification
   - Couvrir tous les modèles par des tests unitaires et de régression
+
+- **Risques :** régression sur l'auth ou les modèles si les tests ne sont pas en place avant le refactoring. Dépendance : les tests unitaires (phpunit) doivent être opérationnels dès le début de cette phase.
+- **Critères de fin :**
+  - Audit JWT passé sans vulnérabilité critique
+  - Aucun bypass de validation détectable sur les modules principaux
+  - Tous les modèles critiques (User, Group, BaseModel) couverts par des tests de régression
+  - Blacklist purgée automatiquement et logs d'accès refusés actifs
 
 ### Phase 1 — Refactoring structurel et plugins
 
 - **Classe de base AbstractPlugin**
-  - Créer la classe abstraite `AbstractPlugin` dans `src/Core/` (log, config, hooks)
-  - Refactoriser tous les plugins pour hériter de cette classe
-  - Définir les méthodes obligatoires (`registerRoutes`, `getMetadata`)
-  - Ajouter des tests unitaires sur le comportement de base
+  - Créer la classe abstraite `AbstractPlugin` dans `src/Core/` (log, accès config, hooks de cycle de vie)
+  - Refactoriser tous les plugins existants pour hériter de cette classe
+  - Définir les méthodes abstraites obligatoires (`registerRoutes`, `getMetadata`)
+  - Ajouter des tests unitaires sur le comportement de base (log, hooks, erreurs de contrat)
   - Documenter l'usage et les conventions dans les guides de contribution
 
 - **Suppression des exclusions manuelles dans PluginManager**
   - Supprimer toutes les exclusions hardcodées dans `scanPluginDirectories()`
   - Se baser uniquement sur la présence de `plugin.json` pour détecter un plugin
+  - Vérifier que `auth_groups` et `Core` n'ont pas de `plugin.json` (et n'en ajoutent pas par erreur)
   - Ajouter des tests pour garantir qu'aucun plugin valide n'est ignoré
   - Documenter la convention d'inclusion/exclusion
 
 - **Factorisation des handlers de routes**
   - Identifier et extraire les handlers redondants dans une base commune (classe ou trait partagé)
-  - Uniformiser la déclaration des routes dans tous les plugins (`registerRoutes`)
-  - Ajouter des exemples de factorisation dans les guides
+  - Uniformiser la déclaration des routes dans tous les plugins via `registerRoutes`
+  - Étendre le lazy-load (factory closures) à tous les plugins non encore couverts (ics, pomo, quiz, puzzle)
+  - Vérifier qu'aucun handler n'est instancié au boot sans raison
+  - Ajouter des exemples de factorisation dans les guides de contribution
   - Mettre en place des tests de non-régression sur les handlers factorisés
 
 - **Centralisation des logs**
-  - Intégrer la gestion des logs dans AbstractPlugin
+  - Migrer `safeLog()` dans `AbstractPlugin` — supprimer toutes les copies locales
   - Uniformiser l'appel aux logs dans tous les modules/plugins
-  - Ajouter la configuration du niveau de log via .env/config
-  - Prévoir la possibilité de loguer vers plusieurs cibles (fichier, stdout, syslog, Sentry)
-  - Documenter la politique de log et les bonnes pratiques
+  - Configurer le niveau de log via `.env` ou config centrale
+  - Documenter la politique de log (quoi, où, quand, niveau)
+
+- **Gestion globale des erreurs et exceptions**
+  - Implémenter un handler global d'exceptions dans le pipeline principal
+  - Mapper toutes les exceptions PHP en réponses HTTP appropriées
+  - Journaliser toutes les erreurs non gérées avec contexte complet
+
+- **Risques :** refactoring des plugins peut casser la détection si `plugin.json` est mal configuré. Dépendance : Phase 0 terminée (modèles et tests stables).
+- **Critères de fin :**
+  - `AbstractPlugin` créé, tous les plugins le référencent
+  - PluginManager sans exclusion hardcodée — tests verts
+  - `safeLog()` présent uniquement dans `AbstractPlugin`
+  - Lazy-load appliqué à tous les plugins
+  - Handler global d'exceptions actif
 
 ### Phase 2 — Documentation, tests et migrations
 
 - **Documentation complète et uniformisée**
   - Compléter chaque guide de module (structure, endpoints, exemples, erreurs, migrations)
-  - Uniformiser la présentation (titres, tables, navigation, schémas)
-  - Générer automatiquement une partie de la doc à partir du code si possible
-  - Ajouter une section FAQ et bonnes pratiques par module
-  - Mettre à jour la doc à chaque ajout ou modification d'endpoint/migration
-
-- **Exemples d'intégration et de migration**
+  - Appliquer strictement les règles markdownlint sur tous les fichiers `.md`
+  - Uniformiser la présentation (titres hiérarchisés, tables, navigation, schémas Mermaid si pertinent)
   - Ajouter des exemples d'intégration pour chaque endpoint critique (auth, création, suppression, update)
-  - Couvrir les cas de succès, d'erreur courante et inattendue
-  - Ajouter des exemples multi-modules (ex : création + ajout à un groupe)
-  - Documenter les prérequis pour chaque exemple (auth, permissions, données)
-  - Référencer chaque fichier SQL de migration dans le guide du module concerné
-  - Ajouter une table récapitulative des migrations (nom, date, description, impact, rollback)
+  - Couvrir les cas de succès, d'erreur courante et inattendue avec exemples curl/Postman/PHP
+  - Ajouter une section FAQ et bonnes pratiques par module
+
+- **Migrations SQL**
+  - Vérifier que chaque module dispose de son dossier `migrations/`
+  - Uniformiser le format et le nommage des fichiers (`YYYYMMDD_description.sql`)
+  - Référencer chaque migration dans le guide du module (table : nom, date, description, impact, rollback)
+  - Générer un fichier `build_DB-vX.X.X.sql` complet à chaque release majeure
+  - Ajouter des scripts de rollback (down) pour chaque migration critique
 
 - **Tests de régression systématiques**
-  - Étendre la couverture des tests à tous les modules, plugins et endpoints
-  - Automatiser l'exécution des tests (CI, pre-commit hook, scripts)
-  - Générer des rapports de couverture et suivre leur évolution
-  - Mettre à jour les tests à chaque évolution du code
+  - Étendre la couverture des tests à tous les modules, plugins et endpoints (cible : 70 % sur chemins critiques)
+  - Automatiser l'exécution des tests (scripts, pre-commit hook)
+  - Générer des rapports de couverture et en suivre l'évolution
+  - Ajouter des tests d'intégrité après migration (vérification schéma, contraintes)
 
-- **Nettoyage et gestion des migrations SQL**
-  - Vérifier que chaque module dispose de son dossier de migrations
-  - Uniformiser le format et le nommage des fichiers de migration
-  - Générer un fichier build complet de la base à chaque release majeure
-  - Ajouter des tests d'intégrité après migration
-  - Mettre en place une convention stricte de versionning des migrations
+- **Roadmap et conventions**
+  - Maintenir la roadmap à jour dans le README et les guides principaux
+  - Documenter toutes les conventions (code, nommage, commit, doc, tests)
+  - Mettre en place une section "contribution" claire pour les nouveaux arrivants
+
+- **Risques :** documentation incomplète bloquante pour les développeurs externes. Dépendance : stabilité du code issue des phases 0 et 1.
+- **Critères de fin :**
+  - Tous les guides de modules complétés et conformes markdownlint
+  - Chaque endpoint critique dispose d'au moins un exemple d'intégration
+  - Toutes les migrations référencées dans la doc
+  - Couverture de tests ≥ 70 % sur les chemins critiques
+  - Build DB complet généré pour la version courante
 
 ### Phase 3 — Améliorations secondaires et optimisation
 
 - **Pagination enrichie**
   - Implémenter la pagination sur tous les endpoints listant des ressources
-  - Documenter les paramètres et le format de réponse
+  - Uniformiser les paramètres et le format de réponse paginée
+  - Documenter et tester les cas limites
 
 - **Normalisation des réponses**
-  - Uniformiser le format JSON, les codes HTTP, les schémas de validation
-  - Ajouter des tests de conformité sur les réponses API
+  - Appliquer le schéma de réponse unique (`success`, `data`, `error`, `meta`) sur tout l'API
+  - Uniformiser les codes HTTP
+  - Ajouter des tests de conformité sur les réponses
 
 - **Pipeline middleware**
-  - Refactoriser le pipeline pour le rendre plus modulaire/extensible (pattern Pipeline/Chain of Responsibility)
-  - Permettre l'ajout/retrait dynamique de middlewares
-  - Uniformiser l'interface des middlewares
-  - Ajouter la gestion des middlewares asynchrones/conditionnels
-  - Documenter la liste et l'ordre d'exécution
+  - Refactoriser le pipeline vers un pattern Pipeline/Chain of Responsibility
+  - Permettre l'ajout/retrait dynamique de middlewares via config ou plugins
+  - Uniformiser l'interface des middlewares (`handle`, `next`)
+  - Ajouter la gestion des middlewares conditionnels
+  - Documenter la liste et l'ordre d'exécution des middlewares
 
-- **Externalisation et centralisation de la configuration**
-  - Centraliser toutes les variables de configuration dans `.env` et `environment.php`
-  - Documenter chaque variable (nom, usage, valeur par défaut)
-  - Ajouter des vérifications au démarrage pour détecter les variables manquantes/incohérentes
+- **Centralisation de la configuration**
+  - Externaliser tous les chemins critiques restants (uploads, logs, assets)
+  - Documenter chaque variable `.env` (nom, usage, valeur par défaut)
+  - Ajouter des vérifications au démarrage pour détecter les variables manquantes
 
-- **Intégration de modules open source complémentaires**
-  - Intégrer et configurer phpunit, monolog, php-cs-fixer, phpstan/psalm, doctrine/orm selon les besoins
-  - Documenter leur usage et leur configuration
-  - Former l'équipe à leur utilisation
+- **Intégration des modules open source**
+  - Configurer et activer php-cs-fixer sur l'ensemble de `src/` (règles strictes, script dédié)
+  - Configurer phpstan ou psalm (niveau progressif) et corriger les erreurs remontées
+  - Configurer monolog si LogService atteint ses limites (multi-cibles, niveaux avancés)
+  - Évaluer la migration vers un ORM et décider de la roadmap
+
+- **Risques :** pagination et normalisation peuvent introduire des régressions sur les clients existants. Dépendance : phases 0-2 terminées, documentation à jour pour guider les clients.
+- **Critères de fin :**
+  - Pagination présente sur tous les endpoints liste
+  - Format de réponse uniforme sur 100 % des endpoints publics
+  - php-cs-fixer et phpstan intégrés et sans erreur bloquante
+  - Pipeline middleware refactorisé et testé
+
+### Phase 4 — Long terme, CI/CD et évolution stratégique
+
+- **Pipeline CI/CD**
+  - Mettre en place un pipeline d'intégration continue (GitHub Actions, GitLab CI, ou équivalent)
+  - Étapes automatisées : lint PHP (php-cs-fixer), analyse statique (phpstan), tests unitaires (phpunit), déploiement staging
+  - Bloquer les merges si les tests ou le lint échouent
+  - Générer automatiquement les rapports de couverture et les publier
+  - Documenter le pipeline et les conventions de branch/merge dans le guide de contribution
+
+- **Versioning de l'API**
+  - Définir et documenter la stratégie de versioning (préfixe `/v1/`, headers, ou autre)
+  - Implémenter la cohabitation de plusieurs versions si nécessaire
+  - Documenter les politiques de dépréciation et de fin de vie des versions
+  - Ajouter des tests de non-régression entre versions
+
+- **Migration vers un ORM (optionnel, conditionnel)**
+  - Finaliser l'évaluation doctrine/orm vs illuminate/database selon les besoins réels
+  - Planifier la migration progressive des modèles (en parallèle des modèles maison)
+  - Former l'équipe et documenter la nouvelle architecture modèle
+  - Adapter les migrations SQL et les scripts de build
+
+- **Gestion avancée des crons et tâches de fond**
+  - Documenter toutes les tâches cron existantes (purge blacklist, nettoyage logs, backups)
+  - Centraliser la configuration des crons (script ou config dédiée)
+  - Ajouter des logs et alertes sur l'exécution des tâches de fond
+  - Revoir la stratégie de backup (fréquence, cibles, tests de restauration)
+
+- **Sécurité avancée**
+  - Implémenter le 2FA sur les endpoints critiques (si POC validé en Phase 0)
+  - Ajouter des headers de sécurité HTTP (CSP, HSTS, X-Frame-Options, X-Content-Type-Options)
+  - Audit de sécurité OWASP complet (injection, XSS, CSRF, accès non autorisé…)
+  - Scanner les dépendances pour les vulnérabilités connues (composer audit, GitHub Dependabot)
+
+- **Observabilité et monitoring**
+  - Mettre en place un tableau de bord de monitoring (erreurs, latence, disponibilité)
+  - Intégrer Sentry ou équivalent pour la remontée d'erreurs en production
+  - Définir des SLOs (objectifs de niveau de service) pour les endpoints critiques
+
+- **Risques :** scope très large, à prioriser selon les ressources disponibles. Dépendance : phases 0-3 terminées.
+- **Critères de fin :**
+  - Pipeline CI/CD actif et bloquant sur tests/lint
+  - Stratégie de versioning documentée et appliquée
+  - Audit sécurité OWASP passé sans vulnérabilité critique ouverte
+  - Crons documentés et monitorés
+
+---
+
+## 6. Git : Pull Request pour les nuls
+
+1. **Créer une branche** :
+
+   ```bash
+   git checkout -b nom-de-ta-branche
+   ```
+
+2. **Faire tes modifications**
+3. **Commit tes changements** :
+
+   ```bash
+   git add .
+   git commit -m "Message clair sur la modification"
+   ```
+
+4. **Pousser la branche sur le dépôt distant** :
+
+   ```bash
+   git push origin nom-de-ta-branche
+   ```
+
+5. **Créer une Pull Request** :
+   - Va sur GitHub/GitLab/Bitbucket
+   - Clique sur "New Pull Request"
+   - Sélectionne ta branche source et la branche cible (souvent `main` ou `develop`)
+   - Ajoute un titre et une description claire
+   - Demande une revue si besoin
+6. **Attendre la revue et le merge**
+   - Corrige si besoin, puis recommence à l'étape 3
+
+> **Astuce** : Toujours faire une branche par fonctionnalité/correctif. Ne jamais travailler directement sur `main`.
+
+---
+
+**Ce plan doit être adapté à chaque release. Documenter chaque étape dans le changelog et les guides concernés.**
 
 ---
