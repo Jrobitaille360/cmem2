@@ -32,14 +32,13 @@ class SharedController
         LoggingMiddleware::logEntry();
         $input = Response::getRequestParams();
 
-        $imageUid         = trim($input['image_uid']        ?? '');
-        $pieceCount       = (int) ($input['piece_count']    ?? 0);
-        $partnerPseudonym = trim($input['partner_pseudonym'] ?? '');
-        $initialPieces    = $input['initial_pieces'] ?? null;
+        $imageUid      = trim($input['image_uid']     ?? '');
+        $pieceCount    = (int) ($input['piece_count'] ?? 0);
+        $partnerPseudo = trim($input['partner_pseudo'] ?? '');
 
-        if ($imageUid === '' || $pieceCount < 2 || $partnerPseudonym === '') {
+        if ($imageUid === '' || $pieceCount < 2 || $partnerPseudo === '') {
             LoggingMiddleware::logExit(422);
-            Response::error('image_uid, piece_count (≥2) et partner_pseudonym requis', null, 422);
+            Response::error('image_uid, piece_count (≥2) et partner_pseudo requis', null, 422);
             return;
         }
 
@@ -52,52 +51,49 @@ class SharedController
         }
 
         // Trouver le partenaire (abonné actif)
-        $partner = (new PuzzleDevice())->findByPseudonym($partnerPseudonym);
-        if (!$partner || !$partner['is_premium'] || strtotime($partner['premium_expires_at'] ?? '0') < time()) {
+        $partner      = (new PuzzleDevice())->findByPseudonymCI($partnerPseudo);
+        $debugPremium = defined('PUZZLE_DEBUG_PREMIUM') && \PUZZLE_DEBUG_PREMIUM;
+        $partnerOk    = $debugPremium
+            || $partner && $partner['is_premium'] && strtotime($partner['premium_expires_at'] ?? '0') >= time();
+        if (!$partner || !$partnerOk) {
             LoggingMiddleware::logExit(404);
             Response::error('Partenaire introuvable ou non abonné', ['code' => 'PARTNER_NOT_FOUND'], 404);
             return;
         }
 
-        $svc = new SharedPuzzleService();
-
-        if ($initialPieces !== null && is_array($initialPieces)) {
-            $seed   = null;
-            $pieces = $initialPieces;
-        } else {
-            $seed   = $svc->generateSeed();
-            $pieces = $svc->generatePiecesFromSeed($pieceCount, $seed);
+        // Vérifier qu'une partie active n'existe pas déjà entre ces deux joueurs
+        $sharedModel = new SharedPuzzle();
+        if ($sharedModel->activeGameExists((int) $device['id'], (int) $partner['id'])) {
+            LoggingMiddleware::logExit(409);
+            Response::error('Une partie active existe déjà avec ce partenaire', ['code' => 'ALREADY_IN_GAME'], 409);
+            return;
         }
 
-        $sharedUid = $svc->generateUuid();
+        $sharedUid = (new SharedPuzzleService())->generateUuid();
+        $imageId   = $this->getImageIdByUid($imageUid);
 
-        // Récupérer l'id interne de l'image
-        $imageInternal = (new PuzzleImage())->findActiveByUid($imageUid);
-        // On a besoin de l'id interne — refaire une requête directe
-        $imageId = $this->getImageIdByUid($imageUid);
-
-        $sharedModel = new SharedPuzzle();
-        $sharedId    = $sharedModel->createFromData([
-            'shared_uid' => $sharedUid,
-            'image_id'   => $imageId,
+        $sharedId = $sharedModel->createFromData([
+            'shared_uid'  => $sharedUid,
+            'image_id'    => $imageId,
             'piece_count' => $pieceCount,
-            'seed'        => $seed,
             'creator_id'  => (int) $device['id'],
             'partner_id'  => (int) $partner['id'],
         ]);
 
-        $sharedModel->insertPieces($sharedId, $pieces);
+        // Toutes les pièces démarrent en état 'tray' (insertPieces initialise l'état)
+        $sharedModel->insertPieces($sharedId, $pieceCount);
 
         LoggingMiddleware::logExit(201);
         Response::success('Casse-tête partagé créé', [
-            'shared_uid'        => $sharedUid,
-            'image_uid'         => $imageUid,
-            'image_label'       => $image['label'],
-            'piece_count'       => $pieceCount,
-            'seed'              => $seed,
-            'creator_pseudonym' => $device['pseudonym'],
-            'partner_pseudonym' => $partnerPseudonym,
-            'created_at'        => date('c'),
+            'uid'            => $sharedUid,
+            'image_uid'      => $imageUid,
+            'piece_count'    => $pieceCount,
+            'creator_pseudo' => $device['pseudonym'] ?? '',
+            'partner_pseudo' => $partnerPseudo,
+            'completion'     => 0,
+            'is_creator'     => true,
+            'partner_active' => false,
+            'status'         => 'active',
         ], 201);
     }
 
@@ -109,10 +105,13 @@ class SharedController
     {
         LoggingMiddleware::logEntry();
 
-        $list = (new SharedPuzzle())->listActiveForDevice((int) $device['id']);
+        $list = (new SharedPuzzle())->listActiveForDevice(
+            (int) $device['id'],
+            $this->pollActiveWindow
+        );
 
         LoggingMiddleware::logExit(200);
-        Response::success('Casse-tête partagés chargés', ['shared_puzzles' => $list]);
+        Response::success('Casse-tête partagés chargés', ['games' => $list]);
     }
 
     // -----------------------------------------------------------------------
@@ -143,10 +142,58 @@ class SharedController
     }
 
     // -----------------------------------------------------------------------
-    // POST /puzzle/shared/{shared_uid}/move  (device_token + premium)
+    // POST /puzzle/shared/{shared_uid}/pick  (device_token + premium)
     // -----------------------------------------------------------------------
 
-    public function move(string $sharedUid, array $device): void
+    public function pick(string $sharedUid, array $device): void
+    {
+        LoggingMiddleware::logEntry();
+        $input = Response::getRequestParams();
+
+        $shared = $this->resolveShared($sharedUid, $device);
+        if ($shared === null) return;
+
+        $pieceId = isset($input['piece_id']) ? (int) $input['piece_id'] : null;
+        if ($pieceId === null) {
+            LoggingMiddleware::logExit(422);
+            Response::error('piece_id requis', null, 422);
+            return;
+        }
+
+        $sharedModel = new SharedPuzzle();
+        $result      = $sharedModel->pickPiece((int) $shared['id'], $pieceId, (int) $device['id']);
+
+        if (!$result['ok']) {
+            $httpCode = ($result['code'] === 'LOCKED') ? 423 : 409;
+            LoggingMiddleware::logExit($httpCode);
+            Response::error('Impossible de prendre cette pièce', ['code' => $result['code']], $httpCode);
+            return;
+        }
+
+        $eventId = $sharedModel->insertEvent(
+            (int) $shared['id'],
+            (int) $device['id'],
+            $pieceId,
+            'held',
+            null,
+            null,
+            0
+        );
+
+        LoggingMiddleware::logExit(200);
+        Response::success('Pièce prise', [
+            'piece_id' => $pieceId,
+            'state'    => 'held',
+            'held_by'  => $result['held_by'],
+            'event_id' => $eventId,
+        ]);
+    }
+
+    // -----------------------------------------------------------------------
+    // POST /puzzle/shared/{shared_uid}/drop  (device_token + premium)
+    // -----------------------------------------------------------------------
+
+    public function drop(string $sharedUid, array $device): void
     {
         LoggingMiddleware::logEntry();
         $input = Response::getRequestParams();
@@ -155,28 +202,55 @@ class SharedController
         if ($shared === null) return;
 
         $pieceId  = isset($input['piece_id']) ? (int) $input['piece_id'] : null;
-        $x        = isset($input['x'])        ? (float) $input['x']        : null;
-        $y        = isset($input['y'])        ? (float) $input['y']        : null;
+        $x        = isset($input['x'])        ? (float) $input['x']      : null;
+        $y        = isset($input['y'])        ? (float) $input['y']      : null;
         $rotation = (int) ($input['rotation'] ?? 0);
-        $locked   = (bool) ($input['locked']  ?? false);
+        $toTray   = (bool) ($input['to_tray'] ?? false);
 
-        if ($pieceId === null || $x === null || $y === null) {
+        if ($pieceId === null || (!$toTray && ($x === null || $y === null))) {
             LoggingMiddleware::logExit(422);
-            Response::error('piece_id, x, y requis', null, 422);
+            Response::error('piece_id requis ; x et y requis sauf si to_tray=true', null, 422);
             return;
         }
 
         $sharedModel = new SharedPuzzle();
-        $completion  = $sharedModel->movePiece((int) $shared['id'], $pieceId, $x, $y, $rotation, $locked);
-        $eventId     = $sharedModel->insertEvent((int) $shared['id'], (int) $device['id'], $pieceId, $x, $y, $rotation, $locked);
+        $result      = $sharedModel->dropPiece(
+            (int) $shared['id'],
+            $pieceId,
+            (int) $device['id'],
+            $x    ?? 0.0,
+            $y    ?? 0.0,
+            $rotation,
+            $toTray
+        );
 
-        // Purge opportuniste des anciens événements
+        if (!$result['ok']) {
+            LoggingMiddleware::logExit(409);
+            Response::error('Cette pièce n\'est pas tenue par vous', ['code' => $result['code']], 409);
+            return;
+        }
+
+        $eventId = $sharedModel->insertEvent(
+            (int) $shared['id'],
+            (int) $device['id'],
+            $pieceId,
+            $result['state'],
+            $result['x'],
+            $result['y'],
+            $result['rotation']
+        );
+
         $sharedModel->purgeOldEvents($this->eventRetentionHours);
 
         LoggingMiddleware::logExit(200);
-        Response::success('Mouvement enregistré', [
+        Response::success('Pièce posée', [
+            'piece_id'   => $pieceId,
+            'state'      => $result['state'],
+            'x'          => $result['x'],
+            'y'          => $result['y'],
+            'rotation'   => $result['rotation'],
+            'completion' => $result['completion'],
             'event_id'   => $eventId,
-            'completion' => $completion,
         ]);
     }
 
@@ -192,8 +266,13 @@ class SharedController
         if ($shared === null) return;
 
         $afterEventId = (int) ($_GET['after'] ?? 0);
+        $ttlSeconds   = (int) (defined('PUZZLE_HELD_TTL_SECONDS') ? \PUZZLE_HELD_TTL_SECONDS : 30);
 
         $sharedModel = new SharedPuzzle();
+
+        // Expirer les pièces tenues depuis trop longtemps (opportuniste)
+        $sharedModel->expireHeldPieces((int) $shared['id'], $ttlSeconds);
+
         [$events, $partnerActive] = $sharedModel->getPartnerEvents(
             (int) $shared['id'],
             (int) $device['id'],
@@ -226,7 +305,9 @@ class SharedController
         $shared = $this->resolveShared($sharedUid, $device);
         if ($shared === null) return;
 
-        (new SharedPuzzle())->archive((int) $shared['id']);
+        $sharedModel = new SharedPuzzle();
+        $sharedModel->releaseHeldPieces((int) $shared['id'], (int) $device['id']);
+        $sharedModel->archive((int) $shared['id']);
 
         LoggingMiddleware::logExit(200);
         Response::success('Vous avez quitté le casse-tête partagé');
@@ -251,8 +332,8 @@ class SharedController
 
         (new SharedPuzzle())->deleteById((int) $shared['id']);
 
-        LoggingMiddleware::logExit(200);
-        Response::success('Casse-tête partagé supprimé');
+        LoggingMiddleware::logExit(204);
+        http_response_code(204);
     }
 
     // -----------------------------------------------------------------------

@@ -31,7 +31,7 @@ class SharedPuzzle extends BaseModel
             $data['shared_uid'],
             $data['image_id'],
             $data['piece_count'],
-            $data['seed'],
+            $data['seed'] ?? null,
             $data['creator_id'],
             $data['partner_id'],
         ]);
@@ -52,46 +52,72 @@ class SharedPuzzle extends BaseModel
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
-    /** Retourne tous les partagés actifs d'un appareil (créateur ou partenaire). */
-    public function listActiveForDevice(int $deviceId): array
+    /**
+     * Retourne tous les partagés actifs d'un appareil (créateur ou partenaire).
+     *
+     * @param int $deviceId         ID du device appelant
+     * @param int $pollActiveWindow Fenêtre en secondes pour déterminer si le partenaire est actif
+     */
+    public function listActiveForDevice(int $deviceId, int $pollActiveWindow = 10): array
     {
         $stmt = $this->getDb()->prepare("
             SELECT
-                ps.shared_uid,
-                pi.uid AS image_uid,
+                ps.shared_uid                        AS uid,
+                pi.uid                               AS image_uid,
                 COALESCE(
-                    (SELECT label FROM puzzle_image_translations WHERE image_id = pi.id AND lang = 'fr'),
+                    (SELECT label FROM puzzle_image_translations
+                      WHERE image_id = pi.id AND lang = 'fr'),
                     ''
-                ) AS image_label,
+                )                                    AS image_label,
                 pi.thumb_path,
                 ps.piece_count,
                 ps.completion,
                 ps.last_activity_at,
+                ps.status                            AS status,
+                (ps.creator_id = ?)                  AS is_creator,
+                pd_c.pseudonym                       AS creator_pseudo,
                 CASE
-                    WHEN ps.creator_id = ? THEN pd.pseudonym
-                    ELSE pd2.pseudonym
-                END AS partner_pseudonym
+                    WHEN ps.creator_id = ? THEN pd_p.pseudonym
+                    ELSE pd_c.pseudonym
+                END                                  AS partner_pseudo,
+                CASE
+                    WHEN ps.creator_id = ?
+                        THEN (pd_p.last_seen_at >= DATE_SUB(NOW(), INTERVAL ? SECOND))
+                    ELSE    (pd_c.last_seen_at >= DATE_SUB(NOW(), INTERVAL ? SECOND))
+                END                                  AS partner_active
             FROM puzzle_shared ps
-            INNER JOIN puzzle_images pi ON pi.id = ps.image_id
-            LEFT JOIN puzzle_devices pd  ON pd.id  = ps.partner_id
-            LEFT JOIN puzzle_devices pd2 ON pd2.id = ps.creator_id
+            INNER JOIN puzzle_images  pi   ON pi.id   = ps.image_id
+            LEFT  JOIN puzzle_devices pd_p ON pd_p.id = ps.partner_id
+            LEFT  JOIN puzzle_devices pd_c ON pd_c.id = ps.creator_id
             WHERE ps.status = 'active'
               AND (ps.creator_id = ? OR ps.partner_id = ?)
             ORDER BY ps.last_activity_at DESC
         ");
-        $stmt->execute([$deviceId, $deviceId, $deviceId]);
+        $stmt->execute([
+            $deviceId,             // is_creator
+            $deviceId,             // partner_pseudonym CASE creator
+            $deviceId,             // partner_active CASE creator
+            $pollActiveWindow,     // partner_active creator branch window
+            $pollActiveWindow,     // partner_active partner branch window
+            $deviceId,             // WHERE creator_id
+            $deviceId,             // WHERE partner_id
+        ]);
         $apiBase = defined('API_BASE_URL') ? rtrim(\API_BASE_URL, '/') : '';
 
         return array_map(function ($r) use ($apiBase) {
             return [
-                'shared_uid'        => $r['shared_uid'],
-                'image_uid'         => $r['image_uid'],
-                'image_label'       => $r['image_label'],
-                'thumb_url'         => "{$apiBase}/puzzle/thumb/{$r['image_uid']}",
-                'piece_count'       => (int) $r['piece_count'],
-                'completion'        => (int) $r['completion'],
-                'partner_pseudonym' => $r['partner_pseudonym'],
-                'last_activity_at'  => date('c', strtotime($r['last_activity_at'])),
+                'uid'              => $r['uid'],
+                'image_uid'        => $r['image_uid'],
+                'image_label'      => $r['image_label'],
+                'thumb_url'        => "{$apiBase}/puzzle/thumb/{$r['image_uid']}",
+                'piece_count'      => (int)  $r['piece_count'],
+                'completion'       => (int)  $r['completion'],
+                'status'           => $r['status'],
+                'is_creator'       => (bool) $r['is_creator'],
+                'creator_pseudo'   => $r['creator_pseudo'],
+                'partner_pseudo'   => $r['partner_pseudo'],
+                'partner_active'   => (bool) $r['partner_active'],
+                'last_activity_at' => date('c', strtotime($r['last_activity_at'])),
             ];
         }, $stmt->fetchAll(PDO::FETCH_ASSOC));
     }
@@ -118,130 +144,260 @@ class SharedPuzzle extends BaseModel
         $stmt->execute([$id]);
     }
 
+    /** Vérifie si une partie active existe déjà entre deux appareils (quelle que soit leur position créateur/partenaire). */
+    public function activeGameExists(int $deviceA, int $deviceB): bool
+    {
+        $stmt = $this->getDb()->prepare("
+            SELECT 1 FROM puzzle_shared
+            WHERE status = 'active'
+              AND (
+                  (creator_id = ? AND partner_id = ?)
+               OR (creator_id = ? AND partner_id = ?)
+              )
+            LIMIT 1
+        ");
+        $stmt->execute([$deviceA, $deviceB, $deviceB, $deviceA]);
+        return (bool) $stmt->fetchColumn();
+    }
+
     // -----------------------------------------------------------------------
     // Pièces
     // -----------------------------------------------------------------------
 
-    /** Insère l'état initial de toutes les pièces. */
-    public function insertPieces(int $sharedId, array $pieces): void
+    /** Insère l'état initial de toutes les pièces (state = 'tray', x/y NULL). */
+    public function insertPieces(int $sharedId, int $pieceCount): void
     {
         $stmt = $this->getDb()->prepare("
-            INSERT INTO puzzle_shared_pieces (shared_id, piece_id, x, y, rotation, locked)
-            VALUES (?, ?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE x = VALUES(x), y = VALUES(y),
-                rotation = VALUES(rotation), locked = VALUES(locked)
+            INSERT INTO puzzle_shared_pieces (shared_id, piece_id, state)
+            VALUES (?, ?, 'tray')
+            ON DUPLICATE KEY UPDATE state = 'tray'
         ");
-        foreach ($pieces as $p) {
-            $stmt->execute([
-                $sharedId,
-                (int) $p['piece_id'],
-                (float) $p['x'],
-                (float) $p['y'],
-                (int) ($p['rotation'] ?? 0),
-                (int) ($p['locked']   ?? 0),
-            ]);
+        for ($i = 0; $i < $pieceCount; $i++) {
+            $stmt->execute([$sharedId, $i]);
         }
     }
 
-    /** Retourne toutes les pièces d'un partagé. */
+    /** Retourne les pièces non-tray d'un partagé avec leur état complet. */
     public function getPieces(int $sharedId): array
     {
-        $stmt = $this->getDb()->prepare(
-            "SELECT piece_id, x, y, rotation, locked FROM puzzle_shared_pieces WHERE shared_id = ? ORDER BY piece_id"
-        );
+        $stmt = $this->getDb()->prepare("
+            SELECT
+                psp.piece_id,
+                psp.state,
+                psp.x,
+                psp.y,
+                psp.rotation,
+                pd_held.pseudonym AS held_by,
+                pd_by.pseudonym   AS `by`
+            FROM puzzle_shared_pieces psp
+            LEFT JOIN puzzle_devices pd_held ON pd_held.id = psp.held_by_id
+            LEFT JOIN puzzle_devices pd_by   ON pd_by.id   = psp.by_id
+            WHERE psp.shared_id = ?
+              AND psp.state != 'tray'
+            ORDER BY psp.piece_id
+        ");
         $stmt->execute([$sharedId]);
         return array_map(fn($r) => [
             'piece_id' => (int) $r['piece_id'],
-            'x'        => (float) $r['x'],
-            'y'        => (float) $r['y'],
+            'state'    => $r['state'],
+            'x'        => $r['x'] !== null ? (float) $r['x'] : null,
+            'y'        => $r['y'] !== null ? (float) $r['y'] : null,
             'rotation' => (int) $r['rotation'],
-            'locked'   => (bool) $r['locked'],
+            'held_by'  => $r['held_by'],
+            'by'       => $r['by'],
         ], $stmt->fetchAll(PDO::FETCH_ASSOC));
     }
 
-    /** Met à jour une pièce et retourne le nouveau pourcentage de completion. */
-    public function movePiece(int $sharedId, int $pieceId, float $x, float $y, int $rotation, bool $locked): int
+    /**
+     * Prend une pièce (tray|floating → held).
+     * Retourne ['ok' => true, 'state' => 'held', 'held_by' => pseudonym]
+     *       ou ['ok' => false, 'code' => 'LOCKED'|'HELD_BY_OTHER']
+     */
+    public function pickPiece(int $sharedId, int $pieceId, int $deviceId): array
+    {
+        $db = $this->getDb();
+        $db->beginTransaction();
+
+        $stmt = $db->prepare(
+            "SELECT state, held_by_id, prev_state FROM puzzle_shared_pieces WHERE shared_id = ? AND piece_id = ?"
+        );
+        $stmt->execute([$sharedId, $pieceId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$row) {
+            $row = ['state' => 'tray', 'held_by_id' => null, 'prev_state' => 'tray'];
+        }
+
+        if ($row['state'] === 'locked') {
+            $db->rollBack();
+            return ['ok' => false, 'code' => 'LOCKED'];
+        }
+
+        if ($row['state'] === 'held' && (int) $row['held_by_id'] !== $deviceId) {
+            $db->rollBack();
+            return ['ok' => false, 'code' => 'HELD_BY_OTHER'];
+        }
+
+        $prevState = ($row['state'] === 'held') ? $row['prev_state'] : $row['state'];
+
+        $db->prepare("
+            INSERT INTO puzzle_shared_pieces (shared_id, piece_id, state, held_by_id, prev_state, held_at)
+            VALUES (?, ?, 'held', ?, ?, NOW())
+            ON DUPLICATE KEY UPDATE
+                prev_state = IF(state != 'held', state, prev_state),
+                state      = 'held',
+                held_by_id = VALUES(held_by_id),
+                held_at    = NOW()
+        ")->execute([$sharedId, $pieceId, $deviceId, $prevState]);
+
+        $db->commit();
+
+        $pseudoStmt = $db->prepare("SELECT pseudonym FROM puzzle_devices WHERE id = ?");
+        $pseudoStmt->execute([$deviceId]);
+        $pseudo = $pseudoStmt->fetchColumn() ?: null;
+
+        return ['ok' => true, 'state' => 'held', 'held_by' => $pseudo];
+    }
+
+    /**
+     * Pose une pièce (held → tray|floating|locked).
+     * Retourne ['ok' => true, 'state' => ..., 'x' => ..., 'y' => ..., 'rotation' => ..., 'completion' => ...]
+     *       ou ['ok' => false, 'code' => 'NOT_HELD_BY_YOU']
+     */
+    public function dropPiece(int $sharedId, int $pieceId, int $deviceId, float $x, float $y, int $rotation, bool $toTray): array
     {
         $db = $this->getDb();
         $db->beginTransaction();
 
         $stmt = $db->prepare("
-            INSERT INTO puzzle_shared_pieces (shared_id, piece_id, x, y, rotation, locked)
-            VALUES (?, ?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE x = VALUES(x), y = VALUES(y),
-                rotation = VALUES(rotation), locked = VALUES(locked)
+            SELECT psp.state, psp.held_by_id, sh.piece_count
+            FROM puzzle_shared_pieces psp
+            INNER JOIN puzzle_shared sh ON sh.id = psp.shared_id
+            WHERE psp.shared_id = ? AND psp.piece_id = ?
         ");
-        $stmt->execute([$sharedId, $pieceId, $x, $y, $rotation, (int) $locked]);
+        $stmt->execute([$sharedId, $pieceId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        // Recalculer completion
-        $stmt2 = $db->prepare("
-            SELECT piece_count FROM puzzle_shared WHERE id = ?
-        ");
-        $stmt2->execute([$sharedId]);
-        $total = (int) ($stmt2->fetchColumn() ?: 1);
+        if (!$row || $row['state'] !== 'held' || (int) $row['held_by_id'] !== $deviceId) {
+            $db->rollBack();
+            return ['ok' => false, 'code' => 'NOT_HELD_BY_YOU'];
+        }
 
-        $stmt3 = $db->prepare(
-            "SELECT COUNT(*) FROM puzzle_shared_pieces WHERE shared_id = ? AND locked = 1"
-        );
-        $stmt3->execute([$sharedId]);
-        $lockedCount = (int) $stmt3->fetchColumn();
+        $pieceCount = (int) $row['piece_count'];
 
-        $completion = (int) round(100 * $lockedCount / $total);
+        if ($toTray) {
+            $newState = 'tray';
+            $finalX   = null;
+            $finalY   = null;
+        } else {
+            $nbCols    = max(1, (int) round(sqrt($pieceCount)));
+            $col       = $pieceId % $nbCols;
+            $rowIdx    = (int) ($pieceId / $nbCols);
+            $targetX   = ($col + 0.5) / $nbCols;
+            $targetY   = ($rowIdx + 0.5) / $nbCols;
+            $snapTol   = defined('PUZZLE_SNAP_TOLERANCE') ? (float) \PUZZLE_SNAP_TOLERANCE : 0.15;
+            $pieceW    = 1.0 / $nbCols;
+            $dist      = sqrt(($x - $targetX) ** 2 + ($y - $targetY) ** 2);
+
+            if ($dist <= $snapTol * $pieceW) {
+                $newState = 'locked';
+                $finalX   = $targetX;
+                $finalY   = $targetY;
+            } else {
+                $newState = 'floating';
+                $finalX   = $x;
+                $finalY   = $y;
+            }
+        }
+
+        $db->prepare("
+            UPDATE puzzle_shared_pieces
+            SET state      = ?,
+                x          = ?,
+                y          = ?,
+                rotation   = ?,
+                held_by_id = NULL,
+                held_at    = NULL,
+                prev_state = 'tray',
+                by_id      = ?
+            WHERE shared_id = ? AND piece_id = ?
+        ")->execute([$newState, $finalX, $finalY, $rotation, $deviceId, $sharedId, $pieceId]);
+
+        $cStmt = $db->prepare("SELECT COUNT(*) FROM puzzle_shared_pieces WHERE shared_id = ? AND state = 'locked'");
+        $cStmt->execute([$sharedId]);
+        $lockedCount = (int) $cStmt->fetchColumn();
+        $completion  = (int) round(100 * $lockedCount / max($pieceCount, 1));
 
         $db->prepare("UPDATE puzzle_shared SET completion = ?, last_activity_at = NOW() WHERE id = ?")
             ->execute([$completion, $sharedId]);
 
         $db->commit();
-        return $completion;
+
+        return [
+            'ok'         => true,
+            'state'      => $newState,
+            'x'          => $finalX,
+            'y'          => $finalY,
+            'rotation'   => $rotation,
+            'completion' => $completion,
+        ];
     }
 
     // -----------------------------------------------------------------------
     // Événements
     // -----------------------------------------------------------------------
 
-    /** Insère un événement de mouvement dans le journal. */
-    public function insertEvent(int $sharedId, int $deviceId, int $pieceId, float $x, float $y, int $rotation, bool $locked): int
+    /**
+     * Insère un événement dans le journal.
+     * Pour state='held' : held_by_id = $deviceId, by_id = null.
+     * Pour state='floating'|'locked'|'tray' : held_by_id = null, by_id = $deviceId.
+     */
+    public function insertEvent(int $sharedId, int $deviceId, int $pieceId, string $state, ?float $x, ?float $y, int $rotation): int
     {
+        $heldById = ($state === 'held') ? $deviceId : null;
+        $byId     = ($state !== 'held') ? $deviceId : null;
         $stmt = $this->getDb()->prepare("
-            INSERT INTO puzzle_shared_events (shared_id, device_id, piece_id, x, y, rotation, locked)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO puzzle_shared_events (shared_id, device_id, piece_id, state, x, y, rotation, held_by_id, by_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        $stmt->execute([$sharedId, $deviceId, $pieceId, $x, $y, $rotation, (int) $locked]);
+        $stmt->execute([$sharedId, $deviceId, $pieceId, $state, $x, $y, $rotation, $heldById, $byId]);
         return (int) $this->getDb()->lastInsertId();
     }
 
-    /** Retourne les événements du partenaire survenus depuis $afterEventId. */
+    /** Retourne tous les événements depuis $afterEventId (tous joueurs, pour réconciliation client). */
     public function getPartnerEvents(int $sharedId, int $callerDeviceId, int $afterEventId, int $partnerActiveWindow): array
     {
         $db = $this->getDb();
 
         $stmt = $db->prepare("
             SELECT
-                e.id AS event_id,
+                e.id              AS event_id,
                 e.piece_id,
+                e.state,
                 e.x,
                 e.y,
                 e.rotation,
-                e.locked,
-                pd.pseudonym AS `by`,
-                e.created_at AS at
+                pd_held.pseudonym AS held_by,
+                pd_by.pseudonym   AS `by`,
+                e.created_at      AS at
             FROM puzzle_shared_events e
-            LEFT JOIN puzzle_devices pd ON pd.id = e.device_id
+            LEFT JOIN puzzle_devices pd_held ON pd_held.id = e.held_by_id
+            LEFT JOIN puzzle_devices pd_by   ON pd_by.id   = e.by_id
             WHERE e.shared_id = ?
               AND e.id > ?
-              AND e.device_id != ?
             ORDER BY e.id ASC
         ");
-        $stmt->execute([$sharedId, $afterEventId, $callerDeviceId]);
+        $stmt->execute([$sharedId, $afterEventId]);
         $events = array_map(fn($r) => [
-            'event_id'  => (int) $r['event_id'],
-            'piece_id'  => (int) $r['piece_id'],
-            'x'         => (float) $r['x'],
-            'y'         => (float) $r['y'],
-            'rotation'  => (int) $r['rotation'],
-            'locked'    => (bool) $r['locked'],
-            'by'        => $r['by'],
-            'at'        => date('c', strtotime($r['at'])),
+            'event_id' => (int) $r['event_id'],
+            'piece_id' => (int) $r['piece_id'],
+            'state'    => $r['state'],
+            'x'        => $r['x'] !== null ? (float) $r['x'] : null,
+            'y'        => $r['y'] !== null ? (float) $r['y'] : null,
+            'rotation' => (int) $r['rotation'],
+            'held_by'  => $r['held_by'],
+            'by'       => $r['by'],
+            'at'       => date('c', strtotime($r['at'])),
         ], $stmt->fetchAll(PDO::FETCH_ASSOC));
 
         // Déterminer si le partenaire est actif récemment
@@ -279,5 +435,68 @@ class SharedPuzzle extends BaseModel
         );
         $stmt->execute([$sharedId]);
         return (int) ($stmt->fetchColumn() ?: 0);
+    }
+
+    /**
+     * Expire les pièces tenues depuis plus de $ttlSeconds secondes.
+     * Les remet à prev_state et insère un événement TTL pour chacune.
+     */
+    public function expireHeldPieces(int $sharedId, int $ttlSeconds): void
+    {
+        $db = $this->getDb();
+
+        $stmt = $db->prepare("
+            SELECT piece_id, prev_state
+            FROM puzzle_shared_pieces
+            WHERE shared_id = ?
+              AND state = 'held'
+              AND held_at < DATE_SUB(NOW(), INTERVAL ? SECOND)
+        ");
+        $stmt->execute([$sharedId, $ttlSeconds]);
+        $expired = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($expired as $p) {
+            $db->prepare("
+                UPDATE puzzle_shared_pieces
+                SET state = ?, held_by_id = NULL, held_at = NULL
+                WHERE shared_id = ? AND piece_id = ?
+            ")->execute([$p['prev_state'], $sharedId, (int) $p['piece_id']]);
+
+            $db->prepare("
+                INSERT INTO puzzle_shared_events (shared_id, device_id, piece_id, state, x, y, rotation, held_by_id, by_id)
+                SELECT ?, NULL, piece_id, ?, x, y, rotation, NULL, NULL
+                FROM puzzle_shared_pieces
+                WHERE shared_id = ? AND piece_id = ?
+            ")->execute([$sharedId, $p['prev_state'], $sharedId, (int) $p['piece_id']]);
+        }
+    }
+
+    /** Relâche toutes les pièces tenues par un appareil (utilisé lors du leave). */
+    public function releaseHeldPieces(int $sharedId, int $deviceId): void
+    {
+        $db = $this->getDb();
+
+        $stmt = $db->prepare("
+            SELECT piece_id, prev_state
+            FROM puzzle_shared_pieces
+            WHERE shared_id = ? AND state = 'held' AND held_by_id = ?
+        ");
+        $stmt->execute([$sharedId, $deviceId]);
+        $held = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($held as $p) {
+            $db->prepare("
+                UPDATE puzzle_shared_pieces
+                SET state = ?, held_by_id = NULL, held_at = NULL
+                WHERE shared_id = ? AND piece_id = ?
+            ")->execute([$p['prev_state'], $sharedId, (int) $p['piece_id']]);
+
+            $db->prepare("
+                INSERT INTO puzzle_shared_events (shared_id, device_id, piece_id, state, x, y, rotation, held_by_id, by_id)
+                SELECT ?, ?, piece_id, ?, x, y, rotation, NULL, NULL
+                FROM puzzle_shared_pieces
+                WHERE shared_id = ? AND piece_id = ?
+            ")->execute([$sharedId, $deviceId, $p['prev_state'], $sharedId, (int) $p['piece_id']]);
+        }
     }
 }

@@ -7,6 +7,56 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-04-13 17h]
+
+### Refonte — SharedPuzzle v2 (plugin Puzzle)
+
+#### Migration DB
+
+- **`docs/puzzle/migrations/002_puzzle_pieces_state.sql`** — migration non destructive :
+  - `puzzle_shared.status` : ajout valeur `'complete'` à l'enum
+  - `puzzle_shared_pieces` : ajout colonnes `state ENUM('tray','floating','locked','held') DEFAULT 'tray'`, `held_by_id INT UNSIGNED NULL`, `prev_state ENUM('tray','floating') DEFAULT 'tray'`, `held_at DATETIME NULL`, `by_id INT UNSIGNED NULL` ; `x`/`y` rendus `NULL`-ables ; `rotation` migré de `TINYINT` à `SMALLINT UNSIGNED` (évite overflow avec valeurs legacy 90/180/270°) ; suppression colonne `locked`
+  - `puzzle_shared_events` : mêmes ajouts (`state`, `held_by_id`, `by_id`) ; `x`/`y` `NULL`-ables ; `rotation` → `SMALLINT UNSIGNED` ; suppression colonne `locked`
+
+#### Modèle `SharedPuzzle`
+
+- **`activeGameExists(int $creatorId, int $partnerId)`** — vérifie si une partie active existe déjà entre deux devices (dans les deux sens de la relation)
+- **`insertPieces(int $sharedId, int $pieceCount)`** — signature revue : insère `$pieceCount` lignes avec `state = 'tray'` (au lieu d'accepter un tableau de positions)
+- **`getPieces()`** — retourne uniquement les pièces dont `state ≠ 'tray'` ; ajout champs `state`, `held_by`, `by` ; `x`/`y` nullable
+- **`pickPiece()`** — transition `tray|floating → held` ; vérifie `locked` (→ `LOCKED`) et `held` par autre joueur (→ `HELD_BY_OTHER`) ; sauvegarde `prev_state`, `held_by_id`, `held_at`
+- **`dropPiece()`** — transition `held → tray|floating|locked` ; logique snap côté serveur (tolérance `PUZZLE_SNAP_TOLERANCE`, grille carrée `sqrt(piece_count)`) ; recalcul `completion` ; retour état final
+- **`movePiece()`** — supprimé (remplacé par `pick` + `drop`)
+- **`insertEvent()`** — signature revue : accepte `state`, `x?`, `y?` au lieu de `locked` ; dérive `held_by_id` / `by_id` automatiquement selon l'état
+- **`getPartnerEvents()`** — retourne désormais tous les événements (les deux joueurs, pour réconciliation client) ; format mis à jour : `state`, `held_by`, `by`, `x`/`y` nullable
+- **`expireHeldPieces()`** — TTL opportuniste : expire les pièces `held` depuis plus de `$ttlSeconds`, les remet à `prev_state`, insère un événement TTL
+- **`releaseHeldPieces()`** — relâche toutes les pièces tenues par un device (utilisé au `leave`)
+- **`listActiveForDevice()`** — renommage `partner_pseudonym` → `partner_pseudo` ; ajout `creator_pseudo`, `status`, `is_creator`
+- **`createFromData()`** — `seed` rendu optionnel (`?? null`)
+
+#### Contrôleur `SharedController`
+
+- **`createShared()`** — lit `partner_pseudo` (était `partner_pseudonym`) ; vérifie `activeGameExists()` → 409 `ALREADY_IN_GAME` ; réponse enrichie : `uid`, `creator_pseudo`, `partner_pseudo`, `is_creator`, `status`
+- **`pick()`** — nouvel endpoint : `POST /puzzle/shared/{uid}/pick` — 200/422/409/423
+- **`drop()`** — nouvel endpoint : `POST /puzzle/shared/{uid}/drop` — 200/422/409
+- **`move()`** — supprimé
+- **`getEvents()`** — appel opportuniste `expireHeldPieces()` avant le poll
+- **`leave()`** — appelle `releaseHeldPieces()` avant `archive()`
+- **`deleteShared()`** — retourne `204` (corps vide) au lieu de `200`
+
+#### Routeur
+
+- **`src/puzzle/Routing/PuzzleRouteHandler.php`** — `POST /pick` et `POST /drop` ajoutés ; `POST /move` retiré
+
+#### Configuration
+
+- **`src/puzzle/config/puzzle_config.php`** — ajout `PUZZLE_SNAP_TOLERANCE` (défaut `0.15`) et `PUZZLE_HELD_TTL_SECONDS` (défaut `30`)
+
+#### Tests
+
+- **`private/tests_mine/test_puzzle_share.php`** — suite entièrement reécrite : **110/110** — sections 0–12 couvrant création (validation, `ALREADY_IN_GAME`, champs v2), liste (`games`, `partner_pseudo`, `creator_pseudo`, `status`), state (pièces tray filtrées), pick/drop (held/floating/locked/snap/423/409), events (format `state`, TTL), leave, DELETE 204
+
+---
+
 ## [Unreleased 2026-04-12 22h]
 
 ### Correctif — POST /puzzle/backup/claim (plugin Puzzle)

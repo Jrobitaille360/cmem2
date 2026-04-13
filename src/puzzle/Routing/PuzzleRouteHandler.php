@@ -202,15 +202,17 @@ class PuzzleRouteHandler extends BaseRouteHandler
                 return;
             }
 
-            // /puzzle/shared/{shared_uid}[/state|/move|/events|/leave]
+            // /puzzle/shared/{shared_uid}[/state|/pick|/drop|/events|/leave]
             $sharedUid = $s2;
 
             if ($s3 === '' && $method === 'DELETE') {
                 (new SharedController())->deleteShared($sharedUid, $device);
             } elseif ($s3 === 'state' && $method === 'GET') {
                 (new SharedController())->getState($sharedUid, $device);
-            } elseif ($s3 === 'move' && $method === 'POST') {
-                (new SharedController())->move($sharedUid, $device);
+            } elseif ($s3 === 'pick' && $method === 'POST') {
+                (new SharedController())->pick($sharedUid, $device);
+            } elseif ($s3 === 'drop' && $method === 'POST') {
+                (new SharedController())->drop($sharedUid, $device);
             } elseif ($s3 === 'events' && $method === 'GET') {
                 (new SharedController())->getEvents($sharedUid, $device);
             } elseif ($s3 === 'leave' && $method === 'POST') {

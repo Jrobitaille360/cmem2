@@ -49,6 +49,20 @@ if (!defined('PUZZLE_DEBUG_PREMIUM')) {
 }
 
 // ============================================================================
+// CONFIGURATION CASSE-TÊTES PARTAGÉS — MÉCANIQUE DE JEU
+// ============================================================================
+
+/** Tolérance snap : fraction de la largeur d'une pièce (ex. 0.15 = 15 %) */
+if (!defined('PUZZLE_SNAP_TOLERANCE')) {
+    define('PUZZLE_SNAP_TOLERANCE', (float) ($_ENV['PUZZLE_SNAP_TOLERANCE'] ?? 0.15));
+}
+
+/** TTL pièce tenue (secondes) avant relâchement automatique */
+if (!defined('PUZZLE_HELD_TTL_SECONDS')) {
+    define('PUZZLE_HELD_TTL_SECONDS', (int) ($_ENV['PUZZLE_HELD_TTL_SECONDS'] ?? 30));
+}
+
+// ============================================================================
 // CONFIGURATION GOOGLE PLAY
 // ============================================================================
 
