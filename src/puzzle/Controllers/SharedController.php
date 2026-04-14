@@ -201,11 +201,12 @@ class SharedController
         $shared = $this->resolveShared($sharedUid, $device);
         if ($shared === null) return;
 
-        $pieceId  = isset($input['piece_id']) ? (int) $input['piece_id'] : null;
-        $x        = isset($input['x'])        ? (float) $input['x']      : null;
-        $y        = isset($input['y'])        ? (float) $input['y']      : null;
-        $rotation = (int) ($input['rotation'] ?? 0);
-        $toTray   = (bool) ($input['to_tray'] ?? false);
+        $pieceId     = isset($input['piece_id']) ? (int) $input['piece_id'] : null;
+        $x           = isset($input['x'])        ? (float) $input['x']      : null;
+        $y           = isset($input['y'])        ? (float) $input['y']      : null;
+        $rotation    = (int) ($input['rotation'] ?? 0);
+        $toTray      = (bool) ($input['to_tray'] ?? false);
+        $lockedHint  = (bool) ($input['locked']  ?? false);
 
         if ($pieceId === null || (!$toTray && ($x === null || $y === null))) {
             LoggingMiddleware::logExit(422);
@@ -221,7 +222,8 @@ class SharedController
             $x    ?? 0.0,
             $y    ?? 0.0,
             $rotation,
-            $toTray
+            $toTray,
+            $lockedHint
         );
 
         if (!$result['ok']) {

@@ -264,7 +264,7 @@ class SharedPuzzle extends BaseModel
      * Retourne ['ok' => true, 'state' => ..., 'x' => ..., 'y' => ..., 'rotation' => ..., 'completion' => ...]
      *       ou ['ok' => false, 'code' => 'NOT_HELD_BY_YOU']
      */
-    public function dropPiece(int $sharedId, int $pieceId, int $deviceId, float $x, float $y, int $rotation, bool $toTray): array
+    public function dropPiece(int $sharedId, int $pieceId, int $deviceId, float $x, float $y, int $rotation, bool $toTray, bool $lockedHint = false): array
     {
         $db = $this->getDb();
         $db->beginTransaction();
@@ -290,23 +290,32 @@ class SharedPuzzle extends BaseModel
             $finalX   = null;
             $finalY   = null;
         } else {
-            $nbCols    = max(1, (int) round(sqrt($pieceCount)));
-            $col       = $pieceId % $nbCols;
-            $rowIdx    = (int) ($pieceId / $nbCols);
-            $targetX   = ($col + 0.5) / $nbCols;
-            $targetY   = ($rowIdx + 0.5) / $nbCols;
-            $snapTol   = defined('PUZZLE_SNAP_TOLERANCE') ? (float) \PUZZLE_SNAP_TOLERANCE : 0.15;
-            $pieceW    = 1.0 / $nbCols;
-            $dist      = sqrt(($x - $targetX) ** 2 + ($y - $targetY) ** 2);
+            $nbCols  = max(1, (int) round(sqrt($pieceCount)));
+            $col     = $pieceId % $nbCols;
+            $rowIdx  = (int) ($pieceId / $nbCols);
+            $targetX = ($col + 0.5) / $nbCols;
+            $targetY = ($rowIdx + 0.5) / $nbCols;
 
-            if ($dist <= $snapTol * $pieceW) {
+            // Le client signal explicitement un snap → on lui fait confiance
+            if ($lockedHint) {
                 $newState = 'locked';
                 $finalX   = $targetX;
                 $finalY   = $targetY;
             } else {
-                $newState = 'floating';
-                $finalX   = $x;
-                $finalY   = $y;
+                // Fallback serveur par distance (client sans hint ou ancien client)
+                $snapTol = defined('PUZZLE_SNAP_TOLERANCE') ? (float) \PUZZLE_SNAP_TOLERANCE : 0.15;
+                $pieceW  = 1.0 / $nbCols;
+                $dist    = sqrt(($x - $targetX) ** 2 + ($y - $targetY) ** 2);
+
+                if ($dist <= $snapTol * $pieceW) {
+                    $newState = 'locked';
+                    $finalX   = $targetX;
+                    $finalY   = $targetY;
+                } else {
+                    $newState = 'floating';
+                    $finalX   = $x;
+                    $finalY   = $y;
+                }
             }
         }
 
