@@ -7,16 +7,16 @@
 - **Sécurisation JWT**
   - **En place :**
     - Blacklist des JWT (table dédiée, invalidation immédiate à la déconnexion ou changement critique)
+    - Surveillance active de la blacklist : purge automatique des tokens expirés (`src/cron/cleanup.php` + `JwtBlacklist::deleteExpired()`)
+    - Journalisation des tentatives d'accès avec JWT invalides ou expirés (`JwtService::validate()` + `JwtAuthMiddleware::authenticate()`), avec IP, route et méthode HTTP
+    - Endpoints pour lister/révoquer toutes les sessions actives : `GET /auth/sessions`, `DELETE /auth/sessions` (déconnexion globale tous appareils)
     - Rotation du device token lors du refresh (empêche le vol de session persistante)
-    - Rate limiting sur les endpoints sensibles (login, envoi de code OTP)
+    - Refresh token rotatif avec chaînage par famille (`family_id`) : détection de replay attack et révocation automatique de toute la famille si un token révoqué est réutilisé (`DeviceTokenService::revokeFamily()`)
+    - Rate limiting sur les endpoints sensibles (login, envoi de code OTP, refresh)
     - Expiration courte des tokens (15 jours max, configurable)
     - Algorithme HS256 avec clé secrète forte (stockée dans .env)
     - Vérification stricte de la signature et du scope à chaque requête
   - **Améliorations à faire :**
-    - Surveillance active de la blacklist (purge automatique des tokens expirés)
-    - Journalisation des tentatives d'accès avec JWT invalides ou expirés (alerte sécurité)
-    - Ajout d'un endpoint pour lister/révoquer toutes les sessions actives d'un utilisateur
-    - Support du refresh token rotatif (chaînage, invalidation automatique des anciens refresh)
     - Option de double authentification (2FA) sur les endpoints critiques
     - Tests automatisés de sécurité sur la gestion JWT (fuzzing, injection, replay)
     - Monitoring du taux d'échec d'authentification (alerte brute force)
@@ -548,13 +548,13 @@
 ### Phase 0 — Sécurité, validation et modèles critiques (PRIORITÉ ABSOLUE)
 
 - **Sécurisation JWT et authentification**
-  - Auditer la gestion actuelle des JWT (blacklist, refresh, device token, algorithme, stockage clé secrète)
-  - Vérifier que la rotation du device token est bien appliquée à chaque refresh
-  - Mettre en place la purge automatique de la blacklist (cron/script dédié)
-  - Ajouter la journalisation des accès refusés (JWT invalide/expiré) et alertes sécurité
-  - Créer un endpoint pour lister/révoquer toutes les sessions actives d'un utilisateur
-  - Implémenter le refresh token rotatif (invalidation automatique des anciens refresh)
-  - Préparer la spécification et le POC de l'option 2FA sur les endpoints critiques
+  - ✅ Audit JWT réalisé : blacklist (index UNIQUE sur jti ✓), refresh (rotation ✓, rate limiting ajouté ✓), device token (hash sha256 ✓, format UUID validé ✓), algorithme (HS256 + vérif alg/iss dans validate() ✓), secret (longueur minimale 32 chars vérifiée au boot ✓)
+  - ✅ Rotation du device token bien appliquée à chaque refresh (`DeviceTokenService::generate()` révoque l'ancien avant d'en créer un nouveau)
+  - ✅ Purge automatique de la blacklist en place (`src/cron/cleanup.php` + `JwtBlacklist::deleteExpired()`)
+  - ✅ Journalisation des accès refusés avec contexte IP/route/méthode (`JwtService::validate()` + `JwtAuthMiddleware`)
+  - ✅ Endpoints `GET /auth/sessions` et `DELETE /auth/sessions` implémentés
+  - ✅ Refresh token rotatif avec chaînage par `family_id` : détection de replay attack + révocation automatique de la famille (`DeviceTokenService::revokeFamily()`)
+  - Identifier les endpoints critique et Préparer la spécification et le POC de l'option 2FA sur les endpoints critiques
   - Écrire des tests automatisés de sécurité (fuzzing, injection, replay attack)
   - Mettre en place le monitoring du taux d'échec d'authentification (alerte brute force)
   - Documenter tous les flux d'authentification et cas d'erreur

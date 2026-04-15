@@ -174,6 +174,8 @@ class PublicRouteHandler extends BaseRouteHandler
                     'POST /auth/logout - Déconnexion (JWT requis)',
                     'GET /auth/devices - Lister les appareils de confiance (JWT requis)',
                     'DELETE /auth/devices/{device_id} - Révoquer un appareil (JWT requis)',
+                    'GET /auth/sessions - Vue unifiée sessions actives + appareils (JWT requis)',
+                    'DELETE /auth/sessions - Déconnexion globale de tous les appareils (JWT requis)',
                     'POST /users/request-password-reset - Demande de réinitialisation de mot de passe',
                     'POST /users/reset-password - Réinitialisation de mot de passe avec token',
                     'POST /users/verify-email - Vérification d\'email avec token',

@@ -73,6 +73,18 @@ class AuthRouteHandler extends BaseRouteHandler
             ($action === 'devices' && $method === 'DELETE' && isset($segments[2])) =>
                 $this->withAuth(fn($user) => $this->controller->revokeDevice($user['user_id'], $segments[2])),
 
+            // GET /auth/sessions  (JWT requis) — vue unifiée sessions + appareils
+            ($action === 'sessions' && $method === 'GET') =>
+                $this->withAuth(fn($user) => $this->controller->listSessions($user['user_id'])),
+
+            // DELETE /auth/sessions  (JWT requis) — déconnexion globale tous appareils
+            ($action === 'sessions' && $method === 'DELETE') =>
+                $this->withAuth(fn($user) => $this->controller->revokeAllSessions(
+                    $user['user_id'],
+                    $user['jti'] ?? null,
+                    $user['exp'] ?? null
+                )),
+
             // POST /auth/logout  (JWT obligatoire)
             ($action === 'logout' && $method === 'POST') =>
                 $this->withAuth(fn($user) => $this->controller->logout(

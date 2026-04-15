@@ -22,6 +22,11 @@ class JwtAuthMiddleware
         $token = self::getTokenFromRequest();
 
         if (!$token) {
+            LogService::warning('Accès refusé : token JWT absent', [
+                'ip'     => self::getClientIp(),
+                'method' => $_SERVER['REQUEST_METHOD'] ?? 'UNKNOWN',
+                'route'  => $_SERVER['REQUEST_URI']    ?? 'UNKNOWN',
+            ]);
             Response::error('Token JWT manquant', [
                 'error'   => 'MISSING_TOKEN',
                 'message' => 'Utilisez le header Authorization: Bearer <token>',
@@ -32,6 +37,8 @@ class JwtAuthMiddleware
         $payload = JwtService::validate($token);
 
         if (!$payload) {
+            // Le détail de l'échec (expiré, blacklisté, malformé) est déjà logué
+            // dans JwtService::validate() avec le contexte IP/route.
             Response::error('Token JWT invalide ou expiré', [
                 'error'   => 'INVALID_TOKEN',
                 'message' => 'Le token est invalide, malformé ou expiré. Reconnectez-vous.',
@@ -61,6 +68,17 @@ class JwtAuthMiddleware
     // -----------------------------------------------------------------------
     // Helpers privés
     // -----------------------------------------------------------------------
+
+    private static function getClientIp(): string
+    {
+        if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+            $ip = trim(explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0]);
+            if (filter_var($ip, FILTER_VALIDATE_IP)) {
+                return $ip;
+            }
+        }
+        return $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+    }
 
     private static function getTokenFromRequest(): ?string
     {

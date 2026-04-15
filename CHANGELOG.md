@@ -7,6 +7,57 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-04-14 11h]
+
+### Sécurité — Refresh token rotatif, détection replay attack, sessions globales (auth_groups)
+
+#### Migration DB
+
+- **`docs/core/migrations/20260413_device_token_family.sql`** — migration non destructive :
+  - `device_tokens` : ajout colonne `family_id VARCHAR(36)` (UUID partagé par tous les tokens d'une même chaîne de rotation) ; index `idx_device_family` pour révocation rapide
+
+#### Service `DeviceTokenService`
+
+- **`generate()`** — nouveau paramètre `$familyId` : conserve le `family_id` existant lors d'une rotation, en crée un nouveau pour le premier token ; validation UUID du `device_id` (rejet si format invalide)
+- **`validate()`** — refactorisé : requête sans filtre `revoked_at` pour détecter les replay attacks ; si un token révoqué est présenté à nouveau → log `CRITICAL` + appel `revokeFamily()` ; distinction token expiré vs révoqué vs introuvable dans les logs
+- **`revokeFamily(string $familyId)`** — nouveau : révoque en bloc tous les tokens d'une famille (réponse à un replay attack détecté)
+- **`isValidDeviceId()`** / **`generateUuid()`** — helpers privés ajoutés
+
+#### Service `JwtService`
+
+- **`validate()`** — vérification de l'algorithme déclaré dans le header JWT avant contrôle de la signature (défense en profondeur contre l'attaque `alg:none`) ; logs enrichis avec contexte IP/route via `getRequestContext()`
+
+#### Middleware `JwtAuthMiddleware`
+
+- Log `warning` émis dès la détection d'un token absent (IP, méthode, route) — renforce la traçabilité des tentatives d'accès non autorisées
+- **`getClientIp()`** — nouveau helper : résout l'IP cliente avec support `X-Forwarded-For`
+
+#### Contrôleur `AuthController`
+
+- **`refreshToken()`** — rate limiting par `device_id` avant validation (429 `RATE_LIMIT_EXCEEDED` si quota dépassé) ; transmission du `family_id` lors de la rotation ; `RateLimitService::clear()` après refresh réussi
+- **`listSessions(int $userId)`** — nouvel endpoint `GET /auth/sessions` : retourne la vue unifiée des sessions JWT actives et des appareils de confiance (`sessions`, `sessions_count`, `devices`, `devices_count`)
+- **`revokeAllSessions()`** — nouvel endpoint `DELETE /auth/sessions` : blackliste le JWT courant, termine toutes les sessions JWT actives, révoque tous les device tokens — déconnexion globale tous appareils
+
+#### Routeur `AuthRouteHandler`
+
+- `GET /auth/sessions` → `listSessions()`
+- `DELETE /auth/sessions` → `revokeAllSessions()` (transmet `jti` et `exp` du JWT courant)
+
+#### `PublicRouteHandler`
+
+- `GET /auth/sessions` et `DELETE /auth/sessions` déclarés dans la liste publique des endpoints disponibles
+
+#### Correctif `UserManagerController`
+
+- `$pdo` déplacé avant la condition `if ($freePlan)` (évite une variable non définie si le plan est absent)
+
+#### Documentation
+
+- **`docs/core/API_ENDPOINTS.json`** — `POST /auth/refresh` : ajout champ `rotation`, `rate_limiting`, erreur 429 ; nouveaux blocs `GET /auth/sessions` et `DELETE /auth/sessions`
+- **`docs/core/GUIDE.md`** — description du refresh rotatif avec `family_id` et replay attack ; documentation des endpoints `/auth/sessions`
+
+---
+
 ## [Unreleased 2026-04-13 17h]
 
 ### Refonte — SharedPuzzle v2 (plugin Puzzle)

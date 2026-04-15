@@ -105,11 +105,13 @@ POST /users/reset-password           → mot de passe mis à jour
 | POST | `/auth/login` | Non | Email + mot de passe → JWT |
 | POST | `/auth/send-code` | Non | Demander code OTP |
 | POST | `/auth/verify-code` | Non | Vérifier OTP → JWT |
-| POST | `/auth/refresh` | Non | Renouveler via device token |
+| POST | `/auth/refresh` | Non | Renouveler via device token (rate-limited par `device_id`) |
 | GET | `/auth/me` | JWT | Infos utilisateur courant |
-| POST | `/auth/logout` | JWT | Invalider le JWT |
+| POST | `/auth/logout` | JWT | Invalider le JWT courant |
 | GET | `/auth/devices` | JWT | Lister les appareils de confiance |
 | DELETE | `/auth/devices/{device_id}` | JWT | Révoquer un appareil |
+| GET | `/auth/sessions` | JWT | Vue unifiée sessions + appareils |
+| DELETE | `/auth/sessions` | JWT | Déconnexion globale tous appareils |
 
 ### POST /auth/login
 
@@ -144,7 +146,40 @@ Réponse `200` :
 }
 ```
 
-Retourne un nouveau `token` + un nouveau `device_token` (l'ancien est révoqué — remplacer côté client).
+Retourne un nouveau `token` + un nouveau `device_token` (l'ancien est révoqué — **remplacer côté client impérativement**).
+
+**Refresh token rotatif** : chaque appel révoque l'ancien `device_token` et émet un nouveau token appartenant à la même famille (`family_id` interne). Si un token déjà révoqué est présenté à nouveau (replay attack), **tous les tokens de la famille sont révoqués immédiatement** et le log `CRITICAL` est émis — l'utilisateur devra se reconnecter.
+
+Cet endpoint est protégé par rate limiting : trop d'échecs consécutifs avec le même `device_id` retournent `429 RATE_LIMIT_EXCEEDED`. Le compteur est réinitialisé après un refresh réussi.
+
+### GET /auth/sessions
+
+Retourne la liste de toutes les sessions JWT actives et de tous les appareils de confiance de l'utilisateur connecté.
+
+Réponse `200` :
+
+```json
+{
+  "sessions": [
+    { "session_id": 1, "created_at": "2026-04-13 10:00:00", "last_activity_at": "2026-04-13 11:30:00" }
+  ],
+  "sessions_count": 1,
+  "devices": [
+    { "device_id": "550e8400...", "device_name": "iPhone Alice", "last_used_at": "2026-04-13 11:30:00", "last_ip": "1.2.3.4", "expires_at": "2027-04-13 10:00:00" }
+  ],
+  "devices_count": 1
+}
+```
+
+### DELETE /auth/sessions
+
+Déconnexion globale : révoque immédiatement le JWT courant (blacklist), termine toutes les sessions actives et révoque tous les appareils de confiance. L'utilisateur devra se reconnecter sur tous ses appareils.
+
+Réponse `200` :
+
+```json
+{ "message": "Toutes vos sessions et appareils de confiance ont été révoqués." }
+```
 
 ---
 

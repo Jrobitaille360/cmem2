@@ -3,7 +3,8 @@
 ## 1. Blacklist des JWT
 
 - **Présent** : Table dédiée, invalidation immédiate à la déconnexion ou changement critique.
-- **À améliorer** : Purge automatique des tokens expirés (cron/script à prévoir), monitoring de la blacklist (alerte si anomalie).
+- **Fait** : Purge automatique des tokens expirés via `src/cron/cleanup.php` (`JwtBlacklist::deleteExpired()`) — planifiée quotidiennement.
+- **À améliorer** : Monitoring de la blacklist (alerte si anomalie).
 
 ## 2. Refresh Token & Device Token
 
@@ -33,8 +34,8 @@
 
 ## 7. Recommandations immédiates
 
-- Mettre en place la purge automatique de la blacklist.
-- Ajouter la journalisation des accès refusés (JWT invalide/expiré).
+- ✅ Purge automatique de la blacklist en place (`src/cron/cleanup.php`).
+- ✅ Journalisation des accès refusés (JWT invalide/expiré/blacklisté/absent) avec IP, route et méthode HTTP — `JwtService::validate()` + `JwtAuthMiddleware::authenticate()`.
 - Documenter et tester tous les flux critiques.
 - Préparer la rotation de la clé secrète.
 

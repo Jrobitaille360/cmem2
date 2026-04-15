@@ -235,12 +235,25 @@ class AuthController
             return;
         }
 
+        $deviceId = trim($input['device_id']);
+
+        // Rate limiting sur le refresh (prévenir le brute-force de device tokens)
+        if (!RateLimitService::check($deviceId, 'refresh')) {
+            LogService::warning('Rate limit refresh dépassé', ['device_id' => $deviceId]);
+            LoggingMiddleware::logExit(429);
+            Response::error('Trop de tentatives. Réessayez dans ' . RATE_LIMIT_AUTH_WINDOW_MINUTES . ' minutes.', [
+                'error' => 'RATE_LIMIT_EXCEEDED',
+            ], 429);
+            return;
+        }
+
         $record = DeviceTokenService::validate(
             trim($input['device_token']),
-            trim($input['device_id'])
+            $deviceId
         );
 
         if (!$record) {
+            RateLimitService::record($deviceId, 'refresh');
             LoggingMiddleware::logExit(401);
             Response::error('Device token invalide ou expiré', [
                 'error'   => 'INVALID_DEVICE_TOKEN',
@@ -262,16 +275,20 @@ class AuthController
         $expiresAt = JwtService::getExpiresAt();
 
         // A3 — Rotation du device token : invalider l'ancien, émettre le nouveau.
+        // Le family_id est conservé pour permettre la détection de replay attack.
         // Le client DOIT remplacer son device_token par la nouvelle valeur retournée.
         $newDeviceToken = DeviceTokenService::generate(
             (int) $record['user_id'],
-            trim($input['device_id']),
-            $record['device_name']
+            $deviceId,
+            $record['device_name'],
+            $record['family_id'] ?? null
         );
+
+        RateLimitService::clear($deviceId, 'refresh');
 
         LogService::info('JWT renouvelé via device token (token rotaté)', [
             'user_id'   => $userData['id'],
-            'device_id' => $input['device_id'],
+            'device_id' => $deviceId,
         ]);
 
         LoggingMiddleware::logExit(200);
@@ -280,7 +297,7 @@ class AuthController
             'token_type'   => 'Bearer',
             'expires_at'   => $expiresAt,
             'device_token' => $newDeviceToken,
-            'device_id'    => trim($input['device_id']),
+            'device_id'    => $deviceId,
             'device_note'  => 'Remplacez votre device_token par cette nouvelle valeur.',
             'user'         => [
                 'id'    => $userData['id'],
@@ -348,6 +365,68 @@ class AuthController
 
         LoggingMiddleware::logExit(200);
         Response::success('Profil utilisateur', ['user' => $data]);
+    }
+
+    // -----------------------------------------------------------------------
+    // GET /auth/sessions  (JWT requis)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Retourne la vue unifiée des sessions actives et des appareils de confiance
+     * de l'utilisateur connecté.
+     */
+    public function listSessions(int $userId): void
+    {
+        LoggingMiddleware::logEntry();
+
+        $sessions = UserSessionService::getUserActiveSessions($userId);
+        $devices  = DeviceTokenService::listDevices($userId);
+
+        LoggingMiddleware::logExit(200);
+        Response::success('Sessions actives', [
+            'sessions'        => $sessions,
+            'sessions_count'  => count($sessions),
+            'devices'         => $devices,
+            'devices_count'   => count($devices),
+        ]);
+    }
+
+    // -----------------------------------------------------------------------
+    // DELETE /auth/sessions  (JWT requis — déconnexion globale)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Révoque toutes les sessions JWT et tous les appareils de confiance
+     * de l'utilisateur connecté (déconnexion de tous les appareils).
+     * Le token courant est également blacklisté.
+     */
+    public function revokeAllSessions(int $userId, ?string $jti = null, ?int $tokenExp = null): void
+    {
+        LoggingMiddleware::logEntry();
+
+        // Blacklister le JWT courant
+        if ($jti !== null) {
+            $expiresAt = $tokenExp
+                ? date('Y-m-d H:i:s', $tokenExp)
+                : date('Y-m-d H:i:s', time() + 60);
+
+            $blacklist = new JwtBlacklist();
+            $blacklist->add($jti, $userId, $expiresAt);
+        }
+
+        // Terminer toutes les sessions et révoquer tous les device tokens
+        UserSessionService::endAllUserSessions($userId);
+        DeviceTokenService::revokeAll($userId);
+
+        LogService::info('Déconnexion globale (toutes sessions + appareils révoqués)', [
+            'user_id' => $userId,
+            'jti'     => $jti,
+        ]);
+
+        LoggingMiddleware::logExit(200);
+        Response::success('Déconnexion globale effectuée', [
+            'message' => 'Toutes vos sessions et appareils de confiance ont été révoqués.',
+        ]);
     }
 
     // -----------------------------------------------------------------------

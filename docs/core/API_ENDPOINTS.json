@@ -112,6 +112,7 @@
             "device_id": "string (required)",
             "device_token": "string (required)"
           },
+          "rotation": "Refresh token rotatif — chaque refresh révoque l'ancien token et émet un nouveau token dans la même famille (family_id). Si un token révoqué est réutilisé (replay attack), toute la famille est révoquée immédiatement.",
           "response": {
             "token": "string — nouveau JWT Bearer",
             "token_type": "Bearer",
@@ -122,12 +123,14 @@
               "email": "string",
               "role": "string"
             },
-            "device_token": "string — nouveau device token (l'ancien est révoqué, remplacer côté client)",
+            "device_token": "string — nouveau device token (l'ancien est révoqué — REMPLACER côté client impérativement)",
             "device_id": "string"
           },
+          "rate_limiting": "Oui — par device_id (max RATE_LIMIT_AUTH_MAX_ATTEMPTS tentatives / RATE_LIMIT_AUTH_WINDOW_MINUTES min)",
           "errors": {
             "400": "device_id ou device_token manquant",
-            "401": "Device token invalide, expiré ou révoqué"
+            "401": "Device token invalide, expiré, révoqué ou replay attack détectée (famille révoquée)",
+            "429": "Trop de tentatives — réessayer après la fenêtre de rate limiting"
           }
         },
         {
@@ -199,6 +202,40 @@
           "params": {
             "device_id": "string (required)"
           },
+          "response": {
+            "message": "string — confirmation"
+          },
+          "errors": {
+            "401": "JWT manquant ou invalide"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/auth/sessions",
+          "description": "Vue unifiée des sessions JWT actives et des appareils de confiance de l'utilisateur connecté",
+          "auth_required": true,
+          "headers": {
+            "Authorization": "Bearer {jwt_token}"
+          },
+          "response": {
+            "sessions": "array — sessions JWT actives",
+            "sessions_count": "integer",
+            "devices": "array — appareils de confiance (device tokens non révoqués)",
+            "devices_count": "integer"
+          },
+          "errors": {
+            "401": "JWT manquant ou invalide"
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/auth/sessions",
+          "description": "Déconnexion globale — révoque toutes les sessions JWT et tous les appareils de confiance de l'utilisateur connecté",
+          "auth_required": true,
+          "headers": {
+            "Authorization": "Bearer {jwt_token}"
+          },
+          "notes": "Le JWT courant est immédiatement ajouté à la blacklist. Tous les device tokens sont révoqués. L'utilisateur devra se reconnecter sur tous ses appareils.",
           "response": {
             "message": "string — confirmation"
           },

@@ -73,9 +73,9 @@ class UserManagerController {
                 $createdUser = $user->findById($user->id);
                 
                 // 1. Assigner le plan gratuit par défaut
+                $pdo = \Database::getInstance()->getConnection();
                 $freePlan = Plan::findByName(Plan::PLAN_FREE);
                 if ($freePlan) {
-                    $pdo = \Database::getInstance()->getConnection();
                     $stmt = $pdo->prepare("
                         UPDATE users 
                         SET plan_id = :plan_id, plan_expires_at = DATE_ADD(NOW(), INTERVAL 7 DAY)
