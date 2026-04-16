@@ -1,11 +1,11 @@
 ﻿# cmem2 API
 
-![Version](https://img.shields.io/badge/version-2.2.3-blue.svg)
+![Version](https://img.shields.io/badge/version-2.3.0-blue.svg)
 ![PHP](https://img.shields.io/badge/PHP-8.0+-purple.svg)
 ![Status](https://img.shields.io/badge/status-production%20ready-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 
-API REST modulaire pour la plateforme **Memories v2**. Elle regroupe quatre modules : authentification/groupes (core), calendriers ICS/CalDAV, Pomodoro et Quiz interactif.
+API REST modulaire pour la plateforme **Memories v2**. Elle regroupe cinq modules : authentification/groupes (core), calendriers ICS/CalDAV, Pomodoro, Quiz interactif et le gestionnaire générique Items.
 
 Authentification **JWT** HS256 (Bearer, 15 jours). Deux méthodes de connexion : **email + mot de passe** ou **email + code OTP**.
 
@@ -32,6 +32,7 @@ cmem2 API fournit :
 - **ICS/CalDAV** : Calendriers iCalendar, export `.ics`, synchronisation CalDAV RFC 5545
 - **Pomo** : Plugin Pomodoro — engagement waitlist/sondage, support, sync cloud
 - **Quiz** : Quiz interactifs en temps réel (style Kahoot) — sessions, scoring dégressif, leaderboard
+- **Items** : Gestionnaire générique d'items (private/public/share), catégories JSON, partages utilisateurs
 
 ## Technologies
 
@@ -286,6 +287,23 @@ Voir [docs/pomo/GUIDE.md](docs/pomo/GUIDE.md) pour la référence complète.
 
 Voir [docs/quiz/GUIDE.md](docs/quiz/GUIDE.md) pour la référence complète.
 
+### Items
+
+| Méthode | Endpoint | Description | Auth |
+| --- | --- | --- | --- |
+| GET | `/items` | Liste des items accessibles (filtres : owner, access, category, limit) | JWT |
+| POST | `/items` | Créer un item | JWT |
+| GET | `/items/categories` | Catégories distinctes accessibles | JWT |
+| GET | `/items/categories/{name}` | Items d'une catégorie | JWT |
+| GET | `/items/{id}` | Lire un item | JWT |
+| PUT | `/items/{id}` | Mettre à jour categories / json_item | JWT |
+| DELETE | `/items/{id}` | Soft-delete (owner/admin) | JWT |
+| PUT | `/items/{id}/access` | Changer le mode d'accès (owner/admin) | JWT |
+| GET/POST | `/items/{id}/shares` | Lister / ajouter des invités | JWT |
+| PUT/DELETE | `/items/{id}/shares/{user_id}` | Modifier / retirer un invité (owner/admin) | JWT |
+
+Voir [docs/items/GUIDE.md](docs/items/GUIDE.md) pour la référence complète.
+
 ### Public
 
 | Méthode | Endpoint | Description |
@@ -301,12 +319,16 @@ Voir [docs/quiz/GUIDE.md](docs/quiz/GUIDE.md) pour la référence complète.
 | ICS / CalDAV | [docs/ics/API_ICS_ENDPOINTS.json](docs/ics/API_ICS_ENDPOINTS.json) | [docs/ics/GUIDE.md](docs/ics/GUIDE.md) |
 | Pomo | [docs/pomo/API_POMO_ENDPOINTS_v1_0_0.json](docs/pomo/API_POMO_ENDPOINTS_v1_0_0.json) | [docs/pomo/GUIDE.md](docs/pomo/GUIDE.md) |
 | Quiz | [docs/quiz/API_QUIZ_ENDPOINTS_v1_0_0.json](docs/quiz/API_QUIZ_ENDPOINTS_v1_0_0.json) | [docs/quiz/GUIDE.md](docs/quiz/GUIDE.md) |
+| Items | [docs/items/API_ITEMS_ENDPOINTS.json](docs/items/API_ITEMS_ENDPOINTS.json) | [docs/items/GUIDE.md](docs/items/GUIDE.md) |
 
 Migrations : [docs/core/](docs/core/) · Schéma initial : [docs/build_cmem2_DB.sql](docs/build_cmem2_DB.sql)
 
 ## Tests
 
 ```bash
+# Plugin Items (84 tests)
+php private/tests_mine/test_items.php
+
 # Plugin Quiz (104 tests)
 php private/tests_mine/test_quiz.php
 
@@ -315,13 +337,16 @@ php private/tests_mine/test_new_calendar_entrypoints_1.php
 
 # Module Pomo
 php private/tests_mine/test_pomo.php
+
+# Tous les tests
+php private/tests_mine/run_all_tests.php
 ```
 
 Les scripts de test utilisent les helpers de `private/tests_mine/test_new_base.php` (`callApiWithJWT`, `testNewResult`, `printNewSection`).
 
 ## Conventions
 
-- **Namespaces** : `AuthGroups\`, `Pomo\`, `Quiz\`
+- **Namespaces** : `AuthGroups\`, `Pomo\`, `Quiz\`, `Items\`
 - **Classes** : PascalCase
 - **Méthodes** : camelCase
 - **Colonnes DB** : snake_case

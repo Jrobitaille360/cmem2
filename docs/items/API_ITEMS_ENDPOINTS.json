@@ -1,0 +1,220 @@
+{
+  "plugin": {
+    "name": "Items",
+    "version": "1.0.0",
+    "description": "Gestionnaire générique d'items avec contrôle d'accès (private/public/share), catégories JSON et blob json_item arbitraire",
+    "generated": "2026-04-15",
+    "base_path": "/items",
+    "authentication": {
+      "type": "JWT_BEARER",
+      "header": "Authorization: Bearer {jwt_token}"
+    }
+  },
+  "endpoints": {
+    "items": {
+      "description": "CRUD items avec contrôle d'accès",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/items",
+          "description": "Liste des items accessibles (propres + partagés + publics selon owner=all)",
+          "auth_required": true,
+          "query": {
+            "owner": "string (me|all) — défaut 'me'",
+            "access": "string (private|public|share) — optionnel",
+            "category": "string — une ou plusieurs catégories séparées par virgule ; OR par défaut",
+            "category_match": "string (any|all) — défaut 'any' ; 'all' active le mode AND",
+            "limit": "integer — défaut 50, max 200",
+            "offset": "integer — défaut 0"
+          },
+          "response": {
+            "items": "array — liste d'items (categories et json_item décodés)",
+            "count": "integer — nombre d'items retournés"
+          },
+          "errors": {
+            "401": "JWT absent ou invalide"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/items",
+          "description": "Créer un nouvel item (owner = utilisateur courant)",
+          "auth_required": true,
+          "body": {
+            "access": "string (private|public|share) — défaut 'private'",
+            "categories": "array de strings — optionnel",
+            "json_item": "any — blob JSON arbitraire, optionnel"
+          },
+          "response": {
+            "item": "object — item créé complet"
+          },
+          "errors": {
+            "401": "JWT absent",
+            "422": "access invalide"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/items/categories",
+          "description": "Liste toutes les catégories distinctes des items accessibles, triées alphabétiquement",
+          "auth_required": true,
+          "response": {
+            "categories": "array de strings — triées alphabétiquement"
+          },
+          "errors": {
+            "401": "JWT absent"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/items/categories/{name}",
+          "description": "Items appartenant à la catégorie {name}. Retourne [] si catégorie inexistante (200).",
+          "auth_required": true,
+          "query": {
+            "limit": "integer — défaut 50",
+            "offset": "integer — défaut 0"
+          },
+          "response": {
+            "items": "array",
+            "count": "integer"
+          },
+          "errors": {
+            "401": "JWT absent"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/items/{id}",
+          "description": "Lire un item selon les règles d'accès",
+          "auth_required": true,
+          "response": {
+            "item": "object — item complet"
+          },
+          "errors": {
+            "401": "JWT absent",
+            "403": "Accès refusé",
+            "404": "Item introuvable"
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/items/{id}",
+          "description": "Mettre à jour categories et/ou json_item. Pour changer access, utiliser PUT /items/{id}/access.",
+          "auth_required": true,
+          "body": {
+            "categories": "array de strings — optionnel",
+            "json_item": "any — optionnel"
+          },
+          "response": {
+            "item": "object — item mis à jour"
+          },
+          "errors": {
+            "401": "JWT absent",
+            "403": "Accès refusé",
+            "404": "Item introuvable",
+            "422": "Aucune donnée à mettre à jour"
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/items/{id}",
+          "description": "Soft-delete d'un item (owner ou admin uniquement)",
+          "auth_required": true,
+          "response": "204 No Content",
+          "errors": {
+            "401": "JWT absent",
+            "403": "Accès refusé — owner ou admin requis",
+            "404": "Item introuvable"
+          }
+        }
+      ]
+    },
+    "shares": {
+      "description": "Gestion des partages — réservé au propriétaire ou à un administrateur (sauf GET /shares)",
+      "routes": [
+        {
+          "method": "PUT",
+          "path": "/items/{id}/access",
+          "description": "Changer le mode d'accès (private|public|share)",
+          "auth_required": true,
+          "body": {
+            "access": "string (private|public|share) — requis"
+          },
+          "response": {
+            "access": "string — nouveau mode"
+          },
+          "errors": {
+            "401": "JWT absent",
+            "403": "Accès refusé — owner ou admin requis",
+            "404": "Item introuvable",
+            "422": "access invalide"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/items/{id}/shares",
+          "description": "Lister les utilisateurs ayant accès (accessible à tout lecteur de l'item)",
+          "auth_required": true,
+          "response": {
+            "shares": "array — [{ id, item_id, user_id, can_update, user_name, user_email }]"
+          },
+          "errors": {
+            "401": "JWT absent",
+            "403": "Accès refusé",
+            "404": "Item introuvable"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/items/{id}/shares",
+          "description": "Ajouter ou remplacer un utilisateur dans la liste de partage",
+          "auth_required": true,
+          "body": {
+            "user_id": "integer — requis",
+            "can_update": "0|1 — défaut 0 (lecture seule)"
+          },
+          "response": {
+            "user_id": "integer",
+            "can_update": "0|1"
+          },
+          "errors": {
+            "401": "JWT absent",
+            "403": "Accès refusé — owner ou admin requis",
+            "404": "Item ou utilisateur introuvable",
+            "422": "user_id manquant ou propriétaire ciblé"
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/items/{id}/shares/{user_id}",
+          "description": "Modifier can_update d'un invité existant",
+          "auth_required": true,
+          "body": {
+            "can_update": "0|1 — requis"
+          },
+          "response": {
+            "user_id": "integer",
+            "can_update": "0|1"
+          },
+          "errors": {
+            "401": "JWT absent",
+            "403": "Accès refusé — owner ou admin requis",
+            "404": "Item ou relation introuvable"
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/items/{id}/shares/{user_id}",
+          "description": "Retirer un utilisateur de la liste de partage",
+          "auth_required": true,
+          "response": "200 OK",
+          "errors": {
+            "401": "JWT absent",
+            "403": "Accès refusé — owner ou admin requis",
+            "404": "Item ou relation introuvable"
+          }
+        }
+      ]
+    }
+  }
+}

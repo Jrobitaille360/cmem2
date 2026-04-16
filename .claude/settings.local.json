@@ -9,7 +9,9 @@
       "Bash(php -d display_errors=1 src/cron/backup/run_all.php)",
       "Bash(jobs)",
       "Bash(powershell -ExecutionPolicy Bypass -File /c/code/cmem2_API/private/sync.ps1)",
-      "Bash(php test_puzzle_share.php)"
+      "Bash(php test_puzzle_share.php)",
+      "Bash(mysql -u root cmem2_API -e \"SHOW TABLES LIKE 'items%'\")",
+      "Bash(php -r ' *)"
     ]
   }
 }

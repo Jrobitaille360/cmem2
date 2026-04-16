@@ -7,7 +7,59 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-04-14 11h]
+## [Unreleased]
+
+---
+
+## [2.3.0] — 2026-04-15
+
+### Nouveau plugin — Items Manager
+
+#### Base de données
+
+- **`docs/items/migrations/001_items_base.sql`** — deux nouvelles tables :
+  - `items` — item générique avec `owner_user_id`, `access` (private/public/share), `categories` (JSON), `json_item` (LONGTEXT), soft-delete `deleted_at`
+  - `item_user_access` — liste de partage par item : `user_id`, `can_update` (0=lecture, 1=écriture) ; cascade DELETE sur l'item parent
+
+#### Plugin `src/items/`
+
+- **`ItemsPlugin`** — entry point ; enregistre le route handler `items` dans le `PluginManager`
+- **`Item`** (Model) — `createItem`, `findItemById`, `findAccessibleByUser` (filtres access/owner/categories OR/AND/pagination), `updateItem`, `softDeleteItem`, `findDistinctCategories`, `decodeRow`
+- **`ItemUserAccess`** (Model) — `findByItem`, `findByItemAndUser`, `upsert` (ON DUPLICATE KEY), `deleteRelation`
+- **`ItemAccessService`** — `canRead`, `canUpdate`, `canDelete`, `canManageShares` ; règles centralisées private/public/share × owner/admin/invité
+- **`ItemController`** — `list`, `create`, `show`, `update`, `delete`, `listCategories`, `byCategory`
+- **`ItemShareController`** — `changeAccess`, `listShares`, `addShare`, `updateShare`, `removeShare`
+- **`ItemRouteHandler`** — dispatch URI ; priorité `categories` avant `{id}` numérique pour éviter toute collision
+
+#### Endpoints
+
+| Méthode | Route | Description |
+| - | - | - |
+| GET | `/items` | Liste (filtres : owner, access, category OR/AND, limit, offset) |
+| POST | `/items` | Créer un item |
+| GET | `/items/categories` | Catégories distinctes accessibles, triées |
+| GET | `/items/categories/{name}` | Items d'une catégorie |
+| GET | `/items/{id}` | Lire un item |
+| PUT | `/items/{id}` | Mettre à jour categories / json_item |
+| DELETE | `/items/{id}` | Soft-delete (owner/admin) |
+| PUT | `/items/{id}/access` | Changer private/public/share (owner/admin) |
+| GET | `/items/{id}/shares` | Lister les invités |
+| POST | `/items/{id}/shares` | Ajouter un invité |
+| PUT | `/items/{id}/shares/{user_id}` | Modifier can_update d'un invité |
+| DELETE | `/items/{id}/shares/{user_id}` | Retirer un invité |
+
+#### Tests
+
+- **`private/tests_mine/test_items.php`** — 84 assertions couvrant sécurité, CRUD, partages, catégories, filtres OR/AND, pagination, contrôle d'accès complet ; ajouté à `run_all_tests.php`
+
+#### Documentation
+
+- **`docs/items/GUIDE.md`** — guide client complet
+- **`docs/items/API_ITEMS_ENDPOINTS.json`** — référence JSON des endpoints
+
+---
+
+## [2.3.0 2026-04-14 11h]
 
 ### Sécurité — Refresh token rotatif, détection replay attack, sessions globales (auth_groups)
 
@@ -58,7 +110,7 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-04-13 17h]
+## [2.3.0 2026-04-13 17h]
 
 ### Refonte — SharedPuzzle v2 (plugin Puzzle)
 
@@ -108,7 +160,7 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-04-12 22h]
+## [2.3.0 2026-04-12 22h]
 
 ### Correctif — POST /puzzle/backup/claim (plugin Puzzle)
 
@@ -116,7 +168,7 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - **`src/puzzle/Routing/PuzzleRouteHandler.php`** — `POST /puzzle/backup/claim` dispatché vers `claimBackup()` avant le `match` ; corrige le bug où la route tombait sur `saveBackup()` (qui exigeait un champ `backup` côté client)
 - **`private/tests_mine/test_pseudo.php`** — suite de tests pseudonyme : 85/85 (enregistrement device, 401, GET/check/POST/DELETE, unicité insensible à la casse, idempotence, libération et réattribution)
 
-## [Unreleased 2026-04-12 21h]
+## [2.3.0 2026-04-12 21h]
 
 ### Nouveau — Endpoints pseudonyme complétés (plugin Puzzle)
 

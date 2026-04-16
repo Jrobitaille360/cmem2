@@ -1,0 +1,31 @@
+{
+    "name": "Items",
+    "version": "1.0.0",
+    "description": "Gestionnaire générique d'items avec contrôle d'accès (private/public/share), catégories JSON et blob json_item",
+    "author": "CMEM Team",
+    "namespace": "Items",
+    "main_class": "Items\\ItemsPlugin",
+    "min_cmem_version": "2.2.4",
+    "status": "active",
+    "dependencies": {
+        "cmem2_core": ">=2.2.4"
+    },
+    "routes": {
+        "prefix": "/items",
+        "auth_routes": [
+            "/items",
+            "/items/{id}",
+            "/items/categories",
+            "/items/categories/{name}",
+            "/items/{id}/access",
+            "/items/{id}/shares",
+            "/items/{id}/shares/{user_id}"
+        ]
+    },
+    "database": {
+        "migrations": [
+            "001_items_base.sql"
+        ],
+        "migrations_path": "docs/items/migrations/"
+    }
+}
