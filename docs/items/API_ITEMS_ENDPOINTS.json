@@ -85,14 +85,14 @@
         {
           "method": "GET",
           "path": "/items/{id}",
-          "description": "Lire un item selon les règles d'accès",
-          "auth_required": true,
+          "description": "Lire un item selon les règles d'accès. JWT optionnel : les items public sont accessibles sans JWT.",
+          "auth_required": false,
+          "notes": "JWT requis pour les items private et share. Items public : aucune authentification requise.",
           "response": {
             "item": "object — item complet"
           },
           "errors": {
-            "401": "JWT absent",
-            "403": "Accès refusé",
+            "403": "Accès refusé (item private ou share sans JWT valide)",
             "404": "Item introuvable"
           }
         },

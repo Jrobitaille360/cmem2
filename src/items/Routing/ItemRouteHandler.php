@@ -30,16 +30,38 @@ use Items\Controllers\ItemShareController;
  */
 class ItemRouteHandler extends BaseRouteHandler
 {
-    protected bool $requiresAuth = true;
+    // Auth résolue de façon optionnelle : JWT si présent, null sinon.
+    // GET /items/{id} est accessible sans JWT pour les items public.
+    // Toutes les routes d'écriture vérifient $user !== null avant de continuer.
+    protected bool $requiresAuth = false;
+
+    protected function getMiddlewares(): array
+    {
+        return [
+            function(array $request): array {
+                $request['user'] = $this->authService?->authenticate();
+                return $request;
+            }
+        ];
+    }
 
     protected function getSupportedControllers(): array
     {
         return ['items'];
     }
 
+    private function requireAuth(?array $user): bool
+    {
+        if ($user === null) {
+            Response::error('Utilisateur non authentifié', null, 401);
+            return false;
+        }
+        return true;
+    }
+
     protected function handleRoute(array $request): void
     {
-        $user   = $request['user'];
+        $user   = $request['user'];   // ?array — null si pas de JWT valide
         $method = $request['method'] ?? 'GET';
         $segs   = $request['segments'] ?? [];
 
@@ -53,6 +75,7 @@ class ItemRouteHandler extends BaseRouteHandler
         // POST /items
         // ------------------------------------------------------------------
         if ($s1 === '') {
+            if (!$this->requireAuth($user)) return;
             match ($method) {
                 'GET'  => (new ItemController())->list($user),
                 'POST' => (new ItemController())->create($user),
@@ -66,6 +89,7 @@ class ItemRouteHandler extends BaseRouteHandler
         // Doit être testé AVANT le cast numérique de $s1
         // ------------------------------------------------------------------
         if ($s1 === 'categories') {
+            if (!$this->requireAuth($user)) return;
             if ($method !== 'GET') {
                 Response::error('Méthode non autorisée', null, 405);
                 return;
@@ -91,9 +115,10 @@ class ItemRouteHandler extends BaseRouteHandler
         // /items/{id}
         if ($s2 === '') {
             match ($method) {
+                // GET /items/{id} : accessible sans JWT pour les items public
                 'GET'    => (new ItemController())->show($user, $itemId),
-                'PUT'    => (new ItemController())->update($user, $itemId),
-                'DELETE' => (new ItemController())->delete($user, $itemId),
+                'PUT'    => $this->requireAuth($user) ? (new ItemController())->update($user, $itemId) : null,
+                'DELETE' => $this->requireAuth($user) ? (new ItemController())->delete($user, $itemId) : null,
                 default  => Response::error('Méthode non autorisée', null, 405),
             };
             return;
@@ -101,6 +126,7 @@ class ItemRouteHandler extends BaseRouteHandler
 
         // /items/{id}/access
         if ($s2 === 'access') {
+            if (!$this->requireAuth($user)) return;
             if ($method === 'PUT') {
                 (new ItemShareController())->changeAccess($user, $itemId);
             } else {
@@ -111,6 +137,7 @@ class ItemRouteHandler extends BaseRouteHandler
 
         // /items/{id}/shares[/{target_user_id}]
         if ($s2 === 'shares') {
+            if (!$this->requireAuth($user)) return;
             if ($s3 === '') {
                 match ($method) {
                     'GET'  => (new ItemShareController())->listShares($user, $itemId),

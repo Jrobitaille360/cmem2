@@ -136,7 +136,7 @@ class ItemController
     // GET /items/{id}
     // ---------------------------------------------------------------
 
-    public function show(array $user, int $id): void
+    public function show(?array $user, int $id): void
     {
         LoggingMiddleware::logEntry();
         $item = $this->model->findItemById($id);

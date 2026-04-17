@@ -29,17 +29,20 @@ Chaque item porte :
 - un blob JSON arbitraire (`json_item`) dont le schéma est libre
 
 Les items `share` peuvent être partagés avec des utilisateurs nommés ;
-les items `public` sont lisibles et modifiables par tout utilisateur authentifié.
+les items `public` sont lisibles sans JWT (accès anonyme) et modifiables par tout utilisateur authentifié.
 
 ---
 
 ## Authentification
 
-Tous les endpoints exigent un JWT valide :
+La plupart des endpoints exigent un JWT valide :
 
 ```http
 Authorization: Bearer <jwt_token>
 ```
+
+**Exception** : `GET /items/{id}` est accessible sans JWT si l'item a le mode `access=public`.
+Tous les autres endpoints (`GET /items`, écriture, partages) requièrent un JWT.
 
 Obtenir un token → `POST /auth/login`.
 
@@ -72,7 +75,7 @@ Obtenir un token → `POST /auth/login`.
 
 | Action | private | share | public |
 | - | - | - | - |
-| Lire | owner, admin | owner, admin, invités | tout JWT |
+| Lire | owner, admin | owner, admin, invités | **tout le monde (sans JWT)** |
 | Modifier le contenu | owner, admin | owner, admin, invités `can_update=1` | tout JWT |
 | Supprimer | owner, admin | owner, admin | owner, admin |
 | Changer `access` | owner, admin | owner, admin | owner, admin |

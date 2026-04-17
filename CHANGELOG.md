@@ -7,7 +7,24 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased]
+## [Unreleased 2026-04-16]
+
+### Plugin Items — accès public sans JWT
+
+#### Changement de comportement
+
+- **`GET /items/{id}`** — accessible sans JWT si l'item a `access=public` ; les items `private` et `share` retournent toujours 403 sans JWT valide
+
+#### Code modifié
+
+- **`ItemRouteHandler`** — auth optionnelle (`requiresAuth = false`) ; middleware résout le JWT si présent mais ne bloque pas si absent ; `requireAuth()` interne pour les routes qui l'exigent toujours
+- **`ItemController::show()`** — signature `?array $user`
+- **`ItemAccessService::canRead()`** — signature `?array $user` ; `public` retourne `true` immédiatement sans vérification du user ; `isAdmin()` / `isOwner()` retournent `false` si `$user === null`
+
+#### Documentation
+
+- **`docs/items/GUIDE.md`** — section Authentification mise à jour ; tableau des règles d'accès précise « tout le monde (sans JWT) » pour la lecture public
+- **`docs/items/API_ITEMS_ENDPOINTS.json`** — `GET /items/{id}` : `auth_required: false`, note explicite, erreur 401 retirée
 
 ---
 

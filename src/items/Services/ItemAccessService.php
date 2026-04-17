@@ -28,14 +28,14 @@ class ItemAccessService
     // Helpers internes
     // ---------------------------------------------------------------
 
-    private function isAdmin(array $user): bool
+    private function isAdmin(?array $user): bool
     {
-        return ($user['role'] ?? '') === 'ADMINISTRATEUR';
+        return $user !== null && ($user['role'] ?? '') === 'ADMINISTRATEUR';
     }
 
-    private function isOwner(array $user, array $item): bool
+    private function isOwner(?array $user, array $item): bool
     {
-        return (int) $user['user_id'] === (int) $item['owner_user_id'];
+        return $user !== null && (int) $user['user_id'] === (int) $item['owner_user_id'];
     }
 
     /**
@@ -54,24 +54,27 @@ class ItemAccessService
     /**
      * L'utilisateur peut-il lire cet item ?
      */
-    public function canRead(array $user, array $item): bool
+    public function canRead(?array $user, array $item): bool
     {
+        // Items public : accessibles sans JWT
+        if ($item['access'] === 'public') {
+            return true;
+        }
+
+        if ($user === null) {
+            return false;
+        }
+
         if ($this->isAdmin($user) || $this->isOwner($user, $item)) {
             return true;
         }
 
-        $access = $item['access'];
-
-        if ($access === 'public') {
-            return true;
-        }
-
-        if ($access === 'share') {
+        if ($item['access'] === 'share') {
             $rel = $this->getRelation((int) $item['id'], (int) $user['user_id']);
             return $rel !== null;
         }
 
-        // private — déjà traité via isOwner
+        // private — non owner, non admin
         return false;
     }
 
