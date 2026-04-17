@@ -85,6 +85,19 @@ class ItemRouteHandler extends BaseRouteHandler
         }
 
         // ------------------------------------------------------------------
+        // GET /items/publics  — sans JWT, items access=public uniquement
+        // Doit être testé AVANT le cast numérique de $s1
+        // ------------------------------------------------------------------
+        if ($s1 === 'publics') {
+            if ($method !== 'GET') {
+                Response::error('Méthode non autorisée', null, 405);
+                return;
+            }
+            (new ItemController())->listPublic();
+            return;
+        }
+
+        // ------------------------------------------------------------------
         // /items/categories[/{name}]
         // Doit être testé AVANT le cast numérique de $s1
         // ------------------------------------------------------------------

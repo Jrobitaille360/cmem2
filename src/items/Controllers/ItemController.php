@@ -95,6 +95,30 @@ class ItemController
     }
 
     // ---------------------------------------------------------------
+    // GET /items/publics  (sans JWT)
+    // ---------------------------------------------------------------
+
+    public function listPublic(): void
+    {
+        LoggingMiddleware::logEntry();
+        $p = Response::getRequestParams();
+
+        $filters = [
+            'category_match' => ($p['category_match'] ?? 'any') === 'all' ? 'all' : 'any',
+            'limit'          => (int) ($p['limit']  ?? 50),
+            'offset'         => (int) ($p['offset'] ?? 0),
+        ];
+
+        if (!empty($p['category'])) {
+            $raw = is_array($p['category']) ? $p['category'] : explode(',', $p['category']);
+            $filters['categories'] = array_values(array_filter(array_map('trim', $raw)));
+        }
+
+        $items = $this->model->findPublic($filters);
+        Response::success('Items publics récupérés', ['items' => $items, 'count' => count($items)]);
+    }
+
+    // ---------------------------------------------------------------
     // GET /items/categories
     // ---------------------------------------------------------------
 

@@ -11,6 +11,7 @@ Version 1.0.0 · Base URL : `/items`
 - [Modèle de données](#modèle-de-données)
 - [Règles d'accès](#règles-daccès)
 - [Endpoints — CRUD](#endpoints--crud)
+- [Endpoint public sans JWT](#endpoint-public-sans-jwt)
 - [Endpoints — Catégories](#endpoints--catégories)
 - [Endpoints — Partages](#endpoints--partages)
 - [Filtres et pagination](#filtres-et-pagination)
@@ -185,6 +186,53 @@ Soft-delete d'un item (owner ou admin uniquement).
 **Réponse 204 :** aucun corps.
 
 **Erreurs :** `403` · `404`.
+
+---
+
+## Endpoint public sans JWT
+
+### `GET /items/publics`
+
+Retourne tous les items `access=public` non supprimés. Aucun JWT requis.
+
+**Filtres (query string) :**
+
+| Paramètre | Valeurs | Défaut | Description |
+| - | - | - | - |
+| `category` | `alpha` ou `alpha,beta` | — | Filtre par catégorie (OR par défaut) |
+| `category_match` | `any` \| `all` | `any` | `all` = l'item doit avoir toutes les catégories |
+| `limit` | entier | 50 | Maximum 200 |
+| `offset` | entier | 0 | Décalage pour la pagination |
+
+**Réponse 200 :**
+
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "id": 12,
+        "owner_user_id": 1,
+        "access": "public",
+        "categories": ["app"],
+        "json_item": { "slug": "mon-app", "nom": "Mon App" },
+        "created_at": "2026-04-16 10:00:00",
+        "updated_at": "2026-04-16 10:00:00"
+      }
+    ],
+    "count": 1
+  }
+}
+```
+
+**Cas d'usage typiques :**
+
+| Usage | Requête |
+| - | - |
+| Liste des apps (page d'accueil) | `GET /items/publics?category=app` |
+| `generateStaticParams` (build Next.js) | `GET /items/publics?category=app` |
+| Page individuelle | `GET /items/{id}` |
 
 ---
 

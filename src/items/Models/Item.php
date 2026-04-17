@@ -175,6 +175,44 @@ class Item extends BaseModel
         return array_map([$this, 'decodeRow'], $rows);
     }
 
+    /**
+     * Liste les items access=public (sans contexte utilisateur).
+     *
+     * Filtres : categories, category_match, limit, offset — mêmes sémantiques
+     * que findAccessibleByUser.
+     *
+     * @return array  Liste d'items décodés
+     */
+    public function findPublic(array $filters = []): array
+    {
+        $categories    = $filters['categories']     ?? [];
+        $categoryMatch = $filters['category_match'] ?? 'any';
+        $limit         = min((int) ($filters['limit']  ?? 50), 200);
+        $offset        = max((int) ($filters['offset'] ?? 0), 0);
+
+        $params = [];
+        $where  = ["i.deleted_at IS NULL", "i.access = 'public'"];
+
+        if (!empty($categories)) {
+            $catClauses = [];
+            foreach ($categories as $cat) {
+                $catClauses[] = 'JSON_CONTAINS(i.categories, JSON_QUOTE(?))';
+                $params[]     = $cat;
+            }
+            $glue    = ($categoryMatch === 'all') ? ' AND ' : ' OR ';
+            $where[] = '(' . implode($glue, $catClauses) . ')';
+        }
+
+        $whereSQL = implode(' AND ', $where);
+        $sql = "SELECT i.* FROM items i WHERE {$whereSQL} ORDER BY i.created_at DESC LIMIT ? OFFSET ?";
+        $params[] = $limit;
+        $params[] = $offset;
+
+        $stmt = $this->getDb()->prepare($sql);
+        $stmt->execute($params);
+        return array_map([$this, 'decodeRow'], $stmt->fetchAll(PDO::FETCH_ASSOC));
+    }
+
     // ---------------------------------------------------------------
     // Mise à jour
     // ---------------------------------------------------------------

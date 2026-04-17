@@ -9,22 +9,28 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased 2026-04-16]
 
-### Plugin Items — accès public sans JWT
+### Plugin Items — endpoints publics sans JWT
 
-#### Changement de comportement
+#### Nouveaux endpoints
 
-- **`GET /items/{id}`** — accessible sans JWT si l'item a `access=public` ; les items `private` et `share` retournent toujours 403 sans JWT valide
+- **`GET /items/publics`** — liste tous les items `access=public` non supprimés sans JWT ; filtres `category`, `category_match`, `limit`, `offset` ; même format de réponse que `GET /items`
+
+#### Changements antérieurs (même session)
+
+- **`GET /items/{id}`** — accessible sans JWT si l'item a `access=public` ; `private` et `share` retournent 403 sans JWT valide
 
 #### Code modifié
 
-- **`ItemRouteHandler`** — auth optionnelle (`requiresAuth = false`) ; middleware résout le JWT si présent mais ne bloque pas si absent ; `requireAuth()` interne pour les routes qui l'exigent toujours
+- **`Item::findPublic()`** — nouvelle méthode : `WHERE access='public' AND deleted_at IS NULL` + filtres catégories/pagination
+- **`ItemController::listPublic()`** — nouvel endpoint sans paramètre `$user`
+- **`ItemRouteHandler`** — route `GET /items/publics` ajoutée (avant le bloc catégories) ; auth optionnelle (`requiresAuth = false`) ; `requireAuth()` interne pour les routes protégées
 - **`ItemController::show()`** — signature `?array $user`
-- **`ItemAccessService::canRead()`** — signature `?array $user` ; `public` retourne `true` immédiatement sans vérification du user ; `isAdmin()` / `isOwner()` retournent `false` si `$user === null`
+- **`ItemAccessService::canRead()`** — signature `?array $user` ; `public` court-circuite sans inspecter le user
 
 #### Documentation
 
-- **`docs/items/GUIDE.md`** — section Authentification mise à jour ; tableau des règles d'accès précise « tout le monde (sans JWT) » pour la lecture public
-- **`docs/items/API_ITEMS_ENDPOINTS.json`** — `GET /items/{id}` : `auth_required: false`, note explicite, erreur 401 retirée
+- **`docs/items/GUIDE.md`** — section « Endpoint public sans JWT » avec tableau d'exemples d'usage
+- **`docs/items/API_ITEMS_ENDPOINTS.json`** — `GET /items/publics` ajouté ; `GET /items/{id}` : `auth_required: false`
 
 ---
 

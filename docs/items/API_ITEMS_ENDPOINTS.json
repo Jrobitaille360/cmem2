@@ -55,6 +55,23 @@
         },
         {
           "method": "GET",
+          "path": "/items/publics",
+          "description": "Liste tous les items access=public non supprimés. Aucune authentification requise.",
+          "auth_required": false,
+          "query": {
+            "category": "string — une ou plusieurs catégories séparées par virgule ; OR par défaut",
+            "category_match": "string (any|all) — défaut 'any' ; 'all' active le mode AND",
+            "limit": "integer — défaut 50, max 200",
+            "offset": "integer — défaut 0"
+          },
+          "response": {
+            "items": "array — liste d'items public (categories et json_item décodés)",
+            "count": "integer — nombre d'items retournés"
+          },
+          "errors": {}
+        },
+        {
+          "method": "GET",
           "path": "/items/categories",
           "description": "Liste toutes les catégories distinctes des items accessibles, triées alphabétiquement",
           "auth_required": true,
