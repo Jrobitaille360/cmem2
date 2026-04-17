@@ -155,9 +155,12 @@ Créer un nouvel item (owner = utilisateur courant).
 
 Lire un item selon les règles d'accès.
 
+**JWT optionnel** — les items `public` sont retournés sans authentification.
+Pour les items `private` ou `share`, un JWT valide est requis.
+
 **Réponse 200 :** item complet (mêmes champs que ci-dessus).
 
-**Erreurs :** `403` accès refusé · `404` introuvable.
+**Erreurs :** `403` accès refusé (item non public et JWT absent/invalide) · `404` introuvable.
 
 ---
 
@@ -376,3 +379,11 @@ Authorization: Bearer <token>
 GET /items/categories
 Authorization: Bearer <token>
 ```
+
+### Lire un item public sans JWT
+
+```http
+GET /items/12
+```
+
+Retourne l'item si `access=public`. Retourne `403` si l'item est `private` ou `share`.
