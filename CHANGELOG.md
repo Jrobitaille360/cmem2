@@ -7,6 +7,14 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-04-19]
+
+### Correctif — répertoire d'upload des fichiers
+
+- **`FileController`** — corrigé le chemin `$uploadDir` : `__DIR__ . '/../../uploads/files/'` remplacé par `'/../../../uploads/files/'` ; les fichiers téléversés via `POST /files` sont désormais sauvegardés dans `uploads/files/` à la racine du projet et non dans `src/uploads/files/`
+
+---
+
 ## [Unreleased 2026-04-16]
 
 ### Plugin Items — endpoints publics sans JWT

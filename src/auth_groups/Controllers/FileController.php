@@ -75,7 +75,7 @@ class FileController
             $description = $input['description'] ?? null;
 
             // 1. Créer le dossier uploads s'il n'existe pas
-            $uploadDir = __DIR__ . '/../../uploads/files/';
+            $uploadDir = __DIR__ . '/../../../uploads/files/';
             if (!is_dir($uploadDir))
             {
                 mkdir($uploadDir, 0755, true);

@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 100" width="320" height="100">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e"/>
+      <stop offset="100%" style="stop-color:#16213e"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7c3aed"/>
+      <stop offset="100%" style="stop-color:#4f46e5"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#7c3aed"/>
+      <stop offset="100%" style="stop-color:#06b6d4"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="320" height="100" rx="12" fill="url(#bg)"/>
+
+  <!-- Icon: stylized "M" inside a circuit/memory chip ring -->
+  <!-- Outer ring -->
+  <circle cx="50" cy="50" r="34" fill="none" stroke="url(#ring)" stroke-width="2.5" opacity="0.6"/>
+  <!-- Inner ring -->
+  <circle cx="50" cy="50" r="26" fill="none" stroke="url(#ring)" stroke-width="1.5" opacity="0.4"/>
+
+  <!-- Circuit pins on ring -->
+  <line x1="50" y1="16" x2="50" y2="10" stroke="#7c3aed" stroke-width="2" stroke-linecap="round"/>
+  <line x1="50" y1="84" x2="50" y2="90" stroke="#7c3aed" stroke-width="2" stroke-linecap="round"/>
+  <line x1="16" y1="50" x2="10" y2="50" stroke="#7c3aed" stroke-width="2" stroke-linecap="round"/>
+  <line x1="84" y1="50" x2="90" y2="50" stroke="#7c3aed" stroke-width="2" stroke-linecap="round"/>
+  <line x1="26" y1="26" x2="21" y2="21" stroke="#4f46e5" stroke-width="1.5" stroke-linecap="round" opacity="0.7"/>
+  <line x1="74" y1="26" x2="79" y2="21" stroke="#4f46e5" stroke-width="1.5" stroke-linecap="round" opacity="0.7"/>
+  <line x1="26" y1="74" x2="21" y2="79" stroke="#4f46e5" stroke-width="1.5" stroke-linecap="round" opacity="0.7"/>
+  <line x1="74" y1="74" x2="79" y2="79" stroke="#4f46e5" stroke-width="1.5" stroke-linecap="round" opacity="0.7"/>
+
+  <!-- Stylized "M" letter inside -->
+  <path d="M33 63 L33 37 L50 55 L67 37 L67 63" fill="none" stroke="url(#accent)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+
+  <!-- Text: cmem2 -->
+  <text x="110" y="46" font-family="'Courier New', monospace" font-size="28" font-weight="700" fill="#ffffff" letter-spacing="-1">cmem2</text>
+
+  <!-- Gradient underline -->
+  <rect x="110" y="52" width="120" height="2.5" rx="1.5" fill="url(#accent)" opacity="0.9"/>
+
+  <!-- Subtitle: API -->
+  <text x="110" y="72" font-family="'Courier New', monospace" font-size="14" font-weight="400" fill="#94a3b8" letter-spacing="6">API</text>
+
+  <!-- Small version badge -->
+  <rect x="247" y="60" width="52" height="18" rx="4" fill="#7c3aed" opacity="0.25"/>
+  <text x="273" y="73" font-family="'Courier New', monospace" font-size="10" fill="#a78bfa" text-anchor="middle" letter-spacing="0.5">v2.3.0</text>
+</svg>
