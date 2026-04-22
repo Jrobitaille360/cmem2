@@ -47,7 +47,9 @@ Le plugin Quiz permet des quiz interactifs en temps réel (style Kahoot) :
 | Code | Cause |
 | --- | --- |
 | 401 | Header Authorization absent |
-| 403 | Token invalide / introuvable / session terminée |
+| 403 | Token invalide / introuvable / token ne correspond pas à la session |
+
+> `GET /quiz/session/{id}` fait exception : il reste accessible avec un `participant_token` valide même si la session est `ended`.
 
 ---
 
@@ -324,7 +326,9 @@ Réponse `201` :
 
 ### GET /quiz/session/{id}
 
-Retourne la question courante **sans** `is_correct` sur les choix (évite la triche). `current_question: null` si statut `waiting`.
+Retourne la question courante **sans** `is_correct` sur les choix (évite la triche). `current_question: null` si statut `waiting` ou `ended`.
+
+**Accessible même lorsque la session est terminée** (`status: ended`) — le guard `participant_token` ne bloque pas cet endpoint après la fin de session.
 
 ```json
 {
@@ -344,10 +348,18 @@ Retourne la question courante **sans** `is_correct` sur les choix (évite la tri
       ],
       "total": 2,
       "index": 0
+    },
+    "quiz_settings": {
+      "result_visibility": "immediate",
+      "time_mode": "per_question",
+      "total_time_sec": null,
+      "show_leaderboard": true
     }
   }
 }
 ```
+
+Lorsque `status: ended`, la réponse est identique mais `current_question` vaut `null`.
 
 ### POST /quiz/session/{id}/answer
 
@@ -484,7 +496,7 @@ $$\text{points\_earned} = \lfloor points \times \max(0, 1 - \frac{response\_time
 | Code | Signification |
 | --- | --- |
 | 401 | Header Authorization absent |
-| 403 | participant_token invalide/introuvable \| JWT invalide \| session terminée |
+| 403 | participant_token invalide/introuvable \| JWT invalide \| token ne correspond pas à la session |
 | 404 | Quiz / question / session introuvable |
 | 409 | Session déjà terminée \| Déjà répondu \| question_id non courant \| Session fermée aux inscriptions |
 | 422 | Validation échouée (trop peu de choix, champ manquant…) |

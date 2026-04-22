@@ -4,8 +4,8 @@
     "version": "1.0.0",
     "description": "Plugin de quiz interactifs en temps réel (style Kahoot). Ph1 : MVP REST — création de quiz, gestion de sessions, participation en direct, scoring dégressif.",
     "generated": "2026-04-05",
-    "reviewed": "2026-04-05",
-    "review_notes": "Relecture lors de la planification du client Flutter (quiz_client). Ajout section client_integration, précisions sur next/end, comportement polling et reconnexion.",
+    "reviewed": "2026-04-21",
+    "review_notes": "GET /quiz/session/{id} accessible même si status: ended — guard middleware assoupli pour cet endpoint uniquement. Réponse 200 avec current_question: null et quiz_settings inclus.",
     "base_url": "/quiz",
     "authentication": {
       "types": ["JWT_BEARER", "PARTICIPANT_TOKEN", "NONE"],
@@ -47,25 +47,25 @@
       ]
     },
     "participant_authenticated": {
-      "description": "Routes participant — requièrent participant_token (Bearer). La session doit être non terminée et le token doit correspondre à la session.",
+      "description": "Routes participant — requièrent participant_token (Bearer). Le token doit correspondre à la session. Exception : GET /quiz/session/{id} reste accessible même si la session est terminée (status: ended).",
       "auth_required": true,
       "auth_type": "PARTICIPANT_TOKEN",
       "routes": [
         {
           "method": "GET",
           "path": "/quiz/session/{session_id}",
-          "description": "Obtenir l'état courant de la session : status, index de la question courante, contenu de la question (sans is_correct sur les choix). Retourne current_question: null si la session est en attente (status: waiting) ou terminée (status: ended).",
+          "description": "Obtenir l'état courant de la session : status, index de la question courante, contenu de la question (sans is_correct sur les choix). Accessible même si status: ended — retourne current_question: null dans ce cas. Retourne aussi current_question: null si status: waiting.",
           "params": {
             "session_id": "integer (required) - ID de la session"
           },
           "responses": {
-            "200": "{ success: true, data: { session_id: integer, status: 'waiting'|'active'|'ended', current_question_idx: integer, current_question: { id, type, content: { text, latex?, image_url? }, points, time_limit_sec, choices: [{ id, content }], total, index } | null } }",
+            "200": "{ success: true, data: { session_id: integer, status: 'waiting'|'active'|'ended', current_question_idx: integer, current_question: { id, type, content: { text, latex?, image_url? }, points, time_limit_sec, choices: [{ id, content }], total, index } | null, quiz_settings: { result_visibility, time_mode, total_time_sec, show_leaderboard } } }",
             "401": "Aucun token fourni (header Authorization absent)",
-            "403": "participant_token invalide ou introuvable | Session terminée",
+            "403": "participant_token invalide ou introuvable | token ne correspond pas à cette session",
             "404": "Session introuvable"
           },
-          "notes": "Le champ is_correct est retiré des choix — non transmis avant fin de session. current_question_idx vaut -1 avant le premier appel à /next.",
-          "client_notes": "Endpoint de polling joueur (intervalle recommandé : 2s). Transitions à surveiller : status 'waiting'→'active' (démarrage de la partie), changement de current_question_idx (nouvelle question, reset timer côté client), status 'active'→'ended' (session terminée → redirect leaderboard)."
+          "notes": "Le champ is_correct est retiré des choix — non transmis avant fin de session. current_question_idx vaut -1 avant le premier appel à /next. Contrairement aux autres routes participant, le guard ne bloque pas les sessions terminées sur cet endpoint.",
+          "client_notes": "Endpoint de polling joueur (intervalle recommandé : 2s). Transitions à surveiller : status 'waiting'→'active' (démarrage de la partie), changement de current_question_idx (nouvelle question, reset timer côté client), status 'active'→'ended' (session terminée → lire le classement final puis redirect)."
         },
         {
           "method": "POST",
@@ -349,7 +349,7 @@
     },
     "error_handling": {
       "401_joueur": "participant_token absent → redirect JoinScreen",
-      "403_joueur": "participant_token invalide ou session terminée → afficher message et redirect HomeScreen",
+      "403_joueur": "participant_token invalide ou token ne correspond pas à la session → afficher message et redirect HomeScreen. Note : GET /quiz/session/{id} ne retourne plus 403 pour session terminée — utiliser status: ended dans la réponse 200 pour détecter la fin.",
       "401_maitre": "JWT expiré ou absent → redirect LoginScreen",
       "network_retry": "Retry automatique 3× (backoff 1s) avant affichage message utilisateur"
     }

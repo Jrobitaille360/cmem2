@@ -1,0 +1,99 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Commands
+
+### Dev server
+
+```bash
+composer serve
+# → php -S localhost:8080 index.php
+```
+
+### Tests
+
+Run a single module:
+
+```bash
+php private/tests_mine/test_items.php
+php private/tests_mine/test_quiz.php
+php private/tests_mine/test_calendars.php
+php private/tests_mine/test_pomo.php
+php private/tests_mine/test_tags.php
+php private/tests_mine/test_groups.php
+php private/tests_mine/test_files.php
+php private/tests_mine/test_public.php
+```
+
+Run all tests:
+
+```bash
+php private/tests_mine/run_all_tests.php
+```
+
+Tests execute real HTTP requests via cURL against a running server. Each test file includes `private/tests_mine/test_new_base.php` for shared helpers (`callNewApi`, `testNewResult`, `printNewSection`).
+
+### Database initialization
+
+```bash
+mysql -u root -p < docs/build_cmem2_DB.sql
+```
+
+## Architecture
+
+This is a **modular REST API** built in PHP 8.0+ on a custom micro-framework (no Laravel/Symfony). All requests enter via `index.php`, which bootstraps the app and delegates to a `Router` instance.
+
+### Boot sequence
+
+`index.php` → `src/auth_groups/loader.php` (validates .env, creates runtime dirs, loads plugins) → `PluginManager` (registers plugin routes) → `Router` (dispatches request)
+
+### Module layout
+
+Each module lives under `src/` and follows the same internal pattern:
+
+```tree
+src/<module>/
+  Controllers/   # Request handlers
+  Models/        # PDO queries
+  Services/      # Business logic
+  Routing/       # Route registration
+```
+
+| Module | Namespace | Purpose |
+| - | - | - |
+| `src/auth_groups/` | `AuthGroups\` | Core: users, JWT auth, groups, files, tags, webhooks |
+| `src/ics/` | `ICS\` | CalDAV/ICS calendar sync (RFC 5545) |
+| `src/quiz/` | `Quiz\` | Real-time quiz sessions with participant tokens |
+| `src/items/` | `Items\` | Generic item manager — private / public / shared |
+| `src/pomo/` | `Pomo\` | Engagement waitlist and support forms |
+| `src/puzzle/` | `Puzzle\` | Collaborative puzzle with pick/drop mechanics |
+| `src/Core/` | `Core\` | `PluginInterface`, `PluginManager`, `AbstractPlugin` |
+
+Plugins are activated in `.env` and loaded dynamically; they register their own routes through `PluginManager`.
+
+### Authentication
+
+JWT (HS256, 15-day expiry) + OTP (email codes). Anti-brute-force: 5 attempts per 10 min per email+IP. Rate limiting: 60 req/min (configurable). Device tokens enable persistent login.
+
+### Response format
+
+All endpoints return:
+
+```json
+{ "success": bool, "message": "...", "data": {}, "errors": [] }
+```
+
+Standard HTTP codes used: 200, 201, 401, 403, 404, 409, 422, 429.
+
+### Configuration
+
+All settings live in a single `.env` file (see `.env.example` for the full 170+ variable reference). `src/auth_groups/loader.php` validates required keys on startup.
+
+## Conventions
+
+- Namespaces: PascalCase matching module name (e.g., `AuthGroups\Controllers\UserController`)
+- Methods: camelCase; DB columns: snake_case
+- SQL via PDO with prepared statements — no ORM
+- API docs per module: `docs/<module>/GUIDE.md` and `docs/<module>/API_*_ENDPOINTS.json`
+- Version history: `CHANGELOG.md`; project roadmap: `docs/PLAN_GLOBAL_CMEM2.md`

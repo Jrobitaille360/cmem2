@@ -54,7 +54,8 @@ class QuizRouteHandler extends BaseRouteHandler
         // -------------------------------------------------------------------
         if ($s1 === 'session') {
             $sessionId  = (int) $s2;
-            $participant = $this->requireParticipantToken($sessionId);
+            $allowEnded  = ($method === 'GET' && $s3 === '');
+            $participant = $this->requireParticipantToken($sessionId, $allowEnded);
             if ($participant === null) {
                 return; // réponse d'erreur déjà envoyée
             }
@@ -170,7 +171,7 @@ class QuizRouteHandler extends BaseRouteHandler
      * Valide le participant_token depuis le header Authorization: Bearer <token>.
      * Vérifie que la session n'est pas terminée et que le token correspond à la session.
      */
-    private function requireParticipantToken(int $sessionId): ?array
+    private function requireParticipantToken(int $sessionId, bool $allowEnded = false): ?array
     {
         $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
 
@@ -193,9 +194,9 @@ class QuizRouteHandler extends BaseRouteHandler
             return null;
         }
 
-        // Vérifier que la session n'est pas terminée
+        // Vérifier que la session n'est pas terminée (sauf routes qui l'autorisent explicitement)
         $session = (new Session())->findById($sessionId);
-        if (!$session || $session['status'] === 'ended') {
+        if (!$session || ($session['status'] === 'ended' && !$allowEnded)) {
             Response::error('Session terminée — token expiré', null, 403);
             return null;
         }

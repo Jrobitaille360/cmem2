@@ -7,6 +7,18 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-04-21]
+
+### Plugin Quiz — GET /quiz/session/{id} accessible après fin de session
+
+- **`QuizRouteHandler::requireParticipantToken()`** — ajout du paramètre `$allowEnded` (défaut `false`) ; le check `status === 'ended'` est sauté quand `true`
+- **`QuizRouteHandler`** — `GET /quiz/session/{id}` passe `$allowEnded = true` ; les autres routes participant (`/answer`, `/leaderboard`) conservent le comportement 403 sur session terminée
+- **`test_quiz.php`** — test `3.14b` : vérifie que `GET /quiz/session/{sid}` retourne 200 avec `status: ended`, `current_question: null`, `session_id` entier et `quiz_settings` complet
+- **`docs/quiz/API_QUIZ_ENDPOINTS_v1_0_0.json`** — description et réponses de l'endpoint mises à jour ; `quiz_settings` ajouté à la réponse 200 ; `403` ne mentionne plus « session terminée » pour cet endpoint ; `error_handling.403_joueur` mis à jour
+- **`docs/quiz/GUIDE.md`** — section `GET /quiz/session/{id}` : note d'accessibilité après `ended`, exemple de réponse avec `quiz_settings`, `current_question: null` documenté pour `ended` ; tableau des erreurs mis à jour
+
+---
+
 ## [Unreleased 2026-04-19]
 
 ### Correctif — répertoire d'upload des fichiers
