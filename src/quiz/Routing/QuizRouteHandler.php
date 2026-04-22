@@ -54,7 +54,7 @@ class QuizRouteHandler extends BaseRouteHandler
         // -------------------------------------------------------------------
         if ($s1 === 'session') {
             $sessionId  = (int) $s2;
-            $allowEnded  = ($method === 'GET' && $s3 === '');
+            $allowEnded  = ($method === 'GET' && ($s3 === '' || $s3 === 'leaderboard'));
             $participant = $this->requireParticipantToken($sessionId, $allowEnded);
             if ($participant === null) {
                 return; // réponse d'erreur déjà envoyée
