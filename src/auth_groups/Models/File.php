@@ -164,6 +164,34 @@ class File extends BaseModel
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    /**
+     * Lister les fichiers d'un sous-dossier uploads/<folder>/
+     */
+    public function getByFolder(string $folder): array
+    {
+        $pattern = '/uploads/' . $folder . '/%';
+        $query   = "SELECT id, original_name, file_name, mime_type, file_size, file_path, created_at
+                    FROM {$this->table}
+                    WHERE file_path LIKE :pattern AND deleted_at IS NULL
+                    ORDER BY created_at DESC";
+
+        $stmt = $this->getDb()->prepare($query);
+        $stmt->bindValue(':pattern', $pattern);
+        $stmt->execute();
+
+        return array_map(static function (array $f): array {
+            return [
+                'id'            => (int) $f['id'],
+                'original_name' => $f['original_name'],
+                'file_name'     => $f['file_name'],
+                'mime_type'     => $f['mime_type'],
+                'file_size'     => (int) $f['file_size'],
+                'url'           => $f['file_path'],
+                'upload_date'   => $f['created_at'],
+            ];
+        }, $stmt->fetchAll(PDO::FETCH_ASSOC));
+    }
+
     public static function getFileCategory(string $mimeType): string
     {
         if (str_starts_with($mimeType, 'image/'))
@@ -177,6 +205,18 @@ class File extends BaseModel
         elseif (str_starts_with($mimeType, 'video/'))
         {
             return 'video';
+        }
+        elseif (in_array($mimeType, [
+            'application/x-msdownload',
+            'application/x-dosexec',
+            'application/x-msi',
+            'application/zip',
+            'application/x-zip-compressed',
+            'application/x-7z-compressed',
+            'application/octet-stream',
+        ]))
+        {
+            return 'executable';
         }
         else
         {

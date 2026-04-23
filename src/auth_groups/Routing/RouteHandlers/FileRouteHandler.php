@@ -26,8 +26,12 @@ class FileRouteHandler extends BaseRouteHandler
         $user = $request['user'];
         
         match(true) {
+            // GET /files?folder=<slug>
+            ($action === '' && $method === 'GET') =>
+                $this->controller->listByFolder($user['user_id'], $user['role']),
+
             // POST /files
-            ($action === '' && $method === 'POST') => 
+            ($action === '' && $method === 'POST') =>
                 $this->controller->upload($user['user_id']),
                 
             // GET /files/{id}

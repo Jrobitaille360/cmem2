@@ -7,7 +7,37 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-04-21]
+## [Unreleased]
+
+---
+
+## [2.3.1] — 2026-04-23
+
+### Module Files — sous-dossiers, exécutables et archives (auth_groups)
+
+#### Nouveaux endpoints
+
+- **`GET /files?folder=<slug>`** — liste les fichiers d'un sous-dossier `uploads/<folder>/` ; réservé aux ADMINISTRATEURS ; retourne tableau vide si le dossier n'a aucun fichier
+
+#### Modifications
+
+- **`POST /files`** — paramètre FormData `folder` optionnel : dépose le fichier dans `uploads/<folder>/` si fourni (slug `a-z 0-9 - _`, max 80 car.) ; défaut `uploads/files/`
+- **`FileController`** — support des exécutables et archives (`exe`, `msi`, `zip`, `7z`) ; taille max 200 MB ; types MIME : `application/x-msdownload`, `application/x-msi`, `application/zip`, `application/x-zip-compressed`, `application/x-7z-compressed`, `application/octet-stream`
+- **`FileController`** — fix chemin `$filePath` dans download (`GET /files/{id}`) et delete (`DELETE /files/{id}`) : `__DIR__ . '/../../..'` au lieu de `__DIR__ . '/../..'`
+- **`File::getByFolder()`** — nouvelle méthode : liste les fichiers par pattern `file_path LIKE '/uploads/<folder>/%'`
+- **`File::getFileCategory()`** — retourne `'executable'` pour les MIME archives/exécutables
+- **`docs/core/API_ENDPOINTS.json`** — `GET /files` et `POST /files` mis à jour
+- **`docs/core/GUIDE.md`** — section Files reécrite (tableau types MIME/tailles, doc `folder`, doc `GET /files?folder`)
+
+#### Migration DB
+
+```sql
+ALTER TABLE files MODIFY COLUMN media_type
+  ENUM('text','audio','video','image','gpx','summary','event','todo','document','executable')
+  DEFAULT NULL;
+```
+
+---
 
 ### Plugin Quiz — GET /quiz/session/{id} accessible après fin de session
 
@@ -19,15 +49,11 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-04-19]
-
 ### Correctif — répertoire d'upload des fichiers
 
 - **`FileController`** — corrigé le chemin `$uploadDir` : `__DIR__ . '/../../uploads/files/'` remplacé par `'/../../../uploads/files/'` ; les fichiers téléversés via `POST /files` sont désormais sauvegardés dans `uploads/files/` à la racine du projet et non dans `src/uploads/files/`
 
 ---
-
-## [Unreleased 2026-04-16]
 
 ### Plugin Items — endpoints publics sans JWT
 

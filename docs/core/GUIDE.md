@@ -249,13 +249,51 @@ Un email de vérification est envoyé. La connexion est bloquée (403) tant que 
 
 | Méthode | Endpoint | Auth | Description |
 | --- | --- | --- | --- |
-| POST | `/files/upload` | JWT | Upload un ou plusieurs fichiers |
-| GET | `/files` | JWT | Liste des fichiers |
-| GET | `/files/{id}` | JWT | Détails d'un fichier |
-| DELETE | `/files/{id}` | JWT | Soft delete |
-| PUT | `/files/{id}/restore` | JWT | Restaurer |
+| GET | `/files` | JWT ADMIN | Lister les fichiers d'un dossier (`?folder=<slug>`) |
+| POST | `/files` | JWT | Uploader un fichier |
+| GET | `/files/{id}` | JWT | Télécharger le contenu binaire |
+| GET | `/files/{id}/info` | JWT | Métadonnées d'un fichier |
+| DELETE | `/files/{id}` | JWT | Soft delete (`force_delete: true` pour suppression physique) |
+| POST | `/files/{id}/restore` | JWT | Restaurer un fichier soft-deleted |
+| GET | `/files/user/{user_id}` | JWT | Lister les fichiers d'un utilisateur (paginé) |
 
-Types supportés : images, vidéos, audio, documents. Validation côté serveur (type MIME + taille).
+### Types MIME acceptés
+
+| Catégorie | Extensions | Taille max |
+| --- | --- | --- |
+| Image | jpeg, png, gif, webp | 5 MB |
+| Document | pdf, txt, doc, docx, xls, xlsx | 10 MB |
+| Audio | mp3, wav, ogg | 20 MB |
+| Vidéo | mp4, avi, mov | 50 MB |
+| Exécutable / Archive | **exe, msi, zip, 7z** | **200 MB** |
+
+Validation côté serveur : type MIME + taille. Retourne `400` si le type est refusé ou la taille dépassée.
+
+### Paramètre `folder` (POST /files)
+
+Le champ FormData `folder` est optionnel. S'il est absent ou vide, le fichier est déposé dans `uploads/files/` (comportement par défaut).
+
+```
+folder: string — a-z, 0-9, - et _ uniquement ; max 80 caractères
+```
+
+Exemples valides : `mon-app`, `setup_v2`, `jdb-windows`
+Exemples invalides : `../secret`, `mon dossier`, `MonApp`, `app/sub`
+
+Le champ `url` de la réponse reflète le chemin réel :
+
+```json
+{ "url": "/uploads/mon-app/setup.exe" }
+```
+
+### GET /files?folder=`<slug>`
+
+Route réservée aux **ADMINISTRATEURS**. Retourne tous les fichiers dont le chemin en base commence par `/uploads/<folder>/`. Retourne un tableau vide (pas 404) si le dossier n'a aucun fichier.
+
+```http
+GET /files?folder=mon-app
+Authorization: Bearer {jwt_token}
+```
 
 ---
 

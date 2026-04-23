@@ -1,6 +1,6 @@
 ﻿# cmem2 API
 
-![Version](https://img.shields.io/badge/version-2.3.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.3.1-blue.svg)
 ![PHP](https://img.shields.io/badge/PHP-8.0+-purple.svg)
 ![Status](https://img.shields.io/badge/status-production%20ready-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
@@ -236,10 +236,13 @@ Authorization: Bearer eyJhbGci...
 
 | Méthode | Endpoint | Description | Auth |
 | --- | --- | --- | --- |
-| POST | `/files/upload` | Upload fichier(s) | JWT |
-| GET | `/files` | Liste des fichiers | JWT |
+| GET | `/files` | Lister les fichiers d'un dossier (`?folder=<slug>`) | JWT ADMIN |
+| POST | `/files` | Uploader un fichier (images, docs, audio, vidéo, exe/zip jusqu'à 200 MB) | JWT |
+| GET | `/files/{id}` | Télécharger le contenu binaire | JWT |
+| GET | `/files/{id}/info` | Métadonnées d'un fichier | JWT |
 | DELETE | `/files/{id}` | Supprimer (soft) | JWT |
-| PUT | `/files/{id}/restore` | Restaurer | JWT |
+| POST | `/files/{id}/restore` | Restaurer | JWT |
+| GET | `/files/user/{user_id}` | Liste paginée des fichiers d'un utilisateur | JWT |
 | GET/POST/PUT/DELETE | `/tags/*` | CRUD tags | JWT |
 | GET | `/stats/user/{id}` | Stats utilisateur | JWT |
 | GET | `/stats/online` | Utilisateurs en ligne | JWT |
@@ -291,11 +294,12 @@ Voir [docs/quiz/GUIDE.md](docs/quiz/GUIDE.md) pour la référence complète.
 
 | Méthode | Endpoint | Description | Auth |
 | --- | --- | --- | --- |
+| GET | `/items/publics` | Liste les items publics sans JWT (filtres : category, limit, offset) | Aucune |
 | GET | `/items` | Liste des items accessibles (filtres : owner, access, category, limit) | JWT |
 | POST | `/items` | Créer un item | JWT |
 | GET | `/items/categories` | Catégories distinctes accessibles | JWT |
 | GET | `/items/categories/{name}` | Items d'une catégorie | JWT |
-| GET | `/items/{id}` | Lire un item | JWT |
+| GET | `/items/{id}` | Lire un item (sans JWT si `access=public`) | JWT / aucune |
 | PUT | `/items/{id}` | Mettre à jour categories / json_item | JWT |
 | DELETE | `/items/{id}` | Soft-delete (owner/admin) | JWT |
 | PUT | `/items/{id}/access` | Changer le mode d'accès (owner/admin) | JWT |
@@ -373,4 +377,4 @@ MIT — voir [LICENSE](LICENSE). Dépendances tierces : [THIRD_PARTY_LICENSES.md
 
 ---
 
-**Version** : 2.2.3 · **Mis à jour** : 2026-04-05 · **Auteur** : [Jrobitaille360](https://github.com/Jrobitaille360)
+**Version** : 2.3.1 · **Mis à jour** : 2026-04-23 · **Auteur** : [Jrobitaille360](https://github.com/Jrobitaille360)

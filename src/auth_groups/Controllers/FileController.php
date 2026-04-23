@@ -29,15 +29,24 @@ class FileController
         'video/mp4',
         'video/avi',
         'video/quicktime',
-        'video/x-msvideo'
+        'video/x-msvideo',
+        // Exécutables et archives Windows
+        'application/x-msdownload',
+        'application/x-dosexec',
+        'application/x-msi',
+        'application/zip',
+        'application/x-zip-compressed',
+        'application/x-7z-compressed',
+        'application/octet-stream',
     ];
 
     private array $maxFileSizes = [
-        'image' => 5 * 1024 * 1024,    // 5 MB
-        'document' => 10 * 1024 * 1024, // 10 MB
-        'audio' => 20 * 1024 * 1024,    // 20 MB
-        'video' => 50 * 1024 * 1024,    // 50 MB
-        'default' => 5 * 1024 * 1024    // 5 MB
+        'image'      => 5 * 1024 * 1024,    // 5 MB
+        'document'   => 10 * 1024 * 1024,   // 10 MB
+        'audio'      => 20 * 1024 * 1024,   // 20 MB
+        'video'      => 50 * 1024 * 1024,   // 50 MB
+        'executable' => 200 * 1024 * 1024,  // 200 MB
+        'default'    => 5 * 1024 * 1024,    // 5 MB
     ];
 
     /**
@@ -71,11 +80,29 @@ class FileController
                 return false;
             }
 
-            $input =  Response::getRequestParams();
+            $input       = Response::getRequestParams();
             $description = $input['description'] ?? null;
 
+            // Validation du paramètre folder (optionnel)
+            $folderRaw = trim($input['folder'] ?? '');
+            if ($folderRaw !== '') {
+                if (!$this->validateFolder($folderRaw)) {
+                    LoggingMiddleware::logExit(400);
+                    Response::error(
+                        'Paramètre folder invalide — caractères autorisés : a-z, 0-9, - et _ ; longueur max 80',
+                        null, 400
+                    );
+                    return false;
+                }
+                $subDir    = $folderRaw;
+                $urlPrefix = '/uploads/' . $folderRaw . '/';
+            } else {
+                $subDir    = 'files';
+                $urlPrefix = '/uploads/files/';
+            }
+
             // 1. Créer le dossier uploads s'il n'existe pas
-            $uploadDir = __DIR__ . '/../../../uploads/files/';
+            $uploadDir = __DIR__ . '/../../../uploads/' . $subDir . '/';
             if (!is_dir($uploadDir))
             {
                 mkdir($uploadDir, 0755, true);
@@ -104,7 +131,7 @@ class FileController
             $fileModel->original_name = $file['name'];
             $fileModel->description = $description;
             $fileModel->file_name = $uniqueName;
-            $fileModel->file_path = '/uploads/files/' . $uniqueName;
+            $fileModel->file_path = $urlPrefix . $uniqueName;
             $fileModel->mime_type = $file['type'];
             $fileModel->file_size = $file['size'];
             $fileModel->media_type = $this->getFileCategory($file['type']);
@@ -187,7 +214,7 @@ class FileController
         
         // Chemin complet vers le fichier
         // Utiliser le bon accès aux clés du tableau
-        $filePath = __DIR__ . '/../..' . $fileInfo['file_path'];
+        $filePath = __DIR__ . '/../../..' . $fileInfo['file_path'];
         
         // Vérifier si le fichier existe physiquement
         if (!file_exists($filePath) || !is_readable($filePath)) {
@@ -274,7 +301,7 @@ class FileController
             }
 
             // 3. Supprimer le fichier physique si force_delete
-            $filePath = __DIR__ . '/../..' . $fileInfo['file_path'];
+            $filePath = __DIR__ . '/../../..' . $fileInfo['file_path'];
             $fileDeleted = false;
             if ($forceDelete && file_exists($filePath)) {
                 $fileDeleted = unlink($filePath);
@@ -472,6 +499,55 @@ class FileController
     }
 
     /**
+     * Lister les fichiers d'un dossier (ADMINISTRATEUR uniquement)
+     * GET /files?folder=<slug>
+     */
+    public function listByFolder(int $userId, string $role): void
+    {
+        if (strtolower($role) !== 'administrateur') {
+            Response::error('Accès réservé aux administrateurs', null, 403);
+            return;
+        }
+
+        $input  = Response::getRequestParams();
+        $folder = trim($input['folder'] ?? '');
+
+        if ($folder === '') {
+            Response::error('Paramètre folder requis', null, 400);
+            return;
+        }
+
+        if (!$this->validateFolder($folder)) {
+            Response::error(
+                'Paramètre folder invalide — caractères autorisés : a-z, 0-9, - et _ ; longueur max 80',
+                null, 400
+            );
+            return;
+        }
+
+        $fileModel = new File();
+        $files     = $fileModel->getByFolder($folder);
+
+        Response::success('Fichiers récupérés', [
+            'files'  => $files,
+            'folder' => $folder,
+            'total'  => count($files),
+        ]);
+    }
+
+    /**
+     * Valider un slug de dossier
+     * Autorisé : a-z 0-9 - _  |  max 80 car.  |  interdit : .. / \ espaces
+     */
+    private function validateFolder(string $folder): bool
+    {
+        if (strlen($folder) > 80) {
+            return false;
+        }
+        return (bool) preg_match('/^[a-z0-9_-]+$/', $folder);
+    }
+
+    /**
      * Valider un fichier uploadé
      */
     private function validateFile(array $file): bool
@@ -498,7 +574,7 @@ class FileController
 
         // Vérifier l'extension
         $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-        $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'txt', 'doc', 'docx', 'xls', 'xlsx', 'mp3', 'wav', 'ogg', 'mp4', 'avi', 'mov'];
+        $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'txt', 'doc', 'docx', 'xls', 'xlsx', 'mp3', 'wav', 'ogg', 'mp4', 'avi', 'mov', 'exe', 'msi', 'zip', '7z'];
 
         if (!in_array($extension, $allowedExtensions))
         {
