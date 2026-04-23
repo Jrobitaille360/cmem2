@@ -16,7 +16,7 @@
  *   [YYYY-MM-DD HH:MM:SS] cleanup_logs ERREUR | message
  */
 
-if (php_sapi_name() !== 'cli') {
+if (isset($_SERVER['HTTP_HOST']) || isset($_SERVER['REMOTE_ADDR'])) {
     http_response_code(403);
     exit('Accès refusé — script CLI uniquement.' . PHP_EOL);
 }

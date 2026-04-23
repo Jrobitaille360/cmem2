@@ -22,7 +22,7 @@
  *   [YYYY-MM-DD HH:MM:SS] run_all DONE | N modules OK | N erreur(s) | Ns
  */
 
-if (php_sapi_name() !== 'cli') {
+if (isset($_SERVER['HTTP_HOST']) || isset($_SERVER['REMOTE_ADDR'])) {
     http_response_code(403);
     exit('Accès refusé — script CLI uniquement.' . PHP_EOL);
 }
