@@ -58,10 +58,19 @@ $scripts = [
 
 $errors  = 0;
 $modules = 0;
+$log     = [];
+
+/** Affiche une ligne et l'ajoute au journal email. */
+function logLine(string $msg): void
+{
+    echo "$msg\n";
+    flush();
+    $GLOBALS['log'][] = $msg;
+}
 
 foreach ($scripts as [$script, $label, $passDir, $timeout]) {
     if (!file_exists($script)) {
-        echo "[{$date}] {$label} IGNORÉ | fichier introuvable : {$script}\n";
+        logLine("[{$date}] {$label} IGNORÉ | fichier introuvable : {$script}");
         continue;
     }
 
@@ -73,7 +82,7 @@ foreach ($scripts as [$script, $label, $passDir, $timeout]) {
     $proc = proc_open($cmd, $desc, $pipes);
 
     if (!is_resource($proc)) {
-        echo "[{$date}] {$label} ERREUR | impossible de démarrer le processus\n";
+        logLine("[{$date}] {$label} ERREUR | impossible de démarrer le processus");
         $errors++;
         continue;
     }
@@ -86,11 +95,12 @@ foreach ($scripts as [$script, $label, $passDir, $timeout]) {
     $code     = null;
 
     while (true) {
-        // Lire stdout et stderr ligne par ligne et afficher immédiatement
         foreach ([$pipes[1], $pipes[2]] as $pipe) {
             while (($line = fgets($pipe)) !== false) {
-                echo rtrim($line) . "\n";
+                $trimmed = rtrim($line);
+                echo "$trimmed\n";
                 flush();
+                $log[] = $trimmed;
             }
         }
 
@@ -102,7 +112,7 @@ foreach ($scripts as [$script, $label, $passDir, $timeout]) {
 
         if (time() > $deadline) {
             proc_terminate($proc);
-            echo "[{$date}] {$label} ERREUR | timeout ({$timeout}s) dépassé\n";
+            logLine("[{$date}] {$label} ERREUR | timeout ({$timeout}s) dépassé");
             $code = 1;
             break;
         }
@@ -121,9 +131,101 @@ foreach ($scripts as [$script, $label, $passDir, $timeout]) {
     }
 }
 
-$elapsed = round(microtime(true) - $startTime, 1);
-echo "[{$date}] run_all DONE | {$modules} scripts OK | {$errors} erreur(s) | {$elapsed}s\n";
+$elapsed     = round(microtime(true) - $startTime, 1);
+$summaryLine = "[{$date}] run_all DONE | {$modules} scripts OK | {$errors} erreur(s) | {$elapsed}s";
+logLine($summaryLine);
+
+// ── Envoi du rapport par email ────────────────────────────────────────────────
+sendBackupReport($log, $errors, $modules, $elapsed, $rootDir);
 
 if ($errors > 0) {
     exit(1);
+}
+
+// ── Fonction d'envoi ──────────────────────────────────────────────────────────
+
+function sendBackupReport(array $log, int $errors, int $modules, float $elapsed, string $rootDir): void
+{
+    $autoload = "$rootDir/vendor/autoload.php";
+    if (!file_exists($autoload)) {
+        fwrite(STDERR, "sendBackupReport: vendor/autoload.php introuvable\n");
+        return;
+    }
+    require_once $autoload;
+
+    $smtpHost = $_ENV['SMTP_HOST']         ?? $_ENV['MAIL_HOST']         ?? '';
+    $smtpPort = (int)($_ENV['SMTP_PORT']   ?? $_ENV['MAIL_PORT']         ?? 587);
+    $smtpUser = $_ENV['SMTP_USERNAME']     ?? $_ENV['MAIL_USERNAME']     ?? '';
+    $smtpPass = $_ENV['SMTP_PASSWORD']     ?? $_ENV['MAIL_PASSWORD']     ?? '';
+    $from     = $_ENV['MAIL_FROM_ADDRESS'] ?? $_ENV['MAIL_FROM']         ?? 'noreply@cmem2.journauxdebord.com';
+    $fromName = $_ENV['MAIL_FROM_NAME']    ?? 'cmem2 API';
+    $to       = 'support@journauxdebord.com';
+
+    if ($smtpHost === '') {
+        fwrite(STDERR, "sendBackupReport: SMTP non configuré — email non envoyé\n");
+        return;
+    }
+
+    $statusLabel = $errors === 0 ? 'SUCCÈS' : "{$errors} ERREUR(S)";
+    $statusColor = $errors === 0 ? '#2e7d32' : '#c62828';
+    $now         = date('Y-m-d H:i');
+    $subject     = "[cmem2 backup] $statusLabel — $now";
+
+    $logHtml = implode("\n", array_map('htmlspecialchars', $log));
+    $logText = implode("\n", $log);
+
+    $body = "<!DOCTYPE html>
+<html>
+<head><meta charset='UTF-8'></head>
+<body style='font-family:Arial,sans-serif;background:#f4f4f4;padding:20px;margin:0'>
+<div style='max-width:700px;margin:auto;background:#fff;border-radius:8px;overflow:hidden'>
+  <div style='background:{$statusColor};color:#fff;padding:20px 24px'>
+    <h2 style='margin:0'>{$statusLabel} — Backup cmem2</h2>
+    <p style='margin:4px 0 0;opacity:.85'>" . date('Y-m-d H:i:s') . "</p>
+  </div>
+  <div style='padding:24px'>
+    <table style='border-collapse:collapse;width:100%;margin-bottom:24px'>
+      <tr style='background:#f5f5f5'>
+        <td style='padding:8px 14px;font-weight:bold'>Scripts OK</td>
+        <td style='padding:8px 14px'>{$modules}</td>
+      </tr>
+      <tr>
+        <td style='padding:8px 14px;font-weight:bold'>Erreurs</td>
+        <td style='padding:8px 14px;color:{$statusColor};font-weight:bold'>{$errors}</td>
+      </tr>
+      <tr style='background:#f5f5f5'>
+        <td style='padding:8px 14px;font-weight:bold'>Durée totale</td>
+        <td style='padding:8px 14px'>{$elapsed}s</td>
+      </tr>
+    </table>
+    <h3 style='margin:0 0 8px;color:#333'>Journal d'exécution</h3>
+    <pre style='background:#1e1e1e;color:#d4d4d4;padding:16px;border-radius:4px;font-size:12px;overflow-x:auto;white-space:pre-wrap'>{$logHtml}</pre>
+  </div>
+</div>
+</body>
+</html>";
+
+    try {
+        $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
+        $mail->isSMTP();
+        $mail->Host       = $smtpHost;
+        $mail->SMTPAuth   = $smtpUser !== '';
+        $mail->Username   = $smtpUser;
+        $mail->Password   = $smtpPass;
+        $mail->Port       = $smtpPort;
+        $mail->SMTPSecure = $smtpPort === 465
+            ? \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS
+            : \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+        $mail->CharSet    = 'UTF-8';
+        $mail->setFrom($from, $fromName);
+        $mail->addAddress($to);
+        $mail->isHTML(true);
+        $mail->Subject = $subject;
+        $mail->Body    = $body;
+        $mail->AltBody = $logText;
+        $mail->send();
+        echo '[' . date('Y-m-d H:i:s') . "] email rapport envoyé à {$to}\n";
+    } catch (\Exception $e) {
+        fwrite(STDERR, 'sendBackupReport ERREUR : ' . $e->getMessage() . "\n");
+    }
 }
