@@ -50,7 +50,7 @@ define('APP_ENV', $_ENV['APP_ENV'] ?? 'development');
 define('APP_DEBUG', filter_var($_ENV['APP_DEBUG'] ?? false, FILTER_VALIDATE_BOOLEAN));
 define('APP_URL', $_ENV['APP_URL'] ?? 'http://localhost');
 define('APP_NAME', $_ENV['APP_NAME'] ?? 'Collective Memories API');
-define('APP_VERSION', $_ENV['APP_VERSION'] ?? '2.0.0');
+define('APP_VERSION', $_ENV['APP_VERSION'] ?? '2.4.0');
 
 // Configuration de l'API
 define('API_VERSION', 'v1');

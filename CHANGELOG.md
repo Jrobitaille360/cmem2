@@ -7,7 +7,16 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased]
+## [Unreleased 2026-04-27 11:00]
+
+### Stripe — chargement des constantes depuis `.env`
+
+- **`src/auth_groups/environment.php`** — bloc `STRIPE_*` ajouté : `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PUZZLE_MONTHLY`, `STRIPE_PRICE_PUZZLE_YEARLY` définis avec `if (!defined(...))` depuis `$_ENV`; valeur par défaut `APP_VERSION` corrigée de `2.0.0` à `2.4.0`
+- **`.env.example`** — nouvelle section commentée `STRIPE — Paiements et abonnements (v2.4.0+)` avec instructions de configuration ; `APP_VERSION` mis à jour à `2.4.0`
+
+### Public — version dynamique et chemins uploads/logs
+
+- **`src/auth_groups/Routing/RouteHandlers/PublicRouteHandler.php`** — version hardcodée `2.0.0` remplacée par `defined('APP_VERSION') ? APP_VERSION : '2.4.0'` dans `/info`, `/help` et `/health`; chemins uploads/logs corrigés via `dirname(__DIR__, 4)` (résolvait un faux négatif sur le health check en production)
 
 ---
 
