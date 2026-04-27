@@ -349,3 +349,19 @@ define('MAX_TRENDING_TAGS', (int)($_ENV['MAX_TRENDING_TAGS'] ?? 20));
 // Configuration de la pagination
 define('DEFAULT_PAGE_SIZE', (int)($_ENV['DEFAULT_PAGE_SIZE'] ?? 20));
 define('MAX_PAGE_SIZE', (int)($_ENV['MAX_PAGE_SIZE'] ?? 100));
+
+// ============================================
+// STRIPE — Paiements et abonnements
+// ============================================
+if (!defined('STRIPE_SECRET_KEY')) {
+    define('STRIPE_SECRET_KEY',           $_ENV['STRIPE_SECRET_KEY']           ?? '');
+}
+if (!defined('STRIPE_WEBHOOK_SECRET')) {
+    define('STRIPE_WEBHOOK_SECRET',       $_ENV['STRIPE_WEBHOOK_SECRET']       ?? '');
+}
+if (!defined('STRIPE_PRICE_PUZZLE_MONTHLY')) {
+    define('STRIPE_PRICE_PUZZLE_MONTHLY', $_ENV['STRIPE_PRICE_PUZZLE_MONTHLY'] ?? '');
+}
+if (!defined('STRIPE_PRICE_PUZZLE_YEARLY')) {
+    define('STRIPE_PRICE_PUZZLE_YEARLY',  $_ENV['STRIPE_PRICE_PUZZLE_YEARLY']  ?? '');
+}
