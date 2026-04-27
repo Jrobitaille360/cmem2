@@ -131,10 +131,30 @@ class AuthController
         $genericOk = ['message' => 'Si cet email est enregistré, un code de connexion vous a été envoyé.'];
 
         if (!$userData || !empty($userData['deleted_at'])) {
-            LogService::warning('Code OTP demandé pour email inexistant', ['email' => $email]);
-            LoggingMiddleware::logExit(200);
-            Response::success('Code envoyé', $genericOk);
-            return;
+            if (!$userData) {
+                // Option A : auto-register silencieux — crée le compte et continue le flux OTP
+                $newUser                 = new User();
+                $newUser->name           = strstr($email, '@', true);
+                $newUser->email          = $email;
+                $newUser->password_hash  = password_hash(bin2hex(random_bytes(32)), PASSWORD_BCRYPT);
+                $newUser->email_verified = 1;
+
+                if (!$newUser->create()) {
+                    LogService::error('Échec auto-register send-code', ['email' => $email]);
+                    LoggingMiddleware::logExit(200);
+                    Response::success('Code envoyé', $genericOk);
+                    return;
+                }
+
+                $userData = $userModel->findByEmail($email);
+                LogService::info('Compte auto-créé via send-code (Option A)', ['email' => $email]);
+            } else {
+                // Compte supprimé : retour générique, pas de recréation
+                LogService::warning('Code OTP demandé pour compte supprimé', ['email' => $email]);
+                LoggingMiddleware::logExit(200);
+                Response::success('Code envoyé', $genericOk);
+                return;
+            }
         }
 
         if (empty($userData['email_verified'])) {

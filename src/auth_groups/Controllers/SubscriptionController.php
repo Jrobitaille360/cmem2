@@ -3,6 +3,7 @@
 namespace AuthGroups\Controllers;
 
 use AuthGroups\Services\SubscriptionService;
+use AuthGroups\Services\StripeService;
 use AuthGroups\Services\LogService;
 use AuthGroups\Utils\Response;
 use AuthGroups\Utils\Validator;
@@ -16,6 +17,7 @@ use Exception;
  *   GET    /subscription/status          → statut de toutes les apps (JWT requis)
  *   GET    /subscription/status?app_id=  → statut d'une app précise (JWT requis)
  *   POST   /subscription/verify          → validation provider + activation (JWT requis)
+ *   POST   /subscription/checkout        → création session Stripe (JWT requis)
  *   DELETE /subscription/cancel          → annulation d'un abonnement (JWT requis)
  */
 class SubscriptionController
@@ -97,6 +99,8 @@ class SubscriptionController
                 'expires_at'     => $expiresAt,
                 'purchase_token' => $input['purchase_token'] ?? null,
                 'stripe_sub_id'  => $input['stripe_sub_id']  ?? null,
+                'is_trial'       => isset($input['is_trial'])  ? (int) $input['is_trial']  : 0,
+                'trial_end'      => $input['trial_end'] ?? null,
             ]);
 
             $status = SubscriptionService::getStatus($userId, $input['app_id']);
@@ -117,6 +121,66 @@ class SubscriptionController
             ]);
             LoggingMiddleware::logExit(500);
             Response::error('Erreur lors de l\'activation de l\'abonnement', null, 500);
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // POST /subscription/checkout
+    // Body : { app_id, plan }   — JWT requis
+    // -----------------------------------------------------------------------
+
+    public function checkout(array $request): void
+    {
+        LoggingMiddleware::logEntry();
+
+        $userId    = (int)    $request['user']['user_id'];
+        $userEmail = (string) ($request['user']['email'] ?? '');
+        $input     = Response::getRequestParams();
+
+        $validation = Validator::validate($input, [
+            'app_id' => 'required|string',
+            'plan'   => 'required|string',
+        ]);
+
+        if (!$validation['valid']) {
+            LoggingMiddleware::logExit(422);
+            Response::error('Données invalides', $validation['errors'], 422);
+            return;
+        }
+
+        $plan     = $input['plan'];
+        $allowed  = ['monthly', 'yearly'];
+        if (!\in_array($plan, $allowed, true)) {
+            LoggingMiddleware::logExit(422);
+            Response::error('Plan invalide', ['plan' => 'Valeurs acceptées : monthly, yearly'], 422);
+            return;
+        }
+
+        try {
+            $result = StripeService::createCheckoutSession(
+                $userId,
+                $userEmail,
+                trim($input['app_id']),
+                $plan
+            );
+
+            LogService::info('Session Stripe créée', [
+                'user_id'    => $userId,
+                'app_id'     => $input['app_id'],
+                'plan'       => $plan,
+                'session_id' => $result['session_id'],
+            ]);
+
+            LoggingMiddleware::logExit(200);
+            Response::success('Session de paiement créée', $result);
+
+        } catch (Exception $e) {
+            LogService::error('Erreur création session Stripe', [
+                'user_id' => $userId,
+                'error'   => $e->getMessage(),
+            ]);
+            LoggingMiddleware::logExit(500);
+            Response::error('Erreur lors de la création de la session de paiement', null, 500);
         }
     }
 

@@ -15,6 +15,9 @@
     "autoload": {
         "psr-4": {
             "AuthGroups\\": "src/auth_groups/",
+            "Core\\": "src/Core/",
+            "ICS\\": "src/ics/",
+            "Items\\": "src/items/",
             "Pomo\\": "src/pomo/",
             "Quiz\\": "src/quiz/",
             "Puzzle\\": "src/puzzle/"

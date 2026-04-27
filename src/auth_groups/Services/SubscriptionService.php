@@ -22,19 +22,30 @@ class SubscriptionService
      * @param int    $userId  ID de l'utilisateur
      * @param string $appId   Identifiant de l'application (ex : 'puzzle', 'pomo', 'quiz')
      * @param array  $data {
-     *   provider       : 'stripe'|'google_play'|'apple'|'microsoft'
-     *   product_id     : string
-     *   plan           : 'monthly'|'yearly'
-     *   started_at     : string (Y-m-d H:i:s)
-     *   expires_at     : string (Y-m-d H:i:s)
-     *   purchase_token : string|null
-     *   stripe_sub_id  : string|null
+     *   provider        : 'stripe'|'google_play'|'apple'|'microsoft'
+     *   product_id      : string
+     *   plan            : 'monthly'|'yearly'
+     *   started_at      : string (Y-m-d H:i:s)
+     *   expires_at      : string (Y-m-d H:i:s)
+     *   purchase_token  : string|null
+     *   stripe_sub_id   : string|null
+     *   stripe_customer : string|null
+     *   device_token    : string|null
+     *   is_premium      : int  (défaut 1)
+     *   show_ads        : int  (défaut 0)
+     *   is_trial        : int  (défaut 0)
+     *   trial_end       : string|null (Y-m-d H:i:s)
      * }
      */
     public static function activatePremium(int $userId, string $appId, array $data): void
     {
         $model = new Subscription();
-        $model->upsert(array_merge($data, [
+        $model->upsert(array_merge([
+            'is_premium' => 1,
+            'show_ads'   => 0,
+            'is_trial'   => 0,
+            'trial_end'  => null,
+        ], $data, [
             'user_id' => $userId,
             'app_id'  => $appId,
         ]));
@@ -66,7 +77,7 @@ class SubscriptionService
     /**
      * Statut Premium pour un utilisateur et une application.
      *
-     * @return array {is_premium: bool, show_ads: bool, expires_at: string|null, provider: string|null, plan: string|null}
+     * @return array {is_premium, show_ads, is_trial, trial_end, expires_at, provider, plan}
      */
     public static function getStatus(int $userId, string $appId): array
     {
@@ -77,6 +88,8 @@ class SubscriptionService
         return [
             'is_premium' => $isPremium,
             'show_ads'   => !$isPremium,
+            'is_trial'   => $isPremium ? (bool) ($active['is_trial'] ?? false) : false,
+            'trial_end'  => $isPremium ? ($active['trial_end'] ?? null) : null,
             'expires_at' => $active['expires_at'] ?? null,
             'provider'   => $active['provider']   ?? null,
             'plan'       => $active['plan']        ?? null,
@@ -85,13 +98,12 @@ class SubscriptionService
 
     /**
      * Statut Premium pour toutes les applications d'un utilisateur.
-     * Retourne un tableau indexé par app_id, chaque valeur ayant la même structure que getStatus().
      *
      * @return array<string, array>
      */
     public static function getAllStatuses(int $userId): array
     {
-        $model  = new Subscription();
+        $model   = new Subscription();
         $actives = $model->findAllActive($userId);
 
         $result = [];
@@ -99,6 +111,8 @@ class SubscriptionService
             $result[$appId] = [
                 'is_premium' => true,
                 'show_ads'   => false,
+                'is_trial'   => (bool) ($row['is_trial'] ?? false),
+                'trial_end'  => $row['trial_end'] ?? null,
                 'expires_at' => $row['expires_at'],
                 'provider'   => $row['provider'],
                 'plan'       => $row['plan'],

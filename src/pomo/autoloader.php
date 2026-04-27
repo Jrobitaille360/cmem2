@@ -10,7 +10,7 @@ spl_autoload_register(function ($className) {
         return;
     }
 
-    $classFile = __DIR__ . '/../Core/' . substr($className, 5) . '.php';
+    $classFile = __DIR__ . '/../Core/' . str_replace('\\', '/', substr($className, 5)) . '.php';
     if (file_exists($classFile)) {
         require_once $classFile;
     }

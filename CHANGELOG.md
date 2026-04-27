@@ -11,6 +11,103 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [2.4.0] — 2026-04-27
+
+### Abonnements — Stripe, essai, champs étendus (auth_groups)
+
+#### Migration DB
+
+- **`docs/20260426_subscriptions_trial.sql`** — nouvelles colonnes : `device_token`, `stripe_customer`, `is_premium`, `show_ads`, `is_trial`, `trial_end` ; `user_id` rendu nullable ; contraintes `UNIQUE` hybrides `uq_user_app` / `uq_device_app` en remplacement de `uq_user_app_provider`
+
+#### Modèle `Subscription`
+
+- **`upsert()`** — intègre les 6 nouveaux champs ; `ON DUPLICATE KEY UPDATE` sur `uq_user_app`
+- **`updateByStripeSubId()`** — mise à jour ciblée par `stripe_sub_id` (whitelist de colonnes)
+- **`findStripeCustomerByUserId()`** — retrouve le `stripe_customer_id` d'un user existant
+- **`markExpired()`** — positionne aussi `is_premium=0`, `show_ads=1`, `is_trial=0`
+
+#### Service `SubscriptionService`
+
+- **`activatePremium()`** — fusionne les valeurs par défaut `is_premium=1 / show_ads=0 / is_trial=0 / trial_end=null` avec les données de l'appelant
+- **`getStatus()` / `getAllStatuses()`** — retournent désormais `is_trial` et `trial_end`
+
+#### Contrôleur `SubscriptionController`
+
+- **`verify()`** — transmet `is_trial` et `trial_end` du body vers `activatePremium()`
+- **`checkout()`** — nouvel endpoint `POST /subscription/checkout` : requiert JWT, valide `app_id` et `plan` (monthly|yearly → 422), délègue à `StripeService::createCheckoutSession()`, retourne `{checkout_url, session_id}`
+
+#### Nouveau — `StripeService`
+
+- **`createCheckoutSession()`** — crée une Stripe Checkout Session (HTTP brut, sans SDK) ; `client_reference_id = user_id`
+- **`getOrCreateCustomer()`** — recherche le `stripe_customer_id` en base ou le crée via l'API Stripe
+- **`verifyWebhookSignature()`** — HMAC-SHA256 sur format `t=timestamp,v1=hash` ; rejet si signature absente, invalide ou timestamp > 300 s
+- Handlers : `handleCheckoutCompleted`, `handleSubscriptionUpdated`, `handlePaymentSucceeded`, `handlePaymentFailed`, `handleSubscriptionDeleted`
+
+#### Nouveau — `StripeController` + `StripeRouteHandler`
+
+- **`POST /stripe/webhook`** — lit `php://input` + `HTTP_STRIPE_SIGNATURE`, vérifie la signature, dispatche les événements Stripe
+- Pas de JWT requis ; route enregistrée dans `Router`
+
+#### Variables `.env` requises
+
+```
+STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+STRIPE_PRICE_PUZZLE_MONTHLY, STRIPE_PRICE_PUZZLE_YEARLY
+```
+
+---
+
+### Auth — Option A : auto-register silencieux dans `send-code`
+
+- **`AuthController::sendCode()`** — si l'email est inconnu, le compte est créé silencieusement avant l'envoi du code OTP (`email_verified=1`, `password_hash` = bcrypt d'un token aléatoire 32 octets pour respecter la contrainte `NOT NULL`) ; les comptes supprimés reçoivent une réponse générique sans recréation
+
+---
+
+### Google Play — Migration vers API subscriptionsv2
+
+- **`GooglePlayService`** — migré de `subscriptions/{productId}/tokens/{token}` vers `subscriptionsv2/tokens/{token}` (v3)
+  - `subscriptionState` → `is_premium` : `ACTIVE / IN_GRACE_PERIOD / CANCELED` = 1, `EXPIRED / ON_HOLD` = 0
+  - `lineItems[0].expiryTime` (RFC 3339) remplace `expiryTimeMillis`
+  - Détection essai via `lineItems[0].offerDetails.offerTags` contenant `"free-trial"`
+  - `externalAccountIdentifiers.obfuscatedExternalAccountId` → `user_id`
+  - Retourne : `{is_premium, show_ads, is_trial, trial_end, product_id, purchase_token, expires_at, user_id}`
+
+---
+
+### Cron — Maintenance centralisée
+
+- **`src/Core/Maintenance/MaintenanceTaskInterface.php`** — interface `run(\PDO): array` avec rapport structuré
+- **`src/Core/Maintenance/MaintenanceOrchestrator.php`** — exécute les `MaintenanceTaskInterface` de chaque module, agrège les rapports
+- **`src/Core/Maintenance/MaintenanceReport.php`** — formatage du rapport (console + email)
+- **`src/auth_groups/Services/MaintenanceService.php`** — purge : notifications, stats, invitations groupe/plan, `login_attempts`, `otp_codes`, `jwt_blacklist`, device tokens, vérifications email, reset mot de passe, sessions, abonnements expirés
+- **`src/ics/Services/MaintenanceService.php`** — purge des données ICS périmées
+- **`src/items/Services/MaintenanceService.php`** — purge des items soft-deleted anciens
+- **`src/pomo/Services/MaintenanceService.php`** — purge des engagements Pomo anciens
+- **`src/puzzle/Services/MaintenanceService.php`** — purge des parties puzzle expirées, tokens révoqués
+- **`src/quiz/Services/MaintenanceService.php`** — purge des sessions quiz terminées anciennes
+- **`src/cron/maintenance.php`** — script CRON unique, lock file (exécution simultanée bloquée), mode `--dry-run`, crontab recommandée `0 3 * * *`
+
+---
+
+### Cron — Correctif sauvegarde
+
+- **`src/cron/backup/backup_uploads.php`** — suppression de l'archive `.tar.gz` existante avant conversion `PharData::compress` (évite l'erreur "phar exists and must be unlinked prior to conversion") ; nettoyage des fichiers partiels `.tar` / `.tar.gz` dans le bloc `catch`
+
+---
+
+### Convention — Migrations SQL entre versions
+
+- **`CLAUDE.md`** (global + projet) — règle documentée : les migrations en attente se placent dans `docs/` (`YYYYMMDD_description.sql`) ; les `build_DB-v-x-x-x.sql` des versions fixées ne sont jamais modifiés ; la prochaine version intègre les migrations dans son `build_DB`
+
+---
+
+### Tests
+
+- **`private/tests/test_users.php`** — section 21 : `POST /auth/send-code` Option A (email inconnu → 200 + compte créé, 2e appel → 200, email existant → 200, format invalide → 400, injection OTP + verify-code)
+- **`private/tests/test_subscriptions.php`** — `callStripeWebhook()` helper ; assertions `is_trial` / `trial_end` dans sections 3, 5, 6, 7 ; section 5b (activation essai) ; section 12 (`POST /subscription/checkout` — 401/422/200) ; section 13 (`POST /stripe/webhook` — signatures absente/invalide/expirée → 400)
+
+---
+
 ## [2.3.1] — 2026-04-23
 
 ### Module Files — sous-dossiers, exécutables et archives (auth_groups)

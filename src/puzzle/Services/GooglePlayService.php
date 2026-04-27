@@ -27,10 +27,15 @@ class GooglePlayService
     }
 
     /**
-     * Valide un achat d'abonnement auprès de Google Play.
+     * Valide un achat d'abonnement auprès de Google Play (API subscriptionsv2).
      *
-     * @return array|null {is_premium, product_id, purchase_token, expires_at (Y-m-d H:i:s)}
-     *                    null si le reçu est invalide ou l'abonnement expiré.
+     * @return array|null {
+     *   is_premium, show_ads, is_trial, trial_end,
+     *   product_id, purchase_token, expires_at, user_id
+     * }
+     * Retourne null si le token est invalide ou si Google est inaccessible.
+     * En cas d'erreur réseau, préférer retourner l'état en base avec stale=true
+     * plutôt que null — géré par l'appelant (SubscriptionController).
      */
     public function validateSubscription(string $purchaseToken, string $productId): ?array
     {
@@ -39,10 +44,10 @@ class GooglePlayService
             return null;
         }
 
+        // subscriptionsv2 : productId absent de l'URL, expiryTime en RFC 3339
         $url = sprintf(
-            'https://androidpublisher.googleapis.com/androidpublisher/v3/applications/%s/purchases/subscriptions/%s/tokens/%s',
+            'https://androidpublisher.googleapis.com/androidpublisher/v3/applications/%s/purchases/subscriptionsv2/tokens/%s',
             urlencode($this->package),
-            urlencode($productId),
             urlencode($purchaseToken)
         );
 
@@ -51,6 +56,7 @@ class GooglePlayService
                 'method'  => 'GET',
                 'header'  => "Authorization: Bearer {$accessToken}\r\n",
                 'timeout' => 10,
+                'ignore_errors' => true,
             ],
         ]);
 
@@ -60,19 +66,44 @@ class GooglePlayService
         }
 
         $data = json_decode($response, true);
-        if (!isset($data['expiryTimeMillis'])) {
+        if (!is_array($data) || isset($data['error'])) {
             return null;
         }
 
-        $expiryMs = (int) $data['expiryTimeMillis'];
-        $expiresAt = date('Y-m-d H:i:s', intdiv($expiryMs, 1000));
-        $isPremium = $expiryMs > (time() * 1000);
+        // Mapper subscriptionState → is_premium / show_ads
+        $state     = $data['subscriptionState'] ?? '';
+        $isPremium = \in_array($state, [
+            'SUBSCRIPTION_STATE_ACTIVE',
+            'SUBSCRIPTION_STATE_IN_GRACE_PERIOD',
+            'SUBSCRIPTION_STATE_CANCELED',
+        ], true);
+
+        // Lire expiryTime depuis lineItems[0]
+        $lineItem  = $data['lineItems'][0] ?? null;
+        $expiryStr = $lineItem['expiryTime'] ?? null;
+        if (!$expiryStr) {
+            return null;
+        }
+        $expiresAt = date('Y-m-d H:i:s', strtotime($expiryStr));
+
+        // Détecter l'essai via offerTags
+        $offerTags = $lineItem['offerDetails']['offerTags'] ?? [];
+        $isTrial   = \in_array('free-trial', $offerTags, true);
+        $trialEnd  = $isTrial ? $expiresAt : null;
+
+        // Lire user_id transmis par Flutter à l'achat
+        $obfuscatedId = $data['externalAccountIdentifiers']['obfuscatedExternalAccountId'] ?? null;
+        $userId       = $obfuscatedId !== null ? (int) $obfuscatedId : null;
 
         return [
-            'is_premium'     => (int) $isPremium,
-            'product_id'     => $productId,
+            'is_premium'     => $isPremium ? 1 : 0,
+            'show_ads'       => $isPremium ? 0 : 1,
+            'is_trial'       => $isTrial   ? 1 : 0,
+            'trial_end'      => $trialEnd,
+            'product_id'     => $lineItem['productId'] ?? $productId,
             'purchase_token' => $purchaseToken,
             'expires_at'     => $expiresAt,
+            'user_id'        => $userId,
         ];
     }
 

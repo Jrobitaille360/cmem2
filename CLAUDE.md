@@ -16,23 +16,33 @@ composer serve
 Run a single module:
 
 ```bash
-php private/tests_mine/test_items.php
-php private/tests_mine/test_quiz.php
-php private/tests_mine/test_calendars.php
-php private/tests_mine/test_pomo.php
-php private/tests_mine/test_tags.php
-php private/tests_mine/test_groups.php
-php private/tests_mine/test_files.php
-php private/tests_mine/test_public.php
+php private/tests/test_items.php
+php private/tests/test_quiz.php
+php private/tests/test_calendars.php
+php private/tests/test_pomo.php
+php private/tests/test_tags.php
+php private/tests/test_groups.php
+php private/tests/test_files.php
+php private/tests/test_public.php
+php private/tests/test_users.php
+php private/tests/test_stats.php
+php private/tests/test_plans.php
+php private/tests/test_subscriptions.php
+php private/tests/test_maintenance.php
+php private/tests/test_secret_admin.php
+php private/tests/test_puzzle_admin.php
+php private/tests/test_puzzle_share.php
+php private/tests/test_quiz2.php
+php private/tests/test_quiz3.php
 ```
 
 Run all tests:
 
 ```bash
-php private/tests_mine/run_all_tests.php
+php private/tests/run_all_tests.php
 ```
 
-Tests execute real HTTP requests via cURL against a running server. Each test file includes `private/tests_mine/test_new_base.php` for shared helpers (`callNewApi`, `testNewResult`, `printNewSection`).
+Tests execute real HTTP requests via cURL against a running server. Each test file includes `private/tests/test_new_base.php` for shared helpers (`callNewApi`, `testNewResult`, `printNewSection`).
 
 ### Database initialization
 
@@ -97,3 +107,9 @@ All settings live in a single `.env` file (see `.env.example` for the full 170+ 
 - SQL via PDO with prepared statements — no ORM
 - API docs per module: `docs/<module>/GUIDE.md` and `docs/<module>/API_*_ENDPOINTS.json`
 - Version history: `CHANGELOG.md`; project roadmap: `docs/PLAN_GLOBAL_CMEM2.md`
+
+## SQL migrations
+
+- Pending migrations (between releases) go in `docs/` as `YYYYMMDD_description.sql`.
+- **Never modify** a `build_DB-v-x-x-x.sql` that belongs to an already-released version.
+- At the next version bump: integrate the pending `docs/*.sql` files into the new `build_DB-v-x-x-x.sql`, then move those files into `docs/v-x-x-x/`.

@@ -10,7 +10,7 @@ spl_autoload_register(function ($className) {
         return;
     }
     
-    $classNameWithoutNamespace = substr($className, 5); // Supprimer "Core\"
+    $classNameWithoutNamespace = str_replace('\\', '/', substr($className, 5));
     $basePath = __DIR__ . '/../Core/';
     $filePath = $basePath . $classNameWithoutNamespace . '.php';
     

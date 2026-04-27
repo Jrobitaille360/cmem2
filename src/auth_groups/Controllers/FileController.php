@@ -41,12 +41,21 @@ class FileController
     ];
 
     private array $maxFileSizes = [
-        'image'      => 5 * 1024 * 1024,    // 5 MB
-        'document'   => 10 * 1024 * 1024,   // 10 MB
-        'audio'      => 20 * 1024 * 1024,   // 20 MB
-        'video'      => 50 * 1024 * 1024,   // 50 MB
-        'executable' => 200 * 1024 * 1024,  // 200 MB
-        'default'    => 5 * 1024 * 1024,    // 5 MB
+        'image'    => 5 * 1024 * 1024,    // 5 MB
+        'document' => 10 * 1024 * 1024,   // 10 MB
+        'audio'    => 20 * 1024 * 1024,   // 20 MB
+        'video'    => 50 * 1024 * 1024,   // 50 MB
+        'default'  => 200 * 1024 * 1024,  // 200 MB
+    ];
+
+    private array $executableMimeTypes = [
+        'application/x-msdownload',
+        'application/x-dosexec',
+        'application/x-msi',
+        'application/zip',
+        'application/x-zip-compressed',
+        'application/x-7z-compressed',
+        'application/octet-stream',
     ];
 
     /**
@@ -562,9 +571,13 @@ class FileController
             return false;
         }
 
-        // Vérifier la taille
-        $fileType = $this->getFileCategory($realMimeType);
-        $maxSize = $this->maxFileSizes[$fileType] ?? $this->maxFileSizes['default'];
+        // Vérifier la taille (les exécutables/archives ont leur propre limite)
+        if (in_array($realMimeType, $this->executableMimeTypes)) {
+            $maxSize = 200 * 1024 * 1024; // 200 MB
+        } else {
+            $fileType = $this->getFileCategory($realMimeType);
+            $maxSize  = $this->maxFileSizes[$fileType] ?? $this->maxFileSizes['default'];
+        }
 
         if ($file['size'] > $maxSize)
         {
