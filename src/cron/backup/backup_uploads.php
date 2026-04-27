@@ -75,6 +75,10 @@ try {
 
         $phar = new PharData($tarBase);
         $phar->buildFromDirectory($uploadDir);
+        // Si une archive compressée existe déjà, la supprimer avant conversion
+        if (file_exists($tarGz)) {
+            unlink($tarGz);
+        }
         $phar->compress(Phar::GZ);
         unlink($tarBase);
 
@@ -126,6 +130,10 @@ try {
             $elapsed = round(microtime(true) - $startTime, 1);
             echo "[{$date}] backup_uploads incr OK | 0 nouveau fichier | {$elapsed}s\n";
         } else {
+            // Si une archive compressée existe déjà, la supprimer avant conversion
+            if (file_exists($tarGz)) {
+                unlink($tarGz);
+            }
             $phar->compress(Phar::GZ);
             unlink($tarBase);
 
@@ -140,9 +148,12 @@ try {
     }
 
 } catch (\Throwable $e) {
-    // Nettoyer le .tar partiel si présent
+    // Nettoyer le .tar et l'.tar.gz partiels si présents
     if (isset($tarBase) && file_exists($tarBase)) {
         unlink($tarBase);
+    }
+    if (isset($tarGz) && file_exists($tarGz)) {
+        unlink($tarGz);
     }
     echo "[{$date}] backup_uploads ERREUR | {$e->getMessage()}\n";
     exit(1);
