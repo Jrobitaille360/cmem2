@@ -47,6 +47,7 @@
               "email": "string",
               "role": "string"
             },
+            "subscriptions": "object — statut Premium par app_id (voir /subscription/status)",
             "device_token": "string (présent uniquement si device_id fourni)",
             "device_id": "string (présent uniquement si device_id fourni)"
           },
@@ -60,17 +61,22 @@
         {
           "method": "POST",
           "path": "/auth/send-code",
-          "description": "Envoyer un code OTP à 6 chiffres par email (valide 15 minutes)",
+          "description": "Envoyer un code OTP à 6 chiffres par email (valide 15 minutes). Si l'email est inconnu, un compte est auto-créé silencieusement (Option A : email_verified=1, mot de passe aléatoire).",
           "auth_required": false,
           "body": {
             "email": "string (required)"
           },
+          "notes": [
+            "Réponse toujours générique (HTTP 200) pour protéger l'énumération d'emails, sauf 403 si l'email existe mais n'est pas vérifié",
+            "Auto-register Option A : si l'email est inconnu, un compte est créé immédiatement (name=partie gauche de l'email, email_verified=1, mot de passe aléatoire inutilisable) et un code OTP est envoyé",
+            "Si le compte est soft-deleted : retour générique 200 sans recréation"
+          ],
           "response": {
             "message": "string — réponse générique (même si email inconnu, pour protéger l'énumération)"
           },
           "errors": {
             "400": "Email manquant ou format invalide",
-            "403": "Email non vérifié",
+            "403": "Email existant mais non vérifié",
             "429": "Trop de tentatives — réessayez dans 10 minutes (5 max / 10 min par email+IP)"
           }
         },
@@ -95,6 +101,7 @@
               "email": "string",
               "role": "string"
             },
+            "subscriptions": "object — statut Premium par app_id (voir /subscription/status)",
             "device_token": "string (présent uniquement si device_id fourni)",
             "device_id": "string (présent uniquement si device_id fourni)"
           },
