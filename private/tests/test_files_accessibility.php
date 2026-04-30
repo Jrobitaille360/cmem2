@@ -13,7 +13,7 @@
 
 // URL cible : utilise la valeur de test_new_base.php (localhost par défaut).
 // Pour cibler la production, décommenter la ligne suivante AVANT l'include :
-// define('BASE_CMEM_URL', 'https://cmem2.journauxdebord.com/');
+ define('BASE_CMEM_URL', 'https://cmem2.journauxdebord.com/');
 
 include_once __DIR__ . '/test_new_base.php';
 
@@ -35,6 +35,8 @@ function accUpload(string $endpoint, ?string $jwt, array $fields, string $filePa
         CURLOPT_POST           => true,
         CURLOPT_POSTFIELDS     => $postFields,
         CURLOPT_HTTPHEADER     => $headers,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYHOST => 0,
     ]);
     $body = curl_exec($ch);
     $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -152,10 +154,12 @@ testNewResult(in_array($resp['code'], [422, 400]), 'A4 Upload accessibility=secr
 // ============================================================
 printNewSection('11. GET /files/{id} — download selon accessibility');
 
+$sslOpts = [CURLOPT_RETURNTRANSFER => true, CURLOPT_SSL_VERIFYPEER => false, CURLOPT_SSL_VERIFYHOST => 0];
+
 // B1 — fichier public, non-propriétaire (user) → 200
 if ($accPublicFileId) {
     $ch = curl_init(BASE_CMEM_URL . "files/{$accPublicFileId}");
-    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_HTTPHEADER => ["Authorization: Bearer {$userJwt}"]]);
+    curl_setopt_array($ch, $sslOpts + [CURLOPT_HTTPHEADER => ["Authorization: Bearer {$userJwt}"]]);
     $body = curl_exec($ch);
     $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     testNewResult($code === 200, "B1 Fichier public — non-propriétaire → 200 (code {$code})");
@@ -165,7 +169,7 @@ if ($accPublicFileId) {
 // B2 — fichier private (admin), non-propriétaire (user) → 403
 if ($accPrivateAdminFileId) {
     $ch = curl_init(BASE_CMEM_URL . "files/{$accPrivateAdminFileId}");
-    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_HTTPHEADER => ["Authorization: Bearer {$userJwt}"]]);
+    curl_setopt_array($ch, $sslOpts + [CURLOPT_HTTPHEADER => ["Authorization: Bearer {$userJwt}"]]);
     curl_exec($ch);
     $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     testNewResult($code === 403, "B2 Fichier private — non-propriétaire → 403 (code {$code})");
@@ -174,7 +178,7 @@ if ($accPrivateAdminFileId) {
 // B3 — fichier private (admin), propriétaire (admin) → 200
 if ($accPrivateAdminFileId) {
     $ch = curl_init(BASE_CMEM_URL . "files/{$accPrivateAdminFileId}");
-    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_HTTPHEADER => ["Authorization: Bearer {$adminJwt}"]]);
+    curl_setopt_array($ch, $sslOpts + [CURLOPT_HTTPHEADER => ["Authorization: Bearer {$adminJwt}"]]);
     $body = curl_exec($ch);
     $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     testNewResult($code === 200, "B3 Fichier private — propriétaire → 200 (code {$code})");
@@ -183,7 +187,7 @@ if ($accPrivateAdminFileId) {
 // B4 — fichier private (user), admin → 200
 if ($accPrivateUserFileId) {
     $ch = curl_init(BASE_CMEM_URL . "files/{$accPrivateUserFileId}");
-    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_HTTPHEADER => ["Authorization: Bearer {$adminJwt}"]]);
+    curl_setopt_array($ch, $sslOpts + [CURLOPT_HTTPHEADER => ["Authorization: Bearer {$adminJwt}"]]);
     curl_exec($ch);
     $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     testNewResult($code === 200, "B4 Fichier private (user) — admin → 200 (code {$code})");
@@ -192,7 +196,7 @@ if ($accPrivateUserFileId) {
 // B5 — fichier public, sans auth → 401/403
 if ($accPublicFileId) {
     $ch = curl_init(BASE_CMEM_URL . "files/{$accPublicFileId}");
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt_array($ch, $sslOpts);
     curl_exec($ch);
     $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     testNewResult(in_array($code, [401, 403]), "B5 Fichier public — sans auth → 401/403 (code {$code})");
