@@ -89,8 +89,15 @@ class FileController
                 return false;
             }
 
-            $input       = Response::getRequestParams();
-            $description = $input['description'] ?? null;
+            $input         = Response::getRequestParams();
+            $description   = $input['description'] ?? null;
+            $accessibility = $input['accessibility'] ?? 'private';
+
+            if (!in_array($accessibility, ['public', 'private'])) {
+                LoggingMiddleware::logExit(422);
+                Response::error('Valeur accessibility invalide — valeurs acceptées : public, private', null, 422);
+                return false;
+            }
 
             // Validation du paramètre folder (optionnel)
             $folderRaw = trim($input['folder'] ?? '');
@@ -143,9 +150,10 @@ class FileController
             $fileModel->file_path = $urlPrefix . $uniqueName;
             $fileModel->mime_type = $file['type'];
             $fileModel->file_size = $file['size'];
-            $fileModel->media_type = $this->getFileCategory($file['type']);
-            $fileModel->uploaded_by = $userId;
-            $fileModel->upload_ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+            $fileModel->media_type   = $this->getFileCategory($file['type']);
+            $fileModel->uploaded_by  = $userId;
+            $fileModel->accessibility = $accessibility;
+            $fileModel->upload_ip    = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 
 
             if (!$fileModel->create())
@@ -169,11 +177,12 @@ class FileController
                     'file_name'    => $fileModel->file_name,
                     'mime_type'    => $fileModel->mime_type,
                     'file_size'    => $fileModel->file_size,
-                    'media_type'   => $fileModel->media_type,
-                    'upload_date'  => $fileModel->created_at,
-                    'upload_ip'    => $fileModel->upload_ip,
-                    'url'          => $fileModel->file_path,
-                    'owner_id'     => $userId,
+                    'media_type'    => $fileModel->media_type,
+                    'accessibility' => $fileModel->accessibility,
+                    'upload_date'   => $fileModel->created_at,
+                    'upload_ip'     => $fileModel->upload_ip,
+                    'url'           => $fileModel->file_path,
+                    'owner_id'      => $userId,
                 ]
             ];
 
@@ -214,12 +223,15 @@ class FileController
             return;
         }
         
-        // Vérifier les permissions
-            // Autoriser l'admin ou l'uploader
-            if (!isset($userId) || (strtolower($role) !== 'administrateur' && (int)$fileInfo['uploaded_by'] != (int)$userId)) {
-                Response::error('Accès non autorisé', null, 403);
-                return;
-            }
+        // Vérifier les permissions selon l'accessibilité du fichier
+        $isAdmin = strtolower($role) === 'administrateur';
+        $isOwner = (int)$fileInfo['uploaded_by'] === (int)$userId;
+        $isPublic = ($fileInfo['accessibility'] ?? 'public') === 'public';
+
+        if (!$isPublic && !$isOwner && !$isAdmin) {
+            Response::error('Accès non autorisé', null, 403);
+            return;
+        }
         
         // Chemin complet vers le fichier
         // Utiliser le bon accès aux clés du tableau
@@ -261,18 +273,66 @@ class FileController
      * @return void
      */
     public function getFileInfo($fileId, $userId, $role): void {
-        // Récupérer les informations du fichier
         $fileModel = new File();
-        $fileInfo = $fileModel->findById($fileId);
-        
-        // Vérifier si le fichier existe
+        $fileInfo  = $fileModel->findById($fileId);
+
         if (!$fileInfo) {
             Response::error('Information non trouvée: Fichier non trouvé', null, 404);
             return;
         }
 
+        $isAdmin  = strtolower($role) === 'administrateur';
+        $isOwner  = (int)$fileInfo['uploaded_by'] === (int)$userId;
+        $isPublic = ($fileInfo['accessibility'] ?? 'public') === 'public';
+
+        if (!$isPublic && !$isOwner && !$isAdmin) {
+            Response::error('Accès non autorisé', null, 403);
+            return;
+        }
+
         Response::success('Information sur le fichier récupérée avec succès', [
             'file' => $fileInfo
+        ]);
+    }
+
+    /**
+     * Mettre à jour l'accessibilité d'un fichier
+     * PATCH /files/{id}/accessibility
+     */
+    public function updateAccessibility(int $fileId, int $userId, string $role): void
+    {
+        $fileModel = new File();
+        $fileInfo  = $fileModel->findById($fileId);
+
+        if (!$fileInfo) {
+            Response::error('Fichier non trouvé', null, 404);
+            return;
+        }
+
+        $isAdmin = strtolower($role) === 'administrateur';
+        $isOwner = (int)$fileInfo['uploaded_by'] === (int)$userId;
+
+        if (!$isOwner && !$isAdmin) {
+            Response::error('Accès non autorisé', null, 403);
+            return;
+        }
+
+        $input         = Response::getRequestParams();
+        $accessibility = $input['accessibility'] ?? '';
+
+        if (!in_array($accessibility, ['public', 'private'])) {
+            Response::error('Valeur accessibility invalide — valeurs acceptées : public, private', null, 422);
+            return;
+        }
+
+        if (!$fileModel->updateAccessibility($fileId, $accessibility)) {
+            Response::error('Erreur lors de la mise à jour', null, 500);
+            return;
+        }
+
+        Response::success('Accessibilité mise à jour', [
+            'file_id'       => $fileId,
+            'accessibility' => $accessibility,
         ]);
     }
     

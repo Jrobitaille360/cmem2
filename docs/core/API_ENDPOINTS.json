@@ -792,9 +792,7 @@
         "Tailles max : image 5 MB, document 10 MB, audio 20 MB, vidéo 50 MB, exécutable/archive (exe/msi/zip/7z) 200 MB"
       ],
       "routes": [
-        {
-          "method": "GET",
-          "path": "/files",
+        { "method": "GET", "path": "/files",
           "description": "Lister les fichiers d'un sous-dossier uploads/<folder>/",
           "auth_required": true,
           "roles": ["ADMINISTRATEUR"],
@@ -825,16 +823,15 @@
             "403": "rôle insuffisant"
           }
         },
-        {
-          "method": "POST",
-          "path": "/files",
+        { "method": "POST", "path": "/files",
           "description": "Uploader un fichier — images, documents, audio, vidéo, et exécutables/archives Windows (exe, msi, zip, 7z)",
           "body": {
             "content_type": "multipart/form-data",
             "fields": {
               "file": "fichier binaire (required)",
               "description": "string (optional)",
-              "folder": "string (optional) — sous-dossier de destination ; caractères autorisés : a-z 0-9 - _ ; max 80 car. ; défaut : uploads/files/"
+              "folder": "string (optional) — sous-dossier de destination ; caractères autorisés : a-z 0-9 - _ ; max 80 car. ; défaut : uploads/files/",
+              "accessibility": "string (optional) — 'public' ou 'private' (défaut)"
             }
           },
           "notes": [
@@ -854,6 +851,7 @@
                 "mime_type": "string",
                 "file_size": "integer (octets)",
                 "media_type": "string (image|document|audio|video|default)",
+                "accessibility": "string (public|private)",
                 "upload_date": "string (datetime)",
                 "upload_ip": "string",
                 "url": "string (chemin relatif /uploads/files/...)",
@@ -864,7 +862,8 @@
           "http_codes": {
             "201": "succès",
             "400": "fichier manquant/invalide",
-            "401": "non authentifié"
+            "401": "non authentifié",
+            "422": "valeur accessibility invalide"
           }
         },
         {
@@ -874,11 +873,15 @@
           "params": {
             "id": "integer (required)"
           },
+          "notes": [
+            "accessibility=public : tout utilisateur authentifié peut télécharger",
+            "accessibility=private : propriétaire ou administrateur uniquement"
+          ],
           "response": "Fichier binaire avec headers Content-Type / Content-Disposition",
           "http_codes": {
             "200": "succès",
             "401": "non authentifié",
-            "403": "accès refusé",
+            "403": "fichier private — accès refusé",
             "404": "introuvable"
           }
         },
@@ -889,6 +892,9 @@
           "params": {
             "id": "integer (required)"
           },
+          "notes": [
+            "Même règle d'accessibilité que le téléchargement : un fichier private n'est visible que par le propriétaire ou un administrateur"
+          ],
           "response": {
             "data": {
               "file": {
@@ -899,6 +905,7 @@
                 "mime_type": "string",
                 "file_size": "integer",
                 "media_type": "string",
+                "accessibility": "string (public|private)",
                 "uploaded_by": "integer",
                 "created_at": "string (datetime)",
                 "updated_at": "string (datetime)",
@@ -909,7 +916,33 @@
           "http_codes": {
             "200": "succès",
             "401": "non authentifié",
+            "403": "fichier private — accès refusé",
             "404": "introuvable"
+          }
+        },
+        {
+          "method": "PATCH",
+          "path": "/files/{id}/accessibility",
+          "description": "Changer l'accessibilité d'un fichier",
+          "params": {
+            "id": "integer (required)"
+          },
+          "body": {
+            "accessibility": "string (required) — 'public' ou 'private'"
+          },
+          "response": {
+            "data": {
+              "file_id": "integer",
+              "accessibility": "string (public|private)"
+            }
+          },
+          "permissions": "propriétaire ou administrateur",
+          "http_codes": {
+            "200": "succès",
+            "401": "non authentifié",
+            "403": "accès refusé",
+            "404": "introuvable",
+            "422": "valeur invalide"
           }
         },
         {
@@ -979,6 +1012,7 @@
                   "description": "string|null",
                   "mime_type": "string",
                   "media_type": "string",
+                  "accessibility": "string (public|private)",
                   "file_size": "integer",
                   "download_count": "integer",
                   "upload_date": "string (datetime)",

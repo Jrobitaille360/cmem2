@@ -53,6 +53,11 @@ class FileRouteHandler extends BaseRouteHandler
             ($action && ctype_digit($action) && $id === 'restore' && $method === 'POST') =>
                 $this->validateIdAndCall($action, fn($fileId) =>
                     $this->controller->restore($fileId, $user['user_id'], $user['role'])),
+
+            // PATCH /files/{id}/accessibility
+            ($action && ctype_digit($action) && $id === 'accessibility' && $method === 'PATCH') =>
+                $this->validateIdAndCall($action, fn($fileId) =>
+                    $this->controller->updateAccessibility($fileId, $user['user_id'], $user['role'])),
                 
             // GET /files/user/{user_id}
             ($action === 'user' && $method === 'GET' && $id) => 

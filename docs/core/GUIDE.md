@@ -273,6 +273,7 @@ Un email de vérification est envoyé. La connexion est bloquée (403) tant que 
 | POST | `/files` | JWT | Uploader un fichier |
 | GET | `/files/{id}` | JWT | Télécharger le contenu binaire |
 | GET | `/files/{id}/info` | JWT | Métadonnées d'un fichier |
+| PATCH | `/files/{id}/accessibility` | JWT propriétaire/admin | Changer l'accessibilité |
 | DELETE | `/files/{id}` | JWT | Soft delete (`force_delete: true` pour suppression physique) |
 | POST | `/files/{id}/restore` | JWT | Restaurer un fichier soft-deleted |
 | GET | `/files/user/{user_id}` | JWT | Lister les fichiers d'un utilisateur (paginé) |
@@ -288,6 +289,38 @@ Un email de vérification est envoyé. La connexion est bloquée (403) tant que 
 | Exécutable / Archive | **exe, msi, zip, 7z** | **200 MB** |
 
 Validation côté serveur : type MIME + taille. Retourne `400` si le type est refusé ou la taille dépassée.
+
+### Paramètre `accessibility` (POST /files)
+
+Le champ FormData `accessibility` est optionnel. Valeurs acceptées : `public` ou `private` (défaut).
+
+| Valeur | Qui peut télécharger / consulter les métadonnées |
+| - | - |
+| `public` | Tout utilisateur authentifié (JWT valide) |
+| `private` | Uniquement le déposant ou un administrateur |
+
+L'accessibilité s'applique à `GET /files/{id}` (download) et `GET /files/{id}/info`. Dans les deux cas, un JWT valide est toujours requis ; aucune ressource n'est publiquement accessible sans authentification.
+
+### PATCH /files/{id}/accessibility
+
+Permet au propriétaire du fichier ou à un administrateur de changer l'accessibilité après l'upload.
+
+```http
+PATCH /files/{id}/accessibility
+Authorization: Bearer {jwt_token}
+Content-Type: application/json
+
+{ "accessibility": "private" }
+```
+
+Réponse `200` :
+
+```json
+{ "file_id": 42, "accessibility": "private" }
+```
+
+Retourne `403` si l'appelant n'est ni propriétaire ni administrateur.
+Retourne `422` si la valeur n'est pas `public` ou `private`.
 
 ### Paramètre `folder` (POST /files)
 

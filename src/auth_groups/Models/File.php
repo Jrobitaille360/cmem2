@@ -21,6 +21,7 @@ class File extends BaseModel
     public $file_size;
     public $media_type;
     public $uploaded_by;
+    public $accessibility;
     public $upload_ip;
     public $download_count;
 
@@ -30,11 +31,11 @@ class File extends BaseModel
      */
     public function create()
     {
-        $query = "INSERT INTO {$this->table} 
-                 (original_name, description, file_name, file_path, mime_type, file_size, 
-                  media_type, uploaded_by, upload_ip) 
-                 VALUES (:original_name, :description, :file_name, :file_path, :mime_type, :file_size, 
-                         :media_type, :uploaded_by, :upload_ip)";
+        $query = "INSERT INTO {$this->table}
+                 (original_name, description, file_name, file_path, mime_type, file_size,
+                  media_type, uploaded_by, accessibility, upload_ip)
+                 VALUES (:original_name, :description, :file_name, :file_path, :mime_type, :file_size,
+                         :media_type, :uploaded_by, :accessibility, :upload_ip)";
 
         $stmt = $this->getDb()->prepare($query);
 
@@ -42,6 +43,7 @@ class File extends BaseModel
         $this->original_name = htmlspecialchars(strip_tags($this->original_name));
         $this->file_name = htmlspecialchars(strip_tags($this->file_name));
         $this->description = htmlspecialchars(strip_tags($this->description));
+        $this->accessibility = in_array($this->accessibility, ['public', 'private']) ? $this->accessibility : 'private';
 
         $stmt->bindParam(':original_name', $this->original_name);
         $stmt->bindParam(':description', $this->description);
@@ -51,6 +53,7 @@ class File extends BaseModel
         $stmt->bindParam(':file_size', $this->file_size, PDO::PARAM_INT);
         $stmt->bindParam(':media_type', $this->media_type);
         $stmt->bindParam(':uploaded_by', $this->uploaded_by, PDO::PARAM_INT);
+        $stmt->bindParam(':accessibility', $this->accessibility);
         $stmt->bindParam(':upload_ip', $this->upload_ip);
 
         if ($stmt->execute()) {
@@ -71,18 +74,20 @@ class File extends BaseModel
             return false;
         }
 
-        $query = "UPDATE {$this->table} 
+        $query = "UPDATE {$this->table}
                  SET original_name = :original_name, description = :description,
-                     updated_at = NOW()
+                     accessibility = :accessibility, updated_at = NOW()
                  WHERE id = :id AND deleted_at IS NULL";
 
         $stmt = $this->getDb()->prepare($query);
-        
-        $original_name = htmlspecialchars(strip_tags($this->original_name));
-        $description = htmlspecialchars(strip_tags($this->description));
+
+        $original_name  = htmlspecialchars(strip_tags($this->original_name));
+        $description    = htmlspecialchars(strip_tags($this->description));
+        $accessibility  = in_array($this->accessibility, ['public', 'private']) ? $this->accessibility : 'private';
 
         $stmt->bindParam(':original_name', $original_name);
         $stmt->bindParam(':description', $description);
+        $stmt->bindParam(':accessibility', $accessibility);
         $stmt->bindParam(':id', $this->id, PDO::PARAM_INT);
 
         return $stmt->execute();
@@ -93,9 +98,9 @@ class File extends BaseModel
      */
     public function getByUserId($userId, $limit = 20, $offset = 0)
     {
-        $query = "SELECT 
-                    id, original_name, description, file_name, file_path, mime_type, 
-                    file_size, media_type, download_count,
+        $query = "SELECT
+                    id, original_name, description, file_name, file_path, mime_type,
+                    file_size, media_type, accessibility, download_count,
                     created_at, updated_at
                   FROM {$this->table}
                   WHERE uploaded_by = :user_id AND deleted_at IS NULL
@@ -222,6 +227,26 @@ class File extends BaseModel
         {
             return 'document';
         }
+    }
+
+    /**
+     * Mettre à jour uniquement l'accessibilité d'un fichier
+     */
+    public function updateAccessibility($fileId, string $accessibility): bool
+    {
+        if (!in_array($accessibility, ['public', 'private'])) {
+            return false;
+        }
+
+        $query = "UPDATE {$this->table}
+                 SET accessibility = :accessibility, updated_at = NOW()
+                 WHERE id = :id AND deleted_at IS NULL";
+
+        $stmt = $this->getDb()->prepare($query);
+        $stmt->bindParam(':accessibility', $accessibility);
+        $stmt->bindParam(':id', $fileId, PDO::PARAM_INT);
+
+        return $stmt->execute() && $stmt->rowCount() > 0;
     }
 
     public function deleteById($fileId)
