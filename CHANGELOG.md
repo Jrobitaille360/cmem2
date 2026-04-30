@@ -7,7 +7,11 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-04-30 10:00]
+## [Unreleased]
+
+---
+
+## [2.4.1] — 2026-04-30
 
 ### Fichiers — champ `accessibility` (public / private)
 
