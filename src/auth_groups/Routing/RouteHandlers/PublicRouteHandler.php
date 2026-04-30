@@ -124,7 +124,7 @@ class PublicRouteHandler extends BaseRouteHandler
         $info = [
             'api' => [
                 'name' => 'CMEM2 API',
-                'version' => '2.0.0',
+                'version' => defined('APP_VERSION') ? APP_VERSION : '2.4.0',
                 'description' => 'API complète de gestion d\'utilisateurs, groupes, fichiers, tags et plans',
                 'status' => 'operational'
             ],
@@ -156,7 +156,7 @@ class PublicRouteHandler extends BaseRouteHandler
         $info = [
             'api' => [
                 'name' => 'CMEM2 API',
-                'version' => '2.0.0',
+                'version' => defined('APP_VERSION') ? APP_VERSION : '2.4.0',
                 'documentation' => '/help',
                 'base_url' => $_SERVER['REQUEST_SCHEME'] . '://' . $_SERVER['HTTP_HOST'] . dirname($_SERVER['SCRIPT_NAME'])
             ],
@@ -268,9 +268,9 @@ class PublicRouteHandler extends BaseRouteHandler
             $dbMessage = 'Erreur de connexion: ' . $e->getMessage();
         }
         
-        // Vérifier les dossiers d'uploads
-        $uploadsWritable = is_writable(__DIR__ . '/../../uploads');
-        $logsWritable = is_writable(__DIR__ . '/../../../logs');
+        $rootDir = dirname(__DIR__, 4);
+        $uploadsWritable = is_writable($rootDir . '/uploads');
+        $logsWritable    = is_writable($rootDir . '/logs');
         
         // Vérifier les plugins
         $pluginsLoaded = isset($GLOBALS['plugin_manager']) ? 
@@ -280,7 +280,7 @@ class PublicRouteHandler extends BaseRouteHandler
             'status' => $dbStatus === 'OK' ? 'healthy' : 'degraded',
             'message' => 'API CMEM2 opérationnelle',
             'timestamp' => date('Y-m-d H:i:s'),
-            'version' => '2.0.0',
+            'version' => defined('APP_VERSION') ? APP_VERSION : '2.4.0',
             'uptime' => [
                 'server' => function_exists('sys_getloadavg') ? sys_getloadavg() : 'N/A',
                 'php_version' => PHP_VERSION,

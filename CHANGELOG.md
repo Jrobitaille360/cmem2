@@ -11,6 +11,53 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [2.4.1] — 2026-04-30
+
+### Fichiers — champ `accessibility` (public / private)
+
+#### Migration DB
+
+- **`docs/20260430_files_accessibility.sql`** — `ALTER TABLE files ADD COLUMN accessibility ENUM('public','private') NOT NULL DEFAULT 'private' AFTER uploaded_by`
+
+#### Modèle `File`
+
+- Nouvelle propriété `$accessibility`
+- **`create()`** — insère la colonne `accessibility`; validation en whitelist avant `bindParam`
+- **`update()`** — persiste `accessibility` avec `original_name` et `description`
+- **`getByUserId()`** — sélectionne désormais `accessibility` dans la liste `SELECT`
+- **`updateAccessibility($fileId, $accessibility)`** — nouvelle méthode dédiée `UPDATE … SET accessibility = :accessibility`
+
+#### Contrôleur `FileController`
+
+- **`upload()`** — accepte le champ FormData `accessibility` (`private` par défaut); retourne 422 si valeur invalide; inclut `accessibility` dans la réponse 201
+- **`download()`** — applique la règle d'accès : `public` → tout utilisateur JWT valide; `private` → propriétaire ou administrateur uniquement (retourne 403 sinon)
+- **`getFileInfo()`** — même règle d'accessibilité que le téléchargement
+- **`updateAccessibility(int $fileId, int $userId, string $role)`** — nouveau handler `PATCH /files/{id}/accessibility`; vérifie propriétaire ou admin; retourne `{file_id, accessibility}`
+
+#### Routage `FileRouteHandler`
+
+- Nouvelle entrée `PATCH /files/{id}/accessibility` → `controller->updateAccessibility()`
+
+#### Documentation
+
+- **`docs/core/API_ENDPOINTS.json`** — champ `accessibility` ajouté aux payloads POST /files, GET /files/{id}/info, GET /files/user/{user_id}; nouvelle entrée PATCH /files/{id}/accessibility avec codes HTTP 200/401/403/404/422
+- **`docs/core/GUIDE.md`** — PATCH /files/{id}/accessibility ajouté au tableau des routes; sections explicatives sur `accessibility` et la règle d'accès
+
+---
+
+## [Unreleased 2026-04-27 11:00]
+
+### Stripe — chargement des constantes depuis `.env`
+
+- **`src/auth_groups/environment.php`** — bloc `STRIPE_*` ajouté : `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PUZZLE_MONTHLY`, `STRIPE_PRICE_PUZZLE_YEARLY` définis avec `if (!defined(...))` depuis `$_ENV`; valeur par défaut `APP_VERSION` corrigée de `2.0.0` à `2.4.0`
+- **`.env.example`** — nouvelle section commentée `STRIPE — Paiements et abonnements (v2.4.0+)` avec instructions de configuration ; `APP_VERSION` mis à jour à `2.4.0`
+
+### Public — version dynamique et chemins uploads/logs
+
+- **`src/auth_groups/Routing/RouteHandlers/PublicRouteHandler.php`** — version hardcodée `2.0.0` remplacée par `defined('APP_VERSION') ? APP_VERSION : '2.4.0'` dans `/info`, `/help` et `/health`; chemins uploads/logs corrigés via `dirname(__DIR__, 4)` (résolvait un faux négatif sur le health check en production)
+
+---
+
 ## [2.4.0] — 2026-04-27
 
 ### Abonnements — Stripe, essai, champs étendus (auth_groups)

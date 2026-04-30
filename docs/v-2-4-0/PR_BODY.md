@@ -38,19 +38,19 @@ Voir `CHANGELOG.md` — section `## [2.4.0]`.
 
 ## Checklist API PHP
 
-- [ ] `composer install --no-dev --optimize-autoloader` exécuté sur le serveur
-- [ ] Migration `docs/v-2-4-0/20260423_files_media_type_executable.sql` appliquée
-- [ ] Migration `docs/v-2-4-0/20260426_subscriptions_trial.sql` appliquée
+- [x] `composer install --no-dev --optimize-autoloader` exécuté sur le serveur
+- [x] Migration `docs/v-2-4-0/20260423_files_media_type_executable.sql` appliquée
+- [x] Migration `docs/v-2-4-0/20260426_subscriptions_trial.sql` appliquée
 - [ ] Variables `.env` ajoutées : `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PUZZLE_MONTHLY`, `STRIPE_PRICE_PUZZLE_YEARLY`
 - [ ] Webhook Stripe configuré dans le tableau de bord : `POST /stripe/webhook`
-- [ ] Cron `maintenance.php` ajouté (remplace `expire_subscriptions.php` et `cleanup.php`)
-- [ ] Endpoint `/health` répond correctement
-- [ ] `php private/tests/test_subscriptions.php` → 112/112
+- [X] Cron `maintenance.php` ajouté (remplace `expire_subscriptions.php` et `cleanup.php`)
+- [X] Endpoint `/health` répond correctement
+- [X] `php private/tests/test_subscriptions.php` → 112/112
 - [ ] `php private/tests/test_users.php` → 103/103
 
 ## Checklist journauxdebord.com
 
-- [ ] Fiche `puzzle` mise à jour (`version: 2.4.0`)
+- [ ] Fiche de l'application mise à jour (`version: 2.4.0`)
 - [ ] Page publique vérifiée
 
 ---

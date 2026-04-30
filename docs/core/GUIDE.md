@@ -74,11 +74,12 @@ POST /users/verify-email     → compte activé
 POST /auth/login             → { token, user }
 ```
 
-### 2. Connexion par OTP
+### 2. Connexion par code (OTP)
 
 ```txt
 POST /auth/send-code         → code OTP envoyé par email (15 min)
-POST /auth/verify-code       → { token, user }
+                               ↳ si email inconnu : compte auto-créé silencieusement (Option A)
+POST /auth/verify-code       → { token, user, subscriptions }
 ```
 
 ### 3. Renouvellement sans re-login (mobile)
@@ -102,9 +103,9 @@ POST /users/reset-password           → mot de passe mis à jour
 
 | Méthode | Endpoint | Auth | Description |
 | --- | --- | --- | --- |
-| POST | `/auth/login` | Non | Email + mot de passe → JWT |
-| POST | `/auth/send-code` | Non | Demander code OTP |
-| POST | `/auth/verify-code` | Non | Vérifier OTP → JWT |
+| POST | `/auth/login` | Non | Email + mot de passe → JWT + subscriptions |
+| POST | `/auth/send-code` | Non | Demander code OTP (auto-register si email inconnu) |
+| POST | `/auth/verify-code` | Non | Vérifier OTP → JWT + subscriptions |
 | POST | `/auth/refresh` | Non | Renouveler via device token (rate-limited par `device_id`) |
 | GET | `/auth/me` | JWT | Infos utilisateur courant |
 | POST | `/auth/logout` | JWT | Invalider le JWT courant |
@@ -132,10 +133,29 @@ Réponse `200` :
   "token_type": "Bearer",
   "expires_at": "2026-04-20 12:00:00",
   "user": { "id": 1, "name": "Alice", "email": "alice@example.com", "role": "UTILISATEUR" },
+  "subscriptions": { "puzzle": { "is_premium": true, "show_ads": false, "is_trial": false, "trial_end": null, "expires_at": "2027-04-20 12:00:00", "provider": "stripe", "plan": "yearly" } },
   "device_token": "abc123...",
   "device_id": "550e8400..."
 }
 ```
+
+> `subscriptions` est aussi présent dans la réponse de `POST /auth/verify-code`. Objet vide `{}` si aucun abonnement actif.
+
+### POST /auth/send-code
+
+```json
+{ "email": "alice@example.com" }
+```
+
+Réponse générique `200` (même si email inconnu) :
+
+```json
+{ "message": "Si cet email est enregistré, un code de connexion vous a été envoyé." }
+```
+
+**Auto-register Option A** : si l'email est inconnu du système, un compte est créé silencieusement (`email_verified=1`, mot de passe aléatoire inutilisable) et un code OTP est envoyé. L'utilisateur peut se connecter sans avoir inscrit de mot de passe.
+
+`403` retourné uniquement si le compte **existe** mais que l'email n'est pas vérifié.
 
 ### POST /auth/refresh
 
@@ -253,6 +273,7 @@ Un email de vérification est envoyé. La connexion est bloquée (403) tant que 
 | POST | `/files` | JWT | Uploader un fichier |
 | GET | `/files/{id}` | JWT | Télécharger le contenu binaire |
 | GET | `/files/{id}/info` | JWT | Métadonnées d'un fichier |
+| PATCH | `/files/{id}/accessibility` | JWT propriétaire/admin | Changer l'accessibilité |
 | DELETE | `/files/{id}` | JWT | Soft delete (`force_delete: true` pour suppression physique) |
 | POST | `/files/{id}/restore` | JWT | Restaurer un fichier soft-deleted |
 | GET | `/files/user/{user_id}` | JWT | Lister les fichiers d'un utilisateur (paginé) |
@@ -268,6 +289,38 @@ Un email de vérification est envoyé. La connexion est bloquée (403) tant que 
 | Exécutable / Archive | **exe, msi, zip, 7z** | **200 MB** |
 
 Validation côté serveur : type MIME + taille. Retourne `400` si le type est refusé ou la taille dépassée.
+
+### Paramètre `accessibility` (POST /files)
+
+Le champ FormData `accessibility` est optionnel. Valeurs acceptées : `public` ou `private` (défaut).
+
+| Valeur | Qui peut télécharger / consulter les métadonnées |
+| - | - |
+| `public` | Tout utilisateur authentifié (JWT valide) |
+| `private` | Uniquement le déposant ou un administrateur |
+
+L'accessibilité s'applique à `GET /files/{id}` (download) et `GET /files/{id}/info`. Dans les deux cas, un JWT valide est toujours requis ; aucune ressource n'est publiquement accessible sans authentification.
+
+### PATCH /files/{id}/accessibility
+
+Permet au propriétaire du fichier ou à un administrateur de changer l'accessibilité après l'upload.
+
+```http
+PATCH /files/{id}/accessibility
+Authorization: Bearer {jwt_token}
+Content-Type: application/json
+
+{ "accessibility": "private" }
+```
+
+Réponse `200` :
+
+```json
+{ "file_id": 42, "accessibility": "private" }
+```
+
+Retourne `403` si l'appelant n'est ni propriétaire ni administrateur.
+Retourne `422` si la valeur n'est pas `public` ou `private`.
 
 ### Paramètre `folder` (POST /files)
 
