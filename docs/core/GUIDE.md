@@ -292,14 +292,15 @@ Validation côté serveur : type MIME + taille. Retourne `400` si le type est re
 
 ### Paramètre `accessibility` (POST /files)
 
-Le champ FormData `accessibility` est optionnel. Valeurs acceptées : `public` ou `private` (défaut).
+Le champ FormData `accessibility` est optionnel. Valeurs acceptées : `public`, `private` (défaut) ou `grand-public`.
 
-| Valeur | Qui peut télécharger / consulter les métadonnées |
-| - | - |
-| `public` | Tout utilisateur authentifié (JWT valide) |
-| `private` | Uniquement le déposant ou un administrateur |
+| Valeur | JWT requis | Qui peut télécharger / consulter les métadonnées |
+| - | - | - |
+| `grand-public` | Non | N'importe qui, sans authentification |
+| `public` | Oui | Tout utilisateur authentifié |
+| `private` | Oui | Uniquement le déposant ou un administrateur |
 
-L'accessibilité s'applique à `GET /files/{id}` (download) et `GET /files/{id}/info`. Dans les deux cas, un JWT valide est toujours requis ; aucune ressource n'est publiquement accessible sans authentification.
+L'accessibilité s'applique à `GET /files/{id}` (download) et `GET /files/{id}/info`. Pour `grand-public`, ces deux routes acceptent les requêtes sans en-tête `Authorization`.
 
 ### PATCH /files/{id}/accessibility
 

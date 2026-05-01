@@ -7,7 +7,42 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased]
+## [Unreleased 2026-04-30 20:30]
+
+### Fichiers — niveau d'accessibilité `grand-public` (sans JWT)
+
+#### Migration DB
+
+- **`docs/v-2-4-1/20260430_files_accessibility.sql`** — ENUM étendu à `('public','private','grand-public')`; correction du commentaire (défaut `private`, non `public`)
+
+#### Modèle `File`
+
+- Whitelist `['public','private','grand-public']` appliquée dans `create()`, `update()` et `updateAccessibility()`
+
+#### Contrôleur `FileController`
+
+- **`upload(int $userId, string $role)`** — nouveau paramètre `$role`; valeur `grand-public` réservée aux administrateurs (retourne 403 sinon)
+- **`download()`** — logique à trois branches : `grand-public` → accès libre sans JWT; `public` → JWT requis; `private` → propriétaire ou administrateur
+- **`getFileInfo()`** — même logique à trois branches que `download()`
+- **`updateAccessibility()`** — valeur `grand-public` réservée aux administrateurs (retourne 403 sinon)
+- Messages d'erreur mis à jour : `valeurs acceptées : public, private, grand-public`
+
+#### Routage `FileRouteHandler`
+
+- **`getMiddlewares()`** surchargée — JWT optionnel pour `GET /files/{id}` et `GET /files/{id}/info` : si le token est absent ou invalide, un utilisateur `guest` (`user_id=null, role='guest'`) est injecté; toutes les autres routes conservent l'auth obligatoire
+- Appel `upload()` mis à jour : passe `$user['role']` en second argument
+
+#### Tests `test_files.php`
+
+- **E0** — upload `grand-public` par non-admin → 403
+- **E1–E6** — upload admin, download sans JWT → 200, `/info` sans JWT → 200, PATCH `private`, vérification re-lock
+- **D6** — PATCH `grand-public` par propriétaire non-admin → 403
+- **D7** — PATCH `grand-public` par admin → 200
+
+#### Documentation
+
+- **`docs/core/GUIDE.md`** — tableau d'accessibilité mis à jour avec colonne JWT et ligne `grand-public`; note sur l'absence d'en-tête `Authorization` pour les routes concernées
+- **`docs/core/API_ENDPOINTS.json`** — ENUM mis à jour (`public|private|grand-public`) dans tous les payloads; notes d'accessibilité enrichies pour `GET /files/{id}` et `GET /files/{id}/info`
 
 ---
 

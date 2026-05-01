@@ -831,7 +831,7 @@
               "file": "fichier binaire (required)",
               "description": "string (optional)",
               "folder": "string (optional) — sous-dossier de destination ; caractères autorisés : a-z 0-9 - _ ; max 80 car. ; défaut : uploads/files/",
-              "accessibility": "string (optional) — 'public' ou 'private' (défaut)"
+              "accessibility": "string (optional) — 'public', 'private' (défaut) ou 'grand-public'"
             }
           },
           "notes": [
@@ -851,7 +851,7 @@
                 "mime_type": "string",
                 "file_size": "integer (octets)",
                 "media_type": "string (image|document|audio|video|default)",
-                "accessibility": "string (public|private)",
+                "accessibility": "string (public|private|grand-public)",
                 "upload_date": "string (datetime)",
                 "upload_ip": "string",
                 "url": "string (chemin relatif /uploads/files/...)",
@@ -874,13 +874,14 @@
             "id": "integer (required)"
           },
           "notes": [
-            "accessibility=public : tout utilisateur authentifié peut télécharger",
-            "accessibility=private : propriétaire ou administrateur uniquement"
+            "accessibility=grand-public : aucun JWT requis — accès libre",
+            "accessibility=public : JWT requis, tout utilisateur authentifié",
+            "accessibility=private : JWT requis, propriétaire ou administrateur uniquement"
           ],
           "response": "Fichier binaire avec headers Content-Type / Content-Disposition",
           "http_codes": {
             "200": "succès",
-            "401": "non authentifié",
+            "401": "fichier public/private sans JWT",
             "403": "fichier private — accès refusé",
             "404": "introuvable"
           }
@@ -893,7 +894,10 @@
             "id": "integer (required)"
           },
           "notes": [
-            "Même règle d'accessibilité que le téléchargement : un fichier private n'est visible que par le propriétaire ou un administrateur"
+            "Mêmes règles d'accessibilité que le téléchargement",
+            "grand-public : pas de JWT requis",
+            "public : JWT requis",
+            "private : JWT requis, propriétaire ou administrateur uniquement"
           ],
           "response": {
             "data": {
@@ -905,7 +909,7 @@
                 "mime_type": "string",
                 "file_size": "integer",
                 "media_type": "string",
-                "accessibility": "string (public|private)",
+                "accessibility": "string (public|private|grand-public)",
                 "uploaded_by": "integer",
                 "created_at": "string (datetime)",
                 "updated_at": "string (datetime)",
@@ -928,12 +932,12 @@
             "id": "integer (required)"
           },
           "body": {
-            "accessibility": "string (required) — 'public' ou 'private'"
+            "accessibility": "string (required) — 'public', 'private' ou 'grand-public'"
           },
           "response": {
             "data": {
               "file_id": "integer",
-              "accessibility": "string (public|private)"
+              "accessibility": "string (public|private|grand-public)"
             }
           },
           "permissions": "propriétaire ou administrateur",
@@ -1012,7 +1016,7 @@
                   "description": "string|null",
                   "mime_type": "string",
                   "media_type": "string",
-                  "accessibility": "string (public|private)",
+                  "accessibility": "string (public|private|grand-public)",
                   "file_size": "integer",
                   "download_count": "integer",
                   "upload_date": "string (datetime)",
