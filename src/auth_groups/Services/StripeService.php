@@ -81,6 +81,27 @@ class StripeService
     }
 
     // -----------------------------------------------------------------------
+    // Billing Portal
+    // -----------------------------------------------------------------------
+
+    /**
+     * Crée une session Stripe Billing Portal pour un customer existant.
+     *
+     * @return array { portal_url: string }
+     */
+    public static function createPortalSession(string $customerId, string $appId): array
+    {
+        $params = http_build_query([
+            'customer'   => $customerId,
+            'return_url' => 'https://journauxdebord.com/' . $appId . '/subscription/manage-return',
+        ]);
+
+        $session = self::request('POST', '/v1/billing_portal/sessions', $params);
+
+        return ['portal_url' => $session['url']];
+    }
+
+    // -----------------------------------------------------------------------
     // Webhook — vérification de signature
     // -----------------------------------------------------------------------
 

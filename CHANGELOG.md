@@ -11,6 +11,81 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [2.5.0] — 2026-05-02
+
+### Portail de facturation Stripe
+
+#### Nouvel endpoint
+
+- **`POST /subscription/portal`** — crée une session Stripe Billing Portal pour un utilisateur
+  ayant un `stripe_customer` en base pour l'`app_id` fourni; retourne `{ portal_url }`
+- JWT obligatoire; `401` si absent, `404 NO_SUBSCRIPTION` si aucun customer Stripe trouvé,
+  `500 STRIPE_ERROR` en cas d'erreur Stripe
+
+#### Modèle `Subscription`
+
+- **`findStripeCustomerByUserAndApp(userId, appId)`** — nouvelle méthode ciblant
+  le couple `(user_id, app_id)` avec `stripe_customer IS NOT NULL`
+- **`upsert()`** — fix : `stripe_customer = COALESCE(VALUES(stripe_customer), stripe_customer)` —
+  la valeur existante est préservée si l'appelant (ex. `POST /subscription/verify`) ne fournit
+  pas de customer Stripe, évitant un écrasement silencieux
+
+#### Service `StripeService`
+
+- **`createPortalSession(customerId, appId)`** — appel HTTP natif vers
+  `/v1/billing_portal/sessions`; retourne `{ portal_url }`
+
+#### Tests `test_subscriptions.php`
+
+- **Section 14** — `POST /subscription/portal` : 401 (sans JWT), 422 (sans `app_id`),
+  404 `NO_SUBSCRIPTION`, 200 avec `portal_url` valide
+
+#### Documentation
+
+- **`docs/core/API_ENDPOINTS.json`** — ajout `POST /subscription/portal`,
+  `POST /subscription/checkout` (manquant), champs `is_trial`/`trial_end` dans
+  la réponse `/subscription/status`
+- **`docs/core/GUIDE.md`** — idem + sections exemples pour `checkout` et `portal`
+
+---
+
+### Fichiers — niveau d'accessibilité `grand-public` (sans JWT)
+
+#### Migration DB
+
+- **`docs/v-2-4-1/20260430_files_accessibility.sql`** — ENUM étendu à `('public','private','grand-public')`; correction du commentaire (défaut `private`, non `public`)
+
+#### Modèle `File`
+
+- Whitelist `['public','private','grand-public']` appliquée dans `create()`, `update()` et `updateAccessibility()`
+
+#### Contrôleur `FileController`
+
+- **`upload(int $userId, string $role)`** — nouveau paramètre `$role`; valeur `grand-public` réservée aux administrateurs (retourne 403 sinon)
+- **`download()`** — logique à trois branches : `grand-public` → accès libre sans JWT; `public` → JWT requis; `private` → propriétaire ou administrateur
+- **`getFileInfo()`** — même logique à trois branches que `download()`
+- **`updateAccessibility()`** — valeur `grand-public` réservée aux administrateurs (retourne 403 sinon)
+- Messages d'erreur mis à jour : `valeurs acceptées : public, private, grand-public`
+
+#### Routage `FileRouteHandler`
+
+- **`getMiddlewares()`** surchargée — JWT optionnel pour `GET /files/{id}` et `GET /files/{id}/info` : si le token est absent ou invalide, un utilisateur `guest` (`user_id=null, role='guest'`) est injecté; toutes les autres routes conservent l'auth obligatoire
+- Appel `upload()` mis à jour : passe `$user['role']` en second argument
+
+#### Tests `test_files.php`
+
+- **E0** — upload `grand-public` par non-admin → 403
+- **E1–E6** — upload admin, download sans JWT → 200, `/info` sans JWT → 200, PATCH `private`, vérification re-lock
+- **D6** — PATCH `grand-public` par propriétaire non-admin → 403
+- **D7** — PATCH `grand-public` par admin → 200
+
+#### Documentation
+
+- **`docs/core/GUIDE.md`** — tableau d'accessibilité mis à jour avec colonne JWT et ligne `grand-public`; note sur l'absence d'en-tête `Authorization` pour les routes concernées
+- **`docs/core/API_ENDPOINTS.json`** — ENUM mis à jour (`public|private|grand-public`) dans tous les payloads; notes d'accessibilité enrichies pour `GET /files/{id}` et `GET /files/{id}/info`
+
+---
+
 ## [2.4.1] — 2026-04-30
 
 ### Fichiers — champ `accessibility` (public / private)

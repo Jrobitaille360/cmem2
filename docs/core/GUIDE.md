@@ -292,14 +292,15 @@ Validation côté serveur : type MIME + taille. Retourne `400` si le type est re
 
 ### Paramètre `accessibility` (POST /files)
 
-Le champ FormData `accessibility` est optionnel. Valeurs acceptées : `public` ou `private` (défaut).
+Le champ FormData `accessibility` est optionnel. Valeurs acceptées : `public`, `private` (défaut) ou `grand-public`.
 
-| Valeur | Qui peut télécharger / consulter les métadonnées |
-| - | - |
-| `public` | Tout utilisateur authentifié (JWT valide) |
-| `private` | Uniquement le déposant ou un administrateur |
+| Valeur | JWT requis | Qui peut télécharger / consulter les métadonnées |
+| - | - | - |
+| `grand-public` | Non | N'importe qui, sans authentification |
+| `public` | Oui | Tout utilisateur authentifié |
+| `private` | Oui | Uniquement le déposant ou un administrateur |
 
-L'accessibilité s'applique à `GET /files/{id}` (download) et `GET /files/{id}/info`. Dans les deux cas, un JWT valide est toujours requis ; aucune ressource n'est publiquement accessible sans authentification.
+L'accessibilité s'applique à `GET /files/{id}` (download) et `GET /files/{id}/info`. Pour `grand-public`, ces deux routes acceptent les requêtes sans en-tête `Authorization`.
 
 ### PATCH /files/{id}/accessibility
 
@@ -445,7 +446,9 @@ Les endpoints `/subscription/*` permettent de gérer les abonnements Premium **p
 | --- | --- | --- | --- |
 | GET | `/subscription/status` | JWT | Statut Premium de toutes les apps |
 | GET | `/subscription/status?app_id={app}` | JWT | Statut Premium d'une app spécifique |
-| POST | `/subscription/verify` | JWT | Valider un achat et activer le Premium |
+| POST | `/subscription/verify` | JWT | Valider un achat provider et activer le Premium |
+| POST | `/subscription/checkout` | JWT | Créer une session Stripe Checkout (paiement web) |
+| POST | `/subscription/portal` | JWT | Ouvrir le portail Stripe pour gérer l'abonnement |
 | DELETE | `/subscription/cancel` | JWT | Annuler un abonnement |
 
 ### Structure de réponse
@@ -460,7 +463,43 @@ Chaque entrée `app_id` dans `subscriptions{}` retourne :
 | `provider` | string\|null | `stripe`, `google_play`, `apple`, `microsoft` |
 | `plan` | string\|null | `monthly` (+31 j) ou `yearly` (+365 j) |
 
+| `is_trial` | boolean | `true` si l'abonnement est en période d'essai |
+| `trial_end` | datetime\|null | Fin de la période d'essai UTC, ou `null` |
+
 > Utiliser `show_ads` (et non `is_premium`) pour décider d'afficher les publicités.
+
+### POST /subscription/checkout
+
+Crée une session Stripe Checkout avec essai gratuit de 7 jours. Retourne une URL à ouvrir dans le navigateur.
+
+```json
+{ "app_id": "puzzle", "plan": "monthly" }
+```
+
+Réponse `200` :
+
+```json
+{
+  "checkout_url": "https://checkout.stripe.com/c/pay/cs_test_...",
+  "session_id": "cs_test_..."
+}
+```
+
+### POST /subscription/portal
+
+Ouvre le Stripe Billing Portal pour qu'un utilisateur puisse gérer (modifier, annuler) son abonnement existant.
+
+```json
+{ "app_id": "puzzle" }
+```
+
+Réponse `200` :
+
+```json
+{ "portal_url": "https://billing.stripe.com/p/session/..." }
+```
+
+Retourne `404` avec `errors.error = "NO_SUBSCRIPTION"` si aucun `stripe_customer_id` n'est trouvé en base pour cet utilisateur + `app_id`.
 
 ### Providers supportés
 

@@ -18,6 +18,39 @@ class FileRouteHandler extends BaseRouteHandler
     protected function getSupportedControllers(): array {
         return ['files'];
     }
+
+    /**
+     * JWT optionnel pour GET /files/{id} et GET /files/{id}/info :
+     * si absent ou invalide, on injecte un utilisateur guest (user_id=null, role='guest')
+     * pour permettre l'accès aux fichiers grand-public sans authentification.
+     */
+    protected function getMiddlewares(): array {
+        return [
+            function(array $request): array|false {
+                $action = $request['action'] ?? '';
+                $id     = $request['id']     ?? '';
+                $method = $request['method'] ?? '';
+
+                $isOptionalAuth = $method === 'GET'
+                    && ctype_digit((string) $action)
+                    && (!$id || $id === 'info');
+
+                $user = $this->authService?->authenticate();
+
+                if (!$user) {
+                    if ($isOptionalAuth) {
+                        $request['user'] = ['user_id' => null, 'role' => 'guest'];
+                        return $request;
+                    }
+                    Response::error('Utilisateur non authentifié', null, 401);
+                    return false;
+                }
+
+                $request['user'] = $user;
+                return $request;
+            }
+        ];
+    }
     
     protected function handleRoute(array $request): void {
         $action = $request['action'];
@@ -32,7 +65,7 @@ class FileRouteHandler extends BaseRouteHandler
 
             // POST /files
             ($action === '' && $method === 'POST') =>
-                $this->controller->upload($user['user_id']),
+                $this->controller->upload($user['user_id'], $user['role']),
                 
             // GET /files/{id}
             ($action && ctype_digit($action) && !$id && $method === 'GET') => 

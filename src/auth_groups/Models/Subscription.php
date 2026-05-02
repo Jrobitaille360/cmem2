@@ -120,7 +120,7 @@ class Subscription extends BaseModel
                 product_id      = VALUES(product_id),
                 purchase_token  = VALUES(purchase_token),
                 stripe_sub_id   = VALUES(stripe_sub_id),
-                stripe_customer = VALUES(stripe_customer),
+                stripe_customer = COALESCE(VALUES(stripe_customer), stripe_customer),
                 status          = 'active',
                 plan            = VALUES(plan),
                 is_premium      = VALUES(is_premium),
@@ -227,6 +227,21 @@ class Subscription extends BaseModel
             LIMIT 1
         ");
         $stmt->execute([$userId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ? (string) $row['stripe_customer'] : null;
+    }
+
+    /**
+     * Retourne le stripe_customer d'un utilisateur pour une app donnée, ou null.
+     */
+    public function findStripeCustomerByUserAndApp(int $userId, string $appId): ?string
+    {
+        $stmt = $this->getDb()->prepare("
+            SELECT stripe_customer FROM {$this->table}
+            WHERE user_id = ? AND app_id = ? AND stripe_customer IS NOT NULL
+            LIMIT 1
+        ");
+        $stmt->execute([$userId, $appId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row ? (string) $row['stripe_customer'] : null;
     }

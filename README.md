@@ -1,6 +1,6 @@
 ﻿# cmem2 API
 
-![Version](https://img.shields.io/badge/version-2.4.1-blue.svg)
+![Version](https://img.shields.io/badge/version-2.5.0-blue.svg)
 ![PHP](https://img.shields.io/badge/PHP-8.0+-purple.svg)
 ![Status](https://img.shields.io/badge/status-production%20ready-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)

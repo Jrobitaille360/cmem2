@@ -61,7 +61,7 @@ class FileController
     /**
      * Upload d'un fichier générique
      */
-    public function upload(int $userId)
+    public function upload(int $userId, string $role)
     {
         try
         {
@@ -93,9 +93,15 @@ class FileController
             $description   = $input['description'] ?? null;
             $accessibility = $input['accessibility'] ?? 'private';
 
-            if (!in_array($accessibility, ['public', 'private'])) {
+            if (!in_array($accessibility, ['public', 'private', 'grand-public'])) {
                 LoggingMiddleware::logExit(422);
-                Response::error('Valeur accessibility invalide — valeurs acceptées : public, private', null, 422);
+                Response::error('Valeur accessibility invalide — valeurs acceptées : public, private, grand-public', null, 422);
+                return false;
+            }
+
+            if ($accessibility === 'grand-public' && strtolower($role) !== 'administrateur') {
+                LoggingMiddleware::logExit(403);
+                Response::error('Seul un administrateur peut uploader un fichier grand-public', null, 403);
                 return false;
             }
 
@@ -224,13 +230,23 @@ class FileController
         }
         
         // Vérifier les permissions selon l'accessibilité du fichier
-        $isAdmin = strtolower($role) === 'administrateur';
-        $isOwner = (int)$fileInfo['uploaded_by'] === (int)$userId;
-        $isPublic = ($fileInfo['accessibility'] ?? 'public') === 'public';
+        $accessibility = $fileInfo['accessibility'] ?? 'private';
 
-        if (!$isPublic && !$isOwner && !$isAdmin) {
-            Response::error('Accès non autorisé', null, 403);
-            return;
+        if ($accessibility === 'grand-public') {
+            // Aucune vérification — accès sans JWT
+        } elseif ($accessibility === 'public') {
+            if (!$userId) {
+                Response::error('Authentification requise', null, 401);
+                return;
+            }
+        } else {
+            // private
+            $isAdmin = strtolower($role ?? '') === 'administrateur';
+            $isOwner = $userId && (int)$fileInfo['uploaded_by'] === (int)$userId;
+            if (!$isOwner && !$isAdmin) {
+                Response::error('Accès non autorisé', null, 403);
+                return;
+            }
         }
         
         // Chemin complet vers le fichier
@@ -281,13 +297,23 @@ class FileController
             return;
         }
 
-        $isAdmin  = strtolower($role) === 'administrateur';
-        $isOwner  = (int)$fileInfo['uploaded_by'] === (int)$userId;
-        $isPublic = ($fileInfo['accessibility'] ?? 'public') === 'public';
+        $accessibility = $fileInfo['accessibility'] ?? 'private';
 
-        if (!$isPublic && !$isOwner && !$isAdmin) {
-            Response::error('Accès non autorisé', null, 403);
-            return;
+        if ($accessibility === 'grand-public') {
+            // Aucune vérification — accès sans JWT
+        } elseif ($accessibility === 'public') {
+            if (!$userId) {
+                Response::error('Authentification requise', null, 401);
+                return;
+            }
+        } else {
+            // private
+            $isAdmin = strtolower($role ?? '') === 'administrateur';
+            $isOwner = $userId && (int)$fileInfo['uploaded_by'] === (int)$userId;
+            if (!$isOwner && !$isAdmin) {
+                Response::error('Accès non autorisé', null, 403);
+                return;
+            }
         }
 
         Response::success('Information sur le fichier récupérée avec succès', [
@@ -320,8 +346,13 @@ class FileController
         $input         = Response::getRequestParams();
         $accessibility = $input['accessibility'] ?? '';
 
-        if (!in_array($accessibility, ['public', 'private'])) {
-            Response::error('Valeur accessibility invalide — valeurs acceptées : public, private', null, 422);
+        if (!in_array($accessibility, ['public', 'private', 'grand-public'])) {
+            Response::error('Valeur accessibility invalide — valeurs acceptées : public, private, grand-public', null, 422);
+            return;
+        }
+
+        if ($accessibility === 'grand-public' && !$isAdmin) {
+            Response::error('Seul un administrateur peut définir un fichier grand-public', null, 403);
             return;
         }
 

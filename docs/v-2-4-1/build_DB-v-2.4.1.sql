@@ -219,7 +219,7 @@ CREATE TABLE `files` (
   `mime_type` varchar(100) NOT NULL,
   `media_type` enum('text','audio','video','image','gpx','summary','event','todo','document','executable') DEFAULT NULL,
   `uploaded_by` int(11) NOT NULL,
-  `accessibility` enum('public','private') NOT NULL DEFAULT 'private',
+  `accessibility` enum('public','private','grand-public') NOT NULL DEFAULT 'private',
   `uploaded_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `download_count` int(11) NOT NULL DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),

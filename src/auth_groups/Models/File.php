@@ -43,7 +43,7 @@ class File extends BaseModel
         $this->original_name = htmlspecialchars(strip_tags($this->original_name));
         $this->file_name = htmlspecialchars(strip_tags($this->file_name));
         $this->description = htmlspecialchars(strip_tags($this->description));
-        $this->accessibility = in_array($this->accessibility, ['public', 'private']) ? $this->accessibility : 'private';
+        $this->accessibility = in_array($this->accessibility, ['public', 'private', 'grand-public']) ? $this->accessibility : 'private';
 
         $stmt->bindParam(':original_name', $this->original_name);
         $stmt->bindParam(':description', $this->description);
@@ -83,7 +83,7 @@ class File extends BaseModel
 
         $original_name  = htmlspecialchars(strip_tags($this->original_name));
         $description    = htmlspecialchars(strip_tags($this->description));
-        $accessibility  = in_array($this->accessibility, ['public', 'private']) ? $this->accessibility : 'private';
+        $accessibility  = in_array($this->accessibility, ['public', 'private', 'grand-public']) ? $this->accessibility : 'private';
 
         $stmt->bindParam(':original_name', $original_name);
         $stmt->bindParam(':description', $description);
@@ -234,7 +234,7 @@ class File extends BaseModel
      */
     public function updateAccessibility($fileId, string $accessibility): bool
     {
-        if (!in_array($accessibility, ['public', 'private'])) {
+        if (!in_array($accessibility, ['public', 'private', 'grand-public'])) {
             return false;
         }
 
