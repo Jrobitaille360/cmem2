@@ -16,6 +16,7 @@ use AuthGroups\Utils\Response;
  *   GET    /subscription/status[?app_id=xxx]  → SubscriptionController::getStatus()
  *   POST   /subscription/verify               → SubscriptionController::verify()
  *   POST   /subscription/checkout             → SubscriptionController::checkout()
+ *   POST   /subscription/portal               → SubscriptionController::portal()
  *   DELETE /subscription/cancel               → SubscriptionController::cancel()
  */
 class SubscriptionRouteHandler extends BaseRouteHandler
@@ -52,6 +53,10 @@ class SubscriptionRouteHandler extends BaseRouteHandler
             // POST /subscription/checkout
             ($method === 'POST' && $s1 === 'checkout') =>
                 $this->subscriptionController->checkout($request),
+
+            // POST /subscription/portal
+            ($method === 'POST' && $s1 === 'portal') =>
+                $this->subscriptionController->portal($request),
 
             // DELETE /subscription/cancel
             ($method === 'DELETE' && $s1 === 'cancel') =>

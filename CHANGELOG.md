@@ -7,7 +7,47 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-04-30 20:30]
+## [Unreleased]
+
+---
+
+## [2.5.0] — 2026-05-02
+
+### Portail de facturation Stripe
+
+#### Nouvel endpoint
+
+- **`POST /subscription/portal`** — crée une session Stripe Billing Portal pour un utilisateur
+  ayant un `stripe_customer` en base pour l'`app_id` fourni; retourne `{ portal_url }`
+- JWT obligatoire; `401` si absent, `404 NO_SUBSCRIPTION` si aucun customer Stripe trouvé,
+  `500 STRIPE_ERROR` en cas d'erreur Stripe
+
+#### Modèle `Subscription`
+
+- **`findStripeCustomerByUserAndApp(userId, appId)`** — nouvelle méthode ciblant
+  le couple `(user_id, app_id)` avec `stripe_customer IS NOT NULL`
+- **`upsert()`** — fix : `stripe_customer = COALESCE(VALUES(stripe_customer), stripe_customer)` —
+  la valeur existante est préservée si l'appelant (ex. `POST /subscription/verify`) ne fournit
+  pas de customer Stripe, évitant un écrasement silencieux
+
+#### Service `StripeService`
+
+- **`createPortalSession(customerId, appId)`** — appel HTTP natif vers
+  `/v1/billing_portal/sessions`; retourne `{ portal_url }`
+
+#### Tests `test_subscriptions.php`
+
+- **Section 14** — `POST /subscription/portal` : 401 (sans JWT), 422 (sans `app_id`),
+  404 `NO_SUBSCRIPTION`, 200 avec `portal_url` valide
+
+#### Documentation
+
+- **`docs/core/API_ENDPOINTS.json`** — ajout `POST /subscription/portal`,
+  `POST /subscription/checkout` (manquant), champs `is_trial`/`trial_end` dans
+  la réponse `/subscription/status`
+- **`docs/core/GUIDE.md`** — idem + sections exemples pour `checkout` et `portal`
+
+---
 
 ### Fichiers — niveau d'accessibilité `grand-public` (sans JWT)
 

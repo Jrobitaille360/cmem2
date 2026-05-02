@@ -2,7 +2,7 @@
     "name": "memories/cmem2-backend",
     "description": "Backend API pour l'application Memories v2",
     "type": "project",
-    "version": "2.4.1",
+    "version": "2.5.0",
     "license": "MIT",
     "require": {
         "php": ">=8.0",

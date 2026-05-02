@@ -446,7 +446,9 @@ Les endpoints `/subscription/*` permettent de gérer les abonnements Premium **p
 | --- | --- | --- | --- |
 | GET | `/subscription/status` | JWT | Statut Premium de toutes les apps |
 | GET | `/subscription/status?app_id={app}` | JWT | Statut Premium d'une app spécifique |
-| POST | `/subscription/verify` | JWT | Valider un achat et activer le Premium |
+| POST | `/subscription/verify` | JWT | Valider un achat provider et activer le Premium |
+| POST | `/subscription/checkout` | JWT | Créer une session Stripe Checkout (paiement web) |
+| POST | `/subscription/portal` | JWT | Ouvrir le portail Stripe pour gérer l'abonnement |
 | DELETE | `/subscription/cancel` | JWT | Annuler un abonnement |
 
 ### Structure de réponse
@@ -461,7 +463,43 @@ Chaque entrée `app_id` dans `subscriptions{}` retourne :
 | `provider` | string\|null | `stripe`, `google_play`, `apple`, `microsoft` |
 | `plan` | string\|null | `monthly` (+31 j) ou `yearly` (+365 j) |
 
+| `is_trial` | boolean | `true` si l'abonnement est en période d'essai |
+| `trial_end` | datetime\|null | Fin de la période d'essai UTC, ou `null` |
+
 > Utiliser `show_ads` (et non `is_premium`) pour décider d'afficher les publicités.
+
+### POST /subscription/checkout
+
+Crée une session Stripe Checkout avec essai gratuit de 7 jours. Retourne une URL à ouvrir dans le navigateur.
+
+```json
+{ "app_id": "puzzle", "plan": "monthly" }
+```
+
+Réponse `200` :
+
+```json
+{
+  "checkout_url": "https://checkout.stripe.com/c/pay/cs_test_...",
+  "session_id": "cs_test_..."
+}
+```
+
+### POST /subscription/portal
+
+Ouvre le Stripe Billing Portal pour qu'un utilisateur puisse gérer (modifier, annuler) son abonnement existant.
+
+```json
+{ "app_id": "puzzle" }
+```
+
+Réponse `200` :
+
+```json
+{ "portal_url": "https://billing.stripe.com/p/session/..." }
+```
+
+Retourne `404` avec `errors.error = "NO_SUBSCRIPTION"` si aucun `stripe_customer_id` n'est trouvé en base pour cet utilisateur + `app_id`.
 
 ### Providers supportés
 

@@ -5,6 +5,7 @@ namespace AuthGroups\Controllers;
 use AuthGroups\Services\SubscriptionService;
 use AuthGroups\Services\StripeService;
 use AuthGroups\Services\LogService;
+use AuthGroups\Models\Subscription;
 use AuthGroups\Utils\Response;
 use AuthGroups\Utils\Validator;
 use AuthGroups\Middleware\LoggingMiddleware;
@@ -18,6 +19,7 @@ use Exception;
  *   GET    /subscription/status?app_id=  → statut d'une app précise (JWT requis)
  *   POST   /subscription/verify          → validation provider + activation (JWT requis)
  *   POST   /subscription/checkout        → création session Stripe (JWT requis)
+ *   POST   /subscription/portal          → session Stripe Billing Portal (JWT requis)
  *   DELETE /subscription/cancel          → annulation d'un abonnement (JWT requis)
  */
 class SubscriptionController
@@ -181,6 +183,60 @@ class SubscriptionController
             ]);
             LoggingMiddleware::logExit(500);
             Response::error('Erreur lors de la création de la session de paiement', null, 500);
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // POST /subscription/portal
+    // Body : { app_id }   — JWT requis
+    // -----------------------------------------------------------------------
+
+    public function portal(array $request): void
+    {
+        LoggingMiddleware::logEntry();
+
+        $userId = (int) $request['user']['user_id'];
+        $input  = Response::getRequestParams();
+
+        $validation = Validator::validate($input, [
+            'app_id' => 'required|string',
+        ]);
+
+        if (!$validation['valid']) {
+            LoggingMiddleware::logExit(422);
+            Response::error('Données invalides', $validation['errors'], 422);
+            return;
+        }
+
+        $appId = trim($input['app_id']);
+
+        try {
+            $model      = new Subscription();
+            $customerId = $model->findStripeCustomerByUserAndApp($userId, $appId);
+
+            if (!$customerId) {
+                LoggingMiddleware::logExit(404);
+                Response::error('Aucun abonnement Stripe trouvé', ['error' => 'NO_SUBSCRIPTION'], 404);
+                return;
+            }
+
+            $result = StripeService::createPortalSession($customerId, $appId);
+
+            LogService::info('Session portail Stripe créée', [
+                'user_id' => $userId,
+                'app_id'  => $appId,
+            ]);
+
+            LoggingMiddleware::logExit(200);
+            Response::success('Session portail créée.', $result);
+
+        } catch (Exception $e) {
+            LogService::error('Erreur création session portail Stripe', [
+                'user_id' => $userId,
+                'error'   => $e->getMessage(),
+            ]);
+            LoggingMiddleware::logExit(500);
+            Response::error('Erreur lors de la création de la session portail', ['error' => 'STRIPE_ERROR'], 500);
         }
     }
 

@@ -1365,7 +1365,9 @@
                 "show_ads": "boolean",
                 "expires_at": "datetime|null",
                 "provider": "string|null",
-                "plan": "string|null"
+                "plan": "string|null",
+                "is_trial": "boolean",
+                "trial_end": "datetime|null"
               }
             }
           },
@@ -1387,7 +1389,9 @@
             "show_ads": "boolean",
             "expires_at": "datetime|null",
             "provider": "string|null",
-            "plan": "string|null"
+            "plan": "string|null",
+            "is_trial": "boolean",
+            "trial_end": "datetime|null"
           },
           "errors": {
             "401": "JWT absent ou invalide"
@@ -1418,6 +1422,52 @@
             "400": "Champ requis manquant, provider ou plan invalide",
             "401": "JWT absent ou invalide",
             "500": "Erreur lors de l'activation"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/subscription/checkout",
+          "description": "Créer une session Stripe Checkout (paiement web) — retourne une URL de redirection",
+          "auth_required": true,
+          "body": {
+            "app_id": "string (required) — identifiant de l'application (ex. puzzle)",
+            "plan": "string (required) — monthly | yearly"
+          },
+          "response": {
+            "checkout_url": "string — URL Stripe Checkout (redirection navigateur)",
+            "session_id": "string — identifiant de la session Stripe"
+          },
+          "notes": [
+            "Essai gratuit de 7 jours inclus automatiquement",
+            "Retourne 500 si STRIPE_SECRET_KEY non configuré"
+          ],
+          "errors": {
+            "401": "JWT absent ou invalide",
+            "422": "app_id ou plan manquant / plan invalide (valeurs : monthly, yearly)",
+            "500": "Erreur Stripe ou clé non configurée"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/subscription/portal",
+          "description": "Créer une session Stripe Billing Portal pour gérer l'abonnement existant — retourne une URL de redirection",
+          "auth_required": true,
+          "body": {
+            "app_id": "string (required) — identifiant de l'application (ex. puzzle)"
+          },
+          "response": {
+            "portal_url": "string — URL Stripe Billing Portal (redirection navigateur)"
+          },
+          "notes": [
+            "Nécessite qu'un stripe_customer_id existe en base pour cet utilisateur + app_id",
+            "Retourne 404 NO_SUBSCRIPTION si aucun abonnement Stripe trouvé",
+            "URL de retour après fermeture du portail : https://journauxdebord.com/{app_id}/subscription/manage-return"
+          ],
+          "errors": {
+            "401": "JWT absent ou invalide",
+            "404": "errors.error = NO_SUBSCRIPTION — aucun stripe_customer_id en base pour cet utilisateur",
+            "422": "app_id manquant",
+            "500": "errors.error = STRIPE_ERROR — erreur Stripe lors de la création de la session"
           }
         },
         {
