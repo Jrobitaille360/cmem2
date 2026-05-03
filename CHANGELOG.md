@@ -7,7 +7,18 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased]
+## [Unreleased 2026-05-03]
+
+### ICS — configuration
+
+- **`src/ics/config/.env.ics`** — `ICS_BASE_URL` commentée (valeur localhost
+  désactivée; l'URL de base principale est utilisée par défaut)
+
+### Documentation
+
+- PLAN files déplacés dans `docs/v-2-5-0/` (ancrage v2.5.0)
+- `docs/v-2-5-0/PR_BODY.md` — checklist de déploiement complétée (composer,
+  migration SQL, endpoint `/health`)
 
 ---
 

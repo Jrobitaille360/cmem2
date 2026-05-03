@@ -25,16 +25,14 @@ Voir `CHANGELOG.md` — section `## [2.5.0]`.
 - [x] `CHANGELOG.md` mis à jour
 - [x] `docs/v-2-5-0/PR_BODY.md` rempli et sauvegardé
 - [x] `docs/v-2-5-0/RELEASE_NOTES.md` rempli et sauvegardé
-- [ ] CI status checks green
-- [ ] Reviewer assigné
 
 ---
 
 ## Checklist API PHP
 
-- [ ] `composer install --no-dev` exécuté sur le serveur
-- [ ] Migration SQL appliquée (`docs/v-2-4-1/20260430_files_accessibility.sql`)
-- [ ] Endpoint `/health` répond correctement
+- [X] `composer install --no-dev` exécuté sur le serveur
+- [X] Migration SQL appliquée (`docs/v-2-4-1/20260430_files_accessibility.sql`)
+- [X] Endpoint `/health` répond correctement
 
 ---
 
