@@ -320,30 +320,87 @@ return $device;
 
 ---
 
-### Phase 2 — Observation en production
+### Phase 2 — Validation sandbox Play Store
 
-Priorité : moyenne. Durée recommandée : 4 à 6 semaines.
+Priorité : moyenne. À compléter avant le premier abonné réel Play Store.
 
-#### Actions
+Aucune période d'observation prolongée n'est nécessaire : aucun abonné Play Store
+n'existe en production. Un test sandbox bout en bout remplace les 4-6 semaines
+d'observation.
 
-- Vérifier dans les logs que tous les accès premium passent par `subscriptions`
-- Vérifier que les nouveaux achats Google Play ont une ligne dans `subscriptions`
-- Vérifier les renouvellements automatiques (Google notifie via RTDN ou re-validation)
-- Confirmer qu'aucun abonné ne reçoit `SUBSCRIPTION_REQUIRED` de façon inattendue
+#### 2.1 Prérequis
 
-#### Enjeux
+- Dans Google Play Console → **Setup → Licence testing** : ajouter l'adresse Gmail
+  du testeur dans la liste des licence testers.
+- Vérifier que `PUZZLE_GOOGLE_PLAY_PACKAGE` et `PUZZLE_GOOGLE_SERVICE_ACCOUNT_JSON`
+  sont corrects dans `.env` de l'environnement cible (staging ou prod selon le build).
+- Avoir un build Flutter signé avec le même keystore que la piste de test Play Store
+  (internal testing ou closed testing selon la configuration).
+- L'appareil de test doit être connecté avec le compte Gmail licence tester.
 
-- Si bug détecté : rollback = retrait du code Phase 1, données intactes dans les deux tables
+#### 2.2 Achat initial
+
+1. Lancer l'app Flutter sur l'appareil de test.
+2. Enregistrer l'appareil : `POST /puzzle/auth/register-device` → noter le `device_token`.
+3. Déclencher l'achat depuis l'app (plan `premium_monthly` ou `premium_yearly`).
+   Google Play retourne immédiatement un `purchaseToken` sandbox.
+4. L'app appelle `POST /puzzle/auth/verify-subscription` avec `purchase_token` et `product_id`.
+5. Vérifier en base que la table `subscriptions` contient une ligne avec :
+   - `purchase_token` = le token reçu
+   - `app_id` = `puzzle`
+   - `provider` = `google_play`
+   - `status` = `active`
+   - `is_premium` = 1
+   - `expires_at` dans le futur
+
+#### 2.3 Accès premium
+
+1. Appeler un endpoint premium (ex. `GET /puzzle/themes`) avec le `device_token`.
+2. Vérifier que la réponse est 200 (et non 403 `SUBSCRIPTION_REQUIRED`).
+3. Inspecter les logs serveur pour confirmer que `requireDeviceToken()` a trouvé
+   l'abonnement via `findActiveByPurchaseToken()`.
+
+#### 2.4 Renouvellement automatique sandbox
+
+Les abonnements sandbox se renouvellent toutes les **5 minutes** (mensuel) ou
+**30 minutes** (annuel) — Google les révoque après 6 renouvellements.
+
+1. Attendre un renouvellement (≥ 5 min pour monthly).
+2. Re-soumettre le même `purchase_token` via `POST /puzzle/auth/verify-subscription`.
+   Le `purchase_token` est stable à travers les renouvellements — `upsert()` doit
+   mettre à jour `expires_at` sans insérer de doublon.
+3. Vérifier en base que la ligne `subscriptions` est mise à jour (pas dupliquée),
+   `expires_at` prolongé.
+
+#### 2.5 Réinstallation (survie de l'abonnement)
+
+1. Désinstaller et réinstaller l'app.
+2. Enregistrer un nouvel appareil (`register-device`) → nouveau `device_token`.
+3. Google Play restaure l'achat au lancement — l'app re-soumet le même `purchase_token`.
+4. Vérifier que `GET /puzzle/themes` retourne 200 : l'abonnement est retrouvé dans
+   `subscriptions` via `purchase_token`, sans lien avec le device_token précédent.
+
+#### 2.6 Upgrade / downgrade
+
+1. Souscrire un second plan depuis l'app (ex. passer de monthly à yearly).
+   Google Play génère un **nouveau** `purchaseToken` et un `linkedPurchaseToken`
+   pointant vers l'ancien.
+2. L'app appelle `POST /puzzle/auth/verify-subscription` avec le nouveau token.
+3. Vérifier en base :
+   - L'ancienne ligne `subscriptions` a `status = expired` (via `expireByPurchaseToken`).
+   - Une nouvelle ligne est active avec le nouveau `purchase_token` et `plan = yearly`.
 
 #### Conditions de complétion
 
-- [ ] Zéro anomalie premium sur 4 semaines consécutives
-- [ ] Tous les nouveaux abonnements Google Play ont `purchase_token` dans `subscriptions`
-- [ ] Les renouvellements Stripe webhook mettent correctement à jour `subscriptions`
+- [ ] Ligne `subscriptions` créée après premier achat sandbox
+- [ ] Accès premium confirmé via `findActiveByPurchaseToken()` (vérifier logs)
+- [ ] Renouvellement sandbox met à jour `expires_at` sans doublon
+- [ ] Réinstallation : accès premium retrouvé avec le même `purchase_token`
+- [ ] Upgrade : ancien token expiré, nouveau token actif
 
 ---
 
-### Phase 3 — Nettoyage (après stabilisation)
+### Phase 3 — Nettoyage (après Phase 2 complétée)
 
 Priorité : basse. Ne déployer qu'après Phase 2 complétée.
 
