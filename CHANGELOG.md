@@ -7,6 +7,30 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-05-05]
+
+### Puzzle — Simplification abonnements Phase 1
+
+- **`subscriptions` source unique de vérité** — `POST /puzzle/auth/verify-subscription` écrit dans
+  `subscriptions` via `SubscriptionService::activatePremium()` au lieu de `PuzzleDevice::updateSubscription()`
+- **Upgrade/downgrade Google Play** — `linked_purchase_token` reçu de Google expire l'ancien
+  abonnement via `Subscription::expireByPurchaseToken()` avant activation du nouveau
+- **Device anonyme** — `PuzzleRouteHandler::requireDeviceToken()` consulte `subscriptions`
+  par `purchase_token` pour les appareils sans `user_id` (en plus du lookup existant par `user_id`)
+- **`GooglePlayService::validateSubscription()`** — retourne `linked_purchase_token`
+  (`linkedPurchaseToken` de l'API Google)
+- **`Subscription::findActiveByPurchaseToken(string $purchaseToken, string $appId): ?array`** — nouvelle méthode
+- **`Subscription::expireByPurchaseToken(string $purchaseToken): void`** — nouvelle méthode
+- **`SubscriptionService::activatePremium(?int $userId, ...)`** — accepte `null` pour les devices anonymes
+- **Migration SQL** — `docs/20260505_subscriptions_purchase_token_unique.sql` :
+  contrainte `uq_purchase_token_app (purchase_token, app_id)` +
+  `INSERT IGNORE` des devices Google Play existants vers `subscriptions`
+- **Documentation** — `docs/puzzle/API_PUZZLE_ENDPOINTS.json` v1.1.0, `docs/puzzle/GUIDE.md` v1.1.0,
+  `docs/puzzle/API_PUZZLE_ADMIN_MANAGER.json` v1.0.4, `docs/core/API_ENDPOINTS.json`,
+  `docs/core/GUIDE.md` mis à jour
+
+---
+
 ## [Unreleased 2026-05-03]
 
 ### ICS — configuration

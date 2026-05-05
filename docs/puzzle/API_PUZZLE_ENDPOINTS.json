@@ -1,10 +1,10 @@
 {
   "api": {
     "name": "Puzzle API",
-    "version": "1.0.0",
-    "description": "Plugin puzzle sans compte : carrousel d'images, thèmes, sauvegarde en ligne, casse-têtes partagés en temps réel. Authentification par token d'appareil opaque, abonnement Google Play.",
+    "version": "1.1.0",
+    "description": "Plugin puzzle sans compte : carrousel d'images, thèmes, sauvegarde en ligne, casse-têtes partagés en temps réel. Authentification par token d'appareil opaque, abonnement Google Play. Depuis v1.1.0 : la table `subscriptions` est la source unique de vérité pour le statut premium (lookup par user_id ou purchase_token).",
     "generated": "2026-04-06",
-    "reviewed": "2026-04-06",
+    "reviewed": "2026-05-05",
     "base_url": "/puzzle",
     "authentication": {
       "types": ["DEVICE_TOKEN", "NONE"],
@@ -13,7 +13,7 @@
         "description": "Token opaque 64 chars obtenu via POST /puzzle/auth/register-device. Durée de vie 365 jours. Renvoyé automatiquement à chaque re-registration du même device_uuid."
       },
       "premium": {
-        "description": "Certains endpoints nécessitent en plus is_premium = 1 et premium_expires_at > NOW(). Erreur 403 SUBSCRIPTION_REQUIRED sinon."
+        "description": "Certains endpoints nécessitent un abonnement actif. Le statut premium est lu depuis la table `subscriptions` : par user_id si le device est lié à un compte, par purchase_token sinon. Erreur 403 SUBSCRIPTION_REQUIRED si aucun abonnement actif trouvé."
       },
       "none": {
         "description": "POST /puzzle/auth/register-device est accessible sans authentification."
@@ -43,9 +43,9 @@
           "path": "/puzzle/auth/verify-subscription",
           "auth_required": true,
           "auth_type": "DEVICE_TOKEN",
-          "description": "Valide un achat d'abonnement Google Play auprès de l'API Google Play Developer. Marque l'appareil premium si valide. À appeler à chaque démarrage de l'app pour confirmer que l'abonnement est actif.",
+          "description": "Valide un achat d'abonnement Google Play auprès de l'API Google Play Developer. Enregistre l'abonnement dans la table `subscriptions` (source unique de vérité) via purchase_token. Gère automatiquement les upgrades/downgrades (linked_purchase_token). À appeler à chaque démarrage de l'app pour confirmer que l'abonnement est actif.",
           "body": {
-            "purchase_token": "string (required) — Token reçu de Google Play après achat",
+            "purchase_token": "string (required) — Token reçu de Google Play après achat. Stable à travers les renouvellements automatiques.",
             "product_id": "string (required) — 'premium_monthly' | 'premium_yearly'"
           },
           "responses": {
@@ -54,7 +54,7 @@
             "401": "device_token absent ou expiré — code DEVICE_NOT_FOUND",
             "422": "purchase_token ou product_id absent | product_id invalide — code SUBSCRIPTION_INVALID"
           },
-          "client_notes": "Si is_premium = false, repasser l'app en mode gratuit sans afficher d'erreur. Si is_premium = true, déverrouiller les fonctionnalités premium."
+          "client_notes": "Si is_premium = false, repasser l'app en mode gratuit sans afficher d'erreur. Si is_premium = true, déverrouiller les fonctionnalités premium. L'abonnement est lié au purchase_token, pas au device : il survit à une réinstallation."
         },
         {
           "method": "POST",

@@ -433,12 +433,15 @@ Format standard de toutes les réponses d'erreur :
 | [MIGRATION_CLIENT_v2_0_0.md](MIGRATION_CLIENT_v2_0_0.md) | Guide client v2.0 |
 | [create_proc_reset_auth_groups.sql](create_proc_reset_auth_groups.sql) | Procédure reset données test |
 | [migrations/20260409_subscriptions.sql](migrations/20260409_subscriptions.sql) | Table `subscriptions` (v2.2.4) |
+| [../20260505_subscriptions_purchase_token_unique.sql](../20260505_subscriptions_purchase_token_unique.sql) | Contrainte `uq_purchase_token_app` + migration devices Google Play (v2.5.0) |
 
 ---
 
 ## Abonnements Premium
 
 Les endpoints `/subscription/*` permettent de gérer les abonnements Premium **par application** (`app_id`). L'accès Premium est indépendant pour chaque app : un utilisateur peut être Premium pour `puzzle` mais pas pour `quiz`.
+
+La table `subscriptions` est la **source unique de vérité** pour tous les providers. Pour Google Play (plugin Puzzle), le lookup s'effectue par `purchase_token + app_id` — l'abonnement est donc lié à l'achat, pas à l'appareil, et survit à une réinstallation.
 
 ### Endpoints
 

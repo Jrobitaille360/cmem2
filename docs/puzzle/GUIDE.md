@@ -1,6 +1,6 @@
 # Guide — Plugin Puzzle (client mobile)
 
-Version 1.0.0 · Base URL : `/puzzle`
+Version 1.1.0 · Base URL : `/puzzle`
 
 > Référence complète : [API_PUZZLE_ENDPOINTS.json](API_PUZZLE_ENDPOINTS.json)
 > Guide admin images : [guide_image_manager.md](guide_image_manager.md)
@@ -123,6 +123,8 @@ Réponse :
 ## Abonnement premium
 
 L'abonnement Google Play doit être validé côté serveur à chaque démarrage de l'app.
+Le serveur enregistre l'abonnement dans la table `subscriptions` (source unique de vérité).
+L'accès premium est ensuite retrouvé par `purchase_token` — il **survit à une réinstallation**.
 
 ### Valider un achat
 
@@ -153,6 +155,13 @@ Réponses :
 
 > Si `is_premium = false`, repasser l'app en mode gratuit sans afficher d'erreur.
 > Si `is_premium = true`, déverrouiller les fonctionnalités premium.
+
+**Upgrade / downgrade** : Google Play génère un nouveau `purchaseToken` lors d'un changement
+de plan et inclut `linkedPurchaseToken` pointant vers l'ancien. Le serveur expire automatiquement
+l'ancien abonnement — aucun traitement particulier côté client.
+
+**Réinstallation** : Google Play restaure l'achat au premier lancement. Re-soumettre le même
+`purchase_token` restaure l'accès premium sur le nouvel appareil.
 
 ---
 
