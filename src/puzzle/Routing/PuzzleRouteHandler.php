@@ -2,6 +2,7 @@
 
 namespace Puzzle\Routing;
 
+use AuthGroups\Models\Subscription;
 use AuthGroups\Routing\BaseRouteHandler;
 use AuthGroups\Utils\Response;
 use Puzzle\Controllers\AdminController;
@@ -320,6 +321,23 @@ class PuzzleRouteHandler extends BaseRouteHandler
 
         // Mettre à jour last_seen_at (fire and forget)
         (new PuzzleDevice())->touchLastSeen((int) $device['id']);
+
+        if (!empty($device['user_id'])) {
+            // Device lié à un compte : subscription par user_id (Stripe ou Google Play connecté)
+            $sub = (new Subscription())->findActive((int) $device['user_id'], 'puzzle');
+        } elseif (!empty($device['purchase_token'])) {
+            // Device anonyme : subscription par purchase_token (Google Play)
+            $sub = (new Subscription())->findActiveByPurchaseToken(
+                $device['purchase_token'], 'puzzle'
+            );
+        } else {
+            $sub = null;
+        }
+
+        if ($sub !== null) {
+            $device['is_premium']         = 1;
+            $device['premium_expires_at'] = $sub['expires_at'];
+        }
 
         return $device;
     }

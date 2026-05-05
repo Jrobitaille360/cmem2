@@ -43,6 +43,33 @@ class Subscription extends BaseModel
     // -----------------------------------------------------------------------
 
     /**
+     * Retourne l'abonnement actif pour un purchase_token et un app_id, ou null.
+     */
+    public function findActiveByPurchaseToken(string $purchaseToken, string $appId): ?array
+    {
+        $stmt = $this->getDb()->prepare("
+            SELECT * FROM {$this->table}
+            WHERE purchase_token = ? AND app_id = ? AND status = 'active' AND expires_at > NOW()
+            LIMIT 1
+        ");
+        $stmt->execute([$purchaseToken, $appId]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    /**
+     * Passe au statut 'expired' l'abonnement actif identifié par purchase_token.
+     */
+    public function expireByPurchaseToken(string $purchaseToken): void
+    {
+        $stmt = $this->getDb()->prepare("
+            UPDATE {$this->table}
+            SET status = 'expired', is_premium = 0, show_ads = 1, updated_at = NOW()
+            WHERE purchase_token = ? AND status = 'active'
+        ");
+        $stmt->execute([$purchaseToken]);
+    }
+
+    /**
      * Retourne l'abonnement actif pour un couple (user_id, app_id), ou null.
      */
     public function findActive(int $userId, string $appId): ?array

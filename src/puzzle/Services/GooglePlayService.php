@@ -96,14 +96,15 @@ class GooglePlayService
         $userId       = $obfuscatedId !== null ? (int) $obfuscatedId : null;
 
         return [
-            'is_premium'     => $isPremium ? 1 : 0,
-            'show_ads'       => $isPremium ? 0 : 1,
-            'is_trial'       => $isTrial   ? 1 : 0,
-            'trial_end'      => $trialEnd,
-            'product_id'     => $lineItem['productId'] ?? $productId,
-            'purchase_token' => $purchaseToken,
-            'expires_at'     => $expiresAt,
-            'user_id'        => $userId,
+            'is_premium'            => $isPremium ? 1 : 0,
+            'show_ads'              => $isPremium ? 0 : 1,
+            'is_trial'              => $isTrial   ? 1 : 0,
+            'trial_end'             => $trialEnd,
+            'product_id'            => $lineItem['productId'] ?? $productId,
+            'purchase_token'        => $purchaseToken,
+            'expires_at'            => $expiresAt,
+            'user_id'               => $userId,
+            'linked_purchase_token' => $data['linkedPurchaseToken'] ?? null,
         ];
     }
 
