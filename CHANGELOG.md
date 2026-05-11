@@ -9,6 +9,11 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased 2026-05-11]
 
+### Déploiement — Traçabilité version déployée
+
+- **`private/deploy.ps1`** (étape 4/4) — injecte `APP_COMMIT` (hash git court) et `APP_DEPLOYED_AT` (timestamp ISO) dans le `.env` distant à chaque déploiement
+- **`.env.example`** — nouvelles variables `APP_COMMIT` et `APP_DEPLOYED_AT` documentées
+
 ### Puzzle — Sync statut Google Play sur GET /subscription/status
 
 - **`SubscriptionController::getStatus()`** — re-vérifie l'état d'un abonnement `google_play` auprès de l'API Google Play Developer à chaque appel `GET /subscription/status?app_id=puzzle`; met à jour `is_premium` et `expires_at` en base de données; fail-safe : valeur DB conservée si Google Play est inaccessible
