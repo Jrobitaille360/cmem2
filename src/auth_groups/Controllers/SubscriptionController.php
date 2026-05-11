@@ -37,6 +37,14 @@ class SubscriptionController
 
         if ($appId !== '') {
             $status = SubscriptionService::getStatus($userId, $appId);
+
+            if ($status['provider'] === 'google_play' && class_exists(\Puzzle\Services\GooglePlayService::class)) {
+                $active = (new Subscription())->findActive($userId, $appId);
+                if ($active && !empty($active['purchase_token'])) {
+                    $status = $this->syncGooglePlayStatus($userId, $appId, $status, $active);
+                }
+            }
+
             LoggingMiddleware::logExit(200);
             Response::success('Statut Premium récupéré', ['app_id' => $appId] + $status);
             return;
@@ -45,6 +53,59 @@ class SubscriptionController
         $statuses = SubscriptionService::getAllStatuses($userId);
         LoggingMiddleware::logExit(200);
         Response::success('Statuts Premium récupérés', ['subscriptions' => $statuses]);
+    }
+
+    private function syncGooglePlayStatus(int $userId, string $appId, array $status, array $active): array
+    {
+        try {
+            $result = (new \Puzzle\Services\GooglePlayService())->validateSubscription(
+                $active['purchase_token'],
+                $active['product_id'] ?? ''
+            );
+
+            if ($result === null) {
+                LogService::warning('GooglePlay sync échoué (fail-safe) — statut DB conservé', [
+                    'user_id' => $userId,
+                    'app_id'  => $appId,
+                ]);
+                return $status;
+            }
+
+            $isPremium = (bool) $result['is_premium'];
+            $expiresAt = $result['expires_at'];
+
+            (new Subscription())->renewByPurchaseToken(
+                $active['purchase_token'],
+                $appId,
+                $expiresAt,
+                $isPremium
+            );
+
+            LogService::info('GooglePlay sync — statut mis à jour', [
+                'user_id'    => $userId,
+                'app_id'     => $appId,
+                'is_premium' => $isPremium,
+                'expires_at' => $expiresAt,
+            ]);
+
+            return [
+                'is_premium' => $isPremium,
+                'show_ads'   => !$isPremium,
+                'is_trial'   => (bool) ($result['is_trial'] ?? false),
+                'trial_end'  => $result['trial_end'] ?? null,
+                'expires_at' => $expiresAt,
+                'provider'   => 'google_play',
+                'plan'       => $status['plan'],
+            ];
+
+        } catch (\Throwable $e) {
+            LogService::warning('GooglePlay sync exception (fail-safe)', [
+                'user_id' => $userId,
+                'app_id'  => $appId,
+                'error'   => $e->getMessage(),
+            ]);
+            return $status;
+        }
     }
 
     // -----------------------------------------------------------------------

@@ -9,6 +9,12 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased 2026-05-11]
 
+### Puzzle — Sync statut Google Play sur GET /subscription/status
+
+- **`SubscriptionController::getStatus()`** — re-vérifie l'état d'un abonnement `google_play` auprès de l'API Google Play Developer à chaque appel `GET /subscription/status?app_id=puzzle`; met à jour `is_premium` et `expires_at` en base de données; fail-safe : valeur DB conservée si Google Play est inaccessible
+- **`SubscriptionController::syncGooglePlayStatus()`** — méthode privée encapsulant la logique de sync (appel `GooglePlayService::validateSubscription`, mise à jour via `Subscription::renewByPurchaseToken`, logging)
+- **`purchase_token` et `product_id`** jamais exposés dans la réponse de l'endpoint
+
 ### Maintenance — Rapport courriel conditionnel
 
 - **`MaintenanceReport::send()`** — courriel envoyé uniquement si des erreurs sont détectées; en l'absence d'erreur, seul le log fichier est écrit
