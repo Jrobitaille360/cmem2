@@ -86,16 +86,29 @@ class AuthController
         // user_id disponible si Flutter a transmis obfuscatedExternalAccountId à l'achat
         $userId = !empty($result['user_id']) ? (int) $result['user_id'] : null;
 
-        SubscriptionService::activatePremium($userId, 'puzzle', [
-            'purchase_token' => $result['purchase_token'],
-            'provider'       => 'google_play',
-            'product_id'     => $result['product_id'],
-            'plan'           => str_contains($result['product_id'], 'yearly') ? 'yearly' : 'monthly',
-            'is_trial'       => $result['is_trial'],
-            'trial_end'      => $result['trial_end'],
-            'started_at'     => date('Y-m-d H:i:s'),
-            'expires_at'     => $result['expires_at'],
-        ]);
+        $subModel = new Subscription();
+        $existing = $subModel->findByPurchaseToken($result['purchase_token'], 'puzzle');
+
+        if ($existing !== null) {
+            // Re-verify : mettre à jour expires_at et status directement par purchase_token
+            $subModel->renewByPurchaseToken(
+                $result['purchase_token'],
+                'puzzle',
+                $result['expires_at'],
+                (bool) $result['is_premium']
+            );
+        } else {
+            SubscriptionService::activatePremium($userId, 'puzzle', [
+                'purchase_token' => $result['purchase_token'],
+                'provider'       => 'google_play',
+                'product_id'     => $result['product_id'],
+                'plan'           => str_contains($result['product_id'], 'yearly') ? 'yearly' : 'monthly',
+                'is_trial'       => $result['is_trial'],
+                'trial_end'      => $result['trial_end'],
+                'started_at'     => date('Y-m-d H:i:s'),
+                'expires_at'     => $result['expires_at'],
+            ]);
+        }
 
         LoggingMiddleware::logExit(200);
         Response::success(

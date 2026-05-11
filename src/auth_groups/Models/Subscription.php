@@ -43,6 +43,39 @@ class Subscription extends BaseModel
     // -----------------------------------------------------------------------
 
     /**
+     * Retourne l'abonnement (tous statuts) pour un purchase_token et un app_id, ou null.
+     */
+    public function findByPurchaseToken(string $purchaseToken, string $appId): ?array
+    {
+        $stmt = $this->getDb()->prepare("
+            SELECT * FROM {$this->table}
+            WHERE purchase_token = ? AND app_id = ?
+            LIMIT 1
+        ");
+        $stmt->execute([$purchaseToken, $appId]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    /**
+     * Met à jour expires_at et status d'un abonnement existant identifié par purchase_token.
+     * Utilisé lors d'un re-verify Google Play pour refléter le renouvellement.
+     */
+    public function renewByPurchaseToken(
+        string $purchaseToken,
+        string $appId,
+        string $expiresAt,
+        bool   $isPremium
+    ): void {
+        $status = $isPremium ? 'active' : 'expired';
+        $stmt   = $this->getDb()->prepare("
+            UPDATE {$this->table}
+            SET expires_at = ?, status = ?, is_premium = ?, show_ads = ?, updated_at = NOW()
+            WHERE purchase_token = ? AND app_id = ?
+        ");
+        $stmt->execute([$expiresAt, $status, $isPremium ? 1 : 0, $isPremium ? 0 : 1, $purchaseToken, $appId]);
+    }
+
+    /**
      * Retourne l'abonnement actif pour un purchase_token et un app_id, ou null.
      */
     public function findActiveByPurchaseToken(string $purchaseToken, string $appId): ?array
