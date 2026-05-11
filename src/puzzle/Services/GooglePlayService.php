@@ -2,6 +2,8 @@
 
 namespace Puzzle\Services;
 
+use AuthGroups\Services\LogService;
+
 /**
  * GooglePlayService — valide un purchase_token via Google Play Developer API.
  *
@@ -62,11 +64,19 @@ class GooglePlayService
 
         $response = @file_get_contents($url, false, $ctx);
         if ($response === false) {
+            LogService::error('GooglePlay: appel API échoué (réseau)', [
+                'url'     => $url,
+                'package' => $this->package,
+            ]);
             return null;
         }
 
         $data = json_decode($response, true);
         if (!is_array($data) || isset($data['error'])) {
+            LogService::error('GooglePlay: réponse API invalide ou erreur', [
+                'package'  => $this->package,
+                'response' => $data,
+            ]);
             return null;
         }
 
@@ -96,14 +106,15 @@ class GooglePlayService
         $userId       = $obfuscatedId !== null ? (int) $obfuscatedId : null;
 
         return [
-            'is_premium'     => $isPremium ? 1 : 0,
-            'show_ads'       => $isPremium ? 0 : 1,
-            'is_trial'       => $isTrial   ? 1 : 0,
-            'trial_end'      => $trialEnd,
-            'product_id'     => $lineItem['productId'] ?? $productId,
-            'purchase_token' => $purchaseToken,
-            'expires_at'     => $expiresAt,
-            'user_id'        => $userId,
+            'is_premium'            => $isPremium ? 1 : 0,
+            'show_ads'              => $isPremium ? 0 : 1,
+            'is_trial'              => $isTrial   ? 1 : 0,
+            'trial_end'             => $trialEnd,
+            'product_id'            => $lineItem['productId'] ?? $productId,
+            'purchase_token'        => $purchaseToken,
+            'expires_at'            => $expiresAt,
+            'user_id'               => $userId,
+            'linked_purchase_token' => $data['linkedPurchaseToken'] ?? null,
         ];
     }
 
@@ -155,10 +166,21 @@ class GooglePlayService
 
         $response = @file_get_contents('https://oauth2.googleapis.com/token', false, $ctx);
         if ($response === false) {
+            LogService::error('GooglePlay: OAuth token exchange échoué (réseau)', [
+                'client_email' => $sa['client_email'],
+            ]);
             return null;
         }
 
         $token = json_decode($response, true);
-        return $token['access_token'] ?? null;
+        if (empty($token['access_token'])) {
+            LogService::error('GooglePlay: OAuth token exchange rejeté', [
+                'client_email' => $sa['client_email'],
+                'response'     => $token,
+            ]);
+            return null;
+        }
+
+        return $token['access_token'];
     }
 }

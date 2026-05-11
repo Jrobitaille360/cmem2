@@ -1499,6 +1499,9 @@
     "tables_removed": [
       "api_keys — système de clés API retiré (v2.1.1), remplacé par JWT",
       "user_sessions.api_key_id — colonne retirée (v2.1.1)"
+    ],
+    "pending_migrations": [
+      "docs/20260505_subscriptions_purchase_token_unique.sql — contrainte UNIQUE uq_purchase_token_app (purchase_token, app_id) sur la table subscriptions + migration INSERT IGNORE des devices Google Play existants"
     ]
   }
 }

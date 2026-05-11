@@ -1,11 +1,11 @@
 {
   "api": {
     "name": "Puzzle Admin API",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "description": "API d'administration du plugin Puzzle. Destinée au SPA React puzzle_images_manager. Permet la gestion complète des images du carrousel et des thèmes premium (CRUD, upload GD, tri, association image-thème).",
     "generated": "2026-04-06",
-    "reviewed": "2026-04-06",
-    "review_notes": "v1.0.3 — livraison images admin via /puzzle/admin/thumb|image (JWT) au lieu de /puzzle/thumb|image (device_token). v1.0.2 — per_page default 50 (min 10), PUT reorder attend [{uid,sort_order}] et retourne {updated}, PUT image/{uid} retourne l'objet complet + champs sort_order/is_carousel acceptés, DELETE messages avec point final, GET/POST themes incluent sort_order+status (pas created_at), PUT theme/{slug} retourne objet complet, PUT themes/{slug}/images retourne {count}.",
+    "reviewed": "2026-05-05",
+    "review_notes": "v1.0.4 — aucun changement de contrat endpoint ; révision suite simplification subscriptions (v1.1.0 Puzzle API). v1.0.3 — livraison images admin via /puzzle/admin/thumb|image (JWT) au lieu de /puzzle/thumb|image (device_token). v1.0.2 — per_page default 50 (min 10), PUT reorder attend [{uid,sort_order}] et retourne {updated}, PUT image/{uid} retourne l'objet complet + champs sort_order/is_carousel acceptés, DELETE messages avec point final, GET/POST themes incluent sort_order+status (pas created_at), PUT theme/{slug} retourne objet complet, PUT themes/{slug}/images retourne {count}.",
     "base_url": "/puzzle/admin",
     "authentication": {
       "types": ["JWT_BEARER"],

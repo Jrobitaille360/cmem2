@@ -37,7 +37,7 @@ class SubscriptionService
      *   trial_end       : string|null (Y-m-d H:i:s)
      * }
      */
-    public static function activatePremium(int $userId, string $appId, array $data): void
+    public static function activatePremium(?int $userId, string $appId, array $data): void
     {
         $model = new Subscription();
         $model->upsert(array_merge([

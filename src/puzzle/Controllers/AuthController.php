@@ -3,6 +3,8 @@
 namespace Puzzle\Controllers;
 
 use AuthGroups\Middleware\LoggingMiddleware;
+use AuthGroups\Models\Subscription;
+use AuthGroups\Services\SubscriptionService;
 use AuthGroups\Utils\Response;
 use Puzzle\Models\PuzzleDevice;
 use Puzzle\Services\DeviceTokenService;
@@ -76,11 +78,23 @@ class AuthController
             return;
         }
 
-        (new PuzzleDevice())->updateSubscription((int) $device['id'], [
-            'is_premium'     => $result['is_premium'],
+        // Upgrade/downgrade : expirer l'ancien abonnement lié
+        if (!empty($result['linked_purchase_token'])) {
+            (new Subscription())->expireByPurchaseToken($result['linked_purchase_token']);
+        }
+
+        // user_id disponible si Flutter a transmis obfuscatedExternalAccountId à l'achat
+        $userId = !empty($result['user_id']) ? (int) $result['user_id'] : null;
+
+        SubscriptionService::activatePremium($userId, 'puzzle', [
             'purchase_token' => $result['purchase_token'],
+            'provider'       => 'google_play',
             'product_id'     => $result['product_id'],
-            'premium_expires_at' => $result['expires_at'],
+            'plan'           => str_contains($result['product_id'], 'yearly') ? 'yearly' : 'monthly',
+            'is_trial'       => $result['is_trial'],
+            'trial_end'      => $result['trial_end'],
+            'started_at'     => date('Y-m-d H:i:s'),
+            'expires_at'     => $result['expires_at'],
         ]);
 
         LoggingMiddleware::logExit(200);
@@ -92,6 +106,35 @@ class AuthController
                 'expires_at' => date('c', strtotime($result['expires_at'])),
             ]
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // POST /puzzle/auth/link-device  (JWT cmem2)
+    // -----------------------------------------------------------------------
+
+    public function linkDevice(array $user): void
+    {
+        LoggingMiddleware::logEntry();
+        $input = Response::getRequestParams();
+
+        $deviceToken = trim($input['device_token'] ?? '');
+        if ($deviceToken === '') {
+            LoggingMiddleware::logExit(422);
+            Response::error('device_token requis', ['field' => 'device_token'], 422);
+            return;
+        }
+
+        $device = (new PuzzleDevice())->findByValidToken($deviceToken);
+        if ($device === null) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Token d\'appareil inconnu ou expiré', ['code' => 'DEVICE_NOT_FOUND'], 404);
+            return;
+        }
+
+        (new PuzzleDevice())->setUserId((int) $device['id'], (int) $user['user_id']);
+
+        LoggingMiddleware::logExit(200);
+        Response::success('Appareil lié au compte', ['device_id' => (int) $device['id']]);
     }
 
     // -----------------------------------------------------------------------

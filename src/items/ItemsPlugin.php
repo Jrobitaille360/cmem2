@@ -12,11 +12,6 @@ class ItemsPlugin extends AbstractPlugin
     {
         PluginManager::getInstance()->registerPluginRoutes('items', $this->getRouteHandlers());
 
-        if (defined('LOG_ENABLED') && LOG_ENABLED) {
-            $this->safeLog('info', 'Plugin Items initialisé', [
-                'version' => $this->getInfo()['version']
-            ]);
-        }
     }
 
     public function getRouteHandlers(): array

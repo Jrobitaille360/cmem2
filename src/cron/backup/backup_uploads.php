@@ -66,21 +66,26 @@ $lastFullFile = "{$destDir}/uploads_last_full.txt";
 $lastFullTime = file_exists($lastFullFile) ? (int) file_get_contents($lastFullFile) : 0;
 $doFull       = (time() - $lastFullTime) >= (90 * 86400);
 
+if (!function_exists('exec')) {
+    echo "[{$date}] backup_uploads ERREUR | exec() désactivé sur ce serveur\n";
+    exit(1);
+}
+
 try {
     if ($doFull) {
         // ====== BACKUP COMPLET ======
-        $stamp   = date('Ym');
-        $tarBase = "{$destDir}/uploads_full_{$stamp}.tar";
-        $tarGz   = "{$tarBase}.gz";
+        $stamp = date('Ym');
+        $tarGz = "{$destDir}/uploads_full_{$stamp}.tar.gz";
 
-        $phar = new PharData($tarBase);
-        $phar->buildFromDirectory($uploadDir);
-        // Si une archive compressée existe déjà, la supprimer avant conversion
         if (file_exists($tarGz)) {
             unlink($tarGz);
         }
-        $phar->compress(Phar::GZ);
-        unlink($tarBase);
+
+        $cmd = sprintf('tar -czf %s -C %s . 2>&1', escapeshellarg($tarGz), escapeshellarg($uploadDir));
+        exec($cmd, $output, $returnCode);
+        if ($returnCode !== 0) {
+            throw new \RuntimeException('tar failed: ' . implode("\n", $output));
+        }
 
         // Supprimer les anciens incrémentiels
         foreach (glob("{$destDir}/uploads_incr_*.tar.gz") ?: [] as $old) {
@@ -90,9 +95,8 @@ try {
         // Mettre à jour le marqueur
         file_put_contents($lastFullFile, (string) time());
 
-        $sizeOctets = filesize($tarGz);
-        $sizeMo     = round($sizeOctets / 1048576, 1);
-        $elapsed    = round(microtime(true) - $startTime, 1);
+        $sizeMo  = round(filesize($tarGz) / 1048576, 1);
+        $elapsed = round(microtime(true) - $startTime, 1);
 
         echo "[{$date}] backup_uploads complet OK | {$sizeMo} Mo | {$elapsed}s\n";
 
@@ -101,57 +105,47 @@ try {
         $lastIncrFile = "{$destDir}/uploads_last_incr.txt";
         $lastIncrTime = file_exists($lastIncrFile) ? (int) file_get_contents($lastIncrFile) : $lastFullTime;
 
-        $stamp   = date('Ymd');
-        $tarBase = "{$destDir}/uploads_incr_{$stamp}.tar";
-        $tarGz   = "{$tarBase}.gz";
+        $stamp = date('Ymd');
+        $tarGz = "{$destDir}/uploads_incr_{$stamp}.tar.gz";
 
-        // Collecter les fichiers modifiés depuis la dernière sauvegarde
-        $newFiles = 0;
-        $phar     = new PharData($tarBase);
-
-        $it = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($uploadDir, FilesystemIterator::SKIP_DOTS)
-        );
-
-        foreach ($it as $file) {
-            if ($file->isFile() && $file->getMTime() > $lastIncrTime) {
-                $relative = ltrim(str_replace($uploadDir, '', $file->getPathname()), '/\\');
-                $phar->addFile($file->getPathname(), $relative);
-                $newFiles++;
-            }
+        if (file_exists($tarGz)) {
+            unlink($tarGz);
         }
 
+        // --newer-mtime filtre les fichiers non modifiés depuis la dernière sauvegarde
+        $sinceDate = date('Y-m-d H:i:s', $lastIncrTime);
+        $cmd = sprintf(
+            'tar -czf %s --newer-mtime=%s -C %s . 2>&1',
+            escapeshellarg($tarGz),
+            escapeshellarg($sinceDate),
+            escapeshellarg($uploadDir)
+        );
+        exec($cmd, $output, $returnCode);
+        if ($returnCode !== 0) {
+            throw new \RuntimeException('tar failed: ' . implode("\n", $output));
+        }
+
+        // Compter les fichiers archivés (exclure les entrées de répertoires)
+        exec(sprintf('tar -tzf %s 2>&1', escapeshellarg($tarGz)), $contents, $listCode);
+        $newFiles = $listCode === 0
+            ? count(array_filter($contents, static fn($f) => !str_ends_with($f, '/')))
+            : 0;
+
         if ($newFiles === 0) {
-            // Rien de nouveau — pas de fichier créé
-            unset($phar);
-            if (file_exists($tarBase)) {
-                unlink($tarBase);
-            }
+            unlink($tarGz);
             $elapsed = round(microtime(true) - $startTime, 1);
             echo "[{$date}] backup_uploads incr OK | 0 nouveau fichier | {$elapsed}s\n";
         } else {
-            // Si une archive compressée existe déjà, la supprimer avant conversion
-            if (file_exists($tarGz)) {
-                unlink($tarGz);
-            }
-            $phar->compress(Phar::GZ);
-            unlink($tarBase);
-
             file_put_contents($lastIncrFile, (string) time());
 
-            $sizeOctets = filesize($tarGz);
-            $sizeMo     = round($sizeOctets / 1048576, 1);
-            $elapsed    = round(microtime(true) - $startTime, 1);
+            $sizeMo  = round(filesize($tarGz) / 1048576, 1);
+            $elapsed = round(microtime(true) - $startTime, 1);
 
             echo "[{$date}] backup_uploads incr OK | {$newFiles} fichiers | {$sizeMo} Mo | {$elapsed}s\n";
         }
     }
 
 } catch (\Throwable $e) {
-    // Nettoyer le .tar et l'.tar.gz partiels si présents
-    if (isset($tarBase) && file_exists($tarBase)) {
-        unlink($tarBase);
-    }
     if (isset($tarGz) && file_exists($tarGz)) {
         unlink($tarGz);
     }

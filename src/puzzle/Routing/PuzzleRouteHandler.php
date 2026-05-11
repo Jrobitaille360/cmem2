@@ -2,6 +2,7 @@
 
 namespace Puzzle\Routing;
 
+use AuthGroups\Models\Subscription;
 use AuthGroups\Routing\BaseRouteHandler;
 use AuthGroups\Utils\Response;
 use Puzzle\Controllers\AdminController;
@@ -18,6 +19,7 @@ use Puzzle\Models\PuzzleDevice;
  *
  * Auth conditionnelle :
  *  - POST /puzzle/auth/register-device              → sans auth
+ *  - POST /puzzle/auth/link-device                  → JWT cmem2 (Bearer)
  *  - POST /puzzle/auth/verify-subscription          → device_token (Bearer)
  *  - GET  /puzzle/auth/pseudonym                    → device_token (Bearer)
  *  - GET  /puzzle/auth/check-pseudonym/{pseudonym}  → device_token (Bearer)
@@ -71,6 +73,13 @@ class PuzzleRouteHandler extends BaseRouteHandler
         if ($s1 === 'auth') {
             if ($s2 === 'register-device' && $method === 'POST') {
                 (new AuthController())->registerDevice();
+                return;
+            }
+
+            if ($s2 === 'link-device' && $method === 'POST') {
+                $user = $this->requireAnyJwt();
+                if ($user === null) return;
+                (new AuthController())->linkDevice($user);
                 return;
             }
 
@@ -276,6 +285,20 @@ class PuzzleRouteHandler extends BaseRouteHandler
     }
 
     /**
+     * Valide le JWT cmem2 sans vérification de rôle.
+     * Retourne le tableau $user ou envoie HTTP 401.
+     */
+    private function requireAnyJwt(): ?array
+    {
+        $user = $this->authService?->authenticate();
+        if (!$user) {
+            Response::error('Authentification requise', null, 401);
+            return null;
+        }
+        return $user;
+    }
+
+    /**
      * Valide le JWT cmem2 et vérifie le rôle ADMINISTRATEUR.
      * Retourne le tableau $user ou envoie HTTP 401/403.
      */
@@ -320,6 +343,23 @@ class PuzzleRouteHandler extends BaseRouteHandler
 
         // Mettre à jour last_seen_at (fire and forget)
         (new PuzzleDevice())->touchLastSeen((int) $device['id']);
+
+        if (!empty($device['user_id'])) {
+            // Device lié à un compte : subscription par user_id (Stripe ou Google Play connecté)
+            $sub = (new Subscription())->findActive((int) $device['user_id'], 'puzzle');
+        } elseif (!empty($device['purchase_token'])) {
+            // Device anonyme : subscription par purchase_token (Google Play)
+            $sub = (new Subscription())->findActiveByPurchaseToken(
+                $device['purchase_token'], 'puzzle'
+            );
+        } else {
+            $sub = null;
+        }
+
+        if ($sub !== null) {
+            $device['is_premium']         = 1;
+            $device['premium_expires_at'] = $sub['expires_at'];
+        }
 
         return $device;
     }

@@ -13,6 +13,9 @@ src/ics/credentials.json
 src/ics/token.json
 src/ics/last_sync.txt
 
+# Credentials Google Play (Puzzle)
+src/puzzle/google-service-account.json
+
 # Garder les fichiers d'exemple
 !.env*.example
 

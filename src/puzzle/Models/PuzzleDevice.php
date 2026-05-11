@@ -126,4 +126,12 @@ class PuzzleDevice extends BaseModel
         );
         $stmt->execute([$id]);
     }
+
+    public function setUserId(int $id, int $userId): void
+    {
+        $stmt = $this->getDb()->prepare(
+            "UPDATE puzzle_devices SET user_id = ?, updated_at = NOW() WHERE id = ?"
+        );
+        $stmt->execute([$userId, $id]);
+    }
 }

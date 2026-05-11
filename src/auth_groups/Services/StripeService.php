@@ -148,6 +148,29 @@ class StripeService
     }
 
     // -----------------------------------------------------------------------
+    // Idempotency helpers
+    // -----------------------------------------------------------------------
+
+    public static function isEventProcessed(string $eventId): bool
+    {
+        require_once __DIR__ . '/../database.php';
+        $db   = \Database::getInstance()->getConnection();
+        $stmt = $db->prepare('SELECT 1 FROM stripe_processed_events WHERE event_id = ? LIMIT 1');
+        $stmt->execute([$eventId]);
+        return (bool) $stmt->fetchColumn();
+    }
+
+    public static function markEventProcessed(string $eventId, string $eventType): void
+    {
+        require_once __DIR__ . '/../database.php';
+        $db   = \Database::getInstance()->getConnection();
+        $stmt = $db->prepare(
+            'INSERT IGNORE INTO stripe_processed_events (event_id, event_type) VALUES (?, ?)'
+        );
+        $stmt->execute([$eventId, $eventType]);
+    }
+
+    // -----------------------------------------------------------------------
     // Handlers d'événements webhook
     // -----------------------------------------------------------------------
 
@@ -201,12 +224,15 @@ class StripeService
         $interval  = $sub['items']['data'][0]['price']['recurring']['interval'] ?? 'month';
         $plan      = ($interval === 'year') ? 'yearly' : 'monthly';
 
+        $userId  = (int) ($sub['metadata']['user_id'] ?? 0);
+        $appId   = $sub['metadata']['app_id']  ?? 'puzzle';
+        $custId  = $sub['customer']            ?? null;
+
         if (!$subId) {
             return;
         }
 
-        $model = new Subscription();
-        $model->updateByStripeSubId($subId, [
+        $fields = [
             'is_premium' => $isPremium,
             'show_ads'   => $isPremium ? 0 : 1,
             'is_trial'   => $isTrial,
@@ -214,7 +240,23 @@ class StripeService
             'expires_at' => $expiresAt,
             'plan'       => $plan,
             'status'     => $isPremium ? 'active' : 'expired',
-        ]);
+        ];
+
+        $model = new Subscription();
+        if ($userId && $appId) {
+            // Upsert when user context available (covers new subscriptions)
+            $model->upsert(array_merge($fields, [
+                'user_id'         => $userId,
+                'app_id'          => $appId,
+                'provider'        => 'stripe',
+                'product_id'      => 'stripe_subscription',
+                'stripe_sub_id'   => $subId,
+                'stripe_customer' => $custId,
+                'started_at'      => date('Y-m-d H:i:s'),
+            ]));
+        } else {
+            $model->updateByStripeSubId($subId, $fields);
+        }
 
         LogService::info('Stripe subscription.updated', ['sub_id' => $subId, 'status' => $status]);
     }

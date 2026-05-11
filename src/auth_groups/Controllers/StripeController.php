@@ -27,8 +27,16 @@ class StripeController
             return;
         }
 
-        $type = $event['type']           ?? '';
-        $obj  = $event['data']['object'] ?? [];
+        $eventId = $event['id']           ?? '';
+        $type    = $event['type']          ?? '';
+        $obj     = $event['data']['object'] ?? [];
+
+        // Idempotency — skip already-processed events
+        if ($eventId && StripeService::isEventProcessed($eventId)) {
+            http_response_code(200);
+            echo json_encode(['received' => true, 'skipped' => true]);
+            return;
+        }
 
         try {
             switch ($type) {
@@ -57,6 +65,10 @@ class StripeController
             ]);
             http_response_code(500);
             return;
+        }
+
+        if ($eventId) {
+            StripeService::markEventProcessed($eventId, $type);
         }
 
         http_response_code(200);

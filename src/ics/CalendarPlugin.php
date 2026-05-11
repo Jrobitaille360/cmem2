@@ -30,12 +30,6 @@ class CalendarPlugin extends AbstractPlugin
 
         $this->runMigrations(__DIR__ . '/../../docs/docs_ICS/migrations/');
         
-        // Log seulement si les constantes de log sont définies
-        if (defined('LOG_ENABLED') && LOG_ENABLED) {
-            $this->safeLog('info', "Plugin ICS Calendar initialisé", [
-                'version' => $this->getInfo()['version']
-            ]);
-        }
     }
 
     public function getRouteHandlers(): array
