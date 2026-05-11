@@ -131,7 +131,7 @@ class AuthController
             return;
         }
 
-        (new PuzzleDevice())->setUserId((int) $device['id'], (int) $user['id']);
+        (new PuzzleDevice())->setUserId((int) $device['id'], (int) $user['user_id']);
 
         LoggingMiddleware::logExit(200);
         Response::success('Appareil lié au compte', ['device_id' => (int) $device['id']]);
