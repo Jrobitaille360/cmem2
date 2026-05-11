@@ -47,18 +47,32 @@ Next.js : `package.json` → `"version": "X.Y.Z"`
 - Ajouter `## [Unreleased]` vide au-dessus
 - Pas de doublons de titres `###` (règle MD024)
 
-## Étape 5 — Dossier de version + templates
+## Étape 5 — Dossier de version
 
 ```powershell
-# Créer le dossier
 mkdir docs\v-X-Y-Z
+```
 
-# Copier les templates (ne jamais modifier les originaux)
+### 5a — Fichiers CLIENT et PRODUCTION
+
+Créer `docs\v-X-Y-Z\X.Y.Z_CLIENT.md` :
+- Changements visibles par les utilisateurs finaux
+- BREAKING CHANGES en tête s'il y en a
+
+Créer `docs\v-X-Y-Z\X.Y.Z_PRODUCTION.md` :
+- Checklist déploiement : migrations SQL, `.env` à ajouter, crons à configurer
+- PHP API : `composer install --no-dev --optimize-autoloader`
+- Vérifications post-déploiement
+
+### 5b — Templates PR et Release Notes
+
+```powershell
+# Ne jamais modifier les templates originaux dans PRIVATE-DATA
 Copy-Item C:\code\PRIVATE-DATA\ancrage_versions\PR_BODY.md       docs\v-X-Y-Z\PR_BODY.md
 Copy-Item C:\code\PRIVATE-DATA\ancrage_versions\RELEASE_NOTES.md docs\v-X-Y-Z\RELEASE_NOTES.md
 ```
 
-Remplir `docs\v-X-Y-Z\PR_BODY.md` avec :
+Remplir `docs\v-X-Y-Z\PR_BODY.md` :
 - Résumé de la release
 - Types de changement cochés
 - Liste des changements (tiré du CHANGELOG)
@@ -68,17 +82,32 @@ Remplir `docs\v-X-Y-Z\PR_BODY.md` avec :
 
 Remplir `docs\v-X-Y-Z\RELEASE_NOTES.md` (notes publiques, langage client).
 
+### 5c — Migrations SQL
+
+- Repérer les `YYYYMMDD_*.sql` dans `/docs/` et les déplacer dans `docs\v-X-Y-Z\`
+- Construire `docs\v-X-Y-Z\build_DB-v-X-Y-Z.sql` : partir du `build_DB` de la version
+  précédente et y intégrer les migrations dans la définition des tables
+- Ne jamais modifier un `build_DB` d'une version antérieure déjà fixée
+
+### 5d — PLAN_*.md
+
 Déplacer tout `PLAN_*.md` associé à la release dans `docs\v-X-Y-Z\`.
 
-## Étape 6 — Commit + push
+## Étape 6 — README.md
+
+Mettre à jour le badge de version et la date à la racine du projet.
+
+## Étape 7 — Commit + push
 
 ```bash
 git add .
 git commit -m "chore: release vX.Y.Z"
 git push
+# Exécuter private/sync.ps1 s'il existe
+if (Test-Path private/sync.ps1) { powershell private/sync.ps1 }
 ```
 
-## Étape 7 — PR draft
+## Étape 8 — PR draft
 
 ```bash
 gh pr create \
@@ -92,7 +121,7 @@ gh pr create \
 Si `gh` non authentifié : fournir l'URL manuelle
 `https://github.com/ORG/REPO/compare/main...release/vX.Y.Z`
 
-## Étape 8 — Post-merge (tag + GitHub Release)
+## Étape 9 — Post-merge (tag + GitHub Release)
 
 **Attendre confirmation que la PR est mergée avant de tagger.**
 
@@ -107,6 +136,20 @@ gh release create vX.Y.Z \
   --draft
 ```
 
-## Étape 9 — Résumé
+## Étape 10 — Post-release publique
+
+Mettre à jour la fiche journauxdebord.com :
+
+```bash
+PUT https://cmem2.journauxdebord.com/items/{id}
+# champs url_* non applicables = null
+# mettre à jour : version, features
+```
+
+## Étape 11 — Résumé
 
 Lister ce qui a été releasé : nouveaux endpoints, fixes, migrations SQL, nombre de tests.
+
+---
+
+> Référence étendue : `C:\code\PRIVATE-DATA\ancrage_versions\version_anchor.md`
