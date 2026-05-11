@@ -37,12 +37,14 @@ class MaintenanceReport
 
         $body = $this->buildHtml($totalDuration);
 
-        LogService::info('MaintenanceReport: envoi du rapport', [
-            'to'       => self::SUPPORT_EMAIL,
-            'subject'  => $subject,
+        LogService::info('MaintenanceReport: rapport généré', [
             'has_errors' => $hasErrors,
-            'duration' => $totalDuration,
+            'duration'   => $totalDuration,
         ]);
+
+        if (!$hasErrors) {
+            return;
+        }
 
         $mailer = new EmailService($db);
         $sent   = $mailer->sendEmail(self::SUPPORT_EMAIL, $subject, $body, true);

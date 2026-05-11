@@ -7,7 +7,12 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased]
+## [Unreleased 2026-05-11]
+
+### Maintenance — Rapport courriel conditionnel
+
+- **`MaintenanceReport::send()`** — courriel envoyé uniquement si des erreurs sont détectées; en l'absence d'erreur, seul le log fichier est écrit
+- **`CRON_maintenance.md`** — documentation mise à jour pour refléter le nouveau comportement
 
 ---
 

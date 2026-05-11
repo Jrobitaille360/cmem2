@@ -33,9 +33,11 @@
 
 ## Rapport courriel
 
-Envoyé à `support@journauxdebord.com` à la fin de chaque exécution.
+Envoyé à `support@journauxdebord.com` **uniquement si des erreurs sont détectées**.
 
-Sujet : `[cmem2 API] Maintenance — YYYY-MM-DD HH:MM:SS — ✓ OK` ou `✗ ERREURS`
+Sujet : `[cmem2 API] Maintenance — YYYY-MM-DD HH:MM:SS — ✗ ERREURS`
+
+En l'absence d'erreur, seul le log fichier est écrit (aucun courriel).
 
 ## Protection contre l'exécution simultanée
 
