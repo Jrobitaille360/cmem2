@@ -7,7 +7,11 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-05-10]
+## [Unreleased]
+
+---
+
+## [2.6.0] — 2026-05-10
 
 ### Puzzle — Fix premium Windows/Web (link-device)
 
@@ -43,23 +47,14 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 ### CLAUDE.md — gouvernance
 
 - Ajout sections : Cross-Project Directives & Plans, Personal Data & Memory, Git & Release Discipline, Windows / File Editing, Changelog Workflow
-
-### Documentation
-
 - `docs/PLAN_simplification-subscriptions.md` — conditions de complétion Phase 1 cochées (121/121 tests, 110/110 tests)
 
----
-
-## [Unreleased 2026-05-08]
-
-### Stripe webhook — signature verification + idempotency (spec-first)
+### Stripe webhook — signature verification + idempotency
 
 - **Idempotency** — `stripe_processed_events` table (new migration `docs/20260508_stripe_idempotency.sql`); duplicate `event.id` returns `{"received":true,"skipped":true}` without re-processing
 - **`StripeService::isEventProcessed()` / `markEventProcessed()`** — `INSERT IGNORE` deduplication via primary key on `event_id`
 - **`handleSubscriptionUpdated` upsert** — now upserts when `user_id` + `app_id` available in metadata, instead of UPDATE-only (fixes new subscriptions delivered via webhook without prior checkout row)
 - **Tests** — `private/tests/test_stripe_webhooks.php` (13 assertions, 0 failures): covers AC1–AC8 (signature validation, idempotency, subscription.updated upsert, subscription.deleted cancel)
-
-## [Unreleased 2026-05-05]
 
 ### Puzzle — Simplification abonnements Phase 1
 
@@ -81,17 +76,19 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
   `docs/puzzle/API_PUZZLE_ADMIN_MANAGER.json` v1.0.4, `docs/core/API_ENDPOINTS.json`,
   `docs/core/GUIDE.md` mis à jour
 
----
+### Cron — backup uploads
 
-## [Unreleased 2026-05-03]
+- **`src/cron/backup_uploads.php`** — remplacé `PharData` (indisponible sur certains serveurs) par `exec('tar ...')` pour la création d'archives
+
+### Tests — infrastructure
+
+- **`test_auth_otp.php`** — cleanup Z.1 migré de API key hardcodée (invalide) vers login JWT admin; ajout Z.0 (login admin pour cleanup)
+- **`private/tests/check_google_play_config.php`** — nouveau script diagnostic standalone : vérifie SA JSON, clé RSA, échange OAuth2 avant tests sandbox
 
 ### ICS — configuration
 
 - **`src/ics/config/.env.ics`** — `ICS_BASE_URL` commentée (valeur localhost
   désactivée; l'URL de base principale est utilisée par défaut)
-
-### Documentation
-
 - PLAN files déplacés dans `docs/v-2-5-0/` (ancrage v2.5.0)
 - `docs/v-2-5-0/PR_BODY.md` — checklist de déploiement complétée (composer,
   migration SQL, endpoint `/health`)

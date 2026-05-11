@@ -30,14 +30,12 @@ Code mergé sur `release/v2.5.0`. Tests : 121/121 et 110/110 verts.
 
 ---
 
-## 2. SQL en attente (non appliqués en DB)
+## 2. SQL appliqués en production ✓
 
-À appliquer manuellement avant tout déploiement de Phase 1.
-
-| Fichier | Contenu | Risque si absent |
+| Fichier | Contenu | Statut |
 | - | - | - |
-| `docs/20260505_subscriptions_purchase_token_unique.sql` | Contrainte `uq_purchase_token_app` + migration depuis `puzzle_devices` | `upsert()` Google Play peut insérer des doublons |
-| `docs/20260508_stripe_idempotency.sql` | Table `stripe_processed_events` | Webhooks Stripe peuvent traiter deux fois le même événement |
+| `docs/20260505_subscriptions_purchase_token_unique.sql` | Contrainte `uq_purchase_token_app` + migration depuis `puzzle_devices` | ✓ appliqué prod |
+| `docs/20260508_stripe_idempotency.sql` | Table `stripe_processed_events` | ✓ appliqué prod |
 
 ---
 
@@ -104,33 +102,17 @@ authentification JWT requise).
 
 Conditions de complétion :
 
-- [ ] Endpoint créé et testé dans `test_puzzle_admin.php`
-- [ ] `puzzle_devices.user_id` rempli après appel
-- [ ] Premium Windows confirmé via `requireDeviceToken()` (200 au lieu de 403)
+- [x] Endpoint créé et testé dans `test_puzzle_admin.php`
+- [x] `puzzle_devices.user_id` rempli après appel
+- [x] Premium Windows confirmé via `requireDeviceToken()` — validation E2E `test_link_device_e2e.php` (7/7)
 
-#### Fix C — Flutter : appel `link-device` au login Windows
+#### Fix C — Flutter : appel `link-device` au login Windows ✓
 
-Fichier : `lib/services/purchase_service.dart` (projet `c:\code\puzzle`)
+Complété. Voir directive `20260510_202000_cmem2_API_vers_puzzle__fix-windows-premium-link-device.md`.
 
-Après login JWT réussi sur Windows, appeler `POST /puzzle/auth/link-device`
-avec le `device_token` courant, puis re-fetch `getSubscriptionStatus()`.
+#### Fix D — Flutter : remplacer `catch (_)` silencieux ✓
 
-Conditions de complétion :
-
-- [ ] Appel `link-device` effectué sur login Windows
-- [ ] `isPremium` mis à jour après re-fetch
-
-#### Fix D — Flutter : remplacer `catch (_)` silencieux
-
-Fichier : `lib/services/purchase_service.dart:106-113`
-
-Remplacer `catch (_)` par `on UserNotLoggedInException` avec UX appropriée
-(invite connexion plutôt que verrouillage silencieux).
-
-Conditions de complétion :
-
-- [ ] Exception `UserNotLoggedInException` gérée explicitement
-- [ ] Aucune absorption silencieuse d'erreur dans le flow subscription
+Complété. Voir directive `20260510_202000_cmem2_API_vers_puzzle__fix-windows-premium-link-device.md`.
 
 ---
 
@@ -143,9 +125,10 @@ remplace toute période d'observation.
 
 Prérequis :
 
-- Ajouter adresse Gmail testeur dans Play Console → Setup → Licence testing
-- Vérifier `PUZZLE_GOOGLE_PLAY_PACKAGE` et `PUZZLE_GOOGLE_SERVICE_ACCOUNT_JSON` dans `.env`
-- Build Flutter signé avec le keystore de la piste de test
+- [ ] Ajouter adresse Gmail testeur dans Play Console → Setup → Licence testing
+- [x] `PUZZLE_GOOGLE_PLAY_PACKAGE` = `com.journauxdebord.puzzle` ✓
+- [x] `PUZZLE_GOOGLE_SERVICE_ACCOUNT_JSON` configuré et OAuth2 validé (`check_google_play_config.php`) ✓
+- [ ] Build Flutter signé avec le keystore de la piste de test
 
 Scénarios à valider :
 
