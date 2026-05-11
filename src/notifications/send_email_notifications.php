@@ -82,7 +82,6 @@ try {
 
     echo $msg . PHP_EOL;
 
-    LogService::info('Cron notifications email terminé', $stats);
     exit(0);
 
 } catch (\Exception $e) {

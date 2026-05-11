@@ -109,6 +109,35 @@ class AuthController
     }
 
     // -----------------------------------------------------------------------
+    // POST /puzzle/auth/link-device  (JWT cmem2)
+    // -----------------------------------------------------------------------
+
+    public function linkDevice(array $user): void
+    {
+        LoggingMiddleware::logEntry();
+        $input = Response::getRequestParams();
+
+        $deviceToken = trim($input['device_token'] ?? '');
+        if ($deviceToken === '') {
+            LoggingMiddleware::logExit(422);
+            Response::error('device_token requis', ['field' => 'device_token'], 422);
+            return;
+        }
+
+        $device = (new PuzzleDevice())->findByValidToken($deviceToken);
+        if ($device === null) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Token d\'appareil inconnu ou expiré', ['code' => 'DEVICE_NOT_FOUND'], 404);
+            return;
+        }
+
+        (new PuzzleDevice())->setUserId((int) $device['id'], (int) $user['id']);
+
+        LoggingMiddleware::logExit(200);
+        Response::success('Appareil lié au compte', ['device_id' => (int) $device['id']]);
+    }
+
+    // -----------------------------------------------------------------------
     // GET /puzzle/auth/pseudonym  (device_token)
     // -----------------------------------------------------------------------
 

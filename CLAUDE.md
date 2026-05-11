@@ -113,3 +113,26 @@ All settings live in a single `.env` file (see `.env.example` for the full 170+ 
 - Pending migrations (between releases) go in `docs/` as `YYYYMMDD_description.sql`.
 - **Never modify** a `build_DB-v-x-x-x.sql` that belongs to an already-released version.
 - At the next version bump: integrate the pending `docs/*.sql` files into the new `build_DB-v-x-x-x.sql`, then move those files into `docs/v-x-x-x/`.
+
+## Cross-Project Directives & Plans
+
+- Before implementing changes that span multiple projects or have architectural implications, present a plan for approval FIRST. Do not apply DB migrations, code changes, or commits to production without explicit confirmation.
+- When a user says 'pas le bon chemin' or rejects an approach, immediately revert all related commits before proposing a new direction.
+
+## Personal Data & Memory
+
+- Never auto-fill contact info, emails, or personal identifiers from MEMORY.md or persistent memory into public-facing pages, docs, or code. Always ask the user what value to use.
+
+## Git & Release Discipline
+
+- Never use `git add -f` to bypass .gitignore. If a file seems needed, ask the user.
+- Do not create git tags until the corresponding PR is merged.
+- Do not commit/push until tests pass locally; for PHP backend always run the full test suite before commit.
+
+## Windows / File Editing
+
+- Files in this environment use CRLF line endings. If the Edit tool fails, fall back to PowerShell line-by-line replacement rather than retrying Edit.
+
+## Changelog Workflow
+
+- After every user-visible change, update CHANGELOG.md before committing. Inspect git history if unsure what to include. Disable MD013 (line length) rather than wrapping changelog entries.

@@ -2,6 +2,8 @@
 
 namespace Puzzle\Services;
 
+use AuthGroups\Services\LogService;
+
 /**
  * GooglePlayService — valide un purchase_token via Google Play Developer API.
  *
@@ -62,11 +64,19 @@ class GooglePlayService
 
         $response = @file_get_contents($url, false, $ctx);
         if ($response === false) {
+            LogService::error('GooglePlay: appel API échoué (réseau)', [
+                'url'     => $url,
+                'package' => $this->package,
+            ]);
             return null;
         }
 
         $data = json_decode($response, true);
         if (!is_array($data) || isset($data['error'])) {
+            LogService::error('GooglePlay: réponse API invalide ou erreur', [
+                'package'  => $this->package,
+                'response' => $data,
+            ]);
             return null;
         }
 
@@ -156,10 +166,21 @@ class GooglePlayService
 
         $response = @file_get_contents('https://oauth2.googleapis.com/token', false, $ctx);
         if ($response === false) {
+            LogService::error('GooglePlay: OAuth token exchange échoué (réseau)', [
+                'client_email' => $sa['client_email'],
+            ]);
             return null;
         }
 
         $token = json_decode($response, true);
-        return $token['access_token'] ?? null;
+        if (empty($token['access_token'])) {
+            LogService::error('GooglePlay: OAuth token exchange rejeté', [
+                'client_email' => $sa['client_email'],
+                'response'     => $token,
+            ]);
+            return null;
+        }
+
+        return $token['access_token'];
     }
 }

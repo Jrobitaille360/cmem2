@@ -119,11 +119,6 @@ class PluginManager
                     $pluginInstance->initialize();
                 }
                 
-                $this->safeLog('info', "Plugin chargé avec succès", [
-                    'plugin' => $pluginName,
-                    'version' => $config['version']
-                ]);
-                
                 return true;
             }
             

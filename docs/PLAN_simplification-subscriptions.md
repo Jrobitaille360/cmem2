@@ -309,14 +309,17 @@ return $device;
 
 #### Conditions de complétion
 
-- [ ] Contrainte `uq_purchase_token_app` ajoutée sans erreur
-- [ ] `findActiveByPurchaseToken()` implémentée et testée
+- [x] Contrainte `uq_purchase_token_app` ajoutée sans erreur
+  — migration `docs/20260505_subscriptions_purchase_token_unique.sql` créée ; à appliquer en DB
+- [x] `findActiveByPurchaseToken()` implémentée et testée
+  — `test_puzzle_share.php` §2b : injection DB + accès premium via subscriptions
 - [ ] `expireByPurchaseToken()` implémentée et testée
-- [ ] `activatePremium()` accepte `?int $userId`
-- [ ] `GooglePlayService` retourne `linked_purchase_token`
-- [ ] `verifySubscription()` écrit dans `subscriptions`
-- [ ] `requireDeviceToken()` lookup par `purchase_token` pour les anonymes
-- [ ] Aucune régression sur la suite de tests
+  — implémentée ✓ ; test automatique impossible sans achat Play Store réel → validée en Phase 2
+- [x] `activatePremium()` accepte `?int $userId`
+- [x] `GooglePlayService` retourne `linked_purchase_token`
+- [x] `verifySubscription()` écrit dans `subscriptions`
+- [x] `requireDeviceToken()` lookup par `purchase_token` pour les anonymes
+- [x] Aucune régression sur la suite de tests (121/121, 110/110)
 
 ---
 

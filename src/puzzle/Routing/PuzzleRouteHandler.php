@@ -19,6 +19,7 @@ use Puzzle\Models\PuzzleDevice;
  *
  * Auth conditionnelle :
  *  - POST /puzzle/auth/register-device              → sans auth
+ *  - POST /puzzle/auth/link-device                  → JWT cmem2 (Bearer)
  *  - POST /puzzle/auth/verify-subscription          → device_token (Bearer)
  *  - GET  /puzzle/auth/pseudonym                    → device_token (Bearer)
  *  - GET  /puzzle/auth/check-pseudonym/{pseudonym}  → device_token (Bearer)
@@ -72,6 +73,13 @@ class PuzzleRouteHandler extends BaseRouteHandler
         if ($s1 === 'auth') {
             if ($s2 === 'register-device' && $method === 'POST') {
                 (new AuthController())->registerDevice();
+                return;
+            }
+
+            if ($s2 === 'link-device' && $method === 'POST') {
+                $user = $this->requireAnyJwt();
+                if ($user === null) return;
+                (new AuthController())->linkDevice($user);
                 return;
             }
 
@@ -274,6 +282,20 @@ class PuzzleRouteHandler extends BaseRouteHandler
         }
 
         Response::error('Endpoint non trouvé', null, 404);
+    }
+
+    /**
+     * Valide le JWT cmem2 sans vérification de rôle.
+     * Retourne le tableau $user ou envoie HTTP 401.
+     */
+    private function requireAnyJwt(): ?array
+    {
+        $user = $this->authService?->authenticate();
+        if (!$user) {
+            Response::error('Authentification requise', null, 401);
+            return null;
+        }
+        return $user;
     }
 
     /**

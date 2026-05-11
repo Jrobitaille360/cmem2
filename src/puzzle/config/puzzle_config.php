@@ -66,10 +66,22 @@ if (!defined('PUZZLE_HELD_TTL_SECONDS')) {
 // CONFIGURATION GOOGLE PLAY
 // ============================================================================
 
+/** Identifiant fixe du package Android pour ce déploiement du plugin Puzzle. */
 if (!defined('PUZZLE_GOOGLE_PLAY_PACKAGE')) {
-    define('PUZZLE_GOOGLE_PLAY_PACKAGE', $_ENV['PUZZLE_GOOGLE_PLAY_PACKAGE'] ?? '');
+    define('PUZZLE_GOOGLE_PLAY_PACKAGE', 'com.journauxdebord.puzzle');
 }
 
+/**
+ * Chemin vers le fichier JSON du service account Google Play.
+ * Obligatoire en production — à définir dans .env.
+ * Chemin relatif → résolu depuis la racine du projet.
+ * Absent ou fichier inexistant → validation Google Play désactivée silencieusement.
+ */
 if (!defined('PUZZLE_GOOGLE_SERVICE_ACCOUNT_JSON')) {
-    define('PUZZLE_GOOGLE_SERVICE_ACCOUNT_JSON', $_ENV['PUZZLE_GOOGLE_SERVICE_ACCOUNT_JSON'] ?? '');
+    $sa = $_ENV['PUZZLE_GOOGLE_SERVICE_ACCOUNT_JSON'] ?? '';
+    if ($sa !== '' && $sa[0] !== '/' && !(strlen($sa) > 1 && $sa[1] === ':')) {
+        $sa = dirname(__DIR__, 3) . '/' . $sa;
+    }
+    define('PUZZLE_GOOGLE_SERVICE_ACCOUNT_JSON', $sa);
+    unset($sa);
 }

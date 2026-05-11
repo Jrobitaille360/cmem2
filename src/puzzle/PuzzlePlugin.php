@@ -14,11 +14,6 @@ class PuzzlePlugin extends AbstractPlugin
 
         $this->runMigrations(__DIR__ . '/migrations/');
 
-        if (defined('LOG_ENABLED') && LOG_ENABLED) {
-            $this->safeLog('info', "Plugin Puzzle initialisé", [
-                'version' => $this->getInfo()['version']
-            ]);
-        }
     }
 
     public function getRouteHandlers(): array

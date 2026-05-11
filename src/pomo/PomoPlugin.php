@@ -14,11 +14,6 @@ class PomoPlugin extends AbstractPlugin
 
         $this->runMigrations(__DIR__ . '/../../docs/pomo/migrations/');
 
-        if (defined('LOG_ENABLED') && LOG_ENABLED) {
-            $this->safeLog('info', "Plugin Pomo initialisé", [
-                'version' => $this->getInfo()['version']
-            ]);
-        }
     }
 
     public function getRouteHandlers(): array
