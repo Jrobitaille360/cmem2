@@ -7,12 +7,23 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-05-11]
+## [Unreleased]
+
+---
+
+## [2.6.5] — 2026-05-14
 
 ### Déploiement — Traçabilité version déployée
 
 - **`private/deploy.ps1`** (étape 4/4) — injecte `APP_COMMIT` (hash git court) et `APP_DEPLOYED_AT` (timestamp ISO) dans le `.env` distant à chaque déploiement
 - **`.env.example`** — nouvelles variables `APP_COMMIT` et `APP_DEPLOYED_AT` documentées
+
+### Puzzle — Sync statut abonnement Google Play (fix annulation PlayStore)
+
+- **`GET /puzzle/auth/subscription-status`** (device_token) — nouvel endpoint; interroge l'API Google Play Developer et retourne `is_premium` + `stale`; met à jour `subscriptions` et `puzzle_devices` en base; fail-safe : état DB conservé si Google Play inaccessible (`stale: true`); résout le bug où l'app restait en mode abonnement après annulation PlayStore
+- **`AuthController::getSubscriptionStatus()`** — handler du nouvel endpoint
+- **`AuthController::verifySubscription()`** — appelle désormais `PuzzleDevice::updateSubscription()` après activation; stocke `purchase_token`, `product_id` et `premium_expires_at` dans `puzzle_devices` (prérequis pour le lookup dans `requireDeviceToken` et `subscription-status`)
+- **`docs/puzzle/API_PUZZLE_ENDPOINTS.json`** — v1.1.0 → v1.2.0; nouveau endpoint documenté; `client_notes` de `verify-subscription` mis à jour
 
 ### Puzzle — Sync statut Google Play sur GET /subscription/status
 

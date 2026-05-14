@@ -110,6 +110,14 @@ class AuthController
             ]);
         }
 
+        // Synchroniser la table puzzle_devices pour que requireDeviceToken trouve l'abonnement
+        (new PuzzleDevice())->updateSubscription((int) $device['id'], [
+            'is_premium'         => $result['is_premium'],
+            'purchase_token'     => $result['purchase_token'],
+            'product_id'         => $result['product_id'],
+            'premium_expires_at' => $result['expires_at'],
+        ]);
+
         LoggingMiddleware::logExit(200);
         Response::success(
             $result['is_premium'] ? 'Abonnement actif' : 'Abonnement expiré',
@@ -117,6 +125,80 @@ class AuthController
                 'is_premium' => (bool) $result['is_premium'],
                 'product_id' => $result['product_id'],
                 'expires_at' => date('c', strtotime($result['expires_at'])),
+            ]
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // GET /puzzle/auth/subscription-status  (device_token)
+    // -----------------------------------------------------------------------
+
+    public function getSubscriptionStatus(array $device): void
+    {
+        LoggingMiddleware::logEntry();
+
+        $purchaseToken = $device['purchase_token'] ?? null;
+        $productId     = $device['product_id']     ?? null;
+
+        if (empty($purchaseToken) || empty($productId)) {
+            LoggingMiddleware::logExit(200);
+            Response::success('Aucun abonnement enregistré', [
+                'is_premium' => false,
+                'expires_at' => null,
+                'provider'   => null,
+                'stale'      => false,
+            ]);
+            return;
+        }
+
+        $result = (new GooglePlayService())->validateSubscription($purchaseToken, $productId);
+
+        if ($result === null) {
+            // Fail-safe : Google Play inaccessible — utiliser la DB
+            $sub       = (new Subscription())->findActiveByPurchaseToken($purchaseToken, 'puzzle');
+            $isPremium = $sub !== null;
+
+            LoggingMiddleware::logExit(200);
+            Response::success('Statut abonnement (cache DB)', [
+                'is_premium' => $isPremium,
+                'expires_at' => $isPremium ? date('c', strtotime($sub['expires_at'])) : null,
+                'provider'   => 'google_play',
+                'stale'      => true,
+            ]);
+            return;
+        }
+
+        $isPremium = (bool) $result['is_premium'];
+        $expiresAt = $result['expires_at'];
+
+        // Mettre à jour la table subscriptions
+        $subModel = new Subscription();
+        $existing = $subModel->findByPurchaseToken($result['purchase_token'], 'puzzle');
+        if ($existing !== null) {
+            $subModel->renewByPurchaseToken(
+                $result['purchase_token'],
+                'puzzle',
+                $expiresAt,
+                $isPremium
+            );
+        }
+
+        // Mettre à jour la table puzzle_devices
+        (new PuzzleDevice())->updateSubscription((int) $device['id'], [
+            'is_premium'         => $isPremium ? 1 : 0,
+            'purchase_token'     => $purchaseToken,
+            'product_id'         => $productId,
+            'premium_expires_at' => $expiresAt,
+        ]);
+
+        LoggingMiddleware::logExit(200);
+        Response::success(
+            $isPremium ? 'Abonnement actif' : 'Abonnement expiré ou annulé',
+            [
+                'is_premium' => $isPremium,
+                'expires_at' => date('c', strtotime($expiresAt)),
+                'provider'   => 'google_play',
+                'stale'      => false,
             ]
         );
     }

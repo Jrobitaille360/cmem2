@@ -1,10 +1,10 @@
 {
   "api": {
     "name": "Puzzle API",
-    "version": "1.1.0",
-    "description": "Plugin puzzle sans compte : carrousel d'images, thèmes, sauvegarde en ligne, casse-têtes partagés en temps réel. Authentification par token d'appareil opaque, abonnement Google Play. Depuis v1.1.0 : la table `subscriptions` est la source unique de vérité pour le statut premium (lookup par user_id ou purchase_token).",
+    "version": "1.2.0",
+    "description": "Plugin puzzle sans compte : carrousel d'images, thèmes, sauvegarde en ligne, casse-têtes partagés en temps réel. Authentification par token d'appareil opaque, abonnement Google Play. Depuis v1.1.0 : la table `subscriptions` est la source unique de vérité pour le statut premium. Depuis v1.2.0 : GET /puzzle/auth/subscription-status permet de synchroniser le statut premium Google Play à chaque ouverture d'app sans JWT.",
     "generated": "2026-04-06",
-    "reviewed": "2026-05-05",
+    "reviewed": "2026-05-11",
     "base_url": "/puzzle",
     "authentication": {
       "types": ["DEVICE_TOKEN", "NONE"],
@@ -54,7 +54,22 @@
             "401": "device_token absent ou expiré — code DEVICE_NOT_FOUND",
             "422": "purchase_token ou product_id absent | product_id invalide — code SUBSCRIPTION_INVALID"
           },
-          "client_notes": "Si is_premium = false, repasser l'app en mode gratuit sans afficher d'erreur. Si is_premium = true, déverrouiller les fonctionnalités premium. L'abonnement est lié au purchase_token, pas au device : il survit à une réinstallation."
+          "client_notes": "Appeler lors du premier achat ou d'une réinstallation pour enregistrer le purchase_token. Depuis v1.2.0, stocker le purchase_token et product_id localement — ils sont nécessaires pour GET /puzzle/auth/subscription-status. L'abonnement est lié au purchase_token, pas au device : il survit à une réinstallation."
+        },
+        {
+          "method": "GET",
+          "path": "/puzzle/auth/subscription-status",
+          "auth_required": true,
+          "auth_type": "DEVICE_TOKEN",
+          "description": "Interroge l'API Google Play Developer pour obtenir le statut actuel de l'abonnement lié au device. Met à jour `subscriptions` et `puzzle_devices` en base. Retourne stale: true si Google Play est inaccessible (fallback DB). À appeler à chaque ouverture d'app et reprise en premier plan.",
+          "responses": {
+            "200_active":   "{ success: true, message: 'Abonnement actif',              data: { is_premium: true,  expires_at: ISO 8601, provider: 'google_play', stale: false } }",
+            "200_expired":  "{ success: true, message: 'Abonnement expiré ou annulé',   data: { is_premium: false, expires_at: ISO 8601, provider: 'google_play', stale: false } }",
+            "200_none":     "{ success: true, message: 'Aucun abonnement enregistré',   data: { is_premium: false, expires_at: null,     provider: null,          stale: false } }",
+            "200_stale":    "{ success: true, message: 'Statut abonnement (cache DB)',  data: { is_premium: bool,  expires_at: ISO 8601|null, provider: 'google_play', stale: true } }",
+            "401": "device_token absent ou expiré — code DEVICE_NOT_FOUND"
+          },
+          "client_notes": "Appeler à chaque AppLifecycleState.resumed (ou au démarrage). Si is_premium = false ET stale = false : désactiver premium immédiatement. Si stale = true : conserver l'état actuel jusqu'au prochain succès. Ne pas passer purchase_token dans la requête — le serveur utilise celui stocké dans puzzle_devices lors de POST /puzzle/auth/verify-subscription."
         },
         {
           "method": "POST",

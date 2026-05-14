@@ -21,6 +21,7 @@ use Puzzle\Models\PuzzleDevice;
  *  - POST /puzzle/auth/register-device              → sans auth
  *  - POST /puzzle/auth/link-device                  → JWT cmem2 (Bearer)
  *  - POST /puzzle/auth/verify-subscription          → device_token (Bearer)
+ *  - GET  /puzzle/auth/subscription-status         → device_token (Bearer) — sync Google Play
  *  - GET  /puzzle/auth/pseudonym                    → device_token (Bearer)
  *  - GET  /puzzle/auth/check-pseudonym/{pseudonym}  → device_token (Bearer)
  *  - POST /puzzle/auth/pseudonym                    → device_token (Bearer)
@@ -88,6 +89,8 @@ class PuzzleRouteHandler extends BaseRouteHandler
 
             if ($s2 === 'verify-subscription' && $method === 'POST') {
                 (new AuthController())->verifySubscription($device);
+            } elseif ($s2 === 'subscription-status' && $method === 'GET') {
+                (new AuthController())->getSubscriptionStatus($device);
             } elseif ($s2 === 'pseudonym' && $method === 'GET') {
                 (new AuthController())->getPseudonym($device);
             } elseif ($s2 === 'pseudonym' && $method === 'POST') {

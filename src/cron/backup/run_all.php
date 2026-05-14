@@ -135,8 +135,10 @@ $elapsed     = round(microtime(true) - $startTime, 1);
 $summaryLine = "[{$date}] run_all DONE | {$modules} scripts OK | {$errors} erreur(s) | {$elapsed}s";
 logLine($summaryLine);
 
-// ── Envoi du rapport par email ────────────────────────────────────────────────
-sendBackupReport($log, $errors, $modules, $elapsed, $rootDir);
+// ── Envoi du rapport par email (uniquement en cas d'erreur) ──────────────────
+if ($errors > 0) {
+    sendBackupReport($log, $errors, $modules, $elapsed, $rootDir);
+}
 
 if ($errors > 0) {
     exit(1);
