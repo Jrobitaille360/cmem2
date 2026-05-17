@@ -186,12 +186,15 @@ Portée : code source uniquement. Domaine métier et schéma DB conservés à 90
 
 **Plugins — Conserver, préfixer /v3/**
 
-- Calendriers ICS : GET/POST/PATCH/DELETE /v3/calendars/** — conserver la structure actuelle
-- CalDAV : PROPFIND/GET/PUT/DELETE/REPORT /caldav/** — **pas de préfixe /v3/** (protocole WebDAV)
+- Calendriers ICS : GET/POST/PATCH/DELETE /v3/calendars/** — migre depuis `/calendars/**` (non versionné en v2.7.0)
+- CalDAV : PROPFIND/GET/PUT/DELETE/REPORT /caldav/** — **pas de préfixe /v3/** (protocole WebDAV, URL fixée côté clients externes iOS/Thunderbird — règle absolue, jamais versionner)
+- Notifications : /v3/notifications/** — migre depuis `/notifications/**`
 - Quiz : GET/POST/PATCH/DELETE /v3/quizzes/** — conserver
 - Items : GET/POST/PATCH/DELETE /v3/items/** — conserver
-- Puzzle : /v3/puzzle/** — conserver
+- Puzzle : /v3/puzzle/** — migre depuis `/v2/puzzle/**` (versionné en v2.7.0)
 - Pomo : À évaluer — si toujours actif, conserver sous /v3/waitlist/** ; sinon archiver
+
+> **Note v2.7.0 → v3.0** : ICS (`/calendars`, `/calendar`, `/notifications`) reste sur routes non versionnées en v2.7.0. La migration vers `/v3/` en v3.0 nécessite directive inter-projet vers tous les clients calendrier.
 
 ### Décisions transversales
 

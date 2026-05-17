@@ -31,13 +31,45 @@ Résultat : impossibilité de raisonner clairement sur l'accès premium par plat
 | `src/puzzle/Models/PuzzleDevice.php` | Device + subscription Play Store | Supprimer |
 | `src/puzzle/Controllers/AuthController.php` | Register device, verify sub, status | Supprimer |
 | `src/puzzle/Services/GooglePlayService.php` | Valide purchase_token via API Google | Déplacer |
-| `src/puzzle/Routing/PuzzleRouteHandler.php` | Routes `/puzzle/auth/*` | Nettoyer |
+| `src/puzzle/Routing/PuzzleRouteHandler.php` | Routes `/puzzle/auth/*` + toutes routes `/puzzle/*` | Adapter |
+| `src/auth_groups/Routing/Router.php` | Dispatch `segments[0]` uniquement | Adapter |
+| `src/auth_groups/Routing/RouteHandlers/V2RouteHandler.php` | Sub-dispatch `/v2/{module}/*` | Créer |
 | `src/auth_groups/Controllers/SubscriptionController.php` | 5 routes subscription | Réécrire |
+| `src/auth_groups/Controllers/StripeController.php` | Route `/stripe/webhook` | Supprimer |
+| `src/auth_groups/Routing/RouteHandlers/SubscriptionRouteHandler.php` | Routes `/subscription/*` | Supprimer |
+| `src/auth_groups/Routing/RouteHandlers/StripeRouteHandler.php` | Route `/stripe/webhook` | Supprimer |
 | `src/auth_groups/Models/Subscription.php` | Queries table `subscriptions` | Supprimer |
 | `src/auth_groups/Services/SubscriptionService.php` | Logique activation/expiration | Réécrire |
 | `src/auth_groups/Services/StripeService.php` | Stripe API, webhooks | Réécrire |
 | `src/auth_groups/Services/DeviceTokenService.php` | Tokens persistants login | Conserver |
+| `src/auth_groups/Controllers/AuthController.php` | Injecte `SubscriptionService::getAllStatuses` dans `/auth/me` | Adapter |
+| `src/auth_groups/Controllers/UserListController.php` | Injecte `SubscriptionService::getAllStatuses` dans liste users | Adapter |
+| `src/auth_groups/Services/MaintenanceService.php` | Expire `subscriptions` (UPDATE status) | Adapter |
+| `src/puzzle/Models/SharedPuzzle.php` | JOINs sur `puzzle_devices` (creator_id, partner_id, held_by_id, by_id, pseudonym, last_seen_at) | Adapter ⚠️ |
+| `src/puzzle/Services/MaintenanceService.php` | Nettoyage `puzzle_devices` (expired/inactive) | Adapter |
 | `src/cron/expire_subscriptions.php` | Expiration quotidienne | Réécrire |
+| `src/cron/backup/backup_puzzle.php` | Inclut `puzzle_devices` dans la sauvegarde | Adapter |
+| `src/cron/backup/backup_core.php` | Inclut `subscriptions` dans la sauvegarde | Adapter |
+| `src/auth_groups/Models/AppUserSettings.php` | Pseudonymes + settings par `(user_id, app_id)` | Créer |
+
+### Dépendance critique — SharedPuzzle ↔ puzzle_devices
+
+`puzzle_shared` et `puzzle_shared_events` utilisent `puzzle_devices.id` comme FK pour
+`creator_id`, `partner_id`, `held_by_id`, `by_id`. La colonne `pseudonym` de `puzzle_devices`
+est affichée dans les sessions partagées ; `last_seen_at` sert à détecter la présence du partenaire.
+
+**Impact sur Phase 2** : la nouvelle table `android_devices` ne contient pas `pseudonym`.
+Il faudra soit :
+
+- Ajouter `pseudonym` dans `android_devices`, ou
+- Créer une table `puzzle_pseudonyms(android_device_id, pseudonym)` séparée.
+
+Cette décision doit être prise avant d'écrire `AndroidDevice.php`.
+
+**Impact sur le schéma** : les FK dans `puzzle_shared` et `puzzle_shared_events`
+doivent pointer sur `android_devices.id` au lieu de `puzzle_devices.id`.
+
+**Décision pseudonyme (arrêtée)** : `pseudonym` stocké dans nouvelle table `app_user_settings(user_id, app_id)` avec `UNIQUE(app_id, pseudonym)`. Pas dans `android_devices` (pseudonyme doit survivre au changement de device). `items` rejeté (pas de contrainte UNIQUE DB sur JSON).
 
 ### Tables SQL à supprimer
 
@@ -54,13 +86,18 @@ device_tokens  -- login persistant multi-device, non lié aux abonnements
 
 ### Conditions de complétion
 
-- [ ] Inventaire complet : chaque fichier marqué Supprimer/Déplacer/Conserver/Réécrire
-- [ ] Aucune référence à `puzzle_devices` ou `subscriptions` dans le code actif
-- [ ] Liste des routes à supprimer documentée dans ce plan
+- [x] Inventaire complet : chaque fichier marqué Supprimer/Déplacer/Conserver/Réécrire/Adapter
+- [x] Toutes les références à `puzzle_devices` et `subscriptions` identifiées et couvertes par l'inventaire
+- [x] Liste des routes à supprimer documentée dans ce plan (voir Phase 5)
 
 ---
 
 ## Phase 1 — Nouveau schéma DB
+
+> **Environnement :** migration appliquée sur la base **locale uniquement** (`localhost`).
+> Stripe et Play Store ne sont pas impliqués à cette phase — pas besoin du serveur dev.
+> La base de production n'est jamais touchée avant Phase 8.
+> Voir [PLAN_environnement-dev-distant.md](PLAN_environnement-dev-distant.md) pour la stratégie d'environnement complète.
 
 ### Nouvelles tables
 
@@ -71,7 +108,7 @@ Enregistrement des devices Android par app. Aucune donnée d'abonnement.
 ```sql
 CREATE TABLE android_devices (
     id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id       BIGINT UNSIGNED NOT NULL,
+    user_id       int(11)         NOT NULL,
     app_id        VARCHAR(64)     NOT NULL,
     device_uuid   VARCHAR(64)     NOT NULL,
     device_token  VARCHAR(256)    NOT NULL,
@@ -84,6 +121,21 @@ CREATE TABLE android_devices (
 );
 ```
 
+#### `app_user_settings`
+
+Pseudonyme par `(user_id, app_id)`. Unique pour éviter la confusion dans les sessions partagées.
+
+```sql
+CREATE TABLE app_user_settings (
+    user_id   int(11)     NOT NULL,
+    app_id    VARCHAR(64) NOT NULL,
+    pseudonym VARCHAR(64) NULL,
+    PRIMARY KEY (user_id, app_id),
+    UNIQUE KEY uq_pseudo_app (app_id, pseudonym),
+    CONSTRAINT fk_aus_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+```
+
 #### `playstore_subscriptions`
 
 Un enregistrement par `(user_id, app_id, purchase_token)`. Le token est lié à l'utilisateur, pas au device.
@@ -91,7 +143,7 @@ Un enregistrement par `(user_id, app_id, purchase_token)`. Le token est lié à 
 ```sql
 CREATE TABLE playstore_subscriptions (
     id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id         BIGINT UNSIGNED NOT NULL,
+    user_id         int(11)         NOT NULL,
     app_id          VARCHAR(64)     NOT NULL,
     purchase_token  VARCHAR(512)    NOT NULL,
     product_id      VARCHAR(128)    NOT NULL,
@@ -113,7 +165,7 @@ Un enregistrement par `(user_id, app_id)`. Identifiant Stripe = email du user.
 ```sql
 CREATE TABLE stripe_subscriptions (
     id                   BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id              BIGINT UNSIGNED NOT NULL,
+    user_id              int(11)         NOT NULL,
     app_id               VARCHAR(64)     NOT NULL,
     stripe_customer_id   VARCHAR(64)     NOT NULL,
     stripe_subscription_id VARCHAR(64)   NULL,
@@ -142,17 +194,19 @@ Contenu :
 DROP TABLE IF EXISTS puzzle_devices;
 DROP TABLE IF EXISTS subscriptions;
 -- CREATE TABLE android_devices ... (voir ci-dessus)
+-- CREATE TABLE app_user_settings ... (voir ci-dessus)
 -- CREATE TABLE playstore_subscriptions ... (voir ci-dessus)
 -- CREATE TABLE stripe_subscriptions ... (voir ci-dessus)
 ```
 
 ### Conditions de complétion
 
-- [ ] `android_devices` créée, testée (insert, select, contraintes FK)
-- [ ] `playstore_subscriptions` créée, unicité `(purchase_token, app_id)` vérifiée
-- [ ] `stripe_subscriptions` créée, unicité `(user_id, app_id)` vérifiée
-- [ ] `puzzle_devices` et `subscriptions` supprimées
-- [ ] Fichier `docs/20260514_device_subscription_refonte.sql` écrit
+- [x] `android_devices` créée en local, testée (insert, select, contraintes FK)
+- [x] `app_user_settings` créée en local, unicité `(app_id, pseudonym)` vérifiée (conflit = 409)
+- [x] `playstore_subscriptions` créée en local, unicité `(purchase_token, app_id)` vérifiée
+- [x] `stripe_subscriptions` créée en local, unicité `(user_id, app_id)` vérifiée
+- [x] `puzzle_devices` et `subscriptions` supprimées de la base locale
+- [x] Fichier `docs/20260514_device_subscription_refonte.sql` écrit
 
 ---
 
@@ -163,10 +217,12 @@ DROP TABLE IF EXISTS subscriptions;
 ```tree
 src/playstore/
   Controllers/
-    DeviceController.php      # POST /v1/devices/android/register
-    SubscriptionController.php # POST /v1/subscriptions/playstore/verify
-                               # GET  /v1/subscriptions/playstore/status
-                               # DELETE /v1/subscriptions/playstore
+    DeviceController.php      # POST /v2/devices/android/register
+                              # GET|POST|DELETE /v2/devices/android/pseudonym
+                              # GET /v2/devices/android/pseudonym/check/{pseudo}
+    SubscriptionController.php # POST /v2/subscriptions/playstore/verify
+                               # GET  /v2/subscriptions/playstore/status
+                               # DELETE /v2/subscriptions/playstore
   Models/
     AndroidDevice.php
     PlaystoreSubscription.php
@@ -175,24 +231,53 @@ src/playstore/
     PlaystoreSubscriptionService.php
   Routing/
     PlaystoreRouteHandler.php
+
+src/auth_groups/Models/
+  AppUserSettings.php         # modèle transversal — namespace AuthGroups\Models
+                              # utilisé par playstore, stripe, et tout futur module
 ```
 
 ### Entrypoints
 
 | Méthode | URL | Auth | Description |
 | - | - | - | - |
-| POST | `/v1/devices/android/register` | JWT | Enregistre device_uuid, retourne device_token |
-| POST | `/v1/subscriptions/playstore/verify` | JWT | Valide purchase_token via Google, active l'abonnement |
-| GET | `/v1/subscriptions/playstore/status` | JWT | État actuel (status, expires_at, product_id) |
-| DELETE | `/v1/subscriptions/playstore` | JWT | Marque l'abonnement annulé côté API |
+| POST | `/v2/devices/android/register` | JWT | Enregistre device_uuid, retourne device_token |
+| GET | `/v2/devices/android/pseudonym` | JWT | Pseudonyme actuel pour `app_id` |
+| POST | `/v2/devices/android/pseudonym` | JWT | Définit ou remplace le pseudonyme (unique par app_id) |
+| DELETE | `/v2/devices/android/pseudonym` | JWT | Supprime le pseudonyme |
+| GET | `/v2/devices/android/pseudonym/check/{pseudo}` | JWT | Vérifie disponibilité d'un pseudonyme |
+| POST | `/v2/subscriptions/playstore/verify` | JWT | Valide purchase_token via Google, active l'abonnement |
+| GET | `/v2/subscriptions/playstore/status` | JWT | État actuel (status, expires_at, product_id) |
+| DELETE | `/v2/subscriptions/playstore` | JWT | Marque l'abonnement annulé côté API |
 
-### Logique `POST /v1/devices/android/register`
+### Logique `POST /v2/devices/android/register`
 
-1. Valider `device_uuid` (requis, format UUID v4)
+1. Valider `device_uuid` (requis, format UUID v4) et `app_id` (requis)
 2. Upsert dans `android_devices` : `device_token` = nouveau token aléatoire, `token_expires_at` = +365 jours
-3. Retourner `{device_token, expires_at}`
+3. Retourner `{device_token, expires_at, pseudonym}` (pseudonym = valeur dans `app_user_settings` ou `null`)
 
-### Logique `POST /v1/subscriptions/playstore/verify`
+### Logique `GET /v2/devices/android/pseudonym`
+
+1. `app_id` depuis query string (requis)
+2. Retourner `{pseudonym}` depuis `app_user_settings` pour `(user_id, app_id)`, ou `null`
+
+### Logique `POST /v2/devices/android/pseudonym`
+
+1. Valider `pseudonym` (requis, 2–64 chars, pas de caractères spéciaux dangereux) et `app_id`
+2. Upsert dans `app_user_settings` — si `(app_id, pseudonym)` pris par autre `user_id` : 409
+3. Retourner `{pseudonym}`
+
+### Logique `DELETE /v2/devices/android/pseudonym`
+
+1. `app_id` depuis body/query (requis)
+2. `UPDATE app_user_settings SET pseudonym = NULL WHERE user_id = ? AND app_id = ?`
+
+### Logique `GET /v2/devices/android/pseudonym/check/{pseudo}`
+
+1. `app_id` depuis query string (requis)
+2. Retourner `{available: bool}` — `false` si un autre `user_id` détient ce pseudonyme pour cet `app_id`
+
+### Logique `POST /v2/subscriptions/playstore/verify`
 
 1. Valider `purchase_token`, `product_id`, `app_id` (requis)
 2. Appel `GooglePlayService::validateSubscription(app_id, product_id, purchase_token)`
@@ -200,7 +285,7 @@ src/playstore/
 4. Si invalide : 422 avec message d'erreur Google
 5. Log de l'opération
 
-### Logique `GET /v1/subscriptions/playstore/status`
+### Logique `GET /v2/subscriptions/playstore/status`
 
 1. `app_id` depuis query string (optionnel, défaut = tous)
 2. Requête sur `playstore_subscriptions` par `(user_id, app_id)` le plus récent actif
@@ -213,10 +298,13 @@ Play Store actif → `android`, `web`, `windows` déverrouillés pour cet `app_i
 
 ### Conditions de complétion
 
-- [ ] `POST /v1/devices/android/register` fonctionnel, testé (register, re-register même uuid)
-- [ ] `POST /v1/subscriptions/playstore/verify` valide un vrai token Google Play Sandbox
-- [ ] `GET /v1/subscriptions/playstore/status` retourne état correct + sync temps réel
-- [ ] `DELETE /v1/subscriptions/playstore` marque annulé
+- [x] `POST /v2/devices/android/register` fonctionnel, testé (register, re-register même uuid)
+- [x] `POST /v2/devices/android/pseudonym` upsert correct, 409 si pseudo pris par autre user
+- [x] `GET /v2/devices/android/pseudonym/check/{pseudo}` retourne `available` correct
+- [x] `DELETE /v2/devices/android/pseudonym` met pseudonym à NULL
+- [ ] `POST /v2/subscriptions/playstore/verify` valide un vrai token Google Play Sandbox
+- [ ] `GET /v2/subscriptions/playstore/status` retourne état correct + sync temps réel
+- [x] `DELETE /v2/subscriptions/playstore` marque annulé
 - [ ] Tests dans `private/tests/test_playstore.php`
 
 ---
@@ -228,11 +316,11 @@ Play Store actif → `android`, `web`, `windows` déverrouillés pour cet `app_i
 ```tree
 src/stripe/
   Controllers/
-    BillingController.php     # POST /v1/billing/checkout
-                              # POST /v1/billing/portal
-                              # POST /v1/billing/webhook (public, sig Stripe)
-    SubscriptionController.php # GET  /v1/subscriptions/stripe/status
-                               # DELETE /v1/subscriptions/stripe
+    BillingController.php     # POST /v2/billing/checkout
+                              # POST /v2/billing/portal
+                              # POST /v2/billing/webhook (public, sig Stripe)
+    SubscriptionController.php # GET  /v2/subscriptions/stripe/status
+                               # DELETE /v2/subscriptions/stripe
   Models/
     StripeSubscription.php
   Services/
@@ -246,11 +334,11 @@ src/stripe/
 
 | Méthode | URL | Auth | Description |
 | - | - | - | - |
-| POST | `/v1/billing/checkout` | JWT | Crée session Stripe Checkout, retourne URL |
-| POST | `/v1/billing/portal` | JWT | Crée session Stripe Billing Portal, retourne URL |
-| POST | `/v1/billing/webhook` | Sig Stripe | Reçoit événements Stripe, met à jour `stripe_subscriptions` |
-| GET | `/v1/subscriptions/stripe/status` | JWT | État abonnement Stripe actuel |
-| DELETE | `/v1/subscriptions/stripe` | JWT | Annule l'abonnement Stripe (cancel_at_period_end) |
+| POST | `/v2/billing/checkout` | JWT | Crée session Stripe Checkout, retourne URL |
+| POST | `/v2/billing/portal` | JWT | Crée session Stripe Billing Portal, retourne URL |
+| POST | `/v2/billing/webhook` | Sig Stripe | Reçoit événements Stripe, met à jour `stripe_subscriptions` |
+| GET | `/v2/subscriptions/stripe/status` | JWT | État abonnement Stripe actuel |
+| DELETE | `/v2/subscriptions/stripe` | JWT | Annule l'abonnement Stripe (cancel_at_period_end) |
 
 ### Mapping Stripe → plateforme
 
@@ -262,11 +350,11 @@ Conserver la logique existante (`20260508_stripe_idempotency.sql`). La table `st
 
 ### Conditions de complétion
 
-- [ ] `POST /v1/billing/checkout` retourne une URL Stripe valide
-- [ ] `POST /v1/billing/webhook` traite `checkout.session.completed` et `customer.subscription.updated`
-- [ ] `GET /v1/subscriptions/stripe/status` retourne état correct
-- [ ] `DELETE /v1/subscriptions/stripe` déclenche `cancel_at_period_end=true` via Stripe API
-- [ ] Tests dans `private/tests/test_stripe.php`
+- [ ] `POST /v2/billing/checkout` retourne une URL Stripe valide
+- [ ] `POST /v2/billing/webhook` traite `checkout.session.completed` et `customer.subscription.updated`
+- [ ] `GET /v2/subscriptions/stripe/status` retourne état correct
+- [ ] `DELETE /v2/subscriptions/stripe` déclenche `cancel_at_period_end=true` via Stripe API
+- [ ] Tests dans `private/tests/test_stripe_v2.php`
 
 ---
 
@@ -276,7 +364,7 @@ Conserver la logique existante (`20260508_stripe_idempotency.sql`). La table `st
 
 | Méthode | URL | Auth | Description |
 | - | - | - | - |
-| GET | `/v1/access/status` | JWT | Statut premium consolidé, toutes sources |
+| GET | `/v2/access/status` | JWT | Statut premium consolidé, toutes sources |
 
 ### Query params
 
@@ -317,14 +405,59 @@ Conserver la logique existante (`20260508_stripe_idempotency.sql`). La table `st
 
 ### Conditions de complétion
 
-- [ ] Retourne `is_premium=true` si Play Store actif, `android=true`
-- [ ] Retourne `android=false` si uniquement Stripe actif
-- [ ] Retourne `is_premium=false` si les deux sont expirés
+- [x] Retourne `is_premium=true` si Play Store actif, `android=true`
+- [x] Retourne `android=false` si uniquement Stripe actif
+- [x] Retourne `is_premium=false` si les deux sont expirés
 - [ ] Testé avec combinaisons : aucun, seulement Play Store, seulement Stripe, les deux
 
 ---
 
-## Phase 5 — Destruction du code mort
+## Phase 5 — Destruction du code mort et versionnement des routes
+
+> **STOP — prérequis avant d'exécuter cette phase :**
+> Les directives clients (Phase 6) doivent avoir été envoyées ET chaque client concerné doit
+> avoir confirmé la migration vers les nouveaux endpoints. Détruire le code avant cette
+> confirmation brise les clients en production.
+
+### Infrastructure de routage v2
+
+Le router dispatch sur `segments[0]`. Pour supporter `/v2/*`, ajouter :
+
+```php
+// src/auth_groups/Routing/Router.php — initializeRouteHandlers()
+'v2' => fn() => new V2RouteHandler($auth),
+```
+
+`V2RouteHandler` sub-dispatch sur `segments[1]` :
+
+| `segments[1]` | Handler |
+| - | - |
+| `puzzle` | `PuzzleRouteHandler` (sans bloc `auth`) |
+| `devices` | `PlaystoreRouteHandler` → `DeviceController` |
+| `subscriptions` | `PlaystoreRouteHandler` ou `StripeRouteHandler` selon `segments[2]` |
+| `billing` | Nouveau `StripeRouteHandler` |
+| `access` | Nouveau `AccessRouteHandler` (Phase 4) |
+
+`PuzzleRouteHandler` adapté : lit `segments[2]` comme `$s1` (décalage de +1 quand appelé via V2).
+
+### Routes puzzle versionnées
+
+| Ancienne route | Nouvelle route |
+| - | - |
+| `GET /puzzle/carousel` | `GET /v2/puzzle/carousel` |
+| `POST /puzzle/carousel/replace-one` | `POST /v2/puzzle/carousel/replace-one` |
+| `POST /puzzle/carousel/replace-all` | `POST /v2/puzzle/carousel/replace-all` |
+| `GET /puzzle/themes` | `GET /v2/puzzle/themes` |
+| `GET /puzzle/themes/{slug}/images` | `GET /v2/puzzle/themes/{slug}/images` |
+| `GET /puzzle/thumb/{uid}` | `GET /v2/puzzle/thumb/{uid}` |
+| `GET /puzzle/thumb/theme/{slug}` | `GET /v2/puzzle/thumb/theme/{slug}` |
+| `GET /puzzle/image/{uid}` | `GET /v2/puzzle/image/{uid}` |
+| `GET\|POST /puzzle/backup` | `GET\|POST /v2/puzzle/backup` |
+| `POST /puzzle/backup/claim` | `POST /v2/puzzle/backup/claim` |
+| `GET\|POST\|DELETE /puzzle/shared[/*]` | `GET\|POST\|DELETE /v2/puzzle/shared[/*]` |
+| `GET\|POST /puzzle/admin/*` | `GET\|POST /v2/puzzle/admin/*` |
+| `POST /puzzle/auth/link-device` | `POST /v2/puzzle/auth/link-device` |
+| `GET\|POST\|DELETE /puzzle/auth/pseudonym` | Remplacé par `/v2/devices/android/pseudonym` |
 
 ### Fichiers à supprimer
 
@@ -333,11 +466,27 @@ src/puzzle/Models/PuzzleDevice.php
 src/puzzle/Controllers/AuthController.php
 src/puzzle/Services/GooglePlayService.php
 src/auth_groups/Controllers/SubscriptionController.php
+src/auth_groups/Controllers/StripeController.php
 src/auth_groups/Models/Subscription.php
 src/auth_groups/Services/SubscriptionService.php
 src/auth_groups/Services/StripeService.php
 src/auth_groups/Routing/RouteHandlers/SubscriptionRouteHandler.php
+src/auth_groups/Routing/RouteHandlers/StripeRouteHandler.php
 src/cron/expire_subscriptions.php
+```
+
+### Fichiers à créer / adapter
+
+```
+src/auth_groups/Routing/RouteHandlers/V2RouteHandler.php   # nouveau
+src/auth_groups/Routing/Router.php                          # ajouter clé 'v2'
+src/puzzle/Routing/PuzzleRouteHandler.php                   # supprimer bloc auth, décaler segments
+src/auth_groups/Controllers/AuthController.php              # retirer champ 'subscriptions' de login()
+src/auth_groups/Controllers/UserListController.php          # retirer champ 'subscriptions' de la réponse admin
+src/auth_groups/Services/MaintenanceService.php             # retirer expiration table subscriptions
+src/puzzle/Services/MaintenanceService.php                  # retirer nettoyage puzzle_devices
+src/cron/backup/backup_puzzle.php                           # retirer puzzle_devices de la liste
+src/cron/backup/backup_core.php                             # retirer subscriptions de la liste
 ```
 
 ### Routes à retirer
@@ -352,6 +501,10 @@ POST   /stripe/webhook
 POST   /puzzle/auth/register-device
 POST   /puzzle/auth/verify-subscription
 GET    /puzzle/auth/subscription-status
+GET    /puzzle/auth/pseudonym
+POST   /puzzle/auth/pseudonym
+DELETE /puzzle/auth/pseudonym
+GET    /puzzle/auth/check-pseudonym/{pseudo}
 ```
 
 ### Cron à réécrire
@@ -361,8 +514,13 @@ GET    /puzzle/auth/subscription-status
 
 ### Conditions de complétion
 
-- [ ] Aucun fichier listé ci-dessus n'existe plus
-- [ ] Aucune route listée n'est enregistrée dans les RouteHandlers actifs
+- [ ] Directives clients envoyées (Phase 6 complétée)
+- [ ] Confirmation migration reçue de chaque client affecté
+- [ ] `V2RouteHandler` dispatch correct sur `segments[1]` pour tous les modules v2
+- [ ] `/v2/puzzle/carousel` accessible, ancienne route `/puzzle/carousel` retourne 404
+- [ ] `POST /auth/login` ne retourne plus de champ `subscriptions`
+- [ ] Aucun fichier listé dans "Fichiers à supprimer" n'existe plus
+- [ ] Aucune route listée dans "Routes à retirer" n'est enregistrée
 - [ ] Cron jobs réécrits, testables manuellement
 - [ ] `grep -r "puzzle_devices\|SubscriptionService\|PuzzleDevice" src/` retourne 0 résultats
 
@@ -391,23 +549,67 @@ docs/core/API_ENDPOINTS_v2_0_0.json   -- retirer routes subscription/stripe supp
 
 Créer une directive inter-projet vers chaque client affecté :
 
-1. **Puzzle Android** — nouveaux entrypoints device + Play Store + accès unifié
-2. **Puzzle Web** — nouvel entrypoint `/v1/access/status` pour vérifier le premium
+1. **Puzzle Android** — nouveaux entrypoints device + Play Store + accès unifié + routes `/v2/puzzle/*`
+2. **Puzzle Web** — nouvel entrypoint `/v2/access/status` pour vérifier le premium + routes `/v2/puzzle/*`
 3. **Puzzle Windows** — idem Web
+4. ~~**Tous clients CMEM2 utilisant `POST /auth/login`**~~ — **annulé** : audit Phase 0 confirme
+   qu'aucun client local ne lit le champ `subscriptions` de la réponse login. Retrait sans directive.
+   Documenter dans CHANGELOG comme breaking change au cas où client inconnu.
 
 Modèle de directive : `c:\code\directives_inter_projet\_GABARIT.md`
 
+### Protocole de communication retour (client → API)
+
+Chaque directive envoyée aux clients **doit inclure** les deux sections suivantes :
+
+#### Confirmation de migration
+
+Quand le client a complété la migration :
+
+1. Créer une directive retour dans `c:\code\directives_inter_projet\` :
+   - Nom : `YYYYMMDD_HHMMSS_{client}_vers_cmem2_API__migration-v2.7.0-confirmée.md`
+   - `statut: complété` dès création (c'est une notification, pas une demande)
+   - Corps : liste des endpoints migrés, date de déploiement, version du client livrée
+
+2. Mettre à jour `_INDEX.md`.
+
+La directive Phase 5 (destruction) ne peut démarrer que lorsque **toutes** les directives
+de confirmation sont reçues.
+
+#### Demande d'ajustement / signalement de problème
+
+Si le client découvre un écart entre la spec et le comportement réel de l'API :
+
+1. Créer une directive dans `c:\code\directives_inter_projet\` :
+   - Nom : `YYYYMMDD_HHMMSS_{client}_vers_cmem2_API__ajustement-{sujet}.md`
+   - `statut: en_attente`
+   - Corps : endpoint concerné, comportement observé vs attendu, exemple req/resp
+
+2. L'API traite la demande et répond en mettant `statut: complété` ou `rejeté` avec explication.
+
+3. Si la correction modifie le contrat API, une nouvelle directive est envoyée au client
+   concerné avant de déployer le correctif.
+
 ### Conditions de complétion
 
-- [ ] `docs/playstore/GUIDE.md` couvre register-device + verify + status
+- [ ] `docs/playstore/GUIDE.md` couvre register-device + verify + status + pseudonyme
 - [ ] `docs/stripe/GUIDE.md` couvre checkout + portal + webhook + status
-- [ ] `docs/access/API_ACCESS_ENDPOINTS.json` couvre GET /v1/access/status
-- [ ] Directives créées pour chaque client Puzzle (Android, Web, Windows)
-- [ ] `docs/puzzle/API_PUZZLE_ENDPOINTS.json` nettoyé (sans routes subscription)
+- [ ] `docs/access/API_ACCESS_ENDPOINTS.json` couvre GET /v2/access/status
+- [ ] Directive créée : Puzzle Android (device, Play Store, v2/puzzle/*)
+- [ ] Directive créée : Puzzle Web/Windows (accès unifié, v2/puzzle/*)
+- [ ] CHANGELOG.md mentionne retrait champ `subscriptions` de `POST /auth/login` (breaking change, aucun client local affecté)
+- [ ] `docs/puzzle/API_PUZZLE_ENDPOINTS.json` nettoyé (sans routes subscription, routes v2)
+- [ ] Chaque directive inclut les sections "Confirmation de migration" et "Demande d'ajustement"
 
 ---
 
 ## Phase 7 — Tests et validation
+
+> **Environnement : serveur dev (`dev-cmem2.journauxdebord.com`).**
+> Les tests d'intégration Play Store Sandbox et Stripe nécessitent une URL publique HTTPS.
+> Les tests API (`private/tests/`) pointent sur `https://dev-cmem2.journauxdebord.com`.
+> Aucun test ne touche la base ou le serveur de production avant Phase 8.
+> Voir [PLAN_environnement-dev-distant.md](PLAN_environnement-dev-distant.md).
 
 ### Fichiers de tests à créer
 
@@ -453,6 +655,10 @@ private/tests/test_access.php
 
 ## Phase 8 — Release v2.7.0
 
+> **Premier contact avec la production.**
+> C'est ici seulement que la migration SQL et le nouveau code sont déployés
+> sur le serveur réel. Tous les STOP obligatoires s'appliquent.
+
 ### Étapes
 
 1. Mettre à jour `CHANGELOG.md`
@@ -491,7 +697,20 @@ Mettre à jour `PLAN_refonte-v3.0.0.md` Phase 1 pour référencer les routes v2.
 ## Ordre de livraison recommandé
 
 ```
-Phase 0 → Phase 1 → Phase 2 → Phase 3 → Phase 4 → Phase 5 → Phase 6 → Phase 7 → Phase 8
+Phase 0 → Phase 1 → Phase 2 → Phase 3 → Phase 4
+                                              ↓
+                                         Phase 7 (tests)
+                                              ↓
+                                         Phase 6 (docs + directives clients)
+                                              ↓
+                                    [attente confirmation migration]
+                                              ↓
+                                         Phase 5 (destruction)
+                                              ↓
+                                         Phase 8 (release)
 ```
 
-Phases 2 et 3 peuvent être parallélisées si deux branches de travail distinctes.
+**Phases 2 et 3** peuvent être parallélisées si deux branches de travail distinctes.
+
+**Cohabitation obligatoire** : après Phase 4, anciens et nouveaux endpoints coexistent.
+Les anciens ne sont détruits (Phase 5) qu'après confirmation explicite de tous les clients concernés.

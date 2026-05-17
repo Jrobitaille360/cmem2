@@ -20,7 +20,10 @@
             "Items\\": "src/items/",
             "Pomo\\": "src/pomo/",
             "Quiz\\": "src/quiz/",
-            "Puzzle\\": "src/puzzle/"
+            "Puzzle\\": "src/puzzle/",
+            "Playstore\\": "src/playstore/",
+            "Stripe\\": "src/stripe/",
+            "Access\\": "src/access/"
         },
         "files": [
             "src/auth_groups/database.php"

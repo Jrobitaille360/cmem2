@@ -13,7 +13,8 @@ use AuthGroups\Routing\RouteHandlers\{
     SecretAdminRouteHandler,
     PlanRouteHandler,
     SubscriptionRouteHandler,
-    StripeRouteHandler
+    StripeRouteHandler,
+    V2RouteHandler
 };
 use AuthGroups\Services\{AuthService, LogService};
 use AuthGroups\Utils\Response;
@@ -47,6 +48,7 @@ class Router
             'plans'        => fn() => new PlanRouteHandler($auth),
             'subscription' => fn() => new SubscriptionRouteHandler($auth),
             'stripe'       => fn() => new StripeRouteHandler(),
+            'v2'           => fn() => new V2RouteHandler($auth),
         ];
 
         $this->loadPluginRouteHandlers();
