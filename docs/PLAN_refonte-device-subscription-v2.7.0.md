@@ -307,6 +307,8 @@ Play Store actif → `android`, `web`, `windows` déverrouillés pour cet `app_i
 - [x] `DELETE /v2/subscriptions/playstore` marque annulé
 - [ ] Tests dans `private/tests/test_playstore.php`
 
+> **Code implémenté.** Items POST verify + GET status + tests : validation en Phase 7 (dev server HTTPS requis).
+
 ---
 
 ## Phase 3 — Module Stripe (réécriture)
@@ -355,6 +357,8 @@ Conserver la logique existante (`20260508_stripe_idempotency.sql`). La table `st
 - [ ] `GET /v2/subscriptions/stripe/status` retourne état correct
 - [ ] `DELETE /v2/subscriptions/stripe` déclenche `cancel_at_period_end=true` via Stripe API
 - [ ] Tests dans `private/tests/test_stripe_v2.php`
+
+> **Code implémenté** (`src/stripe/` — tous les fichiers). Toutes les conditions requièrent Stripe API ou dev server HTTPS — validation en Phase 7.
 
 ---
 
@@ -409,6 +413,8 @@ Conserver la logique existante (`20260508_stripe_idempotency.sql`). La table `st
 - [x] Retourne `android=false` si uniquement Stripe actif
 - [x] Retourne `is_premium=false` si les deux sont expirés
 - [ ] Testé avec combinaisons : aucun, seulement Play Store, seulement Stripe, les deux
+
+> **Code implémenté** (`src/access/`). Dernier item (tests combinaisons) : validation en Phase 7.
 
 ---
 
@@ -697,9 +703,9 @@ Mettre à jour `PLAN_refonte-v3.0.0.md` Phase 1 pour référencer les routes v2.
 ## Ordre de livraison recommandé
 
 ```
-Phase 0 → Phase 1 → Phase 2 → Phase 3 → Phase 4
+Phase 0 → Phase 1 → Phase 2 → Phase 3 → Phase 4   ← CODE COMPLET (2026-05-17)
                                               ↓
-                                         Phase 7 (tests)
+                                         Phase 7 (tests)   ← PROCHAINE ÉTAPE
                                               ↓
                                          Phase 6 (docs + directives clients)
                                               ↓
