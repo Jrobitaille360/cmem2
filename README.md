@@ -1,6 +1,6 @@
 ﻿# cmem2 API
 
-![Version](https://img.shields.io/badge/version-2.6.5-blue.svg)
+![Version](https://img.shields.io/badge/version-2.7.0-blue.svg)
 ![PHP](https://img.shields.io/badge/PHP-8.0+-purple.svg)
 ![Status](https://img.shields.io/badge/status-production%20ready-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
@@ -63,8 +63,8 @@ mysql -u root -p < docs/build_cmem2_DB.sql
 Configurer l'environnement :
 
 ```bash
-cp .env.auth_groups.example .env.auth_groups
-# éditer .env.auth_groups avec vos valeurs
+cp .env.example .env
+# éditer .env avec vos valeurs
 ```
 
 Permissions :
@@ -82,23 +82,41 @@ composer serve
 
 ## Configuration
 
-Toutes les variables sont dans `.env.auth_groups` (ne pas versionner).
+Toutes les variables sont dans `.env` (gitignored). Gabarit : [`.env.example`](.env.example).
 
-| Variable | Description | Exemple |
-| --- | --- | --- |
-| `DB_HOST` | Hôte MySQL | `localhost` |
-| `DB_NAME` | Nom de la base | `cmem2_db` |
-| `DB_USER` | Utilisateur | `root` |
-| `DB_PASS` | Mot de passe | — |
-| `JWT_SECRET` | Clé HMAC ≥ 32 chars **(obligatoire)** | — |
-| `JWT_EXPIRY_DAYS` | Durée JWT | `15` |
-| `OTP_EXPIRY_MINUTES` | Durée code OTP | `15` |
-| `MAIL_HOST` | Serveur SMTP | `smtp.example.com` |
-| `MAIL_PORT` | Port SMTP | `587` |
-| `MAIL_USERNAME` | Courriel SMTP | — |
-| `MAIL_PASSWORD` | Mot de passe SMTP | — |
-| `MAIL_FROM` | Expéditeur | `no_reply@journauxdebord.com` |
-| `MAINTENANCE_MODE` | Mode maintenance | `false` |
+### Variables dépendantes de l'environnement
+
+Ces variables changent selon la cible de déploiement (marquées `↓ à ajuster` dans `.env`) :
+
+| Variable | dev.local | dev.online | prod |
+| - | - | - | - |
+| `APP_ENV` | `development` | `development` | `production` |
+| `APP_DEBUG` | `true` | `true` | `false` |
+| `DB_HOST` | `localhost` | `nom de l'hôte de developpement` | `nom de l'hôte' de production` |
+| `DB_NAME` | `nom de la base de donnée en développement local` | `nom de la base de donnée en développement online` | `nom de la base de donnée en production` |
+| `APP_URL` / `BASE_URL` | `http://localhost/api` | `https://dev-votre_site.com` | `https://api.votre_site.com` |
+| `BASE_PATH` | `/api` | `/` | `/` |
+| `ALLOWED_ORIGINS` | origines localhost | domaine dev | domaine prod |
+| `LOG_LEVEL` | `debug` | `debug` | `info` |
+| `LOG_DIR` | `logs/` | `/home/xxx/logs/` | `/home/xxx/logs/` |
+| `BACKUP_DIR` | chemin local | `/home/xxx/backups/` | `/home/xxx/backups/` |
+| `STRIPE_SECRET_KEY` | `sk_test_…` | `sk_test_…` | `sk_live_…` |
+| `PUZZLE_DEBUG_PREMIUM` | `false` | `false` | `false` |
+
+### Variables sensibles
+
+À ne jamais committer. Générer des valeurs fortes en production :
+
+| Variable | Description |
+| - | - |
+| `JWT_SECRET` | Clé HMAC HS256 — minimum 32 caractères |
+| `ADMIN_SECRET_KEY` | Clé d'accès à l'API d'administration |
+| `SECRET_ADMIN_ENDPOINT` | Segment d'URL de l'endpoint admin |
+| `DB_PASS` | Mot de passe MySQL |
+| `SMTP_PASSWORD` | Mot de passe SMTP |
+| `BACKUP_PASSPHRASE` | Passphrase de chiffrement des backups |
+| `STRIPE_SECRET_KEY` | Clé secrète Stripe (`sk_test_` ou `sk_live_`) |
+| `STRIPE_WEBHOOK_SECRET` | Secret de signature webhook Stripe |
 
 ## Architecture
 
@@ -138,8 +156,7 @@ cmem2_API/
 │   ├── pomo/                  # Documentation plugin Pomo
 │   └── quiz/                  # Documentation plugin Quiz
 ├── uploads/                   # Fichiers uploadés (avatars, groupes)
-├── tmp_assets/                # Fichiers temporaires / exports
-└── private/                   # Scripts maintenance (non exposés)
+└── tmp_assets/                # Fichiers temporaires / exports
 ```
 
 Namespaces PSR-4 :
@@ -377,4 +394,4 @@ MIT — voir [LICENSE](LICENSE). Dépendances tierces : [THIRD_PARTY_LICENSES.md
 
 ---
 
-**Version** : 2.4.1 · **Mis à jour** : 2026-04-30 · **Auteur** : [Jrobitaille360](https://github.com/Jrobitaille360)
+**Version** : 2.7.0 · **Mis à jour** : 2026-05-17 · **Auteur** : [Jrobitaille360](https://github.com/Jrobitaille360)

@@ -52,8 +52,6 @@ define('APP_URL', $_ENV['APP_URL'] ?? 'http://localhost');
 define('APP_NAME', $_ENV['APP_NAME'] ?? 'Collective Memories API');
 define('APP_VERSION', $_ENV['APP_VERSION'] ?? '2.4.0');
 
-// Configuration de l'API
-define('API_VERSION', 'v1');
 define('BASE_URL',  $_ENV['BASE_URL']  ?? (APP_ENV === 'production' ? 'https://cmem1.journauxdebord.com' : 'http://localhost'));
 define('BASE_PATH', $_ENV['BASE_PATH'] ?? '/cmem2_API');
 

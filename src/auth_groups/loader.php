@@ -54,20 +54,6 @@ function initializeDirectories(): void {
     
     }
 
-/**
- * Affichage des informations de configuration (debug uniquement)
- */
-function displayConfigurationInfo(): void {
-    // Fonction désactivée pour éviter les problèmes de headers HTTP
-    return;
-    
-    /* echo "<!-- Configuration Modulaire Chargée:\n";
-    echo "- Environnement: " . APP_ENV . "\n";
-    echo "- Base URL: " . BASE_URL . "\n";
-    echo "- Version API: " . API_VERSION . "\n";
-    echo "-->\n"; */
-}
-
 // Exécuter l'initialisation
 $config_errors = validateConfiguration();
 
@@ -90,9 +76,6 @@ if (!empty($config_errors)) {
 } else {
     // Initialiser les répertoires si la configuration est valide
     initializeDirectories();
-    
-    // Afficher les infos de debug si nécessaire
-    displayConfigurationInfo();
 }
 
 // ============================================================================
