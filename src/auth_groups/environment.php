@@ -259,6 +259,7 @@ define('JWT_EXPIRY_DAYS', (int)($_ENV['JWT_EXPIRY_DAYS'] ?? 15));
 // ============================================
 define('OTP_EXPIRY_MINUTES', (int)($_ENV['OTP_EXPIRY_MINUTES'] ?? 15));
 define('OTP_MAX_ATTEMPTS', (int)($_ENV['OTP_MAX_ATTEMPTS'] ?? 5));
+define('TMP_CODE', $_ENV['TMP_CODE'] ?? '');
 
 // ============================================
 // DEVICE TOKENS - Appareils de confiance

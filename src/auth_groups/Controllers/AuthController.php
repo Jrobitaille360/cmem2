@@ -166,7 +166,8 @@ class AuthController
         }
 
         try {
-            $code         = OtpService::generateAndStore($email);
+            $forceCode    = (defined('APP_ENV') && APP_ENV === 'development' && defined('TMP_CODE') && TMP_CODE !== '') ? TMP_CODE : null;
+            $code         = OtpService::generateAndStore($email, $forceCode);
             $emailService = new EmailService();
             $emailService->sendOtpCode($email, $userData['name'], $code);
         } catch (Exception $e) {

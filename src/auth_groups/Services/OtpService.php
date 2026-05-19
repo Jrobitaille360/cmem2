@@ -20,12 +20,12 @@ class OtpService
      * Génère un code OTP à 6 chiffres, le stocke hashé en base et retourne
      * le code en clair (à envoyer par email).
      */
-    public static function generateAndStore(string $email): string
+    public static function generateAndStore(string $email, ?string $forceCode = null): string
     {
         $expiryMinutes = defined('OTP_EXPIRY_MINUTES') ? (int) OTP_EXPIRY_MINUTES : self::DEFAULT_EXPIRY;
         $maxAttempts   = defined('OTP_MAX_ATTEMPTS')   ? (int) OTP_MAX_ATTEMPTS   : self::MAX_ATTEMPTS;
 
-        $code = str_pad((string) random_int(0, 999999), self::CODE_LENGTH, '0', STR_PAD_LEFT);
+        $code = $forceCode ?? str_pad((string) random_int(0, 999999), self::CODE_LENGTH, '0', STR_PAD_LEFT);
         $hash = password_hash($code, PASSWORD_BCRYPT);
 
         $pdo = \Database::getInstance()->getConnection();

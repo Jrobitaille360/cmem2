@@ -7,6 +7,17 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-05-20]
+
+### Tests — OTP dev sans injection DB directe (21.6)
+
+- **`OtpService::generateAndStore()`** — paramètre optionnel `?string $forceCode = null` : si fourni, utilisé à la place du code aléatoire
+- **`AuthController::sendCode()`** — en `APP_ENV=development`, passe `TMP_CODE` (défini dans `.env.dev.*`) à `generateAndStore()` pour rendre le code OTP prévisible dans les tests
+- **`environment.php`** — `define('TMP_CODE', $_ENV['TMP_CODE'] ?? '')` ; valeur `654321` dans `.env.dev.local` et `.env.dev.online` uniquement
+- **`test_users.php` 21.6** — remplace l'injection PDO directe (`injectOtpCode`) par un appel HTTP `POST /auth/send-code` suivi de `POST /auth/verify-code` avec `654321` ; SKIP propre si env non-dev
+
+---
+
 ## [Unreleased 2026-05-19 23:00]
 
 ### v2 API — Modules Playstore, Stripe, Access (feat — b88cbfa)
