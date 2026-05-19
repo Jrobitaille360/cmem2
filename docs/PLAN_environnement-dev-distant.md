@@ -19,8 +19,8 @@ Le serveur dev est l'environnement de développement actif de cmem2_API.
 | Domaine | `dev-cmem2.journauxdebord.com` |
 | Base de données | `lmdkhdg5_dev_cmem2` |
 | DB user / password | Identiques à la production (dans `.env` uniquement — jamais versionné) |
-| Serveur | Même hébergeur que production, compte séparé |
-| `.env` | Clés Sandbox uniquement (Stripe test mode, Google Play Sandbox) |
+| Serveur | Même hébergeur et même compte SSH (`lmdkhdg5`) que production — répertoire séparé |
+| `.env` | Clés Sandbox uniquement (Stripe test mode, Google Play Sandbox) — source : `private/.env.dev.online` |
 
 Le serveur de production (`cmem2.journauxdebord.com`, DB `cmem2`) n'est jamais
 touché hors release officielle.
@@ -35,22 +35,33 @@ Règle absolue : tout changement transite par git avant d'atterrir sur le serveu
 Aucune édition directe sur le serveur sans commit préalable.
 
 ```
-[local]  →  git push  →  [dev server] git pull
+[local]  →  git push  →  .\private\deploy.ps1 -Target dev.online  →  [serveur dev via SCP]
 ```
 
 ---
 
 ## Workflow quotidien
 
-```bash
+```powershell
 # Local : éditer, tester unitairement, committer
 git add .
 git commit -m "..."
 git push origin <branche>
 
-# Serveur dev (SSH)
-git pull origin <branche>
+# Déployer sur le serveur dev (SCP + composer)
+.\private\deploy.ps1 -Target dev.online
+
+# Déployer en production (confirmation requise)
+.\private\deploy.ps1 -Target prod
 ```
+
+Le script `deploy.ps1` :
+
+1. Prépare le dossier distant (`mkdir -p`)
+2. Upload le `.env` correspondant (`private/.env.<target>`)
+3. Transfère les fichiers sources via SCP (`index.php`, `src/`, `composer.*`, etc.)
+4. Exécute `composer install --no-dev --optimize-autoloader` via SSH
+5. Injecte `APP_COMMIT` et `APP_DEPLOYED_AT` dans le `.env` distant
 
 ---
 
@@ -58,7 +69,7 @@ git pull origin <branche>
 
 | Besoin | Approche |
 | - | - |
-| Édition code | Local, push git, pull sur serveur |
+| Édition code | Local, commit + push, puis `deploy.ps1` |
 | Inspection live serveur | VSCode Remote-SSH dans fenêtre séparée |
 | Docs | Locales, dans le repo, git comme pont |
 

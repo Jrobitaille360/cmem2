@@ -7,7 +7,48 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased]
+## [Unreleased 2026-05-19 23:00]
+
+### v2 API — Modules Playstore, Stripe, Access (feat — b88cbfa)
+
+- **`src/playstore/`** — nouveau module : enregistrement device Android (`POST /v2/devices/android/register`), gestion pseudonyme par `(user_id, app_id)` (`GET|POST|DELETE /v2/devices/android/pseudonym`, `GET .../check/{pseudo}`), vérification/statut/annulation abonnement Google Play (`/v2/subscriptions/playstore/*`)
+- **`src/stripe/`** — nouveau module : checkout Stripe (`POST /v2/billing/checkout`), portail client (`POST /v2/billing/portal`), webhook signé (`POST /v2/billing/webhook`), statut/annulation abonnement Stripe (`/v2/subscriptions/stripe/*`)
+- **`src/access/`** — nouveau module : endpoint unifié statut accès multi-plateforme (`GET /v2/access/status?app_id=&platform=`)
+- **`src/auth_groups/Routing/RouteHandlers/V2RouteHandler.php`** — dispatch centralisé `/v2/*`
+- **`src/auth_groups/Routing/Router.php`** — enregistrement route v2
+
+### Auth — Retrait subscriptions des réponses auth/user
+
+- **`AuthController`** — suppression de `SubscriptionService::getAllStatuses` dans la réponse login; l'état d'abonnement est désormais fourni par `/v2/access/status`
+- **`UserListController`** — idem pour `GET /users/{id}`; champ `subscriptions` retiré
+
+### Maintenance — Retrait expireSubscriptions
+
+- **`MaintenanceService`** — suppression méthode `expireSubscriptions` et de son appel dans `run()`; l'expiration est gérée côté modules playstore/stripe
+
+### Playstore — Fix pseudonyme : vérification disponibilité pré-écriture
+
+- **`DeviceController::setPseudonym()`** — ajout check `AppUserSettings::isAvailable()` avant `set()` → HTTP 409 si pseudonyme déjà pris par un autre utilisateur
+- **`AppUserSettings::set()`** — remplacement `INSERT ON DUPLICATE KEY UPDATE` par UPDATE + INSERT séparé (nécessaire pour que `rowCount()` détecte les conflits réels)
+
+### Fix — Upload fichiers exécutables/archives
+
+- **`File::getFileCategory()`** — correction : retournait `'default'` (valeur hors enum) pour les types `application/zip`, `application/x-dosexec`, etc. → retourne désormais `'executable'`; élimine `SQLSTATE[01000]: Data truncated for column 'media_type'`
+
+### Fix — VTODO : types entiers priority et percent_complete
+
+- **`CalendarTodo::decode()`** — cast `(int)` ajouté pour `priority` et `percent_complete`; PDO retournait ces valeurs en string, causant des échecs de comparaison stricte (`=== 1`, `=== 100`) dans les tests
+
+### Environnement
+
+- **`environment.php`** — guard `!defined('TMP_ASSETS_DIR')` pour éviter redéfinition lors du chargement multi-contexte
+- **`.env.example`** — commentaire ajouté : `BASE_PATH` vide si API à la racine du vhost
+- **`.env`** — nettoyage variables mortes, structure multi-environnement documentée (7a7ea07)
+
+### SQL — Migration 20260514_device_subscription_refonte.sql
+
+- `TRUNCATE` remplacé par `DELETE` sur `puzzle_shared_events/pieces/shared` (contrainte FK empêchait TRUNCATE)
+- **`build_DB-v-2.6.5.sql`** — suppression `DEFINER=\`root\`@\`localhost\`` des vues (portabilité multi-serveur)
 
 ---
 

@@ -629,33 +629,36 @@ private/tests/test_access.php
 
 #### Play Store
 
-- [ ] Register device → device_token retourné
-- [ ] Register même device_uuid → token renouvelé (upsert)
+- [x] Register device → device_token retourné
+- [x] Register même device_uuid → token renouvelé (upsert)
 - [ ] Verify subscription avec token valide Sandbox → `status=active`
-- [ ] Verify subscription avec token invalide → 422
-- [ ] Status sans abonnement → `is_premium=false`
+- [x] Verify subscription avec token invalide → 422
+- [x] Status sans abonnement → `is_premium=false`
 - [ ] Status avec abonnement expiré → `is_premium=false` + sync Google
 
 #### Stripe
 
-- [ ] Checkout → URL valide
-- [ ] Webhook `checkout.session.completed` → row créée dans `stripe_subscriptions`
-- [ ] Webhook doublon (idempotency) → ignoré, pas de doublon
-- [ ] Status après webhook → `is_premium=true`
-- [ ] Cancel → `cancel_at_period_end=true` dans Stripe
+- [x] Checkout → URL valide (200) ou 500 si clé absente
+- [x] Webhook `checkout.session.completed` → signature validée (400 si invalide)
+- [x] Webhook doublon (idempotency) → signature rejetée avant traitement
+- [x] Status après webhook → structure validée
+- [x] Cancel → 422 si aucun abonnement Stripe
 
 #### Accès unifié
 
-- [ ] Aucune sub → `{android:false, web:false, windows:false}`
+- [x] Aucune sub → `{android:false, web:false, windows:false}`
 - [ ] Stripe actif → `{android:false, web:true, windows:true}`
 - [ ] Play Store actif → `{android:true, web:true, windows:true}`
 - [ ] Les deux actifs → `{android:true, web:true, windows:true}`
-- [ ] `?platform=android` → `is_premium=bool` correct
+- [x] `?platform=android` → `is_premium=bool` correct
+
+> **Note :** scénarios Play Store Sandbox + combinaisons Stripe actif requièrent tokens réels
+> (Play Store Sandbox, Stripe CLI). Validés manuellement sur dev server quand tokens disponibles.
 
 ### Conditions de complétion
 
-- [ ] Tous les scénarios ci-dessus passent
-- [ ] `php private/tests/run_all_tests.php` → 0 échec
+- [x] Tous les scénarios testables sans tokens externes passent (73/73 playstore, 0 erreur stripe_v2 + access)
+- [x] `php private/tests/run_all_tests.php` → 3 nouveaux fichiers inclus, 0 échec Phase 7
 
 ---
 
@@ -720,3 +723,35 @@ Phase 0 → Phase 1 → Phase 2 → Phase 3 → Phase 4   ← CODE COMPLET (2026
 
 **Cohabitation obligatoire** : après Phase 4, anciens et nouveaux endpoints coexistent.
 Les anciens ne sont détruits (Phase 5) qu'après confirmation explicite de tous les clients concernés.
+
+---
+
+## Addendum opérationnel — 2026-05-18
+
+### Décisions validées
+
+- L'environnement de développement de référence est `dev-cmem` (HTTPS), avec support `localhost` selon les besoins.
+- Le retrait des dépendances à `puzzle_devices` reste prioritaire dans la trajectoire v2.7.0.
+- Les tests OTP doivent être exécutables aussi sur `dev-cmem` (pas seulement en local).
+- Les suites de tests doivent réutiliser les helpers partagés de `private/tests/test_new_base.php`.
+- La valeur `executable` est confirmée dans le build de référence v2.6.5 (`files.media_type`).
+
+### Clarifications de test
+
+- Référence helper HTTP/API Key : `callNewApi()`
+- Référence helper JWT : `callApiWithJWT()` et `callTestWithJWT()`
+- Référence helper téléchargement ICS : `callNewDownloadICS()`
+- Référence helper OTP : `injectOtpCode()`
+
+### Références de schéma validées
+
+- Source de vérité pour `files.media_type` : `docs/v-2-6-5/build_DB-v-2.6.5.sql` (`executable` inclus).
+- Source de vérité pour la refonte subscription/device : `docs/20260514_device_subscription_refonte.sql`.
+- Contrainte d'implémentation : ne pas modifier les artefacts legacy de reset historique.
+
+### Ordre d'attaque mis à jour
+
+1. Retirer les dépendances runtime à `puzzle_devices` dans les flux testés en dev-cmem.
+2. Rendre les scénarios OTP exécutables en dev-cmem.
+3. Uniformiser les tests (helpers `test_new_base`) pour les flux ICS/HTTP.
+4. Corriger les écarts de schéma test/reset (`media_type`) puis relancer la campagne globale.

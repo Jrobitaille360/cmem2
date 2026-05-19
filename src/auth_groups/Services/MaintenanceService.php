@@ -43,8 +43,6 @@ class MaintenanceService implements MaintenanceTaskInterface
         $this->purgeEmailVerifications($db, $result);
         $this->purgePasswordResets($db, $result);
         $this->cleanupSessions($db, $result);
-        $this->expireSubscriptions($db, $result);
-
         return $result;
     }
 
@@ -329,29 +327,4 @@ class MaintenanceService implements MaintenanceTaskInterface
         }
     }
 
-    private function expireSubscriptions(\PDO $db, array &$result): void
-    {
-        try {
-            $sql = "
-                UPDATE subscriptions
-                SET status = 'expired'
-                WHERE status = 'active'
-                  AND expires_at < NOW()
-            ";
-
-            if ($this->dryRun) {
-                $stmt = $db->prepare("SELECT COUNT(*) FROM subscriptions WHERE status = 'active' AND expires_at < NOW()");
-                $stmt->execute();
-                $result['rows_updated']['subscriptions (→ expired)'] = (int) $stmt->fetchColumn();
-                return;
-            }
-
-            $stmt = $db->prepare($sql);
-            $stmt->execute();
-            $result['rows_updated']['subscriptions (→ expired)'] = $stmt->rowCount();
-        } catch (\Throwable $e) {
-            $result['errors'][] = 'expireSubscriptions: ' . $e->getMessage();
-            LogService::error('Maintenance[auth_groups] expireSubscriptions', ['exception' => $e->getMessage()]);
-        }
-    }
 }

@@ -221,7 +221,7 @@ class File extends BaseModel
             'application/octet-stream',
         ]))
         {
-            return 'default';
+            return 'executable';
         }
         else
         {

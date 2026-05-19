@@ -222,6 +222,12 @@ class CalendarTodo extends BaseModel
         if (isset($row['is_all_day'])) {
             $row['is_all_day'] = (bool) $row['is_all_day'];
         }
+        if (isset($row['priority'])) {
+            $row['priority'] = (int) $row['priority'];
+        }
+        if (isset($row['percent_complete'])) {
+            $row['percent_complete'] = (int) $row['percent_complete'];
+        }
         return $row;
     }
 }

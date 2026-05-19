@@ -11,7 +11,6 @@ use AuthGroups\Services\DeviceTokenService;
 use AuthGroups\Services\EmailService;
 use AuthGroups\Services\LogService;
 use AuthGroups\Services\UserSessionService;
-use AuthGroups\Services\SubscriptionService;
 use AuthGroups\Utils\Response;
 use AuthGroups\Utils\Validator;
 use AuthGroups\Middleware\LoggingMiddleware;
@@ -520,7 +519,6 @@ class AuthController
                 'email' => $userData['email'],
                 'role'  => $userData['role'],
             ],
-            'subscriptions' => SubscriptionService::getAllStatuses((int) $userData['id']),
         ];
 
         if ($deviceToken !== null) {

@@ -27,12 +27,17 @@ class AppUserSettings extends BaseModel
 
     public function set(int $userId, string $appId, string $pseudonym): void
     {
-        $stmt = $this->getDb()->prepare(
-            "INSERT INTO {$this->table} (user_id, app_id, pseudonym)
-             VALUES (?, ?, ?)
-             ON DUPLICATE KEY UPDATE pseudonym = VALUES(pseudonym)"
+        $db = $this->getDb();
+        $upd = $db->prepare(
+            "UPDATE {$this->table} SET pseudonym = ? WHERE user_id = ? AND app_id = ?"
         );
-        $stmt->execute([$userId, $appId, $pseudonym]);
+        $upd->execute([$pseudonym, $userId, $appId]);
+
+        if ($upd->rowCount() === 0) {
+            $db->prepare(
+                "INSERT INTO {$this->table} (user_id, app_id, pseudonym) VALUES (?, ?, ?)"
+            )->execute([$userId, $appId, $pseudonym]);
+        }
     }
 
     public function clear(int $userId, string $appId): void

@@ -87,8 +87,16 @@ class DeviceController
             return;
         }
 
+        $model = new AppUserSettings();
+
+        if (!$model->isAvailable($appId, $pseudonym, $userId)) {
+            LoggingMiddleware::logExit(409);
+            Response::error('Pseudonyme déjà pris', null, 409);
+            return;
+        }
+
         try {
-            (new AppUserSettings())->set($userId, $appId, $pseudonym);
+            $model->set($userId, $appId, $pseudonym);
         } catch (\PDOException $e) {
             if ($e->getCode() === '23000') {
                 LoggingMiddleware::logExit(409);

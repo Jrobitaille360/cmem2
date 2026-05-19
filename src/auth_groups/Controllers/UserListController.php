@@ -3,7 +3,6 @@
 namespace AuthGroups\Controllers;
 
 use AuthGroups\Models\User;
-use AuthGroups\Services\SubscriptionService;
 use AuthGroups\Utils\Response;
 use AuthGroups\Utils\Validator;
 use AuthGroups\Services\LogService;
@@ -106,8 +105,7 @@ class UserListController {
             ]);
             LoggingMiddleware::logExit(200);
             Response::success("Données utilisateur récupérées", [
-                'user'          => $userData,
-                'subscriptions' => SubscriptionService::getAllStatuses((int) $id),
+                'user' => $userData,
             ]);
             return true;
         } catch (Exception $e) {

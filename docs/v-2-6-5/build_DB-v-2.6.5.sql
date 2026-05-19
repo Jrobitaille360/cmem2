@@ -718,7 +718,7 @@ ALTER TABLE `user_stats_snapshot` MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 DROP TABLE IF EXISTS `active_user_sessions`;
 DROP VIEW IF EXISTS `active_user_sessions`;
-CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `active_user_sessions` AS
+CREATE VIEW `active_user_sessions` AS
   SELECT `us`.`id`, `us`.`user_id`, `us`.`login_at`, `us`.`last_activity_at`,
     `us`.`logout_at`, `us`.`expires_at`, `us`.`ip_address`, `us`.`user_agent`, `us`.`is_active`,
     `us`.`session_data`, `u`.`email`, `u`.`name` AS `username`, `u`.`role`,
@@ -732,7 +732,7 @@ CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW 
 
 DROP TABLE IF EXISTS `user_sessions_stats`;
 DROP VIEW IF EXISTS `user_sessions_stats`;
-CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `user_sessions_stats` AS
+CREATE VIEW `user_sessions_stats` AS
   SELECT COUNT(0) AS `total_active_sessions`,
     COUNT(DISTINCT `active_user_sessions`.`user_id`) AS `unique_users_online`,
     AVG(TIMESTAMPDIFF(MINUTE, `active_user_sessions`.`login_at`, IFNULL(`active_user_sessions`.`logout_at`, CURRENT_TIMESTAMP()))) AS `avg_session_duration_minutes`,
@@ -743,7 +743,7 @@ CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW 
 
 DROP TABLE IF EXISTS `v_admin_dashboard`;
 DROP VIEW IF EXISTS `v_admin_dashboard`;
-CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `v_admin_dashboard` AS
+CREATE VIEW `v_admin_dashboard` AS
   SELECT
     (SELECT COUNT(0) FROM `users` WHERE `deleted_at` IS NULL) AS `total_users`,
     (SELECT COUNT(0) FROM `users` WHERE `deleted_at` IS NULL AND `last_login` >= CURRENT_TIMESTAMP() - INTERVAL 7 DAY) AS `active_users_7d`,

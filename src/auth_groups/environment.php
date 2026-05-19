@@ -82,7 +82,7 @@ date_default_timezone_set($_ENV['APP_TIMEZONE'] ?? 'America/Montreal');
 
 // Configuration des uploads généraux
 define('UPLOAD_DIR', __DIR__ . '/../../' . ($_ENV['UPLOAD_DIR'] ?? 'uploads/'));
-define('TMP_ASSETS_DIR', __DIR__ . '/../../' . ($_ENV['TMP_ASSETS_DIR'] ?? 'tmp_assets/'));
+if (!defined('TMP_ASSETS_DIR')) define('TMP_ASSETS_DIR', __DIR__ . '/../../' . ($_ENV['TMP_ASSETS_DIR'] ?? 'tmp_assets/'));
 define('MAX_FILE_SIZE', (int)($_ENV['MAX_FILE_SIZE'] ?? 10485760)); // 10MB par défaut
 
 // Configuration de sécurité

@@ -24,9 +24,9 @@ SET foreign_key_checks = 0;
 -- 1. Vider les tables dépendantes de puzzle_devices
 --    (données caduques — pas de migration)
 -- ------------------------------------------------------------
-TRUNCATE TABLE `puzzle_shared_events`;
-TRUNCATE TABLE `puzzle_shared_pieces`;
-TRUNCATE TABLE `puzzle_shared`;
+DELETE FROM `puzzle_shared_events`;
+DELETE FROM `puzzle_shared_pieces`;
+DELETE FROM `puzzle_shared`;
 
 -- ------------------------------------------------------------
 -- 2. Supprimer les contraintes FK sur puzzle_shared
