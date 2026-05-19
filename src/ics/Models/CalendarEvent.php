@@ -163,13 +163,28 @@ class CalendarEvent extends BaseModel
      * Récupère un événement par son ID
      */
     public function getEventById($eventId): ?array
-    {      
+    {
         $query = "SELECT * FROM calendar_events WHERE id = ? AND deleted_at IS NULL";
         $stmt = $this->getDb()->prepare($query);
         $stmt->execute([$eventId]);
-        
+
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $result ?: null;
+        return $result ? $this->castEvent($result) : null;
+    }
+
+    private function castEvent(array $row): array
+    {
+        if (isset($row['priority']))    $row['priority']    = (int) $row['priority'];
+        if (isset($row['all_day']))     $row['all_day']     = (bool) $row['all_day'];
+        if (isset($row['categories']) && is_string($row['categories']))
+            $row['categories'] = json_decode($row['categories'], true) ?? [];
+        if (isset($row['attachments']) && is_string($row['attachments']))
+            $row['attachments'] = json_decode($row['attachments'], true) ?? [];
+        if (isset($row['attendees']) && is_string($row['attendees']))
+            $row['attendees'] = json_decode($row['attendees'], true) ?? [];
+        if (isset($row['notifications']) && is_string($row['notifications']))
+            $row['notifications'] = json_decode($row['notifications'], true) ?? [];
+        return $row;
     }  
 
     /**
