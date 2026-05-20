@@ -7,6 +7,34 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-05-19 Phase 6]
+
+### Docs — Nouveaux modules v2.7.0
+
+- **`docs/playstore/GUIDE.md`** — guide complet : register-device, pseudonyme, vérification/statut/annulation Play Store
+- **`docs/playstore/API_PLAYSTORE_ENDPOINTS.json`** — référence JSON tous les endpoints `/v2/devices/android/*` et `/v2/subscriptions/playstore/*`
+- **`docs/stripe/GUIDE.md`** — guide complet : checkout, portail, webhook, statut/annulation Stripe
+- **`docs/stripe/API_STRIPE_ENDPOINTS.json`** — référence JSON tous les endpoints `/v2/billing/*` et `/v2/subscriptions/stripe/*`
+- **`docs/access/API_ACCESS_ENDPOINTS.json`** — référence JSON `GET /v2/access/status` avec matrice d'accès et exemples
+
+### Docs — Mise à jour docs existants
+
+- **`docs/puzzle/API_PUZZLE_ENDPOINTS.json`** — v1.2.0 → v2.0.0 : routes `/puzzle/*` → `/v2/puzzle/*`, suppression section `auth` (register-device, verify-subscription, pseudonym — désormais dans module playstore), mise à jour `client_integration` (référence `/v2/devices/android/register` et `/v2/access/status`)
+- **`docs/core/API_ENDPOINTS.json`** — suppression section `subscription` complète (`/subscription/status`, `/subscription/verify`, `/subscription/checkout`, `/subscription/portal`, `/subscription/cancel`); retrait champ `subscriptions` de la réponse `POST /auth/login` et `POST /auth/verify-code`
+
+### BREAKING CHANGE — Champ `subscriptions` retiré de POST /auth/login
+
+Le champ `subscriptions` n'est plus retourné dans la réponse de `POST /auth/login` ni de
+`POST /auth/verify-code`. **Aucun client local connu ne lit ce champ** (audit Phase 0 confirmé).
+Pour connaître l'état premium, utiliser `GET /v2/access/status?app_id={app_id}`.
+
+### Directives inter-projets
+
+- **`directives_inter_projet/20260519_120000_cmem2_API_vers_puzzle__migration-v2.7.0-android.md`** — directive Puzzle Android : migration device, Play Store, accès unifié, routes `/v2/puzzle/*`
+- **`directives_inter_projet/20260519_120100_cmem2_API_vers_puzzle__migration-v2.7.0-web-windows.md`** — directive Puzzle Web/Windows : migration Stripe, accès unifié, routes `/v2/puzzle/*`, retrait champ `subscriptions` du login
+
+---
+
 ## [Unreleased 2026-05-20]
 
 ### Tests — OTP dev sans injection DB directe (21.6)

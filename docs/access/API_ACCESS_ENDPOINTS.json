@@ -1,0 +1,82 @@
+{
+  "api": {
+    "name": "Access Module",
+    "version": "1.0.0",
+    "description": "Endpoint d'accès unifié — agrège Play Store et Stripe pour retourner la matrice d'accès premium par plateforme. Introduit en v2.7.0.",
+    "generated": "2026-05-19",
+    "base_url": "/v2",
+    "authentication": {
+      "type": "JWT_BEARER",
+      "header": "Authorization: Bearer {jwt_token}",
+      "obtain": "POST /auth/login"
+    }
+  },
+  "endpoints": {
+    "access": {
+      "description": "Accès premium consolidé",
+      "base_path": "/v2/access",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/v2/access/status",
+          "auth_required": true,
+          "description": "Retourne le statut premium consolidé pour un utilisateur, une app et optionnellement une plateforme. Agrège playstore_subscriptions et stripe_subscriptions. Appeler à chaque démarrage ou reprise en premier plan pour connaître l'accès actuel.",
+          "query_params": {
+            "app_id": "string (required) — identifiant de l'application",
+            "platform": "string (optional) — 'android' | 'web' | 'windows'. Si fourni, retourne is_premium pour cette plateforme uniquement."
+          },
+          "responses": {
+            "200_no_platform": {
+              "description": "Réponse sans filtre platform — matrice complète",
+              "example": {
+                "success": true,
+                "data": {
+                  "is_premium": true,
+                  "platforms": {
+                    "android": true,
+                    "web": true,
+                    "windows": true
+                  },
+                  "sources": [
+                    { "provider": "playstore", "status": "active", "expires_at": "2027-06-01T00:00:00" }
+                  ]
+                }
+              }
+            },
+            "200_with_platform": {
+              "description": "Réponse avec filtre platform",
+              "example": {
+                "success": true,
+                "data": {
+                  "is_premium": false,
+                  "platform": "android",
+                  "sources": []
+                }
+              }
+            },
+            "401": "JWT absent ou invalide",
+            "422": "app_id manquant | platform invalide (valeurs acceptées : android, web, windows)"
+          },
+          "access_matrix": {
+            "description": "Règles de calcul de l'accès par source",
+            "rules": {
+              "playstore_active": { "android": true,  "web": true,  "windows": true  },
+              "stripe_active":    { "android": false, "web": true,  "windows": true  },
+              "none":             { "android": false, "web": false, "windows": false }
+            },
+            "combination": "OR des deux sources — si l'une ou l'autre est active, l'accès est accordé"
+          },
+          "sources_array": {
+            "description": "Tableau des abonnements actifs contribuant à l'accès",
+            "schema": {
+              "provider": "string — 'playstore' | 'stripe'",
+              "status": "string — 'active' | 'trialing' | ...",
+              "expires_at": "datetime | null"
+            }
+          },
+          "client_notes": "Appeler à chaque AppLifecycleState.resumed (mobile) ou navigation entre pages (web). Le résultat est la source de vérité pour l'accès premium — ne pas recourir à un cache local au-delà de la session."
+        }
+      ]
+    }
+  }
+}

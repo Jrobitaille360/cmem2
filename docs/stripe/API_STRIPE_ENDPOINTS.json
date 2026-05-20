@@ -1,0 +1,129 @@
+{
+  "api": {
+    "name": "Stripe Module",
+    "version": "1.0.0",
+    "description": "Abonnements Stripe pour plateformes web et Windows. Multi-app via app_id. Introduit en v2.7.0 — remplace /subscription/* et /stripe/webhook.",
+    "generated": "2026-05-19",
+    "base_url": "/v2",
+    "authentication": {
+      "jwt": {
+        "type": "JWT_BEARER",
+        "header": "Authorization: Bearer {jwt_token}",
+        "obtain": "POST /auth/login"
+      },
+      "webhook": {
+        "type": "STRIPE_SIGNATURE",
+        "header": "Stripe-Signature: t=...,v1=...",
+        "description": "Endpoint public — vérifié côté serveur via HMAC-SHA256 avec STRIPE_WEBHOOK_SECRET"
+      }
+    }
+  },
+  "endpoints": {
+    "billing": {
+      "description": "Sessions de paiement et portail de gestion Stripe",
+      "base_path": "/v2/billing",
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/v2/billing/checkout",
+          "auth_required": true,
+          "description": "Crée une session Stripe Checkout. Retourne une URL de paiement. Après paiement, Stripe déclenche checkout.session.completed vers /v2/billing/webhook.",
+          "body": {
+            "app_id": "string (required) — identifiant de l'application",
+            "plan": "string (required) — 'monthly' | 'yearly'"
+          },
+          "responses": {
+            "200": "{ success: true, data: { checkout_url: string, session_id: string } }",
+            "401": "JWT absent ou invalide",
+            "422": "app_id ou plan manquant | plan invalide (doit être monthly ou yearly)",
+            "500": "Clé Stripe non configurée ou erreur API Stripe"
+          },
+          "client_notes": "Rediriger l'utilisateur vers checkout_url. URL de succès/annulation configurées dans .env (STRIPE_SUCCESS_URL_{APP_ID}, STRIPE_CANCEL_URL_{APP_ID})."
+        },
+        {
+          "method": "POST",
+          "path": "/v2/billing/portal",
+          "auth_required": true,
+          "description": "Crée une session Stripe Billing Portal. Nécessite qu'un stripe_customer_id existe pour (user_id, app_id).",
+          "body": {
+            "app_id": "string (required)"
+          },
+          "responses": {
+            "200": "{ success: true, data: { portal_url: string } }",
+            "401": "JWT absent ou invalide",
+            "404": "Aucun stripe_customer_id en base pour cet utilisateur + app_id",
+            "422": "app_id manquant",
+            "500": "Erreur API Stripe"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/v2/billing/webhook",
+          "auth_required": false,
+          "auth_type": "STRIPE_SIGNATURE",
+          "description": "Endpoint Stripe webhook. Public, protégé par signature HMAC-SHA256. Idempotent (stripe_webhook_events). Configurer dans le Stripe Dashboard : https://{domain}/v2/billing/webhook.",
+          "headers": {
+            "Content-Type": "application/json",
+            "Stripe-Signature": "t=...,v1=... (généré par Stripe)"
+          },
+          "events_handled": {
+            "checkout.session.completed": "Active l'abonnement — crée stripe_subscriptions",
+            "customer.subscription.updated": "Met à jour status, expires_at, cancel_at_period_end",
+            "invoice.payment_succeeded": "Renouvelle expires_at",
+            "invoice.payment_failed": "Passe status à past_due",
+            "customer.subscription.deleted": "Passe status à cancelled"
+          },
+          "responses": {
+            "200": "{ success: true } — événement traité ou déjà traité (idempotent)",
+            "400": "Header Stripe-Signature absent | HMAC invalide | timestamp expiré (>300 s)"
+          }
+        }
+      ]
+    },
+    "subscriptions": {
+      "description": "Statut et gestion des abonnements Stripe",
+      "base_path": "/v2/subscriptions/stripe",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/v2/subscriptions/stripe/status",
+          "auth_required": true,
+          "description": "Retourne le statut de l'abonnement Stripe le plus récent pour (user_id, app_id).",
+          "query_params": {
+            "app_id": "string (required)"
+          },
+          "responses": {
+            "200_active":  "{ success: true, data: { is_premium: true,  status: 'active',   expires_at: datetime, plan: string, cancel_at_period_end: bool } }",
+            "200_none":    "{ success: true, data: { is_premium: false, status: null,        expires_at: null,     plan: null,   cancel_at_period_end: false } }",
+            "401": "JWT absent ou invalide",
+            "422": "app_id manquant"
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/v2/subscriptions/stripe",
+          "auth_required": true,
+          "description": "Annule l'abonnement Stripe à la fin de la période en cours (cancel_at_period_end=true). L'accès reste actif jusqu'à expires_at.",
+          "body": {
+            "app_id": "string (required)"
+          },
+          "responses": {
+            "200": "{ success: true, message: 'Abonnement annulé en fin de période' }",
+            "401": "JWT absent ou invalide",
+            "422": "app_id manquant | aucun abonnement Stripe actif",
+            "500": "Erreur API Stripe"
+          }
+        }
+      ]
+    }
+  },
+  "access_model": {
+    "description": "Un abonnement Stripe actif déverrouille les plateformes web et Windows uniquement.",
+    "platforms": {
+      "android": false,
+      "web": true,
+      "windows": true
+    },
+    "unified_status": "GET /v2/access/status — endpoint consolidé (Play Store + Stripe)"
+  }
+}

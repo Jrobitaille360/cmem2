@@ -1,94 +1,24 @@
 {
   "api": {
     "name": "Puzzle API",
-    "version": "1.2.0",
-    "description": "Plugin puzzle sans compte : carrousel d'images, thèmes, sauvegarde en ligne, casse-têtes partagés en temps réel. Authentification par token d'appareil opaque, abonnement Google Play. Depuis v1.1.0 : la table `subscriptions` est la source unique de vérité pour le statut premium. Depuis v1.2.0 : GET /puzzle/auth/subscription-status permet de synchroniser le statut premium Google Play à chaque ouverture d'app sans JWT.",
-    "generated": "2026-04-06",
-    "reviewed": "2026-05-11",
-    "base_url": "/puzzle",
+    "version": "2.0.0",
+    "description": "Plugin puzzle : carrousel d'images, thèmes, sauvegarde en ligne, casse-têtes partagés en temps réel. Authentification par device_token obtenu via POST /v2/devices/android/register. Depuis v2.7.0 : routes sous /v2/puzzle/*, device et abonnement gérés par les modules /v2/devices/ et /v2/subscriptions/.",
+    "generated": "2026-05-19",
+    "reviewed": "2026-05-19",
+    "base_url": "/v2/puzzle",
     "authentication": {
-      "types": ["DEVICE_TOKEN", "NONE"],
+      "types": ["DEVICE_TOKEN"],
       "device_token": {
         "header": "Authorization: Bearer {device_token}",
-        "description": "Token opaque 64 chars obtenu via POST /puzzle/auth/register-device. Durée de vie 365 jours. Renvoyé automatiquement à chaque re-registration du même device_uuid."
+        "description": "Token opaque 64 chars obtenu via POST /v2/devices/android/register. Durée de vie 365 jours. Renouvellement : rappeler POST /v2/devices/android/register avec le même device_uuid.",
+        "obtain": "POST /v2/devices/android/register"
       },
       "premium": {
-        "description": "Certains endpoints nécessitent un abonnement actif. Le statut premium est lu depuis la table `subscriptions` : par user_id si le device est lié à un compte, par purchase_token sinon. Erreur 403 SUBSCRIPTION_REQUIRED si aucun abonnement actif trouvé."
-      },
-      "none": {
-        "description": "POST /puzzle/auth/register-device est accessible sans authentification."
+        "description": "Certains endpoints nécessitent un abonnement actif. Statut vérifié via /v2/access/status (Play Store ou Stripe). Erreur 403 SUBSCRIPTION_REQUIRED si aucun abonnement actif."
       }
     }
   },
   "endpoints": {
-    "auth": {
-      "description": "Authentification appareil, abonnement Google Play, pseudonyme",
-      "routes": [
-        {
-          "method": "POST",
-          "path": "/puzzle/auth/register-device",
-          "auth_required": false,
-          "description": "Enregistre un nouvel appareil ou renouvelle le token d'un appareil existant (même device_uuid). Retourne un device_token valide 365 jours.",
-          "body": {
-            "device_uuid": "string (required) — UUID v4 généré une seule fois à l'installation de l'app, stable entre sessions"
-          },
-          "responses": {
-            "200": "{ success: true, message: 'Appareil enregistré', data: { device_token: string (64 chars hex), expires_at: ISO 8601 } }",
-            "422": "device_uuid absent ou vide"
-          },
-          "client_notes": "Appeler au premier démarrage de l'app. Stocker device_token dans SharedPreferences. Si token expiré (401 sur un autre endpoint), rappeler cet endpoint avec le même device_uuid pour renouveler."
-        },
-        {
-          "method": "POST",
-          "path": "/puzzle/auth/verify-subscription",
-          "auth_required": true,
-          "auth_type": "DEVICE_TOKEN",
-          "description": "Valide un achat d'abonnement Google Play auprès de l'API Google Play Developer. Enregistre l'abonnement dans la table `subscriptions` (source unique de vérité) via purchase_token. Gère automatiquement les upgrades/downgrades (linked_purchase_token). À appeler à chaque démarrage de l'app pour confirmer que l'abonnement est actif.",
-          "body": {
-            "purchase_token": "string (required) — Token reçu de Google Play après achat. Stable à travers les renouvellements automatiques.",
-            "product_id": "string (required) — 'premium_monthly' | 'premium_yearly'"
-          },
-          "responses": {
-            "200_active":   "{ success: true, message: 'Abonnement actif',   data: { is_premium: true,  product_id: string, expires_at: ISO 8601 } }",
-            "200_expired":  "{ success: true, message: 'Abonnement expiré',  data: { is_premium: false, product_id: string, expires_at: ISO 8601 } }",
-            "401": "device_token absent ou expiré — code DEVICE_NOT_FOUND",
-            "422": "purchase_token ou product_id absent | product_id invalide — code SUBSCRIPTION_INVALID"
-          },
-          "client_notes": "Appeler lors du premier achat ou d'une réinstallation pour enregistrer le purchase_token. Depuis v1.2.0, stocker le purchase_token et product_id localement — ils sont nécessaires pour GET /puzzle/auth/subscription-status. L'abonnement est lié au purchase_token, pas au device : il survit à une réinstallation."
-        },
-        {
-          "method": "GET",
-          "path": "/puzzle/auth/subscription-status",
-          "auth_required": true,
-          "auth_type": "DEVICE_TOKEN",
-          "description": "Interroge l'API Google Play Developer pour obtenir le statut actuel de l'abonnement lié au device. Met à jour `subscriptions` et `puzzle_devices` en base. Retourne stale: true si Google Play est inaccessible (fallback DB). À appeler à chaque ouverture d'app et reprise en premier plan.",
-          "responses": {
-            "200_active":   "{ success: true, message: 'Abonnement actif',              data: { is_premium: true,  expires_at: ISO 8601, provider: 'google_play', stale: false } }",
-            "200_expired":  "{ success: true, message: 'Abonnement expiré ou annulé',   data: { is_premium: false, expires_at: ISO 8601, provider: 'google_play', stale: false } }",
-            "200_none":     "{ success: true, message: 'Aucun abonnement enregistré',   data: { is_premium: false, expires_at: null,     provider: null,          stale: false } }",
-            "200_stale":    "{ success: true, message: 'Statut abonnement (cache DB)',  data: { is_premium: bool,  expires_at: ISO 8601|null, provider: 'google_play', stale: true } }",
-            "401": "device_token absent ou expiré — code DEVICE_NOT_FOUND"
-          },
-          "client_notes": "Appeler à chaque AppLifecycleState.resumed (ou au démarrage). Si is_premium = false ET stale = false : désactiver premium immédiatement. Si stale = true : conserver l'état actuel jusqu'au prochain succès. Ne pas passer purchase_token dans la requête — le serveur utilise celui stocké dans puzzle_devices lors de POST /puzzle/auth/verify-subscription."
-        },
-        {
-          "method": "POST",
-          "path": "/puzzle/auth/pseudonym",
-          "auth_required": true,
-          "auth_type": "DEVICE_TOKEN",
-          "description": "Choisit ou met à jour le pseudonyme de l'appareil. Requis avant de créer ou rejoindre un casse-tête partagé. Le pseudonyme est unique sur tout le serveur.",
-          "body": {
-            "pseudonym": "string (required) — 3 à 50 caractères"
-          },
-          "responses": {
-            "200": "{ success: true, message: 'Pseudonyme enregistré', data: { pseudonym: string } }",
-            "401": "device_token absent ou expiré",
-            "409": "{ success: false, message: 'Pseudonyme déjà utilisé', errors: { code: 'PSEUDONYM_TAKEN' } }",
-            "422": "Pseudonyme vide, trop court (< 3) ou trop long (> 50)"
-          }
-        }
-      ]
-    },
     "carousel": {
       "description": "Carrousel principal — accessible à tous les appareils enregistrés (gratuit + premium)",
       "auth_required": true,
@@ -96,7 +26,7 @@
       "routes": [
         {
           "method": "GET",
-          "path": "/puzzle/carousel",
+          "path": "/v2/puzzle/carousel",
           "description": "Retourne les 30 images actives du carrousel principal, triées par sort_order. Les labels sont traduits selon Accept-Language (fr | en | es, repli sur fr).",
           "headers": {
             "Authorization": "Bearer {device_token}",
@@ -110,7 +40,7 @@
         },
         {
           "method": "POST",
-          "path": "/puzzle/carousel/replace-one",
+          "path": "/v2/puzzle/carousel/replace-one",
           "description": "Retourne une nouvelle image pour remplacer l'image complétée la plus ancienne. Maximum un remplacement par jour par appareil. Le serveur choisit l'image à remplacer (completed[].completed_at minimal).",
           "headers": {
             "Authorization": "Bearer {device_token}"
@@ -129,7 +59,7 @@
         },
         {
           "method": "POST",
-          "path": "/puzzle/carousel/replace-all",
+          "path": "/v2/puzzle/carousel/replace-all",
           "premium_required": true,
           "description": "Retourne N nouvelles images pour remplacer toutes les images à 100% (abonnés uniquement). Retourne unavailable_count si le pool est insuffisant.",
           "headers": {
@@ -156,7 +86,7 @@
       "routes": [
         {
           "method": "GET",
-          "path": "/puzzle/themes",
+          "path": "/v2/puzzle/themes",
           "description": "Retourne tous les thèmes actifs avec leur label traduit et le nombre d'images actives associées.",
           "headers": {
             "Authorization": "Bearer {device_token}",
@@ -170,7 +100,7 @@
         },
         {
           "method": "GET",
-          "path": "/puzzle/themes/{slug}/images",
+          "path": "/v2/puzzle/themes/{slug}/images",
           "description": "Retourne toutes les images actives d'un thème, triées par sort_order.",
           "params": {
             "slug": "string (required) — Slug du thème (ex. 'nature', 'hiver')"
@@ -195,7 +125,7 @@
       "routes": [
         {
           "method": "GET",
-          "path": "/puzzle/thumb/{uid}",
+          "path": "/v2/puzzle/thumb/{uid}",
           "description": "Retourne le thumbnail de l'image (200×200 px, JPEG). Nécessite device_token.",
           "params": { "uid": "string (required) — UID de l'image" },
           "responses": {
@@ -206,7 +136,7 @@
         },
         {
           "method": "GET",
-          "path": "/puzzle/image/{uid}",
+          "path": "/v2/puzzle/image/{uid}",
           "description": "Retourne l'image complète (max 1920 px côté long, JPEG qualité 85). Nécessite device_token.",
           "params": { "uid": "string (required) — UID de l'image" },
           "responses": {
@@ -217,7 +147,7 @@
         },
         {
           "method": "GET",
-          "path": "/puzzle/thumb/theme/{slug}",
+          "path": "/v2/puzzle/thumb/theme/{slug}",
           "description": "Retourne le thumbnail du thème (JPEG). Nécessite device_token.",
           "params": { "slug": "string (required) — Slug du thème" },
           "responses": {
@@ -225,7 +155,7 @@
             "401": "device_token absent ou expiré",
             "404": "Slug inconnu ou thème inactif"
           },
-          "client_notes": "Flutter : Image.network('$apiBase/puzzle/thumb/theme/$slug', headers: {'Authorization': 'Bearer $deviceToken'})"
+          "client_notes": "Flutter : Image.network('$apiBase/v2/puzzle/thumb/theme/$slug', headers: {'Authorization': 'Bearer $deviceToken'})"
         }
       ]
     },
@@ -237,7 +167,7 @@
       "routes": [
         {
           "method": "POST",
-          "path": "/puzzle/backup",
+          "path": "/v2/puzzle/backup",
           "description": "Enregistre le blob JSON de l'app tel quel sur le serveur (remplace tout). Taille maximale : 512 Ko.",
           "body": {
             "backup": "object (required) — Blob opaque de l'app (progress, exploits, …)"
@@ -252,7 +182,7 @@
         },
         {
           "method": "GET",
-          "path": "/puzzle/backup",
+          "path": "/v2/puzzle/backup",
           "description": "Restaure le blob JSON précédemment sauvegardé.",
           "responses": {
             "200": "{ success: true, message: 'Sauvegarde récupérée', data: { backup: object, saved_at: ISO 8601 } }",
@@ -271,7 +201,7 @@
       "routes": [
         {
           "method": "POST",
-          "path": "/puzzle/shared",
+          "path": "/v2/puzzle/shared",
           "description": "Crée un nouveau casse-tête partagé entre l'appareil courant (créateur) et le partenaire identifié par son pseudonyme. Si initial_pieces est fourni, il est utilisé comme état de départ (seed = null). Sinon, le serveur génère un seed aléatoire.",
           "body": {
             "image_uid":         "string (required) — UID d'une image active de la banque",
@@ -290,7 +220,7 @@
         },
         {
           "method": "GET",
-          "path": "/puzzle/shared",
+          "path": "/v2/puzzle/shared",
           "description": "Retourne la liste des casse-têtes partagés actifs de l'appareil (créateur ou partenaire).",
           "responses": {
             "200": "{ success: true, message: 'Casse-tête partagés chargés', data: { shared_puzzles: [ { shared_uid, image_uid, image_label, thumb_url, piece_count, completion, partner_pseudonym, last_activity_at } ] } }",
@@ -300,7 +230,7 @@
         },
         {
           "method": "GET",
-          "path": "/puzzle/shared/{shared_uid}/state",
+          "path": "/v2/puzzle/shared/{shared_uid}/state",
           "description": "Charge l'état complet du casse-tête partagé : toutes les pièces + last_event_id. Appeler à l'ouverture de l'écran de jeu, puis utiliser /events pour le polling incrémental.",
           "params": {
             "shared_uid": "string (required) — UID du partagé"
@@ -315,7 +245,7 @@
         },
         {
           "method": "POST",
-          "path": "/puzzle/shared/{shared_uid}/move",
+          "path": "/v2/puzzle/shared/{shared_uid}/move",
           "description": "Envoie un placement de pièce au serveur. Mise à jour atomique de puzzle_shared_pieces + insertion dans puzzle_shared_events. Retourne le nouveau pourcentage de complétion.",
           "params": {
             "shared_uid": "string (required)"
@@ -338,7 +268,7 @@
         },
         {
           "method": "GET",
-          "path": "/puzzle/shared/{shared_uid}/events",
+          "path": "/v2/puzzle/shared/{shared_uid}/events",
           "description": "Retourne les événements du partenaire survenus depuis after (exclusif). N'inclut pas les événements de l'appelant. Indique si le partenaire est actif (last_seen_at < 10 s).",
           "params": {
             "shared_uid": "string (required)"
@@ -357,7 +287,7 @@
         },
         {
           "method": "POST",
-          "path": "/puzzle/shared/{shared_uid}/leave",
+          "path": "/v2/puzzle/shared/{shared_uid}/leave",
           "description": "Quitter le casse-tête partagé. Archive le partagé (status = archived) pour les deux participants. Accessible au créateur comme au partenaire.",
           "params": {
             "shared_uid": "string (required)"
@@ -371,7 +301,7 @@
         },
         {
           "method": "DELETE",
-          "path": "/puzzle/shared/{shared_uid}",
+          "path": "/v2/puzzle/shared/{shared_uid}",
           "description": "Supprime définitivement le casse-tête partagé et toutes ses pièces/événements (cascade). Réservé au créateur.",
           "params": {
             "shared_uid": "string (required)"
@@ -379,7 +309,7 @@
           "responses": {
             "200": "{ success: true, message: 'Casse-tête partagé supprimé' }",
             "401": "device_token absent ou expiré",
-            "403_premium":   "SUBSCRIPTION_REQUIRED",
+            "403_premium":     "SUBSCRIPTION_REQUIRED",
             "403_not_creator": "{ success: false, errors: { code: 'NOT_CREATOR' } }",
             "404": "SHARED_NOT_FOUND"
           }
@@ -390,8 +320,6 @@
   "error_codes": {
     "DEVICE_NOT_FOUND":         "Token d'appareil inconnu ou expiré — HTTP 401",
     "SUBSCRIPTION_REQUIRED":    "Endpoint réservé aux abonnés actifs — HTTP 403",
-    "SUBSCRIPTION_INVALID":     "Reçu Google Play invalide ou abonnement expiré — HTTP 422",
-    "PSEUDONYM_TAKEN":          "Pseudonyme déjà utilisé par un autre appareil — HTTP 409",
     "NO_REPLACEMENT_AVAILABLE": "Aucune image de remplacement disponible — HTTP 404",
     "ALREADY_REPLACED_TODAY":   "Un remplacement a déjà eu lieu aujourd'hui (gratuit) — HTTP 429",
     "THEME_NOT_FOUND":          "Slug de thème inexistant ou inactif — HTTP 404",
@@ -401,16 +329,17 @@
   },
   "client_integration": {
     "token_storage": {
-      "device_token": "SharedPreferences — clé 'puzzle_device_token'. Généré une fois, stable 365 jours.",
+      "device_token": "SharedPreferences — clé 'puzzle_device_token'. Généré via POST /v2/devices/android/register, stable 365 jours.",
       "device_uuid":  "SharedPreferences — clé 'puzzle_device_uuid'. UUID v4, généré une fois à l'installation.",
-      "pseudonym":    "SharedPreferences — clé 'puzzle_pseudonym'. Optionnel, requis pour le mode partagé."
+      "pseudonym":    "SharedPreferences — clé 'puzzle_pseudonym'. Géré via POST /v2/devices/android/pseudonym. Requis pour le mode partagé."
     },
-    "token_renewal": "Si 401 sur un endpoint protégé, rappeler POST /puzzle/auth/register-device avec le même device_uuid. Le serveur renouvelle le token. Stocker le nouveau device_token.",
+    "token_renewal": "Si 401 sur un endpoint protégé, rappeler POST /v2/devices/android/register avec le même device_uuid. Le serveur renouvelle le token. Stocker le nouveau device_token.",
+    "premium_check":  "Utiliser GET /v2/access/status?app_id=puzzle&platform=android pour connaître l'accès premium actuel. Appeler à chaque AppLifecycleState.resumed.",
     "language": "Envoyer Accept-Language: fr|en|es dans toutes les requêtes pour obtenir les labels traduits.",
     "image_loading": "Les images sont protégées. Utiliser Image.network() avec headers: {'Authorization': 'Bearer $deviceToken'}. Cache-Control: private, max-age=86400 — laisser Flutter/HTTP cacher.",
     "shared_polling": {
       "interval_ms": 2500,
-      "endpoint": "GET /puzzle/shared/{shared_uid}/events?after={last_event_id}",
+      "endpoint": "GET /v2/puzzle/shared/{shared_uid}/events?after={last_event_id}",
       "stop_conditions": "Arrêter le polling quand completion = 100, partagé archivé (404), ou destroy du widget.",
       "move_flow": "À chaque action : 1) appliquer localement, 2) POST /move (fire-and-forget UI), 3) stocker event_id retourné comme nouveau last_event_id."
     }

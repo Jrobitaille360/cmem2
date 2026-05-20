@@ -598,14 +598,14 @@ Si le client découvre un écart entre la spec et le comportement réel de l'API
 
 ### Conditions de complétion
 
-- [ ] `docs/playstore/GUIDE.md` couvre register-device + verify + status + pseudonyme
-- [ ] `docs/stripe/GUIDE.md` couvre checkout + portal + webhook + status
-- [ ] `docs/access/API_ACCESS_ENDPOINTS.json` couvre GET /v2/access/status
-- [ ] Directive créée : Puzzle Android (device, Play Store, v2/puzzle/*)
-- [ ] Directive créée : Puzzle Web/Windows (accès unifié, v2/puzzle/*)
-- [ ] CHANGELOG.md mentionne retrait champ `subscriptions` de `POST /auth/login` (breaking change, aucun client local affecté)
-- [ ] `docs/puzzle/API_PUZZLE_ENDPOINTS.json` nettoyé (sans routes subscription, routes v2)
-- [ ] Chaque directive inclut les sections "Confirmation de migration" et "Demande d'ajustement"
+- [x] `docs/playstore/GUIDE.md` couvre register-device + verify + status + pseudonyme
+- [x] `docs/stripe/GUIDE.md` couvre checkout + portal + webhook + status
+- [x] `docs/access/API_ACCESS_ENDPOINTS.json` couvre GET /v2/access/status
+- [x] Directive créée : Puzzle Android (device, Play Store, v2/puzzle/*)
+- [x] Directive créée : Puzzle Web/Windows (accès unifié, v2/puzzle/*)
+- [x] CHANGELOG.md mentionne retrait champ `subscriptions` de `POST /auth/login` (breaking change, aucun client local affecté)
+- [x] `docs/puzzle/API_PUZZLE_ENDPOINTS.json` nettoyé (sans routes subscription, routes v2)
+- [x] Chaque directive inclut les sections "Confirmation de migration" et "Demande d'ajustement"
 
 ---
 

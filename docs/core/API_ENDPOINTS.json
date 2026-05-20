@@ -47,7 +47,6 @@
               "email": "string",
               "role": "string"
             },
-            "subscriptions": "object — statut Premium par app_id (voir /subscription/status)",
             "device_token": "string (présent uniquement si device_id fourni)",
             "device_id": "string (présent uniquement si device_id fourni)"
           },
@@ -101,7 +100,6 @@
               "email": "string",
               "role": "string"
             },
-            "subscriptions": "object — statut Premium par app_id (voir /subscription/status)",
             "device_token": "string (présent uniquement si device_id fourni)",
             "device_id": "string (présent uniquement si device_id fourni)"
           },
@@ -1346,148 +1344,6 @@
           }
         }
       ]
-    },
-    "subscription": {
-      "description": "Abonnements Premium par utilisateur et par application",
-      "base_path": "/subscription",
-      "auth_required": true,
-      "auth_note": "Toutes les routes nécessitent Authorization: Bearer <jwt_token>",
-      "routes": [
-        {
-          "method": "GET",
-          "path": "/subscription/status",
-          "description": "Statut Premium de toutes les applications de l'utilisateur",
-          "auth_required": true,
-          "response": {
-            "subscriptions": {
-              "<app_id>": {
-                "is_premium": "boolean",
-                "show_ads": "boolean",
-                "expires_at": "datetime|null",
-                "provider": "string|null",
-                "plan": "string|null",
-                "is_trial": "boolean",
-                "trial_end": "datetime|null"
-              }
-            }
-          },
-          "errors": {
-            "401": "JWT absent ou invalide"
-          }
-        },
-        {
-          "method": "GET",
-          "path": "/subscription/status?app_id={app_id}",
-          "description": "Statut Premium d'une application précise",
-          "auth_required": true,
-          "query": {
-            "app_id": "string (required) — identifiant de l'application (puzzle, pomo, quiz, …)"
-          },
-          "response": {
-            "app_id": "string",
-            "is_premium": "boolean",
-            "show_ads": "boolean",
-            "expires_at": "datetime|null",
-            "provider": "string|null",
-            "plan": "string|null",
-            "is_trial": "boolean",
-            "trial_end": "datetime|null"
-          },
-          "errors": {
-            "401": "JWT absent ou invalide"
-          }
-        },
-        {
-          "method": "POST",
-          "path": "/subscription/verify",
-          "description": "Valider un achat provider et activer (ou renouveler) le Premium",
-          "auth_required": true,
-          "body": {
-            "app_id": "string (required) — identifiant de l'application",
-            "provider": "string (required) — stripe | google_play | apple | microsoft",
-            "product_id": "string (required) — identifiant du produit côté provider",
-            "plan": "string (required) — monthly | yearly",
-            "purchase_token": "string (optional) — token Google Play / Apple",
-            "stripe_sub_id": "string (optional) — ID souscription Stripe"
-          },
-          "response": {
-            "app_id": "string",
-            "is_premium": "boolean — true",
-            "show_ads": "boolean — false",
-            "expires_at": "datetime",
-            "provider": "string",
-            "plan": "string"
-          },
-          "errors": {
-            "400": "Champ requis manquant, provider ou plan invalide",
-            "401": "JWT absent ou invalide",
-            "500": "Erreur lors de l'activation"
-          }
-        },
-        {
-          "method": "POST",
-          "path": "/subscription/checkout",
-          "description": "Créer une session Stripe Checkout (paiement web) — retourne une URL de redirection",
-          "auth_required": true,
-          "body": {
-            "app_id": "string (required) — identifiant de l'application (ex. puzzle)",
-            "plan": "string (required) — monthly | yearly"
-          },
-          "response": {
-            "checkout_url": "string — URL Stripe Checkout (redirection navigateur)",
-            "session_id": "string — identifiant de la session Stripe"
-          },
-          "notes": [
-            "Essai gratuit de 7 jours inclus automatiquement",
-            "Retourne 500 si STRIPE_SECRET_KEY non configuré"
-          ],
-          "errors": {
-            "401": "JWT absent ou invalide",
-            "422": "app_id ou plan manquant / plan invalide (valeurs : monthly, yearly)",
-            "500": "Erreur Stripe ou clé non configurée"
-          }
-        },
-        {
-          "method": "POST",
-          "path": "/subscription/portal",
-          "description": "Créer une session Stripe Billing Portal pour gérer l'abonnement existant — retourne une URL de redirection",
-          "auth_required": true,
-          "body": {
-            "app_id": "string (required) — identifiant de l'application (ex. puzzle)"
-          },
-          "response": {
-            "portal_url": "string — URL Stripe Billing Portal (redirection navigateur)"
-          },
-          "notes": [
-            "Nécessite qu'un stripe_customer_id existe en base pour cet utilisateur + app_id",
-            "Retourne 404 NO_SUBSCRIPTION si aucun abonnement Stripe trouvé",
-            "URL de retour après fermeture du portail : https://journauxdebord.com/{app_id}/subscription/manage-return"
-          ],
-          "errors": {
-            "401": "JWT absent ou invalide",
-            "404": "errors.error = NO_SUBSCRIPTION — aucun stripe_customer_id en base pour cet utilisateur",
-            "422": "app_id manquant",
-            "500": "errors.error = STRIPE_ERROR — erreur Stripe lors de la création de la session"
-          }
-        },
-        {
-          "method": "DELETE",
-          "path": "/subscription/cancel",
-          "description": "Annuler un abonnement — l'accès Premium reste actif jusqu'à expires_at",
-          "auth_required": true,
-          "body": {
-            "app_id": "string (required) — identifiant de l'application à annuler"
-          },
-          "response": {
-            "message": "string — confirmation d'annulation"
-          },
-          "errors": {
-            "400": "app_id manquant",
-            "401": "JWT absent ou invalide",
-            "500": "Erreur lors de l'annulation"
-          }
-        }
-      ]
     }
   },
   "database_migration": {
@@ -1500,8 +1356,6 @@
       "api_keys — système de clés API retiré (v2.1.1), remplacé par JWT",
       "user_sessions.api_key_id — colonne retirée (v2.1.1)"
     ],
-    "pending_migrations": [
-      "docs/20260505_subscriptions_purchase_token_unique.sql — contrainte UNIQUE uq_purchase_token_app (purchase_token, app_id) sur la table subscriptions + migration INSERT IGNORE des devices Google Play existants"
-    ]
+    "pending_migrations": []
   }
 }
