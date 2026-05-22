@@ -7,6 +7,23 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-05-22]
+
+### Feat — Enregistrement device anonyme + routage v2/puzzle
+
+- **`src/auth_groups/Routing/RouteHandlers/V2RouteHandler.php`** — câblage `PuzzleRouteHandler` pour les routes `/v2/puzzle/*` (manquait dans le router v2)
+- **`src/playstore/Routing/PlaystoreRouteHandler.php`** — JWT désormais optionnel pour `POST /v2/devices/android/register` et `POST /v2/devices/web/register` (anonyme si absent) ; autres routes android gardent JWT obligatoire ; section `/v2/devices/web/*` ajoutée
+- **`src/playstore/Controllers/DeviceController.php`** — `register()` accepte `?array $user` (nullable) ; `AppUserSettings::get()` ignoré si `user_id` null
+- **`src/playstore/Models/AndroidDevice.php`** — `upsertDevice()` accepte `?int $userId` ; ON DUPLICATE KEY UPDATE utilise `COALESCE(VALUES(user_id), user_id)` pour préserver le `user_id` existant ; ajout `findByValidToken()` et `touchLastSeen()`
+
+### Feat — Mode simulation email (`EMAIL_SIMULATION`)
+
+- **`src/auth_groups/environment.php`** — constante `EMAIL_SIMULATION` (défaut `false`)
+- **`src/auth_groups/Services/EmailService.php`** — `$simulationMode` actif si `isDevMode && EMAIL_SIMULATION` ; log "simulation" distinctement de "development" ; `testSMTPConnection()` et `canSendEmails()` honorent le mode simulation
+- **`.env.example`** — variable `EMAIL_SIMULATION=false` documentée
+
+---
+
 ## [Unreleased 2026-05-21]
 
 ### Fix — Endpoints thumb/image accessibles avec device_token anonyme Android

@@ -6,6 +6,7 @@ use AuthGroups\Routing\BaseRouteHandler;
 use AuthGroups\Utils\Response;
 use Playstore\Controllers\DeviceController;
 use Playstore\Controllers\SubscriptionController;
+use WebDevice\Controllers\WebDeviceController;
 
 class PlaystoreRouteHandler extends BaseRouteHandler
 {
@@ -18,25 +19,31 @@ class PlaystoreRouteHandler extends BaseRouteHandler
 
     protected function handleRoute(array $request): void
     {
-        $user = $this->authService->authenticate();
-        if (!$user) {
-            Response::error('Authentification requise', null, 401);
-            return;
-        }
-
         $method   = $request['method']   ?? 'GET';
         $segments = $request['segments'] ?? [];
 
         // segments[0] = 'v2'
         $s1 = $segments[1] ?? '';   // 'devices' ou 'subscriptions'
-        $s2 = $segments[2] ?? '';   // 'android' ou 'playstore'
+        $s2 = $segments[2] ?? '';   // 'android', 'web' ou 'playstore'
         $s3 = $segments[3] ?? '';   // action
         $s4 = $segments[4] ?? '';   // 'check'
         $s5 = $segments[5] ?? '';   // {pseudo}
 
+        // --------------------------------------------------------------------
+        // /v2/devices/android/*
+        // --------------------------------------------------------------------
         if ($s1 === 'devices' && $s2 === 'android') {
             if ($s3 === 'register' && $method === 'POST') {
-                (new DeviceController())->register($user);
+                // JWT optionnel — anonyme si absent
+                $user = $this->authService->authenticate();
+                (new DeviceController())->register($user ?: null);
+                return;
+            }
+
+            // Toutes les autres routes /devices/android/* requièrent JWT
+            $user = $this->authService->authenticate();
+            if (!$user) {
+                Response::error('Authentification requise', null, 401);
                 return;
             }
 
@@ -59,7 +66,31 @@ class PlaystoreRouteHandler extends BaseRouteHandler
             return;
         }
 
+        // --------------------------------------------------------------------
+        // /v2/devices/web/*
+        // --------------------------------------------------------------------
+        if ($s1 === 'devices' && $s2 === 'web') {
+            if ($s3 === 'register' && $method === 'POST') {
+                // JWT optionnel — anonyme si absent
+                $user = $this->authService->authenticate();
+                (new WebDeviceController())->register($user ?: null);
+                return;
+            }
+
+            Response::error('Endpoint non trouvé', null, 404);
+            return;
+        }
+
+        // --------------------------------------------------------------------
+        // /v2/subscriptions/playstore/*
+        // --------------------------------------------------------------------
         if ($s1 === 'subscriptions' && $s2 === 'playstore') {
+            $user = $this->authService->authenticate();
+            if (!$user) {
+                Response::error('Authentification requise', null, 401);
+                return;
+            }
+
             match (true) {
                 ($s3 === 'verify' && $method === 'POST')  => (new SubscriptionController())->verify($user),
                 ($s3 === 'status' && $method === 'GET')   => (new SubscriptionController())->getStatus($user),

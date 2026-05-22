@@ -9,13 +9,13 @@ use Playstore\Models\AndroidDevice;
 
 class DeviceController
 {
-    public function register(array $user): void
+    public function register(?array $user): void
     {
         LoggingMiddleware::logEntry();
-        $input    = Response::getRequestParams();
-        $userId   = $user['user_id'];
-        $appId    = $input['app_id'] ?? '';
-        $uuid     = $input['device_uuid'] ?? '';
+        $input  = Response::getRequestParams();
+        $userId = $user['user_id'] ?? null;
+        $appId  = $input['app_id'] ?? '';
+        $uuid   = $input['device_uuid'] ?? '';
 
         if (!$appId) {
             LoggingMiddleware::logExit(422);
@@ -33,7 +33,7 @@ class DeviceController
         $tokenExpiresAt = date('Y-m-d H:i:s', strtotime('+365 days'));
 
         $device    = (new AndroidDevice())->upsertDevice($userId, $appId, $uuid, $deviceToken, $tokenExpiresAt);
-        $pseudonym = (new AppUserSettings())->get($userId, $appId);
+        $pseudonym = $userId ? (new AppUserSettings())->get($userId, $appId) : null;
 
         LoggingMiddleware::logExit(200);
         Response::success('Device enregistré', [

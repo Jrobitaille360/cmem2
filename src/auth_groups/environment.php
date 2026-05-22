@@ -183,6 +183,7 @@ define('LOG_FAILED_LOGINS', filter_var($_ENV['LOG_FAILED_LOGINS'] ?? 'true', FIL
 define('LOG_SUSPICIOUS_ACTIVITY', filter_var($_ENV['LOG_SUSPICIOUS_ACTIVITY'] ?? 'true', FILTER_VALIDATE_BOOLEAN));
 
 // Configuration d'envoi des logs critiques
+define('EMAIL_SIMULATION',    filter_var($_ENV['EMAIL_SIMULATION']    ?? 'false', FILTER_VALIDATE_BOOLEAN));
 define('EMAIL_CRITICAL_LOGS', filter_var($_ENV['EMAIL_CRITICAL_LOGS'] ?? 'false', FILTER_VALIDATE_BOOLEAN));
 define('CRITICAL_LOG_EMAIL', $_ENV['CRITICAL_LOG_EMAIL'] ?? '');
 define('LOG_EMAIL_THRESHOLD', $_ENV['LOG_EMAIL_THRESHOLD'] ?? 'error');

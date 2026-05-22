@@ -20,6 +20,7 @@ class EmailService {
     private $fromEmail;
     private $fromName;
     private $isDevMode;
+    private $simulationMode;
     private $useSMTP;
     private $apiStatus;
     private $db;
@@ -34,6 +35,7 @@ class EmailService {
         $this->fromEmail = $_ENV['MAIL_FROM_ADDRESS'] ?? 'noreply@authgroups.local';
         $this->fromName = $_ENV['MAIL_FROM_NAME'] ?? 'AuthGroups API';
         $this->isDevMode = ($_ENV['APP_ENV'] ?? 'production') === 'development';
+        $this->simulationMode = $this->isDevMode && EMAIL_SIMULATION;
         $this->useSMTP = $_ENV['USE_SMTP'] ?? 'true'; // true par défaut pour utiliser SMTP
         
         // Initialiser l'état de l'API et la base de données
@@ -68,8 +70,8 @@ class EmailService {
             }
         }
         
-        // Test SMTP en mode rapide (ne teste la connexion qu'en production)
-        if (!$this->isDevMode && $this->useSMTP === 'true') {
+        // Test SMTP en mode rapide (ne teste la connexion qu'en production et hors simulation)
+        if (!$this->isDevMode && !$this->simulationMode && $this->useSMTP === 'true') {
             $smtpTest = $this->testSMTPConnection();
             $status['smtp_available'] = $smtpTest['success'] ?? false;
         } else {
@@ -116,11 +118,10 @@ class EmailService {
             LogService::info("EmailService: Début d'envoi d'email", [
                 'to' => $to,
                 'subject' => $subject,
-                'method' => $this->isDevMode ? 'dev_log' : ($this->useSMTP === 'true' ? 'smtp' : 'mail_function')
+                'method' => $this->simulationMode ? 'simulation' : ($this->isDevMode ? 'dev_log' : ($this->useSMTP === 'true' ? 'smtp' : 'mail_function'))
             ]);
-            
-            if ($this->isDevMode) {
-                // En développement, juste logger
+
+            if ($this->simulationMode) {
                 return $this->logEmail($to, $subject, $body);
             }
             
@@ -950,11 +951,12 @@ class EmailService {
      * Logger un email en développement
      */
     private function logEmail($to, $subject, $body) {
-        LogService::info("EmailService: Email simulé en mode développement", [
+        $mode = $this->simulationMode ? 'simulation' : 'development';
+        LogService::info("EmailService: Email simulé [{$mode}]", [
             'to' => $to,
             'subject' => $subject,
             'body_length' => strlen($body),
-            'mode' => 'development'
+            'mode' => $mode
         ]);
         
         return true;
@@ -1009,17 +1011,17 @@ class EmailService {
      */
     public function testSMTPConnection() {
         try {
-            // En mode développement, retourner un test simulé
-            if ($this->isDevMode) {
+            if ($this->simulationMode || $this->isDevMode) {
+                $mode = $this->simulationMode ? 'simulation' : 'development';
                 return [
                     'success' => true,
-                    'message' => 'Mode développement - test simulé',
+                    'message' => "Mode {$mode} - test simulé",
                     'config' => [
                         'host' => $this->smtpHost,
                         'port' => $this->smtpPort,
                         'secure' => $this->smtpSecure,
                         'auth' => !empty($this->smtpUsername),
-                        'mode' => 'development'
+                        'mode' => $mode
                     ]
                 ];
             }
@@ -1154,8 +1156,7 @@ class EmailService {
     public function canSendEmails() {
         $status = $this->getAPIStatus();
         
-        // En mode développement, toujours autorisé
-        if ($this->isDevMode) {
+        if ($this->simulationMode || $this->isDevMode) {
             return true;
         }
         

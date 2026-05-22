@@ -6,6 +6,7 @@ use Access\Routing\AccessRouteHandler;
 use AuthGroups\Routing\BaseRouteHandler;
 use AuthGroups\Utils\Response;
 use Playstore\Routing\PlaystoreRouteHandler;
+use Puzzle\Routing\PuzzleRouteHandler;
 use Stripe\Routing\StripeRouteHandler;
 
 /**
@@ -30,6 +31,7 @@ class V2RouteHandler extends BaseRouteHandler
         $s2 = $segments[2] ?? '';
 
         $handler = match (true) {
+            $s1 === 'puzzle'                               => new PuzzleRouteHandler($this->authService),
             $s1 === 'devices'                              => new PlaystoreRouteHandler($this->authService),
             $s1 === 'subscriptions' && $s2 === 'playstore' => new PlaystoreRouteHandler($this->authService),
             $s1 === 'subscriptions' && $s2 === 'stripe'    => new StripeRouteHandler($this->authService),

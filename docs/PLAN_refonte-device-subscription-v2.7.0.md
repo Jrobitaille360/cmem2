@@ -755,3 +755,82 @@ Les anciens ne sont détruits (Phase 5) qu'après confirmation explicite de tous
 2. Rendre les scénarios OTP exécutables en dev-cmem.
 3. Uniformiser les tests (helpers `test_new_base`) pour les flux ICS/HTTP.
 4. Corriger les écarts de schéma test/reset (`media_type`) puis relancer la campagne globale.
+
+---
+
+## Addendum — Gap enregistrement anonyme (2026-05-20)
+
+### Problème identifié
+
+`android_devices.user_id NOT NULL` + `POST /v2/devices/android/register` exige JWT.
+Or Android fonctionne anonyme par défaut (pas de JWT avant achat). Idem web/windows :
+aucune table ni endpoint de device pour les utilisateurs non connectés.
+
+Conséquence : fresh install → pas de `device_token` → `GET /v2/puzzle/carousel` → 401
+→ fallback local (`uid: ''`) → progression perdue pour tous les anonymes.
+
+Deuxième gap : `/v2/puzzle/*` non câblé dans `V2RouteHandler` (Phase 5 incomplète).
+Flutter ayant migré (directive `20260519_130000` complétée), les anciennes routes
+`/puzzle/*` ne sont plus appelées.
+
+### Décisions
+
+- `android_devices.user_id` : passe à `NULL` autorisé, FK → `ON DELETE SET NULL`
+- Nouvelle table `web_devices` (même structure, `user_id` nullable) pour web/Windows
+- `POST /v2/devices/android/register` : sans JWT → device anonyme (`user_id = NULL`)
+- `POST /v2/devices/web/register` : nouvel endpoint, même logique (inclus scope v2.7.0)
+- Premium check dans `requireDeviceToken()` : via `AccessService::getMatrix()` (plus `Subscription`)
+- `/v2/puzzle/*` câblé dans `V2RouteHandler`
+- `PuzzleRouteHandler` : offset de segment +1 quand appelé via `/v2/puzzle/*`
+
+### Nouvelles migrations SQL
+
+Fichier : `docs/20260520_android_anonymous_web_devices.sql`
+
+```sql
+-- ALTER android_devices : user_id nullable
+-- CREATE web_devices
+```
+
+### Phase 1 — ajouts (rétroactifs)
+
+| Table | Sort |
+| - | - |
+| `web_devices` | Créer (même structure qu'`android_devices`, `user_id NULL`) |
+| `android_devices.user_id` | ALTER : `NOT NULL` → `NULL`, FK → `ON DELETE SET NULL` |
+
+### Phase 2 — ajouts
+
+| Méthode | URL | Auth | Description |
+| - | - | - | - |
+| POST | `/v2/devices/android/register` | JWT optionnel | Sans JWT → device anonyme |
+| POST | `/v2/devices/web/register` | JWT optionnel | Device web/Windows, user_id nullable |
+
+### Phase 5 — complétion (routes puzzle)
+
+- [x] `/v2/puzzle/*` câblé dans `V2RouteHandler` → `PuzzleRouteHandler`
+- [x] `PuzzleRouteHandler` : détection offset segment (`segments[0] === 'v2'`)
+- [x] `requireDeviceToken()` : cherche dans `android_devices` puis `web_devices`
+- [x] Premium check via `AccessService::getMatrix()` (retire dépendance à `Subscription`)
+- [x] `requirePremium()` : trust `is_premium` uniquement (AccessService gère expiry)
+
+### Fichiers créés / modifiés
+
+```
+docs/20260520_android_anonymous_web_devices.sql   — nouvelle migration
+src/playstore/Models/AndroidDevice.php             — user_id nullable, findByValidToken, touchLastSeen
+src/playstore/Controllers/DeviceController.php     — user nullable
+src/playstore/Routing/PlaystoreRouteHandler.php    — register anonyme + routing /devices/web/*
+src/webdevice/Models/WebDevice.php                 — nouveau
+src/webdevice/Controllers/WebDeviceController.php  — nouveau
+src/auth_groups/Routing/RouteHandlers/V2RouteHandler.php — route /v2/puzzle/*
+src/puzzle/Routing/PuzzleRouteHandler.php          — offset segment + requireDeviceToken refacto
+```
+
+### Conditions de complétion
+
+- [ ] `POST /v2/devices/android/register` sans JWT → 200, device_token valide
+- [ ] `POST /v2/devices/web/register` sans JWT → 200, device_token valide
+- [ ] `GET /v2/puzzle/carousel` avec device_token anonyme → 200 (images retournées)
+- [ ] Device avec `user_id` lié → premium check correct via AccessService
+- [ ] Tests : section ajoutée dans `test_playstore.php` + nouveau `test_webdevice.php`
