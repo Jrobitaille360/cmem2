@@ -23,7 +23,8 @@
             "Puzzle\\": "src/puzzle/",
             "Playstore\\": "src/playstore/",
             "Stripe\\": "src/stripe/",
-            "Access\\": "src/access/"
+            "Access\\": "src/access/",
+            "WebDevice\\": "src/webdevice/"
         },
         "files": [
             "src/auth_groups/database.php"

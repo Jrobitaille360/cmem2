@@ -2,9 +2,10 @@
 
 namespace Puzzle\Routing;
 
-use AuthGroups\Models\Subscription;
+use Access\Services\AccessService;
 use AuthGroups\Routing\BaseRouteHandler;
 use AuthGroups\Utils\Response;
+use Playstore\Models\AndroidDevice;
 use Puzzle\Controllers\AdminController;
 use Puzzle\Controllers\AuthController;
 use Puzzle\Controllers\CarouselController;
@@ -12,33 +13,28 @@ use Puzzle\Controllers\ThemeController;
 use Puzzle\Controllers\ImageDeliveryController;
 use Puzzle\Controllers\SyncController;
 use Puzzle\Controllers\SharedController;
-use Puzzle\Models\PuzzleDevice;
+use WebDevice\Models\WebDevice;
 
 /**
- * PuzzleRouteHandler — gestionnaire unique pour toutes les routes /puzzle/*
+ * PuzzleRouteHandler — gestionnaire unique pour toutes les routes /puzzle/* et /v2/puzzle/*
  *
  * Auth conditionnelle :
- *  - POST /puzzle/auth/register-device              → sans auth
+ *  - POST /puzzle/auth/register-device              → sans auth (legacy)
  *  - POST /puzzle/auth/link-device                  → JWT cmem2 (Bearer)
- *  - POST /puzzle/auth/verify-subscription          → device_token (Bearer)
- *  - GET  /puzzle/auth/subscription-status         → device_token (Bearer) — sync Google Play
- *  - GET  /puzzle/auth/pseudonym                    → device_token (Bearer)
- *  - GET  /puzzle/auth/check-pseudonym/{pseudonym}  → device_token (Bearer)
- *  - POST /puzzle/auth/pseudonym                    → device_token (Bearer)
- *  - DELETE /puzzle/auth/pseudonym                  → device_token (Bearer)
- *  - GET  /puzzle/carousel                          → device_token
- *  - POST /puzzle/carousel/replace-one              → device_token
- *  - POST /puzzle/carousel/replace-all              → device_token + premium
- *  - GET  /puzzle/themes                            → device_token + premium
- *  - GET  /puzzle/themes/{slug}/images              → device_token + premium
- *  - GET  /puzzle/thumb/{uid}                       → device_token
- *  - GET  /puzzle/image/{uid}                       → device_token
- *  - GET  /puzzle/thumb/theme/{slug}                → device_token
- *  - GET/POST /puzzle/backup                        → device_token + premium
- *  - /puzzle/shared[/...]                           → device_token + premium
+ *  - POST /v2/puzzle/auth/link-device               → JWT cmem2 (Bearer)
+ *  - GET  /v2/puzzle/carousel                       → device_token (android_devices ou web_devices)
+ *  - POST /v2/puzzle/carousel/replace-one           → device_token
+ *  - POST /v2/puzzle/carousel/replace-all           → device_token + premium
+ *  - GET  /v2/puzzle/themes[/{slug}/images]         → device_token + premium
+ *  - GET  /v2/puzzle/thumb/{uid}                    → device_token
+ *  - GET  /v2/puzzle/image/{uid}                    → device_token
+ *  - GET|POST /v2/puzzle/backup                     → device_token + premium
+ *  - /v2/puzzle/shared[/...]                        → device_token + premium
  *
  * requiresAuth = false : le middleware de base est ignoré ; chaque branche
  * gère elle-même son niveau d'authentification.
+ *
+ * Offset de segment : +1 quand appelé via /v2/puzzle/* (segments[0] = 'v2').
  */
 class PuzzleRouteHandler extends BaseRouteHandler
 {
@@ -54,22 +50,23 @@ class PuzzleRouteHandler extends BaseRouteHandler
         $method   = $request['method']   ?? 'GET';
         $segments = $request['segments'] ?? [];
 
-        // segments[0] = 'puzzle'
-        $s1 = $segments[1] ?? '';   // auth | carousel | themes | thumb | image | backup | shared
-        $s2 = $segments[2] ?? '';   // sous-route
-        $s3 = $segments[3] ?? '';   // sous-ressource
-        $s4 = $segments[4] ?? '';   // action
+        // Décalage +1 quand appelé via /v2/puzzle/*
+        $off = ($segments[0] === 'v2') ? 1 : 0;
+
+        $s1 = $segments[1 + $off] ?? '';   // auth | carousel | themes | thumb | image | backup | shared | admin
+        $s2 = $segments[2 + $off] ?? '';
+        $s3 = $segments[3 + $off] ?? '';
 
         // -------------------------------------------------------------------
         // /puzzle/admin/*  (JWT cmem2 + rôle ADMINISTRATEUR)
         // -------------------------------------------------------------------
         if ($s1 === 'admin') {
-            $this->handleAdminRoute($segments, $method);
+            $this->handleAdminRoute($segments, $off, $method);
             return;
         }
 
         // -------------------------------------------------------------------
-        // /puzzle/auth/*
+        // /puzzle/auth/*  (routes legacy — conservées pendant cohabitation)
         // -------------------------------------------------------------------
         if ($s1 === 'auth') {
             if ($s2 === 'register-device' && $method === 'POST') {
@@ -106,7 +103,7 @@ class PuzzleRouteHandler extends BaseRouteHandler
         }
 
         // -------------------------------------------------------------------
-        // /puzzle/carousel/*
+        // /puzzle/carousel/*  ou  /v2/puzzle/carousel/*
         // -------------------------------------------------------------------
         if ($s1 === 'carousel') {
             $device = $this->requireDeviceToken();
@@ -117,7 +114,7 @@ class PuzzleRouteHandler extends BaseRouteHandler
             } elseif ($s2 === 'replace-one' && $method === 'POST') {
                 (new CarouselController())->replaceOne($device);
             } elseif ($s2 === 'replace-all' && $method === 'POST') {
-                $this->requirePremium($device);
+                if (!$this->requirePremium($device)) return;
                 (new CarouselController())->replaceAll($device);
             } else {
                 Response::error('Endpoint non trouvé', null, 404);
@@ -153,7 +150,7 @@ class PuzzleRouteHandler extends BaseRouteHandler
             if ($s2 === 'theme' && $s3 !== '') {
                 (new ImageDeliveryController())->serveThemeThumb($s3);
             } elseif ($s2 !== '') {
-                (new ImageDeliveryController())->serveThumb($s2);
+                (new ImageDeliveryController())->serveThumb($s2, $device);
             } else {
                 Response::error('Endpoint non trouvé', null, 404);
             }
@@ -168,7 +165,7 @@ class PuzzleRouteHandler extends BaseRouteHandler
             if ($device === null) return;
 
             if ($s2 !== '' && $method === 'GET') {
-                (new ImageDeliveryController())->serveImage($s2);
+                (new ImageDeliveryController())->serveImage($s2, $device);
             } else {
                 Response::error('Endpoint non trouvé', null, 404);
             }
@@ -204,7 +201,6 @@ class PuzzleRouteHandler extends BaseRouteHandler
             if ($device === null) return;
             if (!$this->requirePremium($device)) return;
 
-            // GET/POST /puzzle/shared
             if ($s2 === '') {
                 match ($method) {
                     'GET'  => (new SharedController())->listShared($device),
@@ -214,7 +210,6 @@ class PuzzleRouteHandler extends BaseRouteHandler
                 return;
             }
 
-            // /puzzle/shared/{shared_uid}[/state|/pick|/drop|/events|/leave]
             $sharedUid = $s2;
 
             if ($s3 === '' && $method === 'DELETE') {
@@ -239,22 +234,18 @@ class PuzzleRouteHandler extends BaseRouteHandler
     }
 
     // -----------------------------------------------------------------------
-    // Admin — dispatch et middleware JWT
+    // Admin
     // -----------------------------------------------------------------------
 
-    /**
-     * Dispatch des routes /puzzle/admin/*
-     * L'authentification JWT est vérifiée dans requireAdminJwt().
-     */
-    private function handleAdminRoute(array $segments, string $method): void
+    private function handleAdminRoute(array $segments, int $off, string $method): void
     {
         $user = $this->requireAdminJwt();
         if ($user === null) return;
 
-        $s2 = $segments[2] ?? ''; // 'images' | 'themes'
-        $s3 = $segments[3] ?? ''; // uid | slug | 'reorder' | 'generate'
-        $s4 = $segments[4] ?? ''; // 'images' (themes/{slug}/images)
-        $s5 = $segments[5] ?? ''; // uid (themes/{slug}/images/{uid})
+        $s2 = $segments[2 + $off] ?? '';
+        $s3 = $segments[3 + $off] ?? '';
+        $s4 = $segments[4 + $off] ?? '';
+        $s5 = $segments[5 + $off] ?? '';
 
         if ($s2 === 'images') {
             (new AdminController())->handleImages($s3, $s4, $method, $user);
@@ -265,8 +256,6 @@ class PuzzleRouteHandler extends BaseRouteHandler
             return;
         }
 
-        // GET /puzzle/admin/thumb/{uid}
-        // GET /puzzle/admin/thumb/theme/{slug}
         if ($s2 === 'thumb' && $method === 'GET') {
             if ($s3 === 'theme' && $s4 !== '') {
                 (new ImageDeliveryController())->serveThemeThumb($s4);
@@ -278,7 +267,6 @@ class PuzzleRouteHandler extends BaseRouteHandler
             return;
         }
 
-        // GET /puzzle/admin/image/{uid}
         if ($s2 === 'image' && $s3 !== '' && $method === 'GET') {
             (new ImageDeliveryController())->serveImage($s3);
             return;
@@ -287,10 +275,10 @@ class PuzzleRouteHandler extends BaseRouteHandler
         Response::error('Endpoint non trouvé', null, 404);
     }
 
-    /**
-     * Valide le JWT cmem2 sans vérification de rôle.
-     * Retourne le tableau $user ou envoie HTTP 401.
-     */
+    // -----------------------------------------------------------------------
+    // Helpers JWT
+    // -----------------------------------------------------------------------
+
     private function requireAnyJwt(): ?array
     {
         $user = $this->authService?->authenticate();
@@ -301,10 +289,6 @@ class PuzzleRouteHandler extends BaseRouteHandler
         return $user;
     }
 
-    /**
-     * Valide le JWT cmem2 et vérifie le rôle ADMINISTRATEUR.
-     * Retourne le tableau $user ou envoie HTTP 401/403.
-     */
     private function requireAdminJwt(): ?array
     {
         $user = $this->authService?->authenticate();
@@ -320,13 +304,9 @@ class PuzzleRouteHandler extends BaseRouteHandler
     }
 
     // -----------------------------------------------------------------------
-    // Helpers d'authentification
+    // Device token — cherche dans android_devices puis web_devices
     // -----------------------------------------------------------------------
 
-    /**
-     * Valide le device_token depuis Authorization: Bearer <token>.
-     * Retourne les données de l'appareil ou envoie HTTP 401.
-     */
     private function requireDeviceToken(): ?array
     {
         $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
@@ -336,48 +316,57 @@ class PuzzleRouteHandler extends BaseRouteHandler
             return null;
         }
 
-        $token  = substr($authHeader, 7);
-        $device = (new PuzzleDevice())->findByValidToken($token);
+        $token = substr($authHeader, 7);
+
+        $androidModel = new AndroidDevice();
+        $device       = $androidModel->findByValidToken($token);
+        if ($device) {
+            $androidModel->touchLastSeen((int) $device['id']);
+        } else {
+            $webModel = new WebDevice();
+            $device   = $webModel->findByValidToken($token);
+            if ($device) {
+                $webModel->touchLastSeen((int) $device['id']);
+            }
+        }
 
         if (!$device) {
             Response::error('Token d\'appareil inconnu ou expiré', ['code' => 'DEVICE_NOT_FOUND'], 401);
             return null;
         }
 
-        // Mettre à jour last_seen_at (fire and forget)
-        (new PuzzleDevice())->touchLastSeen((int) $device['id']);
+        $device['is_premium']         = 0;
+        $device['premium_expires_at'] = null;
 
         if (!empty($device['user_id'])) {
-            // Device lié à un compte : subscription par user_id (Stripe ou Google Play connecté)
-            $sub = (new Subscription())->findActive((int) $device['user_id'], 'puzzle');
-        } elseif (!empty($device['purchase_token'])) {
-            // Device anonyme : subscription par purchase_token (Google Play)
-            $sub = (new Subscription())->findActiveByPurchaseToken(
-                $device['purchase_token'], 'puzzle'
-            );
-        } else {
-            $sub = null;
-        }
+            $result = AccessService::getMatrix((int) $device['user_id'], $device['app_id'] ?? 'puzzle');
+            $matrix = $result['matrix'];
 
-        if ($sub !== null) {
-            $device['is_premium']         = 1;
-            $device['premium_expires_at'] = $sub['expires_at'];
+            if ($matrix['android'] || $matrix['web'] || $matrix['windows']) {
+                $device['is_premium'] = 1;
+                foreach ($result['sources'] as $src) {
+                    if (!empty($src['expires_at'])) {
+                        $device['premium_expires_at'] = $src['expires_at'];
+                        break;
+                    }
+                }
+            }
         }
 
         return $device;
     }
 
-    /**
-     * Vérifie que l'appareil est abonné actif.
-     * Envoie HTTP 403 et retourne false si non.
-     */
+    // -----------------------------------------------------------------------
+    // Premium guard — trust is_premium set by requireDeviceToken()
+    // -----------------------------------------------------------------------
+
     private function requirePremium(array $device): bool
     {
         if (defined('PUZZLE_DEBUG_PREMIUM') && \PUZZLE_DEBUG_PREMIUM) {
             return true;
         }
 
-        if (!$device['is_premium'] || strtotime($device['premium_expires_at'] ?? '0') < time()) {
+        if (!$device['is_premium']) {
             Response::error('Abonnement requis', ['code' => 'SUBSCRIPTION_REQUIRED'], 403);
             return false;
         }

@@ -27,7 +27,7 @@ class ImageDeliveryController
     // GET /puzzle/thumb/{uid}
     // -----------------------------------------------------------------------
 
-    public function serveThumb(string $uid): void
+    public function serveThumb(string $uid, array $device = []): void
     {
         $path = (new PuzzleImage())->getThumbPath($uid);
         $this->serveFile($path, $uid);
@@ -37,7 +37,7 @@ class ImageDeliveryController
     // GET /puzzle/image/{uid}
     // -----------------------------------------------------------------------
 
-    public function serveImage(string $uid): void
+    public function serveImage(string $uid, array $device = []): void
     {
         $path = (new PuzzleImage())->getFullPath($uid);
         $this->serveFile($path, $uid);

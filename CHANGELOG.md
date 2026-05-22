@@ -7,6 +7,20 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-05-21]
+
+### Fix — Endpoints thumb/image accessibles avec device_token anonyme Android
+
+- **`composer.json`** — ajout namespace `WebDevice\\` au PSR-4 ; sans cela, `new WebDevice()` levait une `Error` non catchée (HTTP 200 avec body d'erreur PHP) pour tout device_token inconnu d'`android_devices`
+- **`src/puzzle/Models/PuzzleImage.php`** — `formatImage()` génère désormais `/v2/puzzle/thumb/{uid}` et `/v2/puzzle/image/{uid}` (était `/puzzle/thumb/`, non-v2)
+- **`src/puzzle/Controllers/ImageDeliveryController.php`** — `serveThumb()` et `serveImage()` acceptent maintenant un paramètre `$device` (transmis par le router pour usage futur)
+- **`src/puzzle/Routing/PuzzleRouteHandler.php`** — passe `$device` aux appels `serveThumb()` et `serveImage()`
+- **`private/tests/test_playstore.php`** — section 1b : tests device anonyme (register sans JWT, carousel, thumb, image, token invalide) ; test 1.1 mis à jour (attendu 200 au lieu de 401)
+
+**Déploiement requis :** `composer dump-autoload` sur le serveur après push.
+
+---
+
 ## [Unreleased 2026-05-19 Phase 6]
 
 ### Docs — Nouveaux modules v2.7.0

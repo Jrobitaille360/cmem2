@@ -181,8 +181,8 @@ class PuzzleImage extends BaseModel
         return [
             'uid'        => $uid,
             'label'      => $row['label'] ?? '',
-            'thumb_url'  => "{$apiBase}/puzzle/thumb/{$uid}",
-            'full_url'   => "{$apiBase}/puzzle/image/{$uid}",
+            'thumb_url'  => "{$apiBase}/v2/puzzle/thumb/{$uid}",
+            'full_url'   => "{$apiBase}/v2/puzzle/image/{$uid}",
             'themes'     => $themes,
             'created_at' => date('c', strtotime($row['created_at'])),
         ];
