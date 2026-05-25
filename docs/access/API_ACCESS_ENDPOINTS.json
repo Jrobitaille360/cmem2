@@ -1,9 +1,9 @@
 {
   "api": {
     "name": "Access Module",
-    "version": "1.0.0",
-    "description": "Endpoint d'accès unifié — agrège Play Store et Stripe pour retourner la matrice d'accès premium par plateforme. Introduit en v2.7.0.",
-    "generated": "2026-05-19",
+    "version": "1.1.0",
+    "description": "Endpoint d'accès unifié (JWT) — agrège Stripe pour retourner la matrice d'accès premium par plateforme. Couvre web et windows. Android utilise GET /v2/subscriptions/playstore/status (X-Device-Token) directement. Introduit en v2.7.0.",
+    "generated": "2026-05-24",
     "base_url": "/v2",
     "authentication": {
       "type": "JWT_BEARER",
@@ -13,14 +13,14 @@
   },
   "endpoints": {
     "access": {
-      "description": "Accès premium consolidé",
+      "description": "Accès premium consolidé (Stripe) — JWT requis",
       "base_path": "/v2/access",
       "routes": [
         {
           "method": "GET",
           "path": "/v2/access/status",
           "auth_required": true,
-          "description": "Retourne le statut premium consolidé pour un utilisateur, une app et optionnellement une plateforme. Agrège playstore_subscriptions et stripe_subscriptions. Appeler à chaque démarrage ou reprise en premier plan pour connaître l'accès actuel.",
+          "description": "Retourne le statut premium consolidé pour un utilisateur authentifié par JWT, une app et optionnellement une plateforme. Source : Stripe uniquement. Pour Android, utiliser GET /v2/subscriptions/playstore/status avec X-Device-Token.",
           "query_params": {
             "app_id": "string (required) — identifiant de l'application",
             "platform": "string (optional) — 'android' | 'web' | 'windows'. Si fourni, retourne is_premium pour cette plateforme uniquement."
@@ -38,7 +38,7 @@
                     "windows": true
                   },
                   "sources": [
-                    { "provider": "playstore", "status": "active", "expires_at": "2027-06-01T00:00:00" }
+                    { "provider": "stripe", "status": "active", "expires_at": "2027-06-01T00:00:00" }
                   ]
                 }
               }
@@ -49,7 +49,7 @@
                 "success": true,
                 "data": {
                   "is_premium": false,
-                  "platform": "android",
+                  "platform": "web",
                   "sources": []
                 }
               }
@@ -58,23 +58,22 @@
             "422": "app_id manquant | platform invalide (valeurs acceptées : android, web, windows)"
           },
           "access_matrix": {
-            "description": "Règles de calcul de l'accès par source",
+            "description": "Règles de calcul de l'accès par source (Stripe uniquement via JWT)",
             "rules": {
-              "playstore_active": { "android": true,  "web": true,  "windows": true  },
-              "stripe_active":    { "android": false, "web": true,  "windows": true  },
-              "none":             { "android": false, "web": false, "windows": false }
+              "stripe_active": { "android": true, "web": true, "windows": true },
+              "none":          { "android": false, "web": false, "windows": false }
             },
-            "combination": "OR des deux sources — si l'une ou l'autre est active, l'accès est accordé"
+            "note": "Les abonnements Play Store ne sont pas inclus — ils sont liés au device_uuid (anonyme) et non au user_id. Android doit appeler GET /v2/subscriptions/playstore/status."
           },
           "sources_array": {
             "description": "Tableau des abonnements actifs contribuant à l'accès",
             "schema": {
-              "provider": "string — 'playstore' | 'stripe'",
-              "status": "string — 'active' | 'trialing' | ...",
+              "provider": "string — 'stripe'",
+              "status": "string — 'active' | 'trialing' | 'past_due'",
               "expires_at": "datetime | null"
             }
           },
-          "client_notes": "Appeler à chaque AppLifecycleState.resumed (mobile) ou navigation entre pages (web). Le résultat est la source de vérité pour l'accès premium — ne pas recourir à un cache local au-delà de la session."
+          "client_notes": "Endpoint pour clients web et windows authentifiés par JWT. Ne pas utiliser pour Android — utiliser GET /v2/subscriptions/playstore/status avec X-Device-Token."
         }
       ]
     }
