@@ -124,6 +124,6 @@
       "web": true,
       "windows": true
     },
-    "unified_status": "GET /v2/access/status — endpoint consolidé (Play Store + Stripe)"
+    "unified_status": "GET /v2/access/status — endpoint consolidé Stripe (JWT). Android : GET /v2/subscriptions/playstore/status (X-Device-Token)"
   }
 }

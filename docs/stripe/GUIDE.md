@@ -218,7 +218,8 @@ Android n'est accessible que via Play Store.
 | web | oui |
 | windows | oui |
 
-Pour vérifier l'accès consolidé (Play Store + Stripe), utiliser `GET /v2/access/status`.
+Pour vérifier l'accès Stripe (web/windows), utiliser `GET /v2/access/status` (JWT).
+Android consulte son propre statut via `GET /v2/subscriptions/playstore/status` (X-Device-Token).
 
 ---
 
