@@ -99,9 +99,8 @@ class GooglePlayService
         $isTrial   = \in_array('free-trial', $offerTags, true);
         $trialEnd  = $isTrial ? $expiresAt : null;
 
-        // Lire user_id transmis par Flutter à l'achat
-        $obfuscatedId = $data['externalAccountIdentifiers']['obfuscatedExternalAccountId'] ?? null;
-        $userId       = $obfuscatedId !== null ? (int) $obfuscatedId : null;
+        // device_uuid transmis par Flutter via setObfuscatedAccountId(device_uuid) à l'achat
+        $deviceUuid = $data['externalAccountIdentifiers']['obfuscatedExternalAccountId'] ?? null;
 
         return [
             'is_premium'            => $isPremium ? 1 : 0,
@@ -111,7 +110,7 @@ class GooglePlayService
             'product_id'            => $lineItem['productId'] ?? $productId,
             'purchase_token'        => $purchaseToken,
             'expires_at'            => $expiresAt,
-            'user_id'               => $userId,
+            'device_uuid'           => $deviceUuid,
             'linked_purchase_token' => $data['linkedPurchaseToken'] ?? null,
         ];
     }

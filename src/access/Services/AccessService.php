@@ -2,35 +2,25 @@
 
 namespace Access\Services;
 
-use Playstore\Models\PlaystoreSubscription;
 use Stripe\Models\StripeSubscription;
 
 class AccessService
 {
-    private const PLAYSTORE_PLATFORMS = ['android', 'web', 'windows'];
-    private const STRIPE_PLATFORMS    = ['web', 'windows'];
+    // Android subscriptions (Playstore) are anonymous — no user_id linkage.
+    // Android clients query /v2/subscriptions/playstore/status directly via device_token.
+    // This JWT-based endpoint covers Stripe (web/windows) only.
 
     public static function getMatrix(int $userId, string $appId): array
     {
-        $playstoreActive = self::isPlaystoreActive($userId, $appId);
-        $stripeActive    = self::isStripeActive($userId, $appId);
+        $stripeActive = self::isStripeActive($userId, $appId);
 
         $matrix = [
-            'android' => $playstoreActive,
-            'web'     => $playstoreActive || $stripeActive,
-            'windows' => $playstoreActive || $stripeActive,
+            'android' => $stripeActive,
+            'web'     => $stripeActive,
+            'windows' => $stripeActive,
         ];
 
         $sources = [];
-
-        if ($playstoreActive) {
-            $row       = (new PlaystoreSubscription())->findLatestActive($userId, $appId);
-            $sources[] = [
-                'provider'   => 'playstore',
-                'status'     => 'active',
-                'expires_at' => $row['expires_at'] ?? null,
-            ];
-        }
 
         if ($stripeActive) {
             $row       = (new StripeSubscription())->findByUserAndApp($userId, $appId);
@@ -42,12 +32,6 @@ class AccessService
         }
 
         return ['matrix' => $matrix, 'sources' => $sources];
-    }
-
-    private static function isPlaystoreActive(int $userId, string $appId): bool
-    {
-        $row = (new PlaystoreSubscription())->findLatestActive($userId, $appId);
-        return $row !== null;
     }
 
     private static function isStripeActive(int $userId, string $appId): bool

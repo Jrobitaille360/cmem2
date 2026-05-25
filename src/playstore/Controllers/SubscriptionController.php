@@ -9,11 +9,10 @@ use Playstore\Services\PlaystoreSubscriptionService;
 
 class SubscriptionController
 {
-    public function verify(array $user): void
+    public function verify(array $device): void
     {
         LoggingMiddleware::logEntry();
-        $input  = Response::getRequestParams();
-        $userId = $user['user_id'];
+        $input = Response::getRequestParams();
 
         $purchaseToken = $input['purchase_token'] ?? '';
         $productId     = $input['product_id']     ?? '';
@@ -26,7 +25,12 @@ class SubscriptionController
         }
 
         try {
-            $result = PlaystoreSubscriptionService::verify($userId, $appId, $purchaseToken, $productId);
+            $result = PlaystoreSubscriptionService::verify(
+                $device['device_uuid'],
+                $appId,
+                $purchaseToken,
+                $productId
+            );
         } catch (\RuntimeException $e) {
             LoggingMiddleware::logExit(422);
             Response::error($e->getMessage(), null, 422);
@@ -37,11 +41,10 @@ class SubscriptionController
         Response::success('Abonnement vérifié', $result);
     }
 
-    public function getStatus(array $user): void
+    public function getStatus(array $device): void
     {
         LoggingMiddleware::logEntry();
-        $userId = $user['user_id'];
-        $appId  = $_GET['app_id'] ?? '';
+        $appId = $_GET['app_id'] ?? '';
 
         if (!$appId) {
             LoggingMiddleware::logExit(422);
@@ -49,18 +52,17 @@ class SubscriptionController
             return;
         }
 
-        $result = PlaystoreSubscriptionService::getStatus($userId, $appId);
+        $result = PlaystoreSubscriptionService::getStatus($device['device_uuid'], $appId);
 
         LoggingMiddleware::logExit(200);
         Response::success('Statut récupéré', $result);
     }
 
-    public function cancel(array $user): void
+    public function cancel(array $device): void
     {
         LoggingMiddleware::logEntry();
-        $input  = Response::getRequestParams();
-        $userId = $user['user_id'];
-        $appId  = $input['app_id'] ?? $_GET['app_id'] ?? '';
+        $input = Response::getRequestParams();
+        $appId = $input['app_id'] ?? $_GET['app_id'] ?? '';
 
         if (!$appId) {
             LoggingMiddleware::logExit(422);
@@ -68,7 +70,7 @@ class SubscriptionController
             return;
         }
 
-        (new PlaystoreSubscription())->markCancelled($userId, $appId);
+        (new PlaystoreSubscription())->markCancelled($device['device_uuid'], $appId);
 
         LoggingMiddleware::logExit(200);
         Response::success('Abonnement annulé');

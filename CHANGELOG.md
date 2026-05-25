@@ -7,6 +7,60 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-05-24]
+
+### Refactor — Abonnements Play Store : `device_uuid` remplace `user_id`
+
+Android étant entièrement anonyme (pas d'email, pas de JWT), les abonnements Play Store sont
+maintenant liés à `device_uuid` plutôt qu'à `user_id`. Le `device_uuid` sert également de
+`obfuscatedExternalAccountId` côté Google Play, ce qui permet la restauration d'abonnement
+sur un nouvel appareil.
+
+#### Migration SQL
+
+- **`docs/20260524_playstore_subscriptions_device_uuid.sql`** — migration appliquée :
+  suppression `user_id` + FK, ajout `device_uuid VARCHAR(64)`,
+  nouvelle clé unique `(device_uuid, app_id)`, index `purchase_token`
+
+#### Modèle
+
+- **`src/playstore/Models/PlaystoreSubscription.php`** — propriété `user_id` → `device_uuid` ;
+  `upsertSubscription(string $deviceUuid, ...)` ; `findActive(string $deviceUuid, string $appId)` ;
+  `markCancelled` et `expireStale` acceptent `string $deviceUuid`
+
+#### Services
+
+- **`src/playstore/Services/GooglePlayService.php`** — `obfuscatedExternalAccountId` retourné
+  comme `string $deviceUuid` (plus de cast `int`)
+- **`src/playstore/Services/PlaystoreSubscriptionService.php`** — `verify()` accepte
+  `string $callerDeviceUuid` ; restauration cross-device via `$result['device_uuid'] ?? $callerDeviceUuid`
+
+#### Contrôleurs et routage
+
+- **`src/playstore/Controllers/SubscriptionController.php`** — tous les endpoints acceptent
+  `array $device` (au lieu de `array $user`) et utilisent `$device['device_uuid']`
+- **`src/playstore/Routing/PlaystoreRouteHandler.php`** — `/v2/subscriptions/playstore/*`
+  authentifié via `X-Device-Token` (plus de JWT) ; validation par `AndroidDevice::findByValidToken()`
+
+#### Module Access
+
+- **`src/access/Services/AccessService.php`** — suppression du lookup Play Store (impossible
+  sans `user_id`) ; `GET /v2/access/status` (JWT) couvre désormais Stripe uniquement ;
+  Android consulte son statut via `GET /v2/subscriptions/playstore/status` (device_token)
+
+#### Tests
+
+- **`private/tests/test_new_base.php`** — ajout `callApiWithDeviceToken()` et
+  `callTestWithDeviceToken()` (envoie `X-Device-Token` au lieu de JWT)
+- **`private/tests/test_subscriptions.php`** — réécriture complète ; teste les nouveaux
+  endpoints plugin (playstore + stripe) au lieu des anciens `/subscription/*` supprimés
+- **`private/tests/test_playstore.php`** — sections 4-6 utilisent désormais
+  `callTestWithDeviceToken($deviceToken, ...)` pour les routes Play Store
+- **`private/tests/test_access.php`** — section 5 : enregistrement device + `callTestWithDeviceToken`
+  pour le setup Play Store ; section 5.0 corrigée (accepte 422 local)
+
+---
+
 ## [Unreleased 2026-05-22]
 
 ### Feat — Enregistrement device anonyme + routage v2/puzzle

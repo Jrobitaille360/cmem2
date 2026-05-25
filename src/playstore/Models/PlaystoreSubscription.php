@@ -10,7 +10,7 @@ class PlaystoreSubscription extends BaseModel
     protected $table = 'playstore_subscriptions';
 
     public $id;
-    public $user_id;
+    public $device_uuid;
     public $app_id;
     public $purchase_token;
     public $product_id;
@@ -24,7 +24,7 @@ class PlaystoreSubscription extends BaseModel
     public function update() { throw new \LogicException('Utiliser les méthodes spécifiques'); }
 
     public function upsertSubscription(
-        int     $userId,
+        string  $deviceUuid,
         string  $appId,
         string  $purchaseToken,
         string  $productId,
@@ -34,47 +34,48 @@ class PlaystoreSubscription extends BaseModel
     ): void {
         $stmt = $this->getDb()->prepare(
             "INSERT INTO {$this->table}
-                 (user_id, app_id, purchase_token, product_id, status, expires_at, verified_at)
+                 (device_uuid, app_id, purchase_token, product_id, status, expires_at, verified_at)
              VALUES (?, ?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE
-                 status      = VALUES(status),
-                 expires_at  = VALUES(expires_at),
-                 verified_at = VALUES(verified_at),
-                 updated_at  = NOW()"
+                 purchase_token = VALUES(purchase_token),
+                 product_id     = VALUES(product_id),
+                 status         = VALUES(status),
+                 expires_at     = VALUES(expires_at),
+                 verified_at    = VALUES(verified_at),
+                 updated_at     = NOW()"
         );
-        $stmt->execute([$userId, $appId, $purchaseToken, $productId, $status, $expiresAt, $verifiedAt]);
+        $stmt->execute([$deviceUuid, $appId, $purchaseToken, $productId, $status, $expiresAt, $verifiedAt]);
     }
 
-    public function findLatestActive(int $userId, string $appId): ?array
+    public function findActive(string $deviceUuid, string $appId): ?array
     {
         $stmt = $this->getDb()->prepare(
             "SELECT * FROM {$this->table}
-             WHERE user_id = ? AND app_id = ? AND status = 'active'
-             ORDER BY expires_at DESC
+             WHERE device_uuid = ? AND app_id = ? AND status = 'active'
              LIMIT 1"
         );
-        $stmt->execute([$userId, $appId]);
+        $stmt->execute([$deviceUuid, $appId]);
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
-    public function markCancelled(int $userId, string $appId): int
+    public function markCancelled(string $deviceUuid, string $appId): int
     {
         $stmt = $this->getDb()->prepare(
             "UPDATE {$this->table}
              SET status = 'cancelled', updated_at = NOW()
-             WHERE user_id = ? AND app_id = ? AND status = 'active'"
+             WHERE device_uuid = ? AND app_id = ? AND status = 'active'"
         );
-        $stmt->execute([$userId, $appId]);
+        $stmt->execute([$deviceUuid, $appId]);
         return $stmt->rowCount();
     }
 
-    public function expireStale(int $userId, string $appId): void
+    public function expireStale(string $deviceUuid, string $appId): void
     {
         $stmt = $this->getDb()->prepare(
             "UPDATE {$this->table}
              SET status = 'expired', updated_at = NOW()
-             WHERE user_id = ? AND app_id = ? AND status = 'active' AND expires_at < NOW()"
+             WHERE device_uuid = ? AND app_id = ? AND status = 'active' AND expires_at < NOW()"
         );
-        $stmt->execute([$userId, $appId]);
+        $stmt->execute([$deviceUuid, $appId]);
     }
 }

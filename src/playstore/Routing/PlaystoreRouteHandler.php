@@ -77,24 +77,90 @@ class PlaystoreRouteHandler extends BaseRouteHandler
                 return;
             }
 
-            Response::error('Endpoint non trouvé', null, 404);
-            return;
-        }
-
-        // --------------------------------------------------------------------
-        // /v2/subscriptions/playstore/*
-        // --------------------------------------------------------------------
-        if ($s1 === 'subscriptions' && $s2 === 'playstore') {
             $user = $this->authService->authenticate();
             if (!$user) {
                 Response::error('Authentification requise', null, 401);
                 return;
             }
 
+            if ($s3 === 'pseudonym') {
+                if ($s4 === 'check' && $method === 'GET') {
+                    (new DeviceController())->checkPseudonym($user, $s5);
+                    return;
+                }
+
+                match ($method) {
+                    'GET'    => (new DeviceController())->getPseudonym($user),
+                    'POST'   => (new DeviceController())->setPseudonym($user),
+                    'DELETE' => (new DeviceController())->deletePseudonym($user),
+                    default  => Response::error('Méthode non autorisée', null, 405),
+                };
+                return;
+            }
+
+            Response::error('Endpoint non trouvé', null, 404);
+            return;
+        }
+
+        // --------------------------------------------------------------------
+        // /v2/devices/windows/*  — stocké dans web_devices (même table que web)
+        // --------------------------------------------------------------------
+        if ($s1 === 'devices' && $s2 === 'windows') {
+            if ($s3 === 'register' && $method === 'POST') {
+                // JWT optionnel — anonyme si absent
+                $user = $this->authService->authenticate();
+                (new WebDeviceController())->register($user ?: null);
+                return;
+            }
+
+            $user = $this->authService->authenticate();
+            if (!$user) {
+                Response::error('Authentification requise', null, 401);
+                return;
+            }
+
+            if ($s3 === 'pseudonym') {
+                if ($s4 === 'check' && $method === 'GET') {
+                    (new DeviceController())->checkPseudonym($user, $s5);
+                    return;
+                }
+
+                match ($method) {
+                    'GET'    => (new DeviceController())->getPseudonym($user),
+                    'POST'   => (new DeviceController())->setPseudonym($user),
+                    'DELETE' => (new DeviceController())->deletePseudonym($user),
+                    default  => Response::error('Méthode non autorisée', null, 405),
+                };
+                return;
+            }
+
+            Response::error('Endpoint non trouvé', null, 404);
+            return;
+        }
+
+        // --------------------------------------------------------------------
+        // /v2/subscriptions/playstore/*
+        // Auth : X-Device-Token (Android, jamais de JWT — pas d'email requis)
+        // --------------------------------------------------------------------
+        if ($s1 === 'subscriptions' && $s2 === 'playstore') {
+            $deviceToken = $_SERVER['HTTP_X_DEVICE_TOKEN'] ?? '';
+
+            if (!$deviceToken) {
+                Response::error('X-Device-Token requis', null, 401);
+                return;
+            }
+
+            $device = (new \Playstore\Models\AndroidDevice())->findByValidToken($deviceToken);
+
+            if (!$device) {
+                Response::error('Device token invalide ou expiré', null, 401);
+                return;
+            }
+
             match (true) {
-                ($s3 === 'verify' && $method === 'POST')  => (new SubscriptionController())->verify($user),
-                ($s3 === 'status' && $method === 'GET')   => (new SubscriptionController())->getStatus($user),
-                ($s3 === ''       && $method === 'DELETE') => (new SubscriptionController())->cancel($user),
+                ($s3 === 'verify' && $method === 'POST')   => (new SubscriptionController())->verify($device),
+                ($s3 === 'status' && $method === 'GET')    => (new SubscriptionController())->getStatus($device),
+                ($s3 === ''       && $method === 'DELETE') => (new SubscriptionController())->cancel($device),
                 default => Response::error('Endpoint non trouvé', null, 404),
             };
             return;

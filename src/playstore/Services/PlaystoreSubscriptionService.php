@@ -8,7 +8,7 @@ use Playstore\Models\PlaystoreSubscription;
 class PlaystoreSubscriptionService
 {
     public static function verify(
-        int    $userId,
+        string $callerDeviceUuid,
         string $appId,
         string $purchaseToken,
         string $productId
@@ -19,14 +19,19 @@ class PlaystoreSubscriptionService
             throw new \RuntimeException('Token Google Play invalide ou inaccessible');
         }
 
-        $isPremium  = (bool) $result['is_premium'];
-        $status     = $isPremium ? 'active' : 'expired';
-        $expiresAt  = $result['expires_at'] ?? null;
-        $verifiedAt = $isPremium ? date('Y-m-d H:i:s') : null;
+        // obfuscatedExternalAccountId = device_uuid de l'appareil original (achat initial).
+        // Sur nouvel appareil : Google retourne le device_uuid original → upsert sur ce uuid.
+        // Si absent (achat sans setObfuscatedAccountId) : fallback sur l'appareil appelant.
+        $ownerDeviceUuid = $result['device_uuid'] ?? $callerDeviceUuid;
+
+        $isPremium      = (bool) $result['is_premium'];
+        $status         = $isPremium ? 'active' : 'expired';
+        $expiresAt      = $result['expires_at'] ?? null;
+        $verifiedAt     = $isPremium ? date('Y-m-d H:i:s') : null;
         $finalProductId = $result['product_id'] ?? $productId;
 
         (new PlaystoreSubscription())->upsertSubscription(
-            $userId,
+            $ownerDeviceUuid,
             $appId,
             $purchaseToken,
             $finalProductId,
@@ -36,10 +41,11 @@ class PlaystoreSubscriptionService
         );
 
         LogService::info('PlaystoreSubscriptionService::verify', [
-            'user_id'    => $userId,
-            'app_id'     => $appId,
-            'product_id' => $finalProductId,
-            'status'     => $status,
+            'owner_device_uuid'  => $ownerDeviceUuid,
+            'caller_device_uuid' => $callerDeviceUuid,
+            'app_id'             => $appId,
+            'product_id'         => $finalProductId,
+            'status'             => $status,
         ]);
 
         return [
@@ -50,17 +56,15 @@ class PlaystoreSubscriptionService
         ];
     }
 
-    public static function getStatus(int $userId, string $appId): array
+    public static function getStatus(string $deviceUuid, string $appId): array
     {
         $model = new PlaystoreSubscription();
-
-        $model->expireStale($userId, $appId);
-
-        $row = $model->findLatestActive($userId, $appId);
+        $model->expireStale($deviceUuid, $appId);
+        $row = $model->findActive($deviceUuid, $appId);
 
         if ($row && $row['expires_at'] !== null) {
             $expiresTs  = strtotime($row['expires_at']);
-            $soonThresh = time() + 86400; // 24h
+            $soonThresh = time() + 86400;
 
             if ($expiresTs < $soonThresh) {
                 $gpResult = (new GooglePlayService())->validateSubscription(
@@ -76,7 +80,7 @@ class PlaystoreSubscriptionService
                     $verifiedAt = $isPremium ? date('Y-m-d H:i:s') : null;
 
                     $model->upsertSubscription(
-                        $userId,
+                        $deviceUuid,
                         $appId,
                         $row['purchase_token'],
                         $row['product_id'],
@@ -85,7 +89,7 @@ class PlaystoreSubscriptionService
                         $verifiedAt
                     );
 
-                    $row = $model->findLatestActive($userId, $appId);
+                    $row = $model->findActive($deviceUuid, $appId);
                 }
             }
         }
