@@ -4,8 +4,9 @@ namespace Puzzle\Controllers;
 
 use AuthGroups\Middleware\LoggingMiddleware;
 use AuthGroups\Utils\Response;
+use Playstore\Models\AndroidDevice;
 use Puzzle\Models\PuzzleImage;
-use Puzzle\Models\PuzzleDevice;
+use WebDevice\Models\WebDevice;
 
 /**
  * CarouselController — carrousel principal, remplacement d'images
@@ -48,7 +49,6 @@ class CarouselController
             return;
         }
 
-        // Vérifier 1 remplacement par jour
         $lastReplaced = $device['last_replaced_at'] ?? null;
         if ($lastReplaced === date('Y-m-d')) {
             LoggingMiddleware::logExit(429);
@@ -56,7 +56,6 @@ class CarouselController
             return;
         }
 
-        // Choisir l'image complétée la plus ancienne
         usort($completed, fn($a, $b) => strcmp($a['completed_at'] ?? '', $b['completed_at'] ?? ''));
         $replaceUid = $completed[0]['uid'] ?? null;
 
@@ -75,7 +74,13 @@ class CarouselController
             return;
         }
 
-        (new PuzzleDevice())->setLastReplacedAt((int) $device['id']);
+        $deviceId   = (int) $device['id'];
+        $deviceType = $device['_device_type'] ?? 'web';
+        if ($deviceType === 'android') {
+            (new AndroidDevice())->setLastReplacedAt($deviceId);
+        } else {
+            (new WebDevice())->setLastReplacedAt($deviceId);
+        }
 
         LoggingMiddleware::logExit(200);
         Response::success('Image de remplacement disponible', [
@@ -107,7 +112,6 @@ class CarouselController
         $replacements    = [];
         $unavailableCount = 0;
 
-        // Accumuler les UIDs déjà assignés pour éviter les doublons dans la réponse
         $usedUids = $knownUids;
 
         foreach ($replaceUids as $replaceUid) {
@@ -125,7 +129,7 @@ class CarouselController
 
         LoggingMiddleware::logExit(200);
         Response::success('Images de remplacement disponibles', [
-            'replacements'     => $replacements,
+            'replacements'      => $replacements,
             'unavailable_count' => $unavailableCount,
         ]);
     }

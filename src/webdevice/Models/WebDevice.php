@@ -54,4 +54,12 @@ class WebDevice extends BaseModel
         );
         $stmt->execute([$id]);
     }
+
+    public function setLastReplacedAt(int $id): void
+    {
+        $stmt = $this->getDb()->prepare(
+            "UPDATE {$this->table} SET last_replaced_at = CURDATE() WHERE id = ?"
+        );
+        $stmt->execute([$id]);
+    }
 }

@@ -56,4 +56,14 @@ class AppUserSettings extends BaseModel
         $stmt->execute([$appId, $pseudonym, $excludeUserId]);
         return $stmt->fetch() === false;
     }
+
+    public function findUserByPseudonym(string $appId, string $pseudonym): ?int
+    {
+        $stmt = $this->getDb()->prepare(
+            "SELECT user_id FROM {$this->table} WHERE app_id = ? AND LOWER(pseudonym) = LOWER(?)"
+        );
+        $stmt->execute([$appId, $pseudonym]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ? (int) $row['user_id'] : null;
+    }
 }

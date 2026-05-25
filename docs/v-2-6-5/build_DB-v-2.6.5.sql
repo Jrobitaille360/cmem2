@@ -1,6 +1,6 @@
 ﻿-- ============================================================
 -- COLLECTIVE MEMORIES â€” Structure de la base de donnÃ©es
--- Version : 2.6.0 â€” 2026-05-10
+-- Version : 2.6.5 â€” 2026-05-10
 -- ============================================================
 -- Ce fichier contient UNIQUEMENT la structure (DDL).
 -- Les donnÃ©es de dÃ©marrage sensibles (utilisateurs) sont dans
@@ -852,6 +852,7 @@ CREATE TABLE IF NOT EXISTS `device_tokens` (
     `user_id`      INT UNSIGNED NOT NULL,
     `device_id`    VARCHAR(128) NOT NULL COMMENT 'UUID stable cÃ´tÃ© client',
     `device_name`  VARCHAR(255) NOT NULL DEFAULT 'Appareil inconnu',
+    `family_id`    VARCHAR(36)  NULL COMMENT 'UUID de la famille de rotation — tokens issus d un meme appareil partagent le meme family_id',
     `token_hash`   VARCHAR(64)  NOT NULL COMMENT 'SHA-256 du token en clair',
     `expires_at`   DATETIME     NOT NULL,
     `revoked_at`   DATETIME     NULL DEFAULT NULL,
@@ -863,7 +864,8 @@ CREATE TABLE IF NOT EXISTS `device_tokens` (
     UNIQUE KEY `uq_device_token_hash` (`token_hash`),
     INDEX `idx_device_user`      (`user_id`),
     INDEX `idx_device_device_id` (`device_id`),
-    INDEX `idx_device_expires`   (`expires_at`)
+    INDEX `idx_device_expires`   (`expires_at`),
+    INDEX `idx_device_family`    (`family_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- jwt_blacklist
@@ -1046,7 +1048,7 @@ BEGIN
     SELECT 'Nettoyage des anciennes statistiques terminÃ©' as message, NOW() as cleaned_at;
 END$$
 
-CREATE OR REPLACE PROCEDURE CleanupExpiredSessions()
+CREATE PROCEDURE CleanupExpiredSessions()
 BEGIN
     -- Marquer les sessions expirÃ©es comme inactives
     UPDATE user_sessions 
@@ -1060,7 +1062,7 @@ BEGIN
        OR (is_active = 0 AND login_at < NOW() - INTERVAL 30 DAY);
        
     SELECT ROW_COUNT() as cleaned_sessions;
-END //
+END$$
 DELIMITER ;
 
 

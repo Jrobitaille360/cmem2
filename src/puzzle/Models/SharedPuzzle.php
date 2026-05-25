@@ -38,8 +38,8 @@ class SharedPuzzle extends BaseModel
         return (int) $this->getDb()->lastInsertId();
     }
 
-    /** Retourne un partagé actif par shared_uid, en vérifiant que device_id est créateur ou partenaire. */
-    public function findActiveByUidAndDevice(string $sharedUid, int $deviceId): ?array
+    /** Retourne un partagé actif par shared_uid, en vérifiant que user_id est créateur ou partenaire. */
+    public function findActiveByUidAndUser(string $sharedUid, int $userId): ?array
     {
         $stmt = $this->getDb()->prepare("
             SELECT ps.*
@@ -48,17 +48,18 @@ class SharedPuzzle extends BaseModel
               AND ps.status = 'active'
               AND (ps.creator_id = ? OR ps.partner_id = ?)
         ");
-        $stmt->execute([$sharedUid, $deviceId, $deviceId]);
+        $stmt->execute([$sharedUid, $userId, $userId]);
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
     /**
-     * Retourne tous les partagés actifs d'un appareil (créateur ou partenaire).
+     * Retourne tous les partagés actifs d'un utilisateur (créateur ou partenaire).
      *
-     * @param int $deviceId         ID du device appelant
-     * @param int $pollActiveWindow Fenêtre en secondes pour déterminer si le partenaire est actif
+     * @param int    $userId          ID de l'utilisateur appelant
+     * @param string $appId           App ID (pour pseudonymes et présence)
+     * @param int    $pollActiveWindow Fenêtre en secondes pour déterminer si le partenaire est actif
      */
-    public function listActiveForDevice(int $deviceId, int $pollActiveWindow = 10): array
+    public function listActiveForUser(int $userId, string $appId, int $pollActiveWindow = 10): array
     {
         $stmt = $this->getDb()->prepare("
             SELECT
@@ -75,32 +76,52 @@ class SharedPuzzle extends BaseModel
                 ps.last_activity_at,
                 ps.status                            AS status,
                 (ps.creator_id = ?)                  AS is_creator,
-                pd_c.pseudonym                       AS creator_pseudo,
+                aus_c.pseudonym                      AS creator_pseudo,
                 CASE
-                    WHEN ps.creator_id = ? THEN pd_p.pseudonym
-                    ELSE pd_c.pseudonym
+                    WHEN ps.creator_id = ? THEN aus_p.pseudonym
+                    ELSE aus_c.pseudonym
                 END                                  AS partner_pseudo,
                 CASE
                     WHEN ps.creator_id = ?
-                        THEN (pd_p.last_seen_at >= DATE_SUB(NOW(), INTERVAL ? SECOND))
-                    ELSE    (pd_c.last_seen_at >= DATE_SUB(NOW(), INTERVAL ? SECOND))
+                        THEN (
+                            SELECT COALESCE(MAX(d.last_seen_at), '2000-01-01') >= DATE_SUB(NOW(), INTERVAL ? SECOND)
+                            FROM (
+                                SELECT last_seen_at FROM android_devices WHERE user_id = ps.partner_id AND app_id = ?
+                                UNION ALL
+                                SELECT last_seen_at FROM web_devices WHERE user_id = ps.partner_id AND app_id = ?
+                            ) d
+                        )
+                    ELSE (
+                        SELECT COALESCE(MAX(d.last_seen_at), '2000-01-01') >= DATE_SUB(NOW(), INTERVAL ? SECOND)
+                        FROM (
+                            SELECT last_seen_at FROM android_devices WHERE user_id = ps.creator_id AND app_id = ?
+                            UNION ALL
+                            SELECT last_seen_at FROM web_devices WHERE user_id = ps.creator_id AND app_id = ?
+                        ) d
+                    )
                 END                                  AS partner_active
             FROM puzzle_shared ps
-            INNER JOIN puzzle_images  pi   ON pi.id   = ps.image_id
-            LEFT  JOIN puzzle_devices pd_p ON pd_p.id = ps.partner_id
-            LEFT  JOIN puzzle_devices pd_c ON pd_c.id = ps.creator_id
+            INNER JOIN puzzle_images  pi    ON pi.id    = ps.image_id
+            LEFT  JOIN app_user_settings aus_p ON aus_p.user_id = ps.partner_id  AND aus_p.app_id = ?
+            LEFT  JOIN app_user_settings aus_c ON aus_c.user_id = ps.creator_id  AND aus_c.app_id = ?
             WHERE ps.status = 'active'
               AND (ps.creator_id = ? OR ps.partner_id = ?)
             ORDER BY ps.last_activity_at DESC
         ");
         $stmt->execute([
-            $deviceId,             // is_creator
-            $deviceId,             // partner_pseudonym CASE creator
-            $deviceId,             // partner_active CASE creator
-            $pollActiveWindow,     // partner_active creator branch window
-            $pollActiveWindow,     // partner_active partner branch window
-            $deviceId,             // WHERE creator_id
-            $deviceId,             // WHERE partner_id
+            $userId,           // is_creator
+            $userId,           // partner_pseudo CASE
+            $userId,           // partner_active CASE
+            $pollActiveWindow, // interval creator branch
+            $appId,            // android_devices creator branch
+            $appId,            // web_devices creator branch
+            $pollActiveWindow, // interval partner branch
+            $appId,            // android_devices partner branch
+            $appId,            // web_devices partner branch
+            $appId,            // aus_p JOIN
+            $appId,            // aus_c JOIN
+            $userId,           // WHERE creator_id
+            $userId,           // WHERE partner_id
         ]);
         $apiBase = defined('API_BASE_URL') ? rtrim(\API_BASE_URL, '/') : '';
 
@@ -144,8 +165,8 @@ class SharedPuzzle extends BaseModel
         $stmt->execute([$id]);
     }
 
-    /** Vérifie si une partie active existe déjà entre deux appareils (quelle que soit leur position créateur/partenaire). */
-    public function activeGameExists(int $deviceA, int $deviceB): bool
+    /** Vérifie si une partie active existe déjà entre deux utilisateurs (quelle que soit leur position créateur/partenaire). */
+    public function activeGameExists(int $userA, int $userB): bool
     {
         $stmt = $this->getDb()->prepare("
             SELECT 1 FROM puzzle_shared
@@ -156,7 +177,7 @@ class SharedPuzzle extends BaseModel
               )
             LIMIT 1
         ");
-        $stmt->execute([$deviceA, $deviceB, $deviceB, $deviceA]);
+        $stmt->execute([$userA, $userB, $userB, $userA]);
         return (bool) $stmt->fetchColumn();
     }
 
@@ -178,7 +199,7 @@ class SharedPuzzle extends BaseModel
     }
 
     /** Retourne les pièces non-tray d'un partagé avec leur état complet. */
-    public function getPieces(int $sharedId): array
+    public function getPieces(int $sharedId, string $appId): array
     {
         $stmt = $this->getDb()->prepare("
             SELECT
@@ -187,16 +208,16 @@ class SharedPuzzle extends BaseModel
                 psp.x,
                 psp.y,
                 psp.rotation,
-                pd_held.pseudonym AS held_by,
-                pd_by.pseudonym   AS `by`
+                aus_held.pseudonym AS held_by,
+                aus_by.pseudonym   AS `by`
             FROM puzzle_shared_pieces psp
-            LEFT JOIN puzzle_devices pd_held ON pd_held.id = psp.held_by_id
-            LEFT JOIN puzzle_devices pd_by   ON pd_by.id   = psp.by_id
+            LEFT JOIN app_user_settings aus_held ON aus_held.user_id = psp.held_by_id AND aus_held.app_id = ?
+            LEFT JOIN app_user_settings aus_by   ON aus_by.user_id   = psp.by_id      AND aus_by.app_id = ?
             WHERE psp.shared_id = ?
               AND psp.state != 'tray'
             ORDER BY psp.piece_id
         ");
-        $stmt->execute([$sharedId]);
+        $stmt->execute([$appId, $appId, $sharedId]);
         return array_map(fn($r) => [
             'piece_id' => (int) $r['piece_id'],
             'state'    => $r['state'],
@@ -213,7 +234,7 @@ class SharedPuzzle extends BaseModel
      * Retourne ['ok' => true, 'state' => 'held', 'held_by' => pseudonym]
      *       ou ['ok' => false, 'code' => 'LOCKED'|'HELD_BY_OTHER']
      */
-    public function pickPiece(int $sharedId, int $pieceId, int $deviceId): array
+    public function pickPiece(int $sharedId, int $pieceId, int $userId, string $appId): array
     {
         $db = $this->getDb();
         $db->beginTransaction();
@@ -233,7 +254,7 @@ class SharedPuzzle extends BaseModel
             return ['ok' => false, 'code' => 'LOCKED'];
         }
 
-        if ($row['state'] === 'held' && (int) $row['held_by_id'] !== $deviceId) {
+        if ($row['state'] === 'held' && (int) $row['held_by_id'] !== $userId) {
             $db->rollBack();
             return ['ok' => false, 'code' => 'HELD_BY_OTHER'];
         }
@@ -248,12 +269,14 @@ class SharedPuzzle extends BaseModel
                 state      = 'held',
                 held_by_id = VALUES(held_by_id),
                 held_at    = NOW()
-        ")->execute([$sharedId, $pieceId, $deviceId, $prevState]);
+        ")->execute([$sharedId, $pieceId, $userId, $prevState]);
 
         $db->commit();
 
-        $pseudoStmt = $db->prepare("SELECT pseudonym FROM puzzle_devices WHERE id = ?");
-        $pseudoStmt->execute([$deviceId]);
+        $pseudoStmt = $db->prepare(
+            "SELECT pseudonym FROM app_user_settings WHERE user_id = ? AND app_id = ?"
+        );
+        $pseudoStmt->execute([$userId, $appId]);
         $pseudo = $pseudoStmt->fetchColumn() ?: null;
 
         return ['ok' => true, 'state' => 'held', 'held_by' => $pseudo];
@@ -264,7 +287,7 @@ class SharedPuzzle extends BaseModel
      * Retourne ['ok' => true, 'state' => ..., 'x' => ..., 'y' => ..., 'rotation' => ..., 'completion' => ...]
      *       ou ['ok' => false, 'code' => 'NOT_HELD_BY_YOU']
      */
-    public function dropPiece(int $sharedId, int $pieceId, int $deviceId, float $x, float $y, int $rotation, bool $toTray, bool $lockedHint = false): array
+    public function dropPiece(int $sharedId, int $pieceId, int $userId, float $x, float $y, int $rotation, bool $toTray, bool $lockedHint = false): array
     {
         $db = $this->getDb();
         $db->beginTransaction();
@@ -278,7 +301,7 @@ class SharedPuzzle extends BaseModel
         $stmt->execute([$sharedId, $pieceId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if (!$row || $row['state'] !== 'held' || (int) $row['held_by_id'] !== $deviceId) {
+        if (!$row || $row['state'] !== 'held' || (int) $row['held_by_id'] !== $userId) {
             $db->rollBack();
             return ['ok' => false, 'code' => 'NOT_HELD_BY_YOU'];
         }
@@ -330,7 +353,7 @@ class SharedPuzzle extends BaseModel
                 prev_state = 'tray',
                 by_id      = ?
             WHERE shared_id = ? AND piece_id = ?
-        ")->execute([$newState, $finalX, $finalY, $rotation, $deviceId, $sharedId, $pieceId]);
+        ")->execute([$newState, $finalX, $finalY, $rotation, $userId, $sharedId, $pieceId]);
 
         $cStmt = $db->prepare("SELECT COUNT(*) FROM puzzle_shared_pieces WHERE shared_id = ? AND state = 'locked'");
         $cStmt->execute([$sharedId]);
@@ -358,23 +381,23 @@ class SharedPuzzle extends BaseModel
 
     /**
      * Insère un événement dans le journal.
-     * Pour state='held' : held_by_id = $deviceId, by_id = null.
-     * Pour state='floating'|'locked'|'tray' : held_by_id = null, by_id = $deviceId.
+     * Pour state='held' : held_by_id = $userId, by_id = null.
+     * Pour state='floating'|'locked'|'tray' : held_by_id = null, by_id = $userId.
      */
-    public function insertEvent(int $sharedId, int $deviceId, int $pieceId, string $state, ?float $x, ?float $y, int $rotation): int
+    public function insertEvent(int $sharedId, int $userId, int $pieceId, string $state, ?float $x, ?float $y, int $rotation): int
     {
-        $heldById = ($state === 'held') ? $deviceId : null;
-        $byId     = ($state !== 'held') ? $deviceId : null;
+        $heldById = ($state === 'held') ? $userId : null;
+        $byId     = ($state !== 'held') ? $userId : null;
         $stmt = $this->getDb()->prepare("
             INSERT INTO puzzle_shared_events (shared_id, device_id, piece_id, state, x, y, rotation, held_by_id, by_id)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        $stmt->execute([$sharedId, $deviceId, $pieceId, $state, $x, $y, $rotation, $heldById, $byId]);
+        $stmt->execute([$sharedId, $userId, $pieceId, $state, $x, $y, $rotation, $heldById, $byId]);
         return (int) $this->getDb()->lastInsertId();
     }
 
     /** Retourne tous les événements depuis $afterEventId (tous joueurs, pour réconciliation client). */
-    public function getPartnerEvents(int $sharedId, int $callerDeviceId, int $afterEventId, int $partnerActiveWindow): array
+    public function getPartnerEvents(int $sharedId, int $callerUserId, int $afterEventId, int $partnerActiveWindow, string $appId): array
     {
         $db = $this->getDb();
 
@@ -386,17 +409,17 @@ class SharedPuzzle extends BaseModel
                 e.x,
                 e.y,
                 e.rotation,
-                pd_held.pseudonym AS held_by,
-                pd_by.pseudonym   AS `by`,
+                aus_held.pseudonym AS held_by,
+                aus_by.pseudonym   AS `by`,
                 e.created_at      AS at
             FROM puzzle_shared_events e
-            LEFT JOIN puzzle_devices pd_held ON pd_held.id = e.held_by_id
-            LEFT JOIN puzzle_devices pd_by   ON pd_by.id   = e.by_id
+            LEFT JOIN app_user_settings aus_held ON aus_held.user_id = e.held_by_id AND aus_held.app_id = ?
+            LEFT JOIN app_user_settings aus_by   ON aus_by.user_id   = e.by_id      AND aus_by.app_id = ?
             WHERE e.shared_id = ?
               AND e.id > ?
             ORDER BY e.id ASC
         ");
-        $stmt->execute([$sharedId, $afterEventId]);
+        $stmt->execute([$appId, $appId, $sharedId, $afterEventId]);
         $events = array_map(fn($r) => [
             'event_id' => (int) $r['event_id'],
             'piece_id' => (int) $r['piece_id'],
@@ -409,19 +432,22 @@ class SharedPuzzle extends BaseModel
             'at'       => date('c', strtotime($r['at'])),
         ], $stmt->fetchAll(PDO::FETCH_ASSOC));
 
-        // Déterminer si le partenaire est actif récemment
         $partnerIdRow = $db->prepare("
-            SELECT CASE WHEN creator_id = ? THEN partner_id ELSE creator_id END AS partner_id
+            SELECT CASE WHEN creator_id = ? THEN partner_id ELSE creator_id END AS partner_user_id
             FROM puzzle_shared WHERE id = ?
         ");
-        $partnerIdRow->execute([$callerDeviceId, $sharedId]);
-        $partnerId = (int) ($partnerIdRow->fetchColumn() ?: 0);
+        $partnerIdRow->execute([$callerUserId, $sharedId]);
+        $partnerUserId = (int) ($partnerIdRow->fetchColumn() ?: 0);
 
         $activeStmt = $db->prepare("
-            SELECT 1 FROM puzzle_devices
-            WHERE id = ? AND last_seen_at >= DATE_SUB(NOW(), INTERVAL ? SECOND)
+            SELECT COALESCE(MAX(d.last_seen_at), '2000-01-01') >= DATE_SUB(NOW(), INTERVAL ? SECOND)
+            FROM (
+                SELECT last_seen_at FROM android_devices WHERE user_id = ? AND app_id = ?
+                UNION ALL
+                SELECT last_seen_at FROM web_devices WHERE user_id = ? AND app_id = ?
+            ) d
         ");
-        $activeStmt->execute([$partnerId, $partnerActiveWindow]);
+        $activeStmt->execute([$partnerActiveWindow, $partnerUserId, $appId, $partnerUserId, $appId]);
         $partnerActive = (bool) $activeStmt->fetchColumn();
 
         return [$events, $partnerActive];
@@ -480,8 +506,8 @@ class SharedPuzzle extends BaseModel
         }
     }
 
-    /** Relâche toutes les pièces tenues par un appareil (utilisé lors du leave). */
-    public function releaseHeldPieces(int $sharedId, int $deviceId): void
+    /** Relâche toutes les pièces tenues par un utilisateur (utilisé lors du leave). */
+    public function releaseHeldPieces(int $sharedId, int $userId): void
     {
         $db = $this->getDb();
 
@@ -490,7 +516,7 @@ class SharedPuzzle extends BaseModel
             FROM puzzle_shared_pieces
             WHERE shared_id = ? AND state = 'held' AND held_by_id = ?
         ");
-        $stmt->execute([$sharedId, $deviceId]);
+        $stmt->execute([$sharedId, $userId]);
         $held = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         foreach ($held as $p) {
@@ -505,7 +531,7 @@ class SharedPuzzle extends BaseModel
                 SELECT ?, ?, piece_id, ?, x, y, rotation, NULL, NULL
                 FROM puzzle_shared_pieces
                 WHERE shared_id = ? AND piece_id = ?
-            ")->execute([$sharedId, $deviceId, $p['prev_state'], $sharedId, (int) $p['piece_id']]);
+            ")->execute([$sharedId, $userId, $p['prev_state'], $sharedId, (int) $p['piece_id']]);
         }
     }
 }

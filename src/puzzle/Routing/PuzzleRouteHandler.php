@@ -322,11 +322,13 @@ class PuzzleRouteHandler extends BaseRouteHandler
         $device       = $androidModel->findByValidToken($token);
         if ($device) {
             $androidModel->touchLastSeen((int) $device['id']);
+            $device['_device_type'] = 'android';
         } else {
             $webModel = new WebDevice();
             $device   = $webModel->findByValidToken($token);
             if ($device) {
                 $webModel->touchLastSeen((int) $device['id']);
+                $device['_device_type'] = 'web';
             }
         }
 

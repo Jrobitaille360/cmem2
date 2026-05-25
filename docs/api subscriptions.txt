@@ -1,0 +1,69 @@
+1 — Validation proposition
+Android correct : Play ne fournit jamais d'email. L'app reçoit purchase_token + product_id + packageName. Identité = device_token (obtenu au register). JWT ne peut pas être requis.
+
+Win/Web correct : Stripe crée un customer via email. JWT obligatoire.
+
+Note : obfuscatedExternalAccountId dans la réponse Google Play = valeur passée par l'app Flutter au moment de l'achat (setObfuscatedAccountId()). Si anonyme, null. L'API le lit mais ne l'utilise pas (ligne 103-104 de GooglePlayService.php).
+
+2 — Cohérence Playstore / Stripe
+Playstore	Stripe
+Identifiant fourni	purchase_token + product_id	JWT → user_id + email
+Email fourni	Non	Oui (via JWT)
+Provider valide côté API	Google Developer API (subscriptionsv2)	Stripe SDK
+Anonyme OK	Oui	Non
+Les deux flows sont cohérents avec leurs providers. ✓
+
+3 — Entrypoints complets
+Android (plugin playstore)
+Méthode	URL	Auth	Body/Query	Retour
+POST	/v2/devices/android/register	Aucune (JWT optionnel)	app_id, device_uuid	device_token, expires_at, pseudonym
+GET	/v2/devices/android/pseudonym	JWT	app_id (query)	pseudonym
+POST	/v2/devices/android/pseudonym	JWT	app_id, pseudonym	pseudonym
+DELETE	/v2/devices/android/pseudonym	JWT	app_id	—
+GET	/v2/devices/android/pseudonym/check/{pseudo}	JWT	app_id (query)	available
+POST	/v2/subscriptions/playstore/verify	JWT ou device_token	app_id, purchase_token, product_id	is_premium, status, expires_at, product_id
+GET	/v2/subscriptions/playstore/status	JWT ou device_token	app_id (query)	is_premium, status, expires_at, product_id, provider
+DELETE	/v2/subscriptions/playstore	JWT ou device_token	app_id	—
+Win/Web (plugin stripe)
+Méthode	URL	Auth	Body/Query	Retour
+POST	/v2/billing/checkout	JWT	app_id, plan (monthly/yearly)	checkout_url, session_id
+POST	/v2/billing/portal	JWT	app_id	portal_url
+POST	/v2/billing/webhook	Signature Stripe	payload Stripe	—
+GET	/v2/subscriptions/stripe/status	JWT	app_id (query)	is_premium, status, expires_at, plan, is_trial, trial_end, cancel_at_period_end, provider
+DELETE	/v2/subscriptions/stripe	JWT	app_id	—
+4 — Corrections à apporter au code
+Bogue critique
+PlaystoreRouteHandler.php lignes 144–158 : toutes les routes /v2/subscriptions/playstore/* retournent 401 si pas de JWT. Bloque tout utilisateur Android anonyme.
+
+Correction : accepter X-Device-Token (header) comme auth alternative. Si JWT absent → valider device_token via AndroidDevice::findByValidToken(). Passer ['device_token' => ..., 'user_id' => null] au controller.
+
+Bogue secondaire
+PlaystoreSubscription.php ligne 26 : upsertSubscription(int $userId, ...) — user_id non nullable. Un anonyme ne peut pas stocker son abonnement.
+
+Correction :
+
+?int $userId
+Ajouter device_token nullable comme clé alternative dans la table
+findLatestActive et expireStale : chercher par user_id OU device_token
+Migration DB requise
+
+ALTER TABLE playstore_subscriptions
+  MODIFY user_id INT NULL,
+  ADD COLUMN device_token VARCHAR(64) NULL AFTER user_id,
+  ADD INDEX idx_device_token (device_token);
+Clé unique actuelle doit intégrer device_token :
+
+
+-- vérifier la contrainte UNIQUE existante avant d'altérer
+Mineur
+GooglePlayService.php ligne 103–104 : $userId extrait de obfuscatedExternalAccountId est retourné dans le résultat mais jamais utilisé pour lier l'abonnement. Soit l'utiliser pour retrouver le compte, soit retirer le champ du retour pour éviter la confusion.
+
+5 — Veux-tu que j'applique ces corrections ?
+Ordre logique :
+
+Migration SQL (ALTER TABLE playstore_subscriptions)
+PlaystoreSubscription model — ?int $userId, device_token nullable
+PlaystoreRouteHandler — auth par device_token
+PlaystoreSubscriptionController + Service — adapter signatures
+Mémoire + doc
+STOP obligatoire avant migration DB — confirme avant que je procède.

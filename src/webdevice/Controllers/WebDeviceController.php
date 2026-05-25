@@ -3,6 +3,7 @@
 namespace WebDevice\Controllers;
 
 use AuthGroups\Middleware\LoggingMiddleware;
+use AuthGroups\Models\AppUserSettings;
 use AuthGroups\Utils\Response;
 use WebDevice\Models\WebDevice;
 
@@ -31,12 +32,14 @@ class WebDeviceController
         $deviceToken    = bin2hex(random_bytes(32));
         $tokenExpiresAt = date('Y-m-d H:i:s', strtotime('+365 days'));
 
-        $device = (new WebDevice())->upsertDevice($userId, $appId, $uuid, $deviceToken, $tokenExpiresAt);
+        $device    = (new WebDevice())->upsertDevice($userId, $appId, $uuid, $deviceToken, $tokenExpiresAt);
+        $pseudonym = $userId ? (new AppUserSettings())->get($userId, $appId) : null;
 
         LoggingMiddleware::logExit(200);
         Response::success('Device enregistré', [
             'device_token' => $device['device_token'],
             'expires_at'   => $device['token_expires_at'],
+            'pseudonym'    => $pseudonym,
         ]);
     }
 }

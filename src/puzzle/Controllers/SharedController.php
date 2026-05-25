@@ -3,14 +3,15 @@
 namespace Puzzle\Controllers;
 
 use AuthGroups\Middleware\LoggingMiddleware;
+use AuthGroups\Models\AppUserSettings;
 use AuthGroups\Utils\Response;
-use Puzzle\Models\PuzzleDevice;
 use Puzzle\Models\PuzzleImage;
 use Puzzle\Models\SharedPuzzle;
 use Puzzle\Services\SharedPuzzleService;
+use Access\Services\AccessService;
 
 /**
- * SharedController — casse-têtes partagés entre deux appareils abonnés
+ * SharedController — casse-têtes partagés entre deux utilisateurs authentifiés
  */
 class SharedController
 {
@@ -24,12 +25,17 @@ class SharedController
     }
 
     // -----------------------------------------------------------------------
-    // POST /puzzle/shared  (device_token + premium)
+    // POST /puzzle/shared  (device_token + premium + authentifié)
     // -----------------------------------------------------------------------
 
     public function createShared(array $device): void
     {
         LoggingMiddleware::logEntry();
+
+        $userId = $this->requireAuthenticatedUser($device);
+        if ($userId === null) return;
+        $appId = $device['app_id'] ?? 'puzzle';
+
         $input = Response::getRequestParams();
 
         $imageUid      = trim($input['image_uid']     ?? '');
@@ -42,7 +48,6 @@ class SharedController
             return;
         }
 
-        // Valider image
         $image = (new PuzzleImage())->findActiveByUid($imageUid);
         if ($image === null) {
             LoggingMiddleware::logExit(404);
@@ -50,20 +55,25 @@ class SharedController
             return;
         }
 
-        // Trouver le partenaire (abonné actif)
-        $partner      = (new PuzzleDevice())->findByPseudonymCI($partnerPseudo);
-        $debugPremium = defined('PUZZLE_DEBUG_PREMIUM') && \PUZZLE_DEBUG_PREMIUM;
-        $partnerOk    = $debugPremium
-            || $partner && $partner['is_premium'] && strtotime($partner['premium_expires_at'] ?? '0') >= time();
-        if (!$partner || !$partnerOk) {
+        $partnerUserId = (new AppUserSettings())->findUserByPseudonym($appId, $partnerPseudo);
+        if (!$partnerUserId) {
             LoggingMiddleware::logExit(404);
             Response::error('Partenaire introuvable ou non abonné', ['code' => 'PARTNER_NOT_FOUND'], 404);
             return;
         }
 
-        // Vérifier qu'une partie active n'existe pas déjà entre ces deux joueurs
+        $debugPremium = defined('PUZZLE_DEBUG_PREMIUM') && \PUZZLE_DEBUG_PREMIUM;
+        if (!$debugPremium) {
+            $partnerMatrix = AccessService::getMatrix($partnerUserId, $appId)['matrix'];
+            if (!($partnerMatrix['android'] || $partnerMatrix['web'] || $partnerMatrix['windows'])) {
+                LoggingMiddleware::logExit(404);
+                Response::error('Partenaire introuvable ou non abonné', ['code' => 'PARTNER_NOT_FOUND'], 404);
+                return;
+            }
+        }
+
         $sharedModel = new SharedPuzzle();
-        if ($sharedModel->activeGameExists((int) $device['id'], (int) $partner['id'])) {
+        if ($sharedModel->activeGameExists($userId, $partnerUserId)) {
             LoggingMiddleware::logExit(409);
             Response::error('Une partie active existe déjà avec ce partenaire', ['code' => 'ALREADY_IN_GAME'], 409);
             return;
@@ -76,19 +86,20 @@ class SharedController
             'shared_uid'  => $sharedUid,
             'image_id'    => $imageId,
             'piece_count' => $pieceCount,
-            'creator_id'  => (int) $device['id'],
-            'partner_id'  => (int) $partner['id'],
+            'creator_id'  => $userId,
+            'partner_id'  => $partnerUserId,
         ]);
 
-        // Toutes les pièces démarrent en état 'tray' (insertPieces initialise l'état)
         $sharedModel->insertPieces($sharedId, $pieceCount);
+
+        $creatorPseudo = (new AppUserSettings())->get($userId, $appId) ?? '';
 
         LoggingMiddleware::logExit(201);
         Response::success('Casse-tête partagé créé', [
             'uid'            => $sharedUid,
             'image_uid'      => $imageUid,
             'piece_count'    => $pieceCount,
-            'creator_pseudo' => $device['pseudonym'] ?? '',
+            'creator_pseudo' => $creatorPseudo,
             'partner_pseudo' => $partnerPseudo,
             'completion'     => 0,
             'is_creator'     => true,
@@ -98,15 +109,20 @@ class SharedController
     }
 
     // -----------------------------------------------------------------------
-    // GET /puzzle/shared  (device_token + premium)
+    // GET /puzzle/shared  (device_token + premium + authentifié)
     // -----------------------------------------------------------------------
 
     public function listShared(array $device): void
     {
         LoggingMiddleware::logEntry();
 
-        $list = (new SharedPuzzle())->listActiveForDevice(
-            (int) $device['id'],
+        $userId = $this->requireAuthenticatedUser($device);
+        if ($userId === null) return;
+        $appId = $device['app_id'] ?? 'puzzle';
+
+        $list = (new SharedPuzzle())->listActiveForUser(
+            $userId,
+            $appId,
             $this->pollActiveWindow
         );
 
@@ -115,18 +131,22 @@ class SharedController
     }
 
     // -----------------------------------------------------------------------
-    // GET /puzzle/shared/{shared_uid}/state  (device_token + premium)
+    // GET /puzzle/shared/{shared_uid}/state  (device_token + premium + authentifié)
     // -----------------------------------------------------------------------
 
     public function getState(string $sharedUid, array $device): void
     {
         LoggingMiddleware::logEntry();
 
-        $shared = $this->resolveShared($sharedUid, $device);
+        $userId = $this->requireAuthenticatedUser($device);
+        if ($userId === null) return;
+        $appId = $device['app_id'] ?? 'puzzle';
+
+        $shared = $this->resolveShared($sharedUid, $userId);
         if ($shared === null) return;
 
         $sharedModel    = new SharedPuzzle();
-        $pieces         = $sharedModel->getPieces((int) $shared['id']);
+        $pieces         = $sharedModel->getPieces((int) $shared['id'], $appId);
         $lastEventIdRow = $this->getLastEventId((int) $shared['id']);
 
         LoggingMiddleware::logExit(200);
@@ -142,7 +162,7 @@ class SharedController
     }
 
     // -----------------------------------------------------------------------
-    // POST /puzzle/shared/{shared_uid}/pick  (device_token + premium)
+    // POST /puzzle/shared/{shared_uid}/pick  (device_token + premium + authentifié)
     // -----------------------------------------------------------------------
 
     public function pick(string $sharedUid, array $device): void
@@ -150,7 +170,11 @@ class SharedController
         LoggingMiddleware::logEntry();
         $input = Response::getRequestParams();
 
-        $shared = $this->resolveShared($sharedUid, $device);
+        $userId = $this->requireAuthenticatedUser($device);
+        if ($userId === null) return;
+        $appId = $device['app_id'] ?? 'puzzle';
+
+        $shared = $this->resolveShared($sharedUid, $userId);
         if ($shared === null) return;
 
         $pieceId = isset($input['piece_id']) ? (int) $input['piece_id'] : null;
@@ -161,7 +185,7 @@ class SharedController
         }
 
         $sharedModel = new SharedPuzzle();
-        $result      = $sharedModel->pickPiece((int) $shared['id'], $pieceId, (int) $device['id']);
+        $result      = $sharedModel->pickPiece((int) $shared['id'], $pieceId, $userId, $appId);
 
         if (!$result['ok']) {
             $httpCode = ($result['code'] === 'LOCKED') ? 423 : 409;
@@ -172,7 +196,7 @@ class SharedController
 
         $eventId = $sharedModel->insertEvent(
             (int) $shared['id'],
-            (int) $device['id'],
+            $userId,
             $pieceId,
             'held',
             null,
@@ -190,7 +214,7 @@ class SharedController
     }
 
     // -----------------------------------------------------------------------
-    // POST /puzzle/shared/{shared_uid}/drop  (device_token + premium)
+    // POST /puzzle/shared/{shared_uid}/drop  (device_token + premium + authentifié)
     // -----------------------------------------------------------------------
 
     public function drop(string $sharedUid, array $device): void
@@ -198,7 +222,11 @@ class SharedController
         LoggingMiddleware::logEntry();
         $input = Response::getRequestParams();
 
-        $shared = $this->resolveShared($sharedUid, $device);
+        $userId = $this->requireAuthenticatedUser($device);
+        if ($userId === null) return;
+        $appId = $device['app_id'] ?? 'puzzle';
+
+        $shared = $this->resolveShared($sharedUid, $userId);
         if ($shared === null) return;
 
         $pieceId     = isset($input['piece_id']) ? (int) $input['piece_id'] : null;
@@ -218,7 +246,7 @@ class SharedController
         $result      = $sharedModel->dropPiece(
             (int) $shared['id'],
             $pieceId,
-            (int) $device['id'],
+            $userId,
             $x    ?? 0.0,
             $y    ?? 0.0,
             $rotation,
@@ -234,7 +262,7 @@ class SharedController
 
         $eventId = $sharedModel->insertEvent(
             (int) $shared['id'],
-            (int) $device['id'],
+            $userId,
             $pieceId,
             $result['state'],
             $result['x'],
@@ -264,7 +292,11 @@ class SharedController
     {
         LoggingMiddleware::logEntry();
 
-        $shared = $this->resolveShared($sharedUid, $device);
+        $userId = $this->requireAuthenticatedUser($device);
+        if ($userId === null) return;
+        $appId = $device['app_id'] ?? 'puzzle';
+
+        $shared = $this->resolveShared($sharedUid, $userId);
         if ($shared === null) return;
 
         $afterEventId = (int) ($_GET['after'] ?? 0);
@@ -272,14 +304,14 @@ class SharedController
 
         $sharedModel = new SharedPuzzle();
 
-        // Expirer les pièces tenues depuis trop longtemps (opportuniste)
         $sharedModel->expireHeldPieces((int) $shared['id'], $ttlSeconds);
 
         [$events, $partnerActive] = $sharedModel->getPartnerEvents(
             (int) $shared['id'],
-            (int) $device['id'],
+            $userId,
             $afterEventId,
-            $this->pollActiveWindow
+            $this->pollActiveWindow,
+            $appId
         );
 
         $lastEventId = empty($events) ? $afterEventId : (int) end($events)['event_id'];
@@ -297,18 +329,21 @@ class SharedController
     }
 
     // -----------------------------------------------------------------------
-    // POST /puzzle/shared/{shared_uid}/leave  (device_token + premium)
+    // POST /puzzle/shared/{shared_uid}/leave  (device_token + premium + authentifié)
     // -----------------------------------------------------------------------
 
     public function leave(string $sharedUid, array $device): void
     {
         LoggingMiddleware::logEntry();
 
-        $shared = $this->resolveShared($sharedUid, $device);
+        $userId = $this->requireAuthenticatedUser($device);
+        if ($userId === null) return;
+
+        $shared = $this->resolveShared($sharedUid, $userId);
         if ($shared === null) return;
 
         $sharedModel = new SharedPuzzle();
-        $sharedModel->releaseHeldPieces((int) $shared['id'], (int) $device['id']);
+        $sharedModel->releaseHeldPieces((int) $shared['id'], $userId);
         $sharedModel->archive((int) $shared['id']);
 
         LoggingMiddleware::logExit(200);
@@ -323,10 +358,13 @@ class SharedController
     {
         LoggingMiddleware::logEntry();
 
-        $shared = $this->resolveShared($sharedUid, $device);
+        $userId = $this->requireAuthenticatedUser($device);
+        if ($userId === null) return;
+
+        $shared = $this->resolveShared($sharedUid, $userId);
         if ($shared === null) return;
 
-        if ((int) $shared['creator_id'] !== (int) $device['id']) {
+        if ((int) $shared['creator_id'] !== $userId) {
             LoggingMiddleware::logExit(403);
             Response::error('Seul le créateur peut supprimer ce casse-tête', ['code' => 'NOT_CREATOR'], 403);
             return;
@@ -342,10 +380,21 @@ class SharedController
     // Helpers privés
     // -----------------------------------------------------------------------
 
-    /** Résout le partagé ou envoie une réponse d'erreur et retourne null. */
-    private function resolveShared(string $sharedUid, array $device): ?array
+    /** Exige un utilisateur authentifié (user_id non nul). Retourne user_id ou null + réponse 401. */
+    private function requireAuthenticatedUser(array $device): ?int
     {
-        $shared = (new SharedPuzzle())->findActiveByUidAndDevice($sharedUid, (int) $device['id']);
+        if (empty($device['user_id'])) {
+            LoggingMiddleware::logExit(401);
+            Response::error('Authentification requise pour les parties partagées', ['code' => 'AUTH_REQUIRED'], 401);
+            return null;
+        }
+        return (int) $device['user_id'];
+    }
+
+    /** Résout le partagé ou envoie une réponse d'erreur et retourne null. */
+    private function resolveShared(string $sharedUid, int $userId): ?array
+    {
+        $shared = (new SharedPuzzle())->findActiveByUidAndUser($sharedUid, $userId);
         if (!$shared) {
             LoggingMiddleware::logExit(404);
             Response::error('Casse-tête partagé introuvable ou archivé', ['code' => 'SHARED_NOT_FOUND'], 404);
