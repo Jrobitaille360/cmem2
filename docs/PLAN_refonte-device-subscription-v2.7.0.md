@@ -472,14 +472,31 @@ src/puzzle/Models/PuzzleDevice.php
 src/puzzle/Controllers/AuthController.php
 src/puzzle/Services/GooglePlayService.php
 src/auth_groups/Controllers/SubscriptionController.php
-src/auth_groups/Controllers/StripeController.php
+src/auth_groups/Controllers/StripeController.php          ← BLOQUÉ — voir note webhook ci-dessous
 src/auth_groups/Models/Subscription.php
 src/auth_groups/Services/SubscriptionService.php
-src/auth_groups/Services/StripeService.php
+src/auth_groups/Services/StripeService.php                ← BLOQUÉ — même raison
 src/auth_groups/Routing/RouteHandlers/SubscriptionRouteHandler.php
-src/auth_groups/Routing/RouteHandlers/StripeRouteHandler.php
+src/auth_groups/Routing/RouteHandlers/StripeRouteHandler.php      ← BLOQUÉ — même raison
 src/cron/expire_subscriptions.php
 ```
+
+> **Note webhook Stripe — prérequis avant suppression des trois fichiers marqués BLOQUÉ :**
+>
+> Le webhook Stripe de **production** (`cmem2 API`) pointe encore sur
+> `https://cmem2.journauxdebord.com/stripe/webhook` (legacy).
+> Le webhook **dev** pointe déjà sur `https://dev-cmem2.journauxdebord.com/v2/billing/webhook` (correct).
+>
+> **Action requise après release v2.7.0 :**
+>
+> 1. Dans le Stripe Dashboard (mode live), mettre à jour l'URL du webhook `cmem2 API` vers
+>    `https://cmem2.journauxdebord.com/v2/billing/webhook`
+> 2. Vérifier dans les logs prod que les événements Stripe arrivent sur `/v2/billing/webhook`
+> 3. Seulement ensuite : supprimer `StripeController`, `StripeRouteHandler`, `StripeService`
+>    (les entrées router correspondantes incluses)
+>
+>
+> Suivi détaillé : `docs/PLAN_consolidation-stripe.md` — Phase 3.
 
 ### Fichiers à créer / adapter
 

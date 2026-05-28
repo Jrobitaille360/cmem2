@@ -1,9 +1,9 @@
 {
   "api": {
     "name": "Stripe Module",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "Abonnements Stripe pour plateformes web et Windows. Multi-app via app_id. Introduit en v2.7.0 — remplace /subscription/* et /stripe/webhook.",
-    "generated": "2026-05-19",
+    "generated": "2026-05-27",
     "base_url": "/v2",
     "authentication": {
       "jwt": {
@@ -38,13 +38,13 @@
             "422": "app_id ou plan manquant | plan invalide (doit être monthly ou yearly)",
             "500": "Clé Stripe non configurée ou erreur API Stripe"
           },
-          "client_notes": "Rediriger l'utilisateur vers checkout_url. URL de succès/annulation configurées dans .env (STRIPE_SUCCESS_URL_{APP_ID}, STRIPE_CANCEL_URL_{APP_ID})."
+          "client_notes": "Rediriger l'utilisateur vers checkout_url. Après paiement : https://journauxdebord.com/{app_id}/subscription/success?session_id={id}. En cas d'annulation : https://journauxdebord.com/{app_id}/subscription/cancel. Ces pages doivent exister dans le frontend."
         },
         {
           "method": "POST",
           "path": "/v2/billing/portal",
           "auth_required": true,
-          "description": "Crée une session Stripe Billing Portal. Nécessite qu'un stripe_customer_id existe pour (user_id, app_id).",
+          "description": "Crée une session Stripe Billing Portal. Nécessite qu'un stripe_customer_id existe pour (user_id, app_id). Retour après gestion : https://journauxdebord.com/{app_id}/subscription/manage-return.",
           "body": {
             "app_id": "string (required)"
           },
@@ -61,15 +61,15 @@
           "path": "/v2/billing/webhook",
           "auth_required": false,
           "auth_type": "STRIPE_SIGNATURE",
-          "description": "Endpoint Stripe webhook. Public, protégé par signature HMAC-SHA256. Idempotent (stripe_webhook_events). Configurer dans le Stripe Dashboard : https://{domain}/v2/billing/webhook.",
+          "description": "Endpoint Stripe webhook. Public, protégé par signature HMAC-SHA256. Idempotent (stripe_processed_events). Configurer dans le Stripe Dashboard : https://{domain}/v2/billing/webhook.",
           "headers": {
             "Content-Type": "application/json",
             "Stripe-Signature": "t=...,v1=... (généré par Stripe)"
           },
           "events_handled": {
-            "checkout.session.completed": "Active l'abonnement — crée stripe_subscriptions",
-            "customer.subscription.updated": "Met à jour status, expires_at, cancel_at_period_end",
-            "invoice.payment_succeeded": "Renouvelle expires_at",
+            "checkout.session.completed": "Active l'abonnement — insère dans stripe_subscriptions (status=trialing, is_trial=1)",
+            "customer.subscription.updated": "Met à jour status, expires_at, is_trial, trial_end, plan",
+            "invoice.payment_succeeded": "Renouvelle expires_at, passe is_trial=0, status=active",
             "invoice.payment_failed": "Passe status à past_due",
             "customer.subscription.deleted": "Passe status à cancelled"
           },
@@ -93,11 +93,13 @@
             "app_id": "string (required)"
           },
           "responses": {
-            "200_active":  "{ success: true, data: { is_premium: true,  status: 'active',   expires_at: datetime, plan: string, cancel_at_period_end: bool } }",
-            "200_none":    "{ success: true, data: { is_premium: false, status: null,        expires_at: null,     plan: null,   cancel_at_period_end: false } }",
+            "200_trialing": "{ success: true, data: { is_premium: true,  status: 'trialing', expires_at: datetime, plan: string, is_trial: true,  trial_end: datetime, cancel_at_period_end: bool, provider: 'stripe' } }",
+            "200_active":   "{ success: true, data: { is_premium: true,  status: 'active',   expires_at: datetime, plan: string, is_trial: false, trial_end: null,     cancel_at_period_end: bool, provider: 'stripe' } }",
+            "200_none":     "{ success: true, data: { is_premium: false, status: null,        expires_at: null,     plan: null,   is_trial: false, trial_end: null,     cancel_at_period_end: false, provider: 'stripe' } }",
             "401": "JWT absent ou invalide",
             "422": "app_id manquant"
-          }
+          },
+          "status_values": ["trialing", "active", "past_due", "cancelled", "null"]
         },
         {
           "method": "DELETE",
@@ -108,7 +110,7 @@
             "app_id": "string (required)"
           },
           "responses": {
-            "200": "{ success: true, message: 'Abonnement annulé en fin de période' }",
+            "200": "{ success: true, message: 'Abonnement Stripe annulé (fin de période)' }",
             "401": "JWT absent ou invalide",
             "422": "app_id manquant | aucun abonnement Stripe actif",
             "500": "Erreur API Stripe"
@@ -116,6 +118,13 @@
         }
       ]
     }
+  },
+  "redirect_urls": {
+    "description": "URLs générées dynamiquement selon app_id. Aucune variable d'environnement requise côté API.",
+    "success": "https://journauxdebord.com/{app_id}/subscription/success?session_id={CHECKOUT_SESSION_ID}",
+    "cancel": "https://journauxdebord.com/{app_id}/subscription/cancel",
+    "manage_return": "https://journauxdebord.com/{app_id}/subscription/manage-return",
+    "frontend_note": "Ces trois routes doivent exister dans le frontend (jdb). Voir directive 20260527_110753_cmem2_API_vers_jdb__pages-stripe-subscription.md."
   },
   "access_model": {
     "description": "Un abonnement Stripe actif déverrouille les plateformes web et Windows uniquement.",
@@ -125,5 +134,13 @@
       "windows": true
     },
     "unified_status": "GET /v2/access/status — endpoint consolidé Stripe (JWT). Android : GET /v2/subscriptions/playstore/status (X-Device-Token)"
+  },
+  "deprecated_routes": {
+    "description": "Routes legacy actives avant v2.7.0. Écrivent dans la table subscriptions (générique). Migrer vers /v2/billing/*.",
+    "routes": [
+      { "method": "POST", "path": "/subscription/checkout", "replaced_by": "POST /v2/billing/checkout" },
+      { "method": "POST", "path": "/subscription/portal",   "replaced_by": "POST /v2/billing/portal" },
+      { "method": "POST", "path": "/stripe/webhook",        "replaced_by": "POST /v2/billing/webhook" }
+    ]
   }
 }

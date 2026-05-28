@@ -1,6 +1,6 @@
 # Guide — Module Stripe (v2.7.0)
 
-Version 1.0.0 · Base URL : `/v2`
+Version 1.1.0 · Base URL : `/v2`
 
 > Référence complète : [API_STRIPE_ENDPOINTS.json](API_STRIPE_ENDPOINTS.json)
 
@@ -11,7 +11,9 @@ Version 1.0.0 · Base URL : `/v2`
 - [Billing — Checkout et Portail](#billing--checkout-et-portail)
 - [Webhook Stripe](#webhook-stripe)
 - [Abonnements Stripe](#abonnements-stripe)
+- [URLs de redirection](#urls-de-redirection)
 - [Mapping plateforme](#mapping-plateforme)
+- [Routes dépréciées](#routes-dépréciées)
 - [Codes d'erreur](#codes-derreur)
 - [Exemples complets](#exemples-complets)
 
@@ -78,7 +80,8 @@ son paiement. Stripe enverra un webhook `checkout.session.completed` à l'issue.
 | 500 | Clé Stripe non configurée ou erreur API Stripe |
 
 **Notes client :** Rediriger l'utilisateur vers `checkout_url`. Après paiement, Stripe redirige
-vers l'URL de succès configurée dans `.env` (`STRIPE_SUCCESS_URL_{APP_ID}`).
+vers `https://journauxdebord.com/{app_id}/subscription/success?session_id={CHECKOUT_SESSION_ID}`.
+En cas d'annulation : `https://journauxdebord.com/{app_id}/subscription/cancel`.
 
 ### POST /v2/billing/portal
 
@@ -111,6 +114,9 @@ Crée une session Stripe Billing Portal permettant à l'utilisateur de gérer so
 | 422 | `app_id` manquant |
 | 500 | Erreur API Stripe |
 
+**Notes client :** Après gestion, Stripe retourne vers
+`https://journauxdebord.com/{app_id}/subscription/manage-return`.
+
 ---
 
 ## Webhook Stripe
@@ -119,6 +125,8 @@ Crée une session Stripe Billing Portal permettant à l'utilisateur de gérer so
 
 Endpoint public qui reçoit les événements Stripe. Protégé par signature HMAC-SHA256
 (`Stripe-Signature` header). Idempotent — un événement déjà traité est ignoré.
+
+**Configuration Stripe Dashboard :** `https://{domain}/v2/billing/webhook`
 
 **Headers requis :**
 
@@ -131,11 +139,11 @@ Stripe-Signature: t=...,v1=...
 
 | Événement | Action |
 | - | - |
-| `checkout.session.completed` | Active l'abonnement, crée `stripe_subscriptions` |
-| `customer.subscription.updated` | Met à jour status, expires_at, cancel_at_period_end |
-| `invoice.payment_succeeded` | Renouvelle expires_at |
-| `invoice.payment_failed` | Passe status à `past_due` |
-| `customer.subscription.deleted` | Passe status à `cancelled` |
+| `checkout.session.completed` | Active l'abonnement, crée ligne dans `stripe_subscriptions` |
+| `customer.subscription.updated` | Met à jour `status`, `expires_at`, `cancel_at_period_end` |
+| `invoice.payment_succeeded` | Renouvelle `expires_at`, passe `is_trial` à 0 |
+| `invoice.payment_failed` | Passe `status` à `past_due` |
+| `customer.subscription.deleted` | Passe `status` à `cancelled` |
 
 **Réponses :**
 
@@ -160,7 +168,7 @@ Retourne le statut de l'abonnement Stripe pour `(user_id, app_id)`.
 
 **Query params :** `app_id` (requis)
 
-**Réponse 200 :**
+**Réponse 200 — aucun abonnement :**
 
 ```json
 {
@@ -170,12 +178,33 @@ Retourne le statut de l'abonnement Stripe pour `(user_id, app_id)`.
     "status": null,
     "expires_at": null,
     "plan": null,
-    "cancel_at_period_end": false
+    "is_trial": false,
+    "trial_end": null,
+    "cancel_at_period_end": false,
+    "provider": "stripe"
   }
 }
 ```
 
-Quand actif :
+**Réponse 200 — essai actif :**
+
+```json
+{
+  "success": true,
+  "data": {
+    "is_premium": true,
+    "status": "trialing",
+    "expires_at": "2026-06-03T11:00:00",
+    "plan": "monthly",
+    "is_trial": true,
+    "trial_end": "2026-06-03T11:00:00",
+    "cancel_at_period_end": false,
+    "provider": "stripe"
+  }
+}
+```
+
+**Réponse 200 — abonnement actif :**
 
 ```json
 {
@@ -185,10 +214,15 @@ Quand actif :
     "status": "active",
     "expires_at": "2027-06-01T00:00:00",
     "plan": "monthly",
-    "cancel_at_period_end": false
+    "is_trial": false,
+    "trial_end": null,
+    "cancel_at_period_end": false,
+    "provider": "stripe"
   }
 }
 ```
+
+**Valeurs possibles de `status` :** `trialing` · `active` · `past_due` · `cancelled` · `null`
 
 ### DELETE /v2/subscriptions/stripe
 
@@ -207,6 +241,22 @@ via l'API Stripe). L'accès reste actif jusqu'à `expires_at`.
 
 ---
 
+## URLs de redirection
+
+Les URLs sont générées dynamiquement selon `app_id`. Aucune variable d'environnement
+n'est requise côté API pour ces URLs — elles sont construites en code.
+
+| Événement | URL |
+| - | - |
+| Paiement réussi | `https://journauxdebord.com/{app_id}/subscription/success?session_id={id}` |
+| Paiement annulé | `https://journauxdebord.com/{app_id}/subscription/cancel` |
+| Retour portail | `https://journauxdebord.com/{app_id}/subscription/manage-return` |
+
+Ces pages doivent exister dans le frontend (`jdb`). Voir directive
+`20260527_110753_cmem2_API_vers_jdb__pages-stripe-subscription.md`.
+
+---
+
 ## Mapping plateforme
 
 Un abonnement Stripe actif déverrouille uniquement les plateformes web et Windows.
@@ -220,6 +270,19 @@ Android n'est accessible que via Play Store.
 
 Pour vérifier l'accès Stripe (web/windows), utiliser `GET /v2/access/status` (JWT).
 Android consulte son propre statut via `GET /v2/subscriptions/playstore/status` (X-Device-Token).
+
+---
+
+## Routes dépréciées
+
+Ces routes existaient avant v2.7.0. Elles restent actives mais écrivent dans la table
+`subscriptions` (générique) au lieu de `stripe_subscriptions`. Migrer vers les routes `/v2/`.
+
+| Route dépréciée | Remplacée par |
+| - | - |
+| `POST /subscription/checkout` | `POST /v2/billing/checkout` |
+| `POST /subscription/portal` | `POST /v2/billing/portal` |
+| `POST /stripe/webhook` | `POST /v2/billing/webhook` |
 
 ---
 

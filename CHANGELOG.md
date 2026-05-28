@@ -7,6 +7,21 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-05-28]
+
+### Refactor — Dépréciation routes legacy `/subscription/checkout` et `/subscription/portal`
+
+- **`src/auth_groups/Controllers/SubscriptionController.php`** — `checkout()` et `portal()` retournent désormais HTTP 410 avec message de redirection vers `POST /v2/billing/checkout` et `POST /v2/billing/portal` ; import `StripeService` retiré (plus utilisé dans ce contrôleur)
+- **`src/auth_groups/Services/StripeService.php`** — `success_url` et `cancel_url` Stripe Checkout dynamiques via `$appId` (était hardcodé sur `puzzle`) : `https://journauxdebord.com/{app_id}/subscription/success` et `/cancel`
+
+### Docs — Stripe endpoints v1.1.0
+
+- **`docs/stripe/API_STRIPE_ENDPOINTS.json`** — v1.0.0 → v1.1.0 ; détail `checkout.session.completed` (status=trialing, is_trial=1) ; `customer.subscription.updated` inclut `is_trial`, `trial_end`, `plan` ; `invoice.payment_succeeded` passe `is_trial=0` ; réponse `/v2/subscriptions/stripe/status` enrichie : champs `is_trial`, `trial_end`, `provider` ; table `status_values` ; note URL retour portail ; table d'événements idempotente renommée `stripe_processed_events`
+- **`docs/stripe/GUIDE.md`** — mise à jour URLs success/cancel/return, section trial, idempotence, prérequis webhook prod
+- **`docs/PLAN_refonte-device-subscription-v2.7.0.md`** — note blocage suppression `StripeController`/`StripeRouteHandler`/`StripeService` legacy (webhook prod pointe encore sur `/stripe/webhook`) ; référence `docs/PLAN_consolidation-stripe.md` Phase 3
+
+---
+
 ## [Unreleased 2026-05-24]
 
 ### Refactor — Abonnements Play Store : `device_uuid` remplace `user_id`

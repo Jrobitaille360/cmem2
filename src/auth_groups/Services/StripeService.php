@@ -48,8 +48,8 @@ class StripeService
                 'trial_period_days' => 7,
                 'metadata'          => ['user_id' => (string) $userId, 'app_id' => $appId],
             ],
-            'success_url'                                => 'https://journauxdebord.com/puzzle/subscription/success?session_id={CHECKOUT_SESSION_ID}',
-            'cancel_url'                                 => 'https://journauxdebord.com/puzzle/subscription/cancel',
+            'success_url'                                => 'https://journauxdebord.com/' . $appId . '/subscription/success?session_id={CHECKOUT_SESSION_ID}',
+            'cancel_url'                                 => 'https://journauxdebord.com/' . $appId . '/subscription/cancel',
             'client_reference_id'                        => (string) $userId,
         ]);
 

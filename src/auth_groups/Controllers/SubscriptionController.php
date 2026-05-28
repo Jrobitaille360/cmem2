@@ -3,7 +3,6 @@
 namespace AuthGroups\Controllers;
 
 use AuthGroups\Services\SubscriptionService;
-use AuthGroups\Services\StripeService;
 use AuthGroups\Services\LogService;
 use AuthGroups\Models\Subscription;
 use AuthGroups\Utils\Response;
@@ -188,117 +187,27 @@ class SubscriptionController
     }
 
     // -----------------------------------------------------------------------
-    // POST /subscription/checkout
-    // Body : { app_id, plan }   — JWT requis
+    // POST /subscription/checkout  — DÉPRÉCIÉE depuis v2.7.0
+    // Utiliser POST /v2/billing/checkout
     // -----------------------------------------------------------------------
 
     public function checkout(array $request): void
     {
         LoggingMiddleware::logEntry();
-
-        $userId    = (int)    $request['user']['user_id'];
-        $userEmail = (string) ($request['user']['email'] ?? '');
-        $input     = Response::getRequestParams();
-
-        $validation = Validator::validate($input, [
-            'app_id' => 'required|string',
-            'plan'   => 'required|string',
-        ]);
-
-        if (!$validation['valid']) {
-            LoggingMiddleware::logExit(422);
-            Response::error('Données invalides', $validation['errors'], 422);
-            return;
-        }
-
-        $plan     = $input['plan'];
-        $allowed  = ['monthly', 'yearly'];
-        if (!\in_array($plan, $allowed, true)) {
-            LoggingMiddleware::logExit(422);
-            Response::error('Plan invalide', ['plan' => 'Valeurs acceptées : monthly, yearly'], 422);
-            return;
-        }
-
-        try {
-            $result = StripeService::createCheckoutSession(
-                $userId,
-                $userEmail,
-                trim($input['app_id']),
-                $plan
-            );
-
-            LogService::info('Session Stripe créée', [
-                'user_id'    => $userId,
-                'app_id'     => $input['app_id'],
-                'plan'       => $plan,
-                'session_id' => $result['session_id'],
-            ]);
-
-            LoggingMiddleware::logExit(200);
-            Response::success('Session de paiement créée', $result);
-
-        } catch (Exception $e) {
-            LogService::error('Erreur création session Stripe', [
-                'user_id' => $userId,
-                'error'   => $e->getMessage(),
-            ]);
-            LoggingMiddleware::logExit(500);
-            Response::error('Erreur lors de la création de la session de paiement', null, 500);
-        }
+        LoggingMiddleware::logExit(410);
+        Response::error('Route dépréciée — utiliser POST /v2/billing/checkout', null, 410);
     }
 
     // -----------------------------------------------------------------------
-    // POST /subscription/portal
-    // Body : { app_id }   — JWT requis
+    // POST /subscription/portal  — DÉPRÉCIÉE depuis v2.7.0
+    // Utiliser POST /v2/billing/portal
     // -----------------------------------------------------------------------
 
     public function portal(array $request): void
     {
         LoggingMiddleware::logEntry();
-
-        $userId = (int) $request['user']['user_id'];
-        $input  = Response::getRequestParams();
-
-        $validation = Validator::validate($input, [
-            'app_id' => 'required|string',
-        ]);
-
-        if (!$validation['valid']) {
-            LoggingMiddleware::logExit(422);
-            Response::error('Données invalides', $validation['errors'], 422);
-            return;
-        }
-
-        $appId = trim($input['app_id']);
-
-        try {
-            $model      = new Subscription();
-            $customerId = $model->findStripeCustomerByUserAndApp($userId, $appId);
-
-            if (!$customerId) {
-                LoggingMiddleware::logExit(404);
-                Response::error('Aucun abonnement Stripe trouvé', ['error' => 'NO_SUBSCRIPTION'], 404);
-                return;
-            }
-
-            $result = StripeService::createPortalSession($customerId, $appId);
-
-            LogService::info('Session portail Stripe créée', [
-                'user_id' => $userId,
-                'app_id'  => $appId,
-            ]);
-
-            LoggingMiddleware::logExit(200);
-            Response::success('Session portail créée.', $result);
-
-        } catch (Exception $e) {
-            LogService::error('Erreur création session portail Stripe', [
-                'user_id' => $userId,
-                'error'   => $e->getMessage(),
-            ]);
-            LoggingMiddleware::logExit(500);
-            Response::error('Erreur lors de la création de la session portail', ['error' => 'STRIPE_ERROR'], 500);
-        }
+        LoggingMiddleware::logExit(410);
+        Response::error('Route dépréciée — utiliser POST /v2/billing/portal', null, 410);
     }
 
     // -----------------------------------------------------------------------
