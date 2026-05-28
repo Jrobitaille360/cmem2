@@ -92,7 +92,7 @@ class GooglePlayService
         if (!$expiryStr) {
             return null;
         }
-        $expiresAt = date('Y-m-d H:i:s', strtotime($expiryStr));
+        $expiresAt = gmdate('Y-m-d H:i:s', strtotime($expiryStr));
 
         // Détecter l'essai via offerTags
         $offerTags = $lineItem['offerDetails']['offerTags'] ?? [];

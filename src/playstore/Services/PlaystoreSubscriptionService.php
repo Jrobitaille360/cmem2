@@ -27,7 +27,7 @@ class PlaystoreSubscriptionService
         $isPremium      = (bool) $result['is_premium'];
         $status         = $isPremium ? 'active' : 'expired';
         $expiresAt      = $result['expires_at'] ?? null;
-        $verifiedAt     = $isPremium ? date('Y-m-d H:i:s') : null;
+        $verifiedAt     = $isPremium ? gmdate('Y-m-d H:i:s') : null;
         $finalProductId = $result['product_id'] ?? $productId;
 
         (new PlaystoreSubscription())->upsertSubscription(
@@ -59,40 +59,7 @@ class PlaystoreSubscriptionService
     public static function getStatus(string $deviceUuid, string $appId): array
     {
         $model = new PlaystoreSubscription();
-        $model->expireStale($deviceUuid, $appId);
-        $row = $model->findActive($deviceUuid, $appId);
-
-        if ($row && $row['expires_at'] !== null) {
-            $expiresTs  = strtotime($row['expires_at']);
-            $soonThresh = time() + 86400;
-
-            if ($expiresTs < $soonThresh) {
-                $gpResult = (new GooglePlayService())->validateSubscription(
-                    $appId,
-                    $row['product_id'],
-                    $row['purchase_token']
-                );
-
-                if ($gpResult !== null) {
-                    $isPremium  = (bool) $gpResult['is_premium'];
-                    $status     = $isPremium ? 'active' : 'expired';
-                    $expiresAt  = $gpResult['expires_at'] ?? null;
-                    $verifiedAt = $isPremium ? date('Y-m-d H:i:s') : null;
-
-                    $model->upsertSubscription(
-                        $deviceUuid,
-                        $appId,
-                        $row['purchase_token'],
-                        $row['product_id'],
-                        $status,
-                        $expiresAt,
-                        $verifiedAt
-                    );
-
-                    $row = $model->findActive($deviceUuid, $appId);
-                }
-            }
-        }
+        $row   = $model->findByDevice($deviceUuid, $appId);
 
         if (!$row) {
             return [
@@ -104,8 +71,56 @@ class PlaystoreSubscriptionService
             ];
         }
 
+        $expiresTs = $row['expires_at'] ? strtotime($row['expires_at']) : null;
+        $now       = time();
+
+        // Revalidate via Google Play if active and expires within 7 days (or already past).
+        // This covers the grace-period case where Google extends expiryTime while the local
+        // expires_at still shows the original date.
+        $needsRevalidation = $row['status'] === 'active'
+            && $expiresTs !== null
+            && $expiresTs <= ($now + 7 * 86400);
+
+        if ($needsRevalidation) {
+            $gpResult = (new GooglePlayService())->validateSubscription(
+                $appId,
+                $row['product_id'],
+                $row['purchase_token']
+            );
+
+            if ($gpResult !== null) {
+                $isPremium  = (bool) $gpResult['is_premium'];
+                $status     = $isPremium ? 'active' : 'expired';
+                $expiresAt  = $gpResult['expires_at'] ?? null;
+                $verifiedAt = $isPremium ? gmdate('Y-m-d H:i:s') : null;
+
+                $model->upsertSubscription(
+                    $deviceUuid,
+                    $appId,
+                    $row['purchase_token'],
+                    $row['product_id'],
+                    $status,
+                    $expiresAt,
+                    $verifiedAt
+                );
+
+                return [
+                    'is_premium' => $isPremium,
+                    'status'     => $status,
+                    'expires_at' => $expiresAt,
+                    'product_id' => $row['product_id'],
+                    'provider'   => 'playstore',
+                ];
+            }
+        }
+
+        // Fallback: Google unreachable or no revalidation needed — derive from DB.
+        $isPremium = $row['status'] === 'active'
+            && $expiresTs !== null
+            && $expiresTs > $now;
+
         return [
-            'is_premium' => $row['status'] === 'active',
+            'is_premium' => $isPremium,
             'status'     => $row['status'],
             'expires_at' => $row['expires_at'],
             'product_id' => $row['product_id'],

@@ -42,9 +42,21 @@ class PlaystoreSubscription extends BaseModel
                  status         = VALUES(status),
                  expires_at     = VALUES(expires_at),
                  verified_at    = VALUES(verified_at),
-                 updated_at     = NOW()"
+                 updated_at     = UTC_TIMESTAMP()"
         );
         $stmt->execute([$deviceUuid, $appId, $purchaseToken, $productId, $status, $expiresAt, $verifiedAt]);
+    }
+
+    public function findByDevice(string $deviceUuid, string $appId): ?array
+    {
+        $stmt = $this->getDb()->prepare(
+            "SELECT * FROM {$this->table}
+             WHERE device_uuid = ? AND app_id = ?
+             ORDER BY created_at DESC
+             LIMIT 1"
+        );
+        $stmt->execute([$deviceUuid, $appId]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
     public function findActive(string $deviceUuid, string $appId): ?array
@@ -62,7 +74,7 @@ class PlaystoreSubscription extends BaseModel
     {
         $stmt = $this->getDb()->prepare(
             "UPDATE {$this->table}
-             SET status = 'cancelled', updated_at = NOW()
+             SET status = 'cancelled', updated_at = UTC_TIMESTAMP()
              WHERE device_uuid = ? AND app_id = ? AND status = 'active'"
         );
         $stmt->execute([$deviceUuid, $appId]);
@@ -73,8 +85,8 @@ class PlaystoreSubscription extends BaseModel
     {
         $stmt = $this->getDb()->prepare(
             "UPDATE {$this->table}
-             SET status = 'expired', updated_at = NOW()
-             WHERE device_uuid = ? AND app_id = ? AND status = 'active' AND expires_at < NOW()"
+             SET status = 'expired', updated_at = UTC_TIMESTAMP()
+             WHERE device_uuid = ? AND app_id = ? AND status = 'active' AND expires_at < UTC_TIMESTAMP()"
         );
         $stmt->execute([$deviceUuid, $appId]);
     }
