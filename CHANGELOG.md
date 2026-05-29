@@ -7,6 +7,19 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-05-29]
+
+### Fix — Play Store upgrade/downgrade : gestion `linked_purchase_token`
+
+- **`src/playstore/Models/PlaystoreSubscription.php`** — nouvelle méthode `expireByToken(purchaseToken, appId)` : expire la ligne active identifiée par token (retourne bool)
+- **`src/playstore/Services/PlaystoreSubscriptionService.php`** — `verify()` accepte paramètre optionnel `$linkedPurchaseToken` ; si présent et token Google valide, expire l'ancien token avant l'upsert du nouveau ; si absent en base, log warning et continue sans erreur
+- **`src/playstore/Controllers/SubscriptionController.php`** — extrait `linked_purchase_token` du body et le transmet au service
+- **`private/tests/test_subscriptions.php`** — test 3.6 : payload avec `linked_purchase_token` fictif accepté, Google rejette le nouveau token → 422 attendu
+
+Note : critère "linked non trouvé → warning" non testable automatiquement (requiert token Google Play réel). Couvert par log `WARNING linked_purchase_token not found in DB`.
+
+---
+
 ## [Unreleased 2026-05-28]
 
 ### Refactor — Dépréciation routes legacy `/subscription/checkout` et `/subscription/portal`

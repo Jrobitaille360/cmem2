@@ -81,6 +81,17 @@ class PlaystoreSubscription extends BaseModel
         return $stmt->rowCount();
     }
 
+    public function expireByToken(string $purchaseToken, string $appId): bool
+    {
+        $stmt = $this->getDb()->prepare(
+            "UPDATE {$this->table}
+             SET status = 'expired', updated_at = UTC_TIMESTAMP()
+             WHERE purchase_token = ? AND app_id = ? AND status = 'active'"
+        );
+        $stmt->execute([$purchaseToken, $appId]);
+        return $stmt->rowCount() > 0;
+    }
+
     public function expireStale(string $deviceUuid, string $appId): void
     {
         $stmt = $this->getDb()->prepare(

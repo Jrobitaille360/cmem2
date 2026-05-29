@@ -14,9 +14,10 @@ class SubscriptionController
         LoggingMiddleware::logEntry();
         $input = Response::getRequestParams();
 
-        $purchaseToken = $input['purchase_token'] ?? '';
-        $productId     = $input['product_id']     ?? '';
-        $appId         = $input['app_id']          ?? '';
+        $purchaseToken       = $input['purchase_token']       ?? '';
+        $productId           = $input['product_id']           ?? '';
+        $appId               = $input['app_id']               ?? '';
+        $linkedPurchaseToken = $input['linked_purchase_token'] ?? null;
 
         if (!$purchaseToken || !$productId || !$appId) {
             LoggingMiddleware::logExit(422);
@@ -29,7 +30,8 @@ class SubscriptionController
                 $device['device_uuid'],
                 $appId,
                 $purchaseToken,
-                $productId
+                $productId,
+                $linkedPurchaseToken ?: null
             );
         } catch (\RuntimeException $e) {
             LoggingMiddleware::logExit(422);

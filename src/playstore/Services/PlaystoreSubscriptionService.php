@@ -11,12 +11,27 @@ class PlaystoreSubscriptionService
         string $callerDeviceUuid,
         string $appId,
         string $purchaseToken,
-        string $productId
+        string $productId,
+        ?string $linkedPurchaseToken = null
     ): array {
         $result = (new GooglePlayService())->validateSubscription($appId, $productId, $purchaseToken);
 
         if ($result === null) {
             throw new \RuntimeException('Token Google Play invalide ou inaccessible');
+        }
+
+        // Upgrade/downgrade: expire the previous token before upserting the new one.
+        // Google validation must succeed first — never expire old token on a rejected new token.
+        if ($linkedPurchaseToken) {
+            $model   = new PlaystoreSubscription();
+            $expired = $model->expireByToken($linkedPurchaseToken, $appId);
+            if (!$expired) {
+                LogService::warning('PlaystoreSubscriptionService::verify', [
+                    'msg'                   => 'linked_purchase_token not found in DB',
+                    'linked_purchase_token' => $linkedPurchaseToken,
+                    'app_id'                => $appId,
+                ]);
+            }
         }
 
         // obfuscatedExternalAccountId = device_uuid de l'appareil original (achat initial).
@@ -41,11 +56,12 @@ class PlaystoreSubscriptionService
         );
 
         LogService::info('PlaystoreSubscriptionService::verify', [
-            'owner_device_uuid'  => $ownerDeviceUuid,
-            'caller_device_uuid' => $callerDeviceUuid,
-            'app_id'             => $appId,
-            'product_id'         => $finalProductId,
-            'status'             => $status,
+            'owner_device_uuid'      => $ownerDeviceUuid,
+            'caller_device_uuid'     => $callerDeviceUuid,
+            'app_id'                 => $appId,
+            'product_id'             => $finalProductId,
+            'status'                 => $status,
+            'linked_purchase_token'  => $linkedPurchaseToken,
         ]);
 
         return [
