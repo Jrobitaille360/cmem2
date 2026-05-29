@@ -7,7 +7,22 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-05-29]
+## [Unreleased]
+
+---
+
+## [2.7.0] — 2026-05-29
+
+### Refactor — Consolidation Stripe Phase 4 : suppression code legacy auth_groups
+
+Webhook prod migré vers `/v2/billing/webhook` (Stripe Dashboard). Fichiers legacy désormais orphelins supprimés.
+
+- **`src/auth_groups/Controllers/StripeController.php`** — supprimé
+- **`src/auth_groups/Routing/RouteHandlers/StripeRouteHandler.php`** — supprimé
+- **`src/auth_groups/Services/StripeService.php`** — supprimé
+- **`src/auth_groups/Routing/Router.php`** — import `StripeRouteHandler` retiré, entrée `'stripe'` retirée du map de routes (route `/stripe/webhook` → 404)
+
+---
 
 ### Refactor — Phase 5 v2.7.0 : destruction code mort + migration backup + nouveaux crons
 
@@ -53,7 +68,7 @@ Note : critère "linked non trouvé → warning" non testable automatiquement (r
 
 ---
 
-## [Unreleased 2026-05-28]
+### 2026-05-28
 
 ### Refactor — Dépréciation routes legacy `/subscription/checkout` et `/subscription/portal`
 
@@ -68,7 +83,7 @@ Note : critère "linked non trouvé → warning" non testable automatiquement (r
 
 ---
 
-## [Unreleased 2026-05-24]
+### 2026-05-24
 
 ### Refactor — Abonnements Play Store : `device_uuid` remplace `user_id`
 
@@ -122,7 +137,7 @@ sur un nouvel appareil.
 
 ---
 
-## [Unreleased 2026-05-22]
+### 2026-05-22
 
 ### Feat — Enregistrement device anonyme + routage v2/puzzle
 
@@ -139,7 +154,7 @@ sur un nouvel appareil.
 
 ---
 
-## [Unreleased 2026-05-21]
+### 2026-05-21
 
 ### Fix — Endpoints thumb/image accessibles avec device_token anonyme Android
 
@@ -153,7 +168,7 @@ sur un nouvel appareil.
 
 ---
 
-## [Unreleased 2026-05-19 Phase 6]
+### 2026-05-19 Phase 6
 
 ### Docs — Nouveaux modules v2.7.0
 
@@ -181,7 +196,7 @@ Pour connaître l'état premium, utiliser `GET /v2/access/status?app_id={app_id}
 
 ---
 
-## [Unreleased 2026-05-20]
+### 2026-05-20
 
 ### Tests — OTP dev sans injection DB directe (21.6)
 
@@ -192,7 +207,7 @@ Pour connaître l'état premium, utiliser `GET /v2/access/status?app_id={app_id}
 
 ---
 
-## [Unreleased 2026-05-19 23:00]
+### 2026-05-19 23:00
 
 ### v2 API — Modules Playstore, Stripe, Access (feat — b88cbfa)
 
@@ -457,7 +472,7 @@ Pour connaître l'état premium, utiliser `GET /v2/access/status?app_id={app_id}
 
 ---
 
-## [Unreleased 2026-04-27 11:00]
+### 2026-04-27 11:00
 
 ### Stripe — chargement des constantes depuis `.env`
 
