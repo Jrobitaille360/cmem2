@@ -34,11 +34,17 @@ ALTER TABLE `puzzle_shared`
 ALTER TABLE `puzzle_shared_pieces`
     DROP FOREIGN KEY IF EXISTS `fk_pieces_held_by`,
     DROP FOREIGN KEY IF EXISTS `fk_pieces_by`;
+ALTER TABLE `puzzle_shared_pieces`
+    DROP INDEX IF EXISTS `fk_pieces_held_by`,
+    DROP INDEX IF EXISTS `fk_pieces_by`;
 
 -- puzzle_shared_events (si 002 avait ete applique)
 ALTER TABLE `puzzle_shared_events`
     DROP FOREIGN KEY IF EXISTS `fk_events_held_by`,
     DROP FOREIGN KEY IF EXISTS `fk_events_by`;
+ALTER TABLE `puzzle_shared_events`
+    DROP INDEX IF EXISTS `fk_events_held_by`,
+    DROP INDEX IF EXISTS `fk_events_by`;
 
 -- ============================================================
 -- 3. DROP tables supprimees en v2.7.0
@@ -87,6 +93,12 @@ ALTER TABLE `puzzle_shared_pieces`
     ADD COLUMN IF NOT EXISTS `by_id`      INT(11) NULL DEFAULT NULL COMMENT 'FK users.id'
         AFTER `held_at`;
 
+-- Normalisation type : colonnes issues de 002 pouvaient etre INT UNSIGNED
+-- users.id est INT(11) signe — doit correspondre exactement
+ALTER TABLE `puzzle_shared_pieces`
+    MODIFY COLUMN `held_by_id` INT(11) NULL DEFAULT NULL COMMENT 'FK users.id',
+    MODIFY COLUMN `by_id`      INT(11) NULL DEFAULT NULL COMMENT 'FK users.id';
+
 -- FK → users
 ALTER TABLE `puzzle_shared_pieces`
     ADD CONSTRAINT `fk_pieces_held_by`
@@ -115,6 +127,11 @@ ALTER TABLE `puzzle_shared_events`
         AFTER `rotation`,
     ADD COLUMN IF NOT EXISTS `by_id`      INT(11) NULL DEFAULT NULL
         AFTER `held_by_id`;
+
+-- Normalisation type : colonnes issues de 002 pouvaient etre INT UNSIGNED
+ALTER TABLE `puzzle_shared_events`
+    MODIFY COLUMN `held_by_id` INT(11) NULL DEFAULT NULL,
+    MODIFY COLUMN `by_id`      INT(11) NULL DEFAULT NULL;
 
 -- FK → users
 ALTER TABLE `puzzle_shared_events`
