@@ -121,84 +121,59 @@ class MaintenanceService implements MaintenanceTaskInterface
 
     private function deleteExpiredDevices(\PDO $db, array &$result): void
     {
-        try {
-            // Ne supprime que les appareils sans aucune partie (active ou archivée) encore présente.
-            $sql = "
-                DELETE FROM puzzle_devices
-                WHERE token_expires_at < NOW()
-                  AND last_seen_at < NOW() - INTERVAL 90 DAY
-                  AND id NOT IN (
-                      SELECT creator_id FROM puzzle_shared
-                      UNION
-                      SELECT partner_id FROM puzzle_shared
-                  )
-            ";
+        foreach (['android_devices', 'web_devices'] as $table) {
+            try {
+                $sql = "DELETE FROM `{$table}`
+                        WHERE token_expires_at < NOW()
+                          AND last_seen_at < NOW() - INTERVAL 90 DAY";
 
-            if ($this->dryRun) {
-                $countSql = "
-                    SELECT COUNT(*) FROM puzzle_devices
-                    WHERE token_expires_at < NOW()
-                      AND last_seen_at < NOW() - INTERVAL 90 DAY
-                      AND id NOT IN (
-                          SELECT creator_id FROM puzzle_shared
-                          UNION
-                          SELECT partner_id FROM puzzle_shared
-                      )
-                ";
-                $stmt = $db->prepare($countSql);
+                if ($this->dryRun) {
+                    $stmt = $db->prepare(
+                        "SELECT COUNT(*) FROM `{$table}`
+                         WHERE token_expires_at < NOW()
+                           AND last_seen_at < NOW() - INTERVAL 90 DAY"
+                    );
+                    $stmt->execute();
+                    $count = (int) $stmt->fetchColumn();
+                    LogService::info("Maintenance[puzzle] dry-run: {$table} expirés", ['count' => $count]);
+                    $result['rows_deleted']["{$table} (expired+inactive >90d)"] = $count;
+                    continue;
+                }
+
+                $stmt = $db->prepare($sql);
                 $stmt->execute();
-                $count = (int) $stmt->fetchColumn();
-                LogService::info('Maintenance[puzzle] dry-run: appareils expirés à purger', ['count' => $count]);
-                $result['rows_deleted']['puzzle_devices (expired+inactive >90d)'] = $count;
-                return;
+                $result['rows_deleted']["{$table} (expired+inactive >90d)"] = $stmt->rowCount();
+            } catch (\Throwable $e) {
+                $result['errors'][] = "deleteExpiredDevices[{$table}]: " . $e->getMessage();
+                LogService::error("Maintenance[puzzle] deleteExpiredDevices[{$table}]", ['exception' => $e->getMessage()]);
             }
-
-            $stmt = $db->prepare($sql);
-            $stmt->execute();
-            $result['rows_deleted']['puzzle_devices (expired+inactive >90d)'] = $stmt->rowCount();
-        } catch (\Throwable $e) {
-            $result['errors'][] = 'deleteExpiredDevices: ' . $e->getMessage();
-            LogService::error('Maintenance[puzzle] deleteExpiredDevices', ['exception' => $e->getMessage()]);
         }
     }
 
     private function deleteInactiveDevices(\PDO $db, array &$result): void
     {
-        try {
-            $sql = "
-                DELETE FROM puzzle_devices
-                WHERE last_seen_at < NOW() - INTERVAL 365 DAY
-                  AND id NOT IN (
-                      SELECT creator_id FROM puzzle_shared
-                      UNION
-                      SELECT partner_id FROM puzzle_shared
-                  )
-            ";
+        foreach (['android_devices', 'web_devices'] as $table) {
+            try {
+                $sql = "DELETE FROM `{$table}` WHERE last_seen_at < NOW() - INTERVAL 365 DAY";
 
-            if ($this->dryRun) {
-                $countSql = "
-                    SELECT COUNT(*) FROM puzzle_devices
-                    WHERE last_seen_at < NOW() - INTERVAL 365 DAY
-                      AND id NOT IN (
-                          SELECT creator_id FROM puzzle_shared
-                          UNION
-                          SELECT partner_id FROM puzzle_shared
-                      )
-                ";
-                $stmt = $db->prepare($countSql);
+                if ($this->dryRun) {
+                    $stmt = $db->prepare(
+                        "SELECT COUNT(*) FROM `{$table}` WHERE last_seen_at < NOW() - INTERVAL 365 DAY"
+                    );
+                    $stmt->execute();
+                    $count = (int) $stmt->fetchColumn();
+                    LogService::info("Maintenance[puzzle] dry-run: {$table} inactifs 1 an", ['count' => $count]);
+                    $result['rows_deleted']["{$table} (inactive >365d)"] = $count;
+                    continue;
+                }
+
+                $stmt = $db->prepare($sql);
                 $stmt->execute();
-                $count = (int) $stmt->fetchColumn();
-                LogService::info('Maintenance[puzzle] dry-run: appareils inactifs 1 an', ['count' => $count]);
-                $result['rows_deleted']['puzzle_devices (inactive >365d)'] = $count;
-                return;
+                $result['rows_deleted']["{$table} (inactive >365d)"] = $stmt->rowCount();
+            } catch (\Throwable $e) {
+                $result['errors'][] = "deleteInactiveDevices[{$table}]: " . $e->getMessage();
+                LogService::error("Maintenance[puzzle] deleteInactiveDevices[{$table}]", ['exception' => $e->getMessage()]);
             }
-
-            $stmt = $db->prepare($sql);
-            $stmt->execute();
-            $result['rows_deleted']['puzzle_devices (inactive >365d)'] = $stmt->rowCount();
-        } catch (\Throwable $e) {
-            $result['errors'][] = 'deleteInactiveDevices: ' . $e->getMessage();
-            LogService::error('Maintenance[puzzle] deleteInactiveDevices', ['exception' => $e->getMessage()]);
         }
     }
 }

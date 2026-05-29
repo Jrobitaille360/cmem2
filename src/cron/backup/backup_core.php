@@ -3,7 +3,7 @@
 /**
  * Sauvegarde — Module core (auth_groups)
  *
- * Exporte les 23 tables du module core dans l'ordre des clés étrangères.
+ * Exporte les 25 tables du module core dans l'ordre des clés étrangères.
  * Effectue un ménage des données expirées avant l'export.
  *
  * Usage :
@@ -48,7 +48,9 @@ $tables = [
     'group_tag_relations',
     'file_tag_relations',
     'plan_invitations',
-    'subscriptions',
+    'playstore_subscriptions',
+    'stripe_subscriptions',
+    'stripe_processed_events',
     'group_stats_snapshot',
     'user_stats_snapshot',
     'platform_stats',

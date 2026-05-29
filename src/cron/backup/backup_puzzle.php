@@ -3,7 +3,7 @@
 /**
  * Sauvegarde — Module Puzzle
  *
- * Exporte les 9 tables du module Puzzle dans l'ordre des clés étrangères.
+ * Exporte les 11 tables du module Puzzle dans l'ordre des clés étrangères.
  * Effectue un ménage des sessions partagées inactives depuis plus de 90 jours.
  *
  * Usage :
@@ -34,7 +34,9 @@ $tables = [
     'puzzle_themes',
     'puzzle_theme_translations',
     'puzzle_image_themes',
-    'puzzle_devices',
+    'app_user_settings',
+    'android_devices',
+    'web_devices',
     'puzzle_shared',
     'puzzle_shared_pieces',
     'puzzle_shared_events',

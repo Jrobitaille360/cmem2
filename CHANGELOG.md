@@ -9,6 +9,39 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased 2026-05-29]
 
+### Refactor — Phase 5 v2.7.0 : destruction code mort + migration backup + nouveaux crons
+
+#### Suppression fichiers legacy
+
+- **`src/puzzle/Controllers/AuthController.php`** — supprimé ; routes `/puzzle/auth/*` (register-device, verify-subscription, subscription-status, pseudonym, check-pseudonym) retournent désormais 410
+- **`src/puzzle/Models/PuzzleDevice.php`** — supprimé ; table `puzzle_devices` abandonnée
+- **`src/puzzle/Services/GooglePlayService.php`** — supprimé ; dupliqué de `src/playstore/Services/GooglePlayService.php`
+- **`src/cron/expire_subscriptions.php`** — supprimé ; remplacé par `expire_playstore.php` + `expire_stripe.php`
+
+#### Migration backup → android_devices / web_devices
+
+- **`docs/20260529_backup_json_devices.sql`** — migration SQL : ajout `backup_json MEDIUMTEXT NULL` et `backup_saved_at DATETIME NULL` sur `android_devices` et `web_devices`
+- **`src/playstore/Models/AndroidDevice.php`** — méthodes `setUserId`, `saveBackup`, `findLatestWithBackupByUser` ajoutées
+- **`src/webdevice/Models/WebDevice.php`** — mêmes méthodes ajoutées
+- **`src/puzzle/Controllers/SyncController.php`** — réécrit sans `PuzzleDevice` ; `saveBackup`/`getBackup` via `_device_type` ; `claimBackup` via `AppUserSettings::findUserByPseudonym` → device le plus récent avec backup
+
+#### Routage + link-device
+
+- **`src/puzzle/Routing/PuzzleRouteHandler.php`** — bloc `/puzzle/auth/*` réduit à `link-device` uniquement (autres : 410) ; `handleLinkDevice` inline sans `PuzzleDevice`
+
+#### Maintenance + backup
+
+- **`src/puzzle/Services/MaintenanceService.php`** — `deleteExpiredDevices` et `deleteInactiveDevices` ciblent `android_devices` + `web_devices` (plus `puzzle_devices`)
+- **`src/cron/backup/backup_puzzle.php`** — 9 → 11 tables : `puzzle_devices` retiré, `android_devices` + `web_devices` + `app_user_settings` ajoutés
+- **`src/cron/backup/backup_core.php`** — 23 → 25 tables : `subscriptions` retiré, `playstore_subscriptions` + `stripe_subscriptions` + `stripe_processed_events` ajoutés
+
+#### Nouveaux crons
+
+- **`src/cron/expire_playstore.php`** — expire `playstore_subscriptions` actifs dont `expires_at < NOW()`
+- **`src/cron/expire_stripe.php`** — expire `stripe_subscriptions` actifs/trialing/past_due dont `expires_at < NOW()` (fallback webhook Stripe)
+
+---
+
 ### Fix — Play Store upgrade/downgrade : gestion `linked_purchase_token`
 
 - **`src/playstore/Models/PlaystoreSubscription.php`** — nouvelle méthode `expireByToken(purchaseToken, appId)` : expire la ligne active identifiée par token (retourne bool)

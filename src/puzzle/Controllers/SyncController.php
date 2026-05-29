@@ -3,8 +3,10 @@
 namespace Puzzle\Controllers;
 
 use AuthGroups\Middleware\LoggingMiddleware;
+use AuthGroups\Models\AppUserSettings;
 use AuthGroups\Utils\Response;
-use Puzzle\Models\PuzzleDevice;
+use Playstore\Models\AndroidDevice;
+use WebDevice\Models\WebDevice;
 
 /**
  * SyncController — sauvegarde en ligne (blob opaque)
@@ -14,7 +16,7 @@ class SyncController
     private const MAX_BACKUP_BYTES = 524288; // 512 Ko
 
     // -----------------------------------------------------------------------
-    // POST /puzzle/backup  (device_token + premium)
+    // POST /v2/puzzle/backup  (device_token + premium)
     // -----------------------------------------------------------------------
 
     public function saveBackup(array $device): void
@@ -35,8 +37,7 @@ class SyncController
             return;
         }
 
-        $deviceModel = new PuzzleDevice();
-        $deviceModel->saveBackup((int) $device['id'], $backupJson);
+        $this->getDeviceModel($device)->saveBackup((int) $device['id'], $backupJson);
 
         LoggingMiddleware::logExit(200);
         Response::success('Sauvegarde enregistrée', [
@@ -45,7 +46,7 @@ class SyncController
     }
 
     // -----------------------------------------------------------------------
-    // POST /puzzle/backup/claim  (device_token + premium)
+    // POST /v2/puzzle/backup/claim  (device_token + premium)
     // -----------------------------------------------------------------------
 
     public function claimBackup(array $device): void
@@ -53,6 +54,7 @@ class SyncController
         LoggingMiddleware::logEntry();
         $input     = Response::getRequestParams();
         $pseudonym = trim($input['pseudonym'] ?? '');
+        $appId     = $device['app_id'] ?? 'puzzle';
 
         if ($pseudonym === '') {
             LoggingMiddleware::logExit(422);
@@ -60,39 +62,39 @@ class SyncController
             return;
         }
 
-        $deviceModel = new PuzzleDevice();
-        $owner = $deviceModel->findByPseudonymCI($pseudonym);
+        $ownerId = (new AppUserSettings())->findUserByPseudonym($appId, $pseudonym);
 
-        if (!$owner) {
+        if ($ownerId === null) {
             LoggingMiddleware::logExit(404);
             Response::error('Pseudonyme introuvable', ['code' => 'PSEUDONYM_NOT_FOUND'], 404);
             return;
         }
 
-        if ($owner['backup_json'] === null) {
+        $androidModel = new AndroidDevice();
+        $webModel     = new WebDevice();
+
+        $owner = $androidModel->findLatestWithBackupByUser($ownerId, $appId)
+              ?? $webModel->findLatestWithBackupByUser($ownerId, $appId);
+
+        if ($owner === null || $owner['backup_json'] === null) {
             LoggingMiddleware::logExit(404);
             Response::error('Aucune sauvegarde pour ce pseudonyme', ['code' => 'BACKUP_NOT_FOUND'], 404);
             return;
         }
 
-        // Copier le backup sur le device courant
-        $deviceModel->saveBackup((int) $device['id'], $owner['backup_json']);
-
-        // Transférer l'ownership du pseudonyme
-        $deviceModel->clearPseudonym((int) $owner['id']);
-        $deviceModel->setPseudonym((int) $device['id'], $owner['pseudonym']);
+        $this->getDeviceModel($device)->saveBackup((int) $device['id'], $owner['backup_json']);
 
         $backup = json_decode($owner['backup_json'], true);
 
         LoggingMiddleware::logExit(200);
         Response::success('Progression récupérée', [
-            'pseudonym' => $owner['pseudonym'],
+            'pseudonym' => $pseudonym,
             'backup'    => $backup,
         ]);
     }
 
     // -----------------------------------------------------------------------
-    // GET /puzzle/backup  (device_token + premium)
+    // GET /v2/puzzle/backup  (device_token + premium)
     // -----------------------------------------------------------------------
 
     public function getBackup(array $device): void
@@ -100,7 +102,7 @@ class SyncController
         LoggingMiddleware::logEntry();
 
         $backupJson = $device['backup_json'] ?? null;
-        $savedAt    = $device['updated_at']  ?? null;
+        $savedAt    = $device['backup_saved_at'] ?? null;
 
         if ($backupJson === null) {
             LoggingMiddleware::logExit(404);
@@ -115,5 +117,16 @@ class SyncController
             'backup'   => $backup,
             'saved_at' => $savedAt ? date('c', strtotime($savedAt)) : null,
         ]);
+    }
+
+    // -----------------------------------------------------------------------
+    // Helpers
+    // -----------------------------------------------------------------------
+
+    private function getDeviceModel(array $device): AndroidDevice|WebDevice
+    {
+        return ($device['_device_type'] ?? 'web') === 'android'
+            ? new AndroidDevice()
+            : new WebDevice();
     }
 }

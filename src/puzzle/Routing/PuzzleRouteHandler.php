@@ -3,11 +3,11 @@
 namespace Puzzle\Routing;
 
 use Access\Services\AccessService;
+use AuthGroups\Middleware\LoggingMiddleware;
 use AuthGroups\Routing\BaseRouteHandler;
 use AuthGroups\Utils\Response;
 use Playstore\Models\AndroidDevice;
 use Puzzle\Controllers\AdminController;
-use Puzzle\Controllers\AuthController;
 use Puzzle\Controllers\CarouselController;
 use Puzzle\Controllers\ThemeController;
 use Puzzle\Controllers\ImageDeliveryController;
@@ -66,39 +66,18 @@ class PuzzleRouteHandler extends BaseRouteHandler
         }
 
         // -------------------------------------------------------------------
-        // /puzzle/auth/*  (routes legacy — conservées pendant cohabitation)
+        // /puzzle/auth/link-device  (conservé — lie device_token à compte JWT)
+        // Toutes les autres routes /puzzle/auth/* sont supprimées (migrées v2.7.0)
         // -------------------------------------------------------------------
         if ($s1 === 'auth') {
-            if ($s2 === 'register-device' && $method === 'POST') {
-                (new AuthController())->registerDevice();
-                return;
-            }
-
             if ($s2 === 'link-device' && $method === 'POST') {
                 $user = $this->requireAnyJwt();
                 if ($user === null) return;
-                (new AuthController())->linkDevice($user);
+                $this->handleLinkDevice($user);
                 return;
             }
 
-            $device = $this->requireDeviceToken();
-            if ($device === null) return;
-
-            if ($s2 === 'verify-subscription' && $method === 'POST') {
-                (new AuthController())->verifySubscription($device);
-            } elseif ($s2 === 'subscription-status' && $method === 'GET') {
-                (new AuthController())->getSubscriptionStatus($device);
-            } elseif ($s2 === 'pseudonym' && $method === 'GET') {
-                (new AuthController())->getPseudonym($device);
-            } elseif ($s2 === 'pseudonym' && $method === 'POST') {
-                (new AuthController())->setPseudonym($device);
-            } elseif ($s2 === 'pseudonym' && $method === 'DELETE') {
-                (new AuthController())->deletePseudonym($device);
-            } elseif ($s2 === 'check-pseudonym' && $s3 !== '' && $method === 'GET') {
-                (new AuthController())->checkPseudonym(rawurldecode($s3), $device);
-            } else {
-                Response::error('Endpoint non trouvé', null, 404);
-            }
+            Response::error('Endpoint supprimé — utilisez /v2/devices/* et /v2/subscriptions/*', null, 410);
             return;
         }
 
@@ -373,5 +352,44 @@ class PuzzleRouteHandler extends BaseRouteHandler
             return false;
         }
         return true;
+    }
+
+    // -----------------------------------------------------------------------
+    // POST /puzzle/auth/link-device  (inline — lie device_token à un compte)
+    // -----------------------------------------------------------------------
+
+    private function handleLinkDevice(array $user): void
+    {
+        LoggingMiddleware::logEntry();
+        $input       = Response::getRequestParams();
+        $deviceToken = trim($input['device_token'] ?? '');
+
+        if ($deviceToken === '') {
+            LoggingMiddleware::logExit(422);
+            Response::error('device_token requis', ['field' => 'device_token'], 422);
+            return;
+        }
+
+        $androidModel = new AndroidDevice();
+        $device       = $androidModel->findByValidToken($deviceToken);
+
+        if ($device) {
+            $androidModel->setUserId((int) $device['id'], (int) $user['user_id']);
+        } else {
+            $webModel = new WebDevice();
+            $device   = $webModel->findByValidToken($deviceToken);
+            if ($device) {
+                $webModel->setUserId((int) $device['id'], (int) $user['user_id']);
+            }
+        }
+
+        if (!$device) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Token d\'appareil inconnu ou expiré', ['code' => 'DEVICE_NOT_FOUND'], 404);
+            return;
+        }
+
+        LoggingMiddleware::logExit(200);
+        Response::success('Appareil lié au compte', ['device_id' => (int) $device['id']]);
     }
 }

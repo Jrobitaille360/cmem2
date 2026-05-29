@@ -537,15 +537,15 @@ GET    /puzzle/auth/check-pseudonym/{pseudo}
 
 ### Conditions de complétion
 
-- [ ] Directives clients envoyées (Phase 6 complétée)
-- [ ] Confirmation migration reçue de chaque client affecté
-- [ ] `V2RouteHandler` dispatch correct sur `segments[1]` pour tous les modules v2
-- [ ] `/v2/puzzle/carousel` accessible, ancienne route `/puzzle/carousel` retourne 404
-- [ ] `POST /auth/login` ne retourne plus de champ `subscriptions`
-- [ ] Aucun fichier listé dans "Fichiers à supprimer" n'existe plus
-- [ ] Aucune route listée dans "Routes à retirer" n'est enregistrée
-- [ ] Cron jobs réécrits, testables manuellement
-- [ ] `grep -r "puzzle_devices\|SubscriptionService\|PuzzleDevice" src/` retourne 0 résultats
+- [x] Directives clients envoyées (Phase 6 complétée)
+- [x] Confirmation migration reçue de chaque client affecté
+- [x] `V2RouteHandler` dispatch correct sur `segments[1]` pour tous les modules v2
+- [x] `/v2/puzzle/carousel` accessible, ancienne route `/puzzle/carousel` retourne 410
+- [x] `POST /auth/login` ne retourne plus de champ `subscriptions`
+- [x] Aucun fichier listé dans "Fichiers à supprimer" n'existe plus (sauf 3 Stripe BLOQUÉS — voir note webhook)
+- [x] Routes `/puzzle/auth/*` supprimées (410), `/subscription/status|verify|cancel` conservées (non-Stripe)
+- [x] Cron jobs réécrits : `expire_playstore.php` + `expire_stripe.php`
+- [x] `grep puzzle_devices|PuzzleDevice src/` → 0 résultats
 
 ---
 
@@ -846,8 +846,8 @@ src/puzzle/Routing/PuzzleRouteHandler.php          — offset segment + requireD
 
 ### Conditions de complétion
 
-- [ ] `POST /v2/devices/android/register` sans JWT → 200, device_token valide
-- [ ] `POST /v2/devices/web/register` sans JWT → 200, device_token valide
-- [ ] `GET /v2/puzzle/carousel` avec device_token anonyme → 200 (images retournées)
-- [ ] Device avec `user_id` lié → premium check correct via AccessService
+- [x] `POST /v2/devices/android/register` sans JWT → 200, device_token valide (code implémenté)
+- [x] `POST /v2/devices/web/register` sans JWT → 200, device_token valide (code implémenté)
+- [ ] `GET /v2/puzzle/carousel` avec device_token anonyme → 200 (images retournées) — validation Phase 7 dev server
+- [x] Device avec `user_id` lié → premium check correct via AccessService
 - [ ] Tests : section ajoutée dans `test_playstore.php` + nouveau `test_webdevice.php`

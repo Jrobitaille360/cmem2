@@ -62,4 +62,31 @@ class WebDevice extends BaseModel
         );
         $stmt->execute([$id]);
     }
+
+    public function setUserId(int $id, int $userId): void
+    {
+        $stmt = $this->getDb()->prepare(
+            "UPDATE {$this->table} SET user_id = ? WHERE id = ?"
+        );
+        $stmt->execute([$userId, $id]);
+    }
+
+    public function saveBackup(int $id, string $json): void
+    {
+        $stmt = $this->getDb()->prepare(
+            "UPDATE {$this->table} SET backup_json = ?, backup_saved_at = NOW() WHERE id = ?"
+        );
+        $stmt->execute([$json, $id]);
+    }
+
+    public function findLatestWithBackupByUser(int $userId, string $appId): ?array
+    {
+        $stmt = $this->getDb()->prepare(
+            "SELECT * FROM {$this->table}
+             WHERE user_id = ? AND app_id = ? AND backup_json IS NOT NULL
+             ORDER BY backup_saved_at DESC LIMIT 1"
+        );
+        $stmt->execute([$userId, $appId]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
 }
