@@ -286,11 +286,6 @@ class TraqueRouteHandler extends BaseRouteHandler
         $playerId = (int) $user['user_id'];
         $model    = new Player();
 
-        if ($model->findById($playerId)) {
-            Response::error('Personnage déjà existant', ['error' => 'character_exists'], 409);
-            return;
-        }
-
         $input = Response::getRequestParams();
 
         $class      = $input['class'] ?? '';
@@ -328,6 +323,11 @@ class TraqueRouteHandler extends BaseRouteHandler
         }
         if ($delta !== 6) {
             Response::error('La somme des bonus de stats doit être 6', ['error' => 'invalid_stat_distribution', 'expected_delta' => 6], 422);
+            return;
+        }
+
+        if ($model->findById($playerId)) {
+            Response::error('Personnage déjà existant', ['error' => 'character_exists'], 409);
             return;
         }
 
