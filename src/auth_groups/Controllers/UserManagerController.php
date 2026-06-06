@@ -36,7 +36,7 @@ class UserManagerController {
                 'phone' => 'string',
                 'date_of_birth' => 'date',
                 'location' => 'string'
-            ]);            
+            ]);
             if (!$validation['valid']) {
                 LogService::warning("Données de création utilisateur invalides", [
                     'errors' => $validation['errors']
@@ -45,9 +45,31 @@ class UserManagerController {
                 Response::error('Données invalides', $validation['errors'], 400);
                 return false;
             }
-            
+
+            // Validation âge ≥ 16 (GDPR) via champ birthdate
+            $birthdate = $input['birthdate'] ?? null;
+            if ($birthdate !== null) {
+                $bd = \DateTime::createFromFormat('Y-m-d', $birthdate);
+                if (!$bd) {
+                    LoggingMiddleware::logExit(422);
+                    Response::error('Format birthdate invalide (YYYY-MM-DD)', null, 422);
+                    return false;
+                }
+                $age = (int) floor($bd->diff(new \DateTime())->days / 365.25);
+                if ($age < 16) {
+                    LogService::warning("Inscription refusée — âge insuffisant", ['age' => $age]);
+                    LoggingMiddleware::logExit(422);
+                    Response::error('Vous devez avoir 16 ans ou plus.', ['error' => 'age_restriction'], 422);
+                    return false;
+                }
+                // Stocker birthdate dans date_of_birth si non déjà fourni
+                if (!isset($input['date_of_birth'])) {
+                    $input['date_of_birth'] = $birthdate;
+                }
+            }
+
             $user = new User();
-            
+
             // Vérifier si l'email existe déjà (incluant les comptes supprimés)
             if ($user->emailExists($input['email'], null, false)) {
                 LogService::warning("Tentative de création avec email existant", [

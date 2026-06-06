@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "680c10bf6d83f8fe027ea23a6e688d1d",
+    "content-hash": "1be1f3ca6cb4a178504e880ad5220cf0",
     "packages": [
         {
             "name": "doctrine/collections",
@@ -139,6 +139,89 @@
                 "source": "https://github.com/doctrine/deprecations/tree/1.1.6"
             },
             "time": "2026-02-07T07:09:04+00:00"
+        },
+        {
+            "name": "mjaschen/phpgeo",
+            "version": "4.2.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/mjaschen/phpgeo.git",
+                "reference": "5e16834f9433c7780cda7e16aa279814f98ca697"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/mjaschen/phpgeo/zipball/5e16834f9433c7780cda7e16aa279814f98ca697",
+                "reference": "5e16834f9433c7780cda7e16aa279814f98ca697",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^7.3 || ^8.0"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "^9.5",
+                "squizlabs/php_codesniffer": "^3.6",
+                "vimeo/psalm": "^4.13"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Location\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Marcus Jaschen",
+                    "email": "mjaschen@gmail.com",
+                    "homepage": "https://www.marcusjaschen.de/"
+                }
+            ],
+            "description": "Simple Yet Powerful Geo Library",
+            "homepage": "https://phpgeo.marcusjaschen.de/",
+            "keywords": [
+                "Polygon",
+                "area",
+                "bearing",
+                "bounds",
+                "calculation",
+                "coordinate",
+                "distance",
+                "earth",
+                "ellipsoid",
+                "geo",
+                "geofence",
+                "gis",
+                "gps",
+                "haversine",
+                "length",
+                "perpendicular",
+                "point",
+                "polyline",
+                "projection",
+                "simplify",
+                "track",
+                "vincenty"
+            ],
+            "support": {
+                "docs": "https://phpgeo.marcusjaschen.de/Installation.html",
+                "email": "mjaschen@gmail.com",
+                "issues": "https://github.com/mjaschen/phpgeo/issues",
+                "source": "https://github.com/mjaschen/phpgeo/tree/4.2.1"
+            },
+            "funding": [
+                {
+                    "url": "https://www.paypal.com/paypalme/mjaschen",
+                    "type": "custom"
+                },
+                {
+                    "url": "https://github.com/mjaschen",
+                    "type": "github"
+                }
+            ],
+            "time": "2023-12-03T08:01:10+00:00"
         },
         {
             "name": "phpmailer/phpmailer",

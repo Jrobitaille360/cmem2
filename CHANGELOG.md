@@ -7,7 +7,29 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased]
+## [Unreleased 2026-06-05]
+
+### Ajout — Module `traque` (gamification géolocalisée)
+
+Nouveau plugin `src/traque/` : monstres, joueurs, sessions de combat et achievements.
+
+- **`src/traque/TraquePlugin.php`** — entrypoint plugin ; enregistre les routes via `TraqueRouteHandler`
+- **`src/traque/Routing/TraqueRouteHandler.php`** — définition des routes du module
+- **`src/traque/Models/Monster.php`** — modèle monstre (positions géographiques)
+- **`src/traque/Models/Player.php`** — modèle joueur
+- **`src/traque/Models/CombatSession.php`** — sessions de combat
+- **`src/traque/Services/CombatService.php`** — logique de résolution des combats
+- **`src/traque/Services/AchievementService.php`** — gestion des achievements joueur
+- **`docs/20260605_traque_init.sql`** — migration SQL initiale (tables `traque_*`)
+- **`composer.json`** — ajout dépendance `mjaschen/phpgeo ^4.1` (calculs géodésiques) + namespace `Traque\`
+
+### Fix — Validation GDPR âge ≥ 16 à la création d'utilisateur
+
+- **`src/auth_groups/Controllers/UserManagerController.php`** — validation du champ `birthdate` (format `YYYY-MM-DD`) lors de `createUser` ; retourne HTTP 422 + `age_restriction` si âge < 16 ; mappe `birthdate` → `date_of_birth` si ce dernier est absent
+
+### Docs — Plan refonte v3.0.0 — section OpenAPI 3.2.0
+
+- **`docs/PLAN_refonte-v3.0.0.md`** — section 3.10 mise à jour : cible OAS 3.2.0, validation via Spectral, exposition `GET /v3/openapi.yaml`, webhooks Stripe documentés sous `webhooks:` top-level, suppression `nullable` (migré vers array de types JSON Schema 2020-12)
 
 ---
 

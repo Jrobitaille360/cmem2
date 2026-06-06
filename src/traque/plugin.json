@@ -1,0 +1,32 @@
+{
+    "name": "Traque",
+    "version": "1.0.0",
+    "description": "Plugin Traque : RPG AR mobile — monstres, combat AD&D, joueurs, classement",
+    "author": "CMEM Team",
+    "namespace": "Traque",
+    "main_class": "Traque\\TraquePlugin",
+    "min_cmem_version": "2.7.0",
+    "status": "active",
+    "dependencies": {
+        "cmem2_core": ">=2.7.0"
+    },
+    "routes": {
+        "prefix": "/traque"
+    },
+    "route_handlers": {
+        "traque": "Traque\\Routing\\TraqueRouteHandler"
+    },
+    "database": {
+        "tables": [
+            "monsters",
+            "traque_combat_sessions",
+            "traque_combat_log",
+            "traque_player_journal",
+            "traque_achievements",
+            "traque_player_achievements",
+            "traque_players",
+            "traque_player_bestiary",
+            "traque_push_tokens"
+        ]
+    }
+}

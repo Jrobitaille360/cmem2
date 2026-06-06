@@ -595,25 +595,36 @@ index.php                          # Entrypoint (15 lignes max)
 
 ---
 
-### 3.10 Documentation OpenAPI
+### 3.10 Documentation OpenAPI 3.2.0
+
+**Cible :** [OAS 3.2.0](https://spec.openapis.org/oas/v3.2.0.html)
 
 **Actions à poser :**
 
-- Intégrer `zircote/swagger-php` (annotations PHP 8 → spec OpenAPI 3.1)
-- Ajouter attributs `#[OA\...]` sur chaque Action
-- Générer `docs/openapi.json` via script Composer
-- Exposer `GET /v3/openapi.json` (lecture seule, pas d'UI Swagger en prod)
+- Intégrer `zircote/swagger-php` ^5.x — vérifier support OAS 3.2.0 ; si insuffisant, écrire la spec YAML manuellement et valider via `spectral lint`
+- Ajouter attributs `#[OA\...]` sur chaque Action (ou annotations YAML directes si swagger-php limité sur 3.2)
+- Exploiter les features OAS 3.2.0 :
+  - `webhooks` top-level — documenter `POST /v3/billing/webhook` (Stripe) sous `webhooks:`
+  - JSON Schema 2020-12 complet — remplacer `nullable: true` par `type: [T, "null"]` (array de types)
+  - `pathItem` réutilisable via `$ref` dans `components/pathItems` pour les routes admin partagées
+- Maintenir `docs/openapi.yaml` (YAML préféré à JSON pour lisibilité et diff Git)
+- Exposer `GET /v3/openapi.json` et `GET /v3/openapi.yaml` (lecture seule, pas d'UI Swagger en prod)
+- Valider la spec : `npx @stoplight/spectral-cli lint docs/openapi.yaml --ruleset spectral:oas`
 - Remplacer tous les `API_*_ENDPOINTS.json` par la spec générée
 
 **Enjeux :**
 
-- Spec générée doit rester dans le dépôt (pas runtime-only) — commit après chaque changement d'API
-- CalDAV restera hors OpenAPI (protocole WebDAV)
+- Support tooling 3.2.0 encore partiel (swagger-php ciblait 3.1 en 2025) — prévoir fallback spec YAML manuelle + validation Spectral
+- `nullable` est une propriété OAS 3.0 dépréciée — à bannir en 3.2.0 ; utiliser `oneOf: [{type: T}, {type: "null"}]` ou l'array de types
+- Spec générée doit rester dans le dépôt (pas runtime-only) — commit obligatoire après chaque changement d'API
+- CalDAV restera hors OpenAPI (protocole WebDAV, URL fixée côté clients)
 
 **Conditions de complétion :**
 
-- [ ] `composer generate-spec` produit un fichier valide OpenAPI 3.1
-- [ ] GET /v3/openapi.json retourne la spec
+- [ ] `spectral lint docs/openapi.yaml` → 0 erreur, 0 warning sur ruleset OAS
+- [ ] `GET /v3/openapi.yaml` retourne une spec valide OAS 3.2.0
+- [ ] Webhooks Stripe documentés sous `webhooks:` top-level (pas sous `paths:`)
+- [ ] Aucune propriété `nullable` dans la spec (toutes migrées vers array de types JSON Schema 2020-12)
 - [ ] Anciens `API_*_ENDPOINTS.json` supprimés
 
 ---
@@ -643,7 +654,7 @@ index.php                          # Entrypoint (15 lignes max)
 | 3.7 — Plugins | DI injecté, autoloaders unifiés | P2 | 3.11 |
 | 3.8 — Migrations | Phinx opérationnel | P1 | 3.11 |
 | 3.9 — Tests | 0 échec, PHPStan P6 | P1 | 3.11 |
-| 3.10 — OpenAPI | Spec générée, /v3/openapi.json | P2 | 3.11 |
+| 3.10 — OpenAPI 3.2.0 | Spec OAS 3.2.0, /v3/openapi.yaml, Spectral 0 erreur | P2 | 3.11 |
 | 3.11 — Release | Tag v3.0.0, guides de migration | P3 | — |
 
 ---
@@ -658,3 +669,4 @@ Approuver ou modifier avant le démarrage de la Phase 2 :
 4. **DI container** — PHP-DI 7 ou autre (Pimple, Laravel Container standalone) ?
 5. **Logging** — Monolog 3 ou conserver le LogService custom ?
 6. **Route definitions** — Attributes PHP 8.2 ou fichiers de config YAML/PHP ?
+7. **OpenAPI 3.2.0 tooling** — `zircote/swagger-php` avec attributes PHP si support 3.2.0 confirmé, ou spec YAML manuelle + Spectral (`@stoplight/spectral-cli`) comme seul validateur ?

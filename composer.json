@@ -7,7 +7,8 @@
         "php": ">=8.0",
         "phpmailer/phpmailer": "^6.10",
         "simshaun/recurr": "^5.0",
-        "sabre/vobject": "^4.5"
+        "sabre/vobject": "^4.5",
+        "mjaschen/phpgeo": "^4.1"
     },
     "require-dev": {
         "phpunit/phpunit": "9.6.33"
@@ -21,6 +22,7 @@
             "Pomo\\": "src/pomo/",
             "Quiz\\": "src/quiz/",
             "Puzzle\\": "src/puzzle/",
+            "Traque\\": "src/traque/",
             "Playstore\\": "src/playstore/",
             "Stripe\\": "src/stripe/",
             "Access\\": "src/access/",
