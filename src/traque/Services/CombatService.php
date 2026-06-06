@@ -37,7 +37,7 @@ class CombatService
 
         $active = $this->sessionModel->findActiveByPlayer($playerId);
         if ($active) {
-            return ['error' => 'session_already_active', 'code' => 409];
+            return ['error' => 'session_already_active', 'code' => 409, 'session_id' => (int) $active['id']];
         }
 
         $player = $this->playerModel->findById($playerId);

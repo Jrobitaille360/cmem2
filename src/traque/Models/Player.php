@@ -62,7 +62,7 @@ class Player
                stat_for, stat_dex, stat_con, stat_int, stat_sag, stat_cha,
                skill_points_available, gems, gps_consent)
             VALUES
-              (:pid, :class, :race, 1, 0, :hpmax, :hpmax,
+              (:pid, :class, :race, 1, 0, :hpmax, :hpcur,
                :for, :dex, :con, :int, :sag, :cha,
                :sp, 0, :gps)
         ");
@@ -71,6 +71,7 @@ class Player
             ':class' => $data['class'],
             ':race'  => $data['race'],
             ':hpmax' => $data['hp_max'],
+            ':hpcur' => $data['hp_max'],
             ':for'   => $data['stat_for'],
             ':dex'   => $data['stat_dex'],
             ':con'   => $data['stat_con'],

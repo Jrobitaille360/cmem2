@@ -212,7 +212,8 @@ class TraqueRouteHandler extends BaseRouteHandler
         $result  = $service->start((int) $user['user_id'], $monsterId);
 
         if (isset($result['error'])) {
-            Response::error($result['error'], null, $result['code']);
+            $extra = isset($result['session_id']) ? ['session_id' => $result['session_id']] : null;
+            Response::error($result['error'], $extra, $result['code']);
             return;
         }
 
@@ -378,7 +379,13 @@ class TraqueRouteHandler extends BaseRouteHandler
     {
         $playerId = (int) $user['user_id'];
         $model    = new Player();
-        $result   = $model->levelUp($playerId);
+
+        if (!$model->findById($playerId)) {
+            Response::error('Personnage introuvable', null, 404);
+            return;
+        }
+
+        $result = $model->levelUp($playerId);
 
         if (isset($result['already_max'])) {
             Response::success('level_up', ['already_max' => true]);
@@ -419,6 +426,10 @@ class TraqueRouteHandler extends BaseRouteHandler
 
         $model->updateSettings($playerId, $allowed);
         $player = $model->findById($playerId);
+        if (!$player) {
+            Response::error('Personnage introuvable', null, 404);
+            return;
+        }
         Response::success('settings_updated', $this->formatPlayer($player, null));
     }
 
