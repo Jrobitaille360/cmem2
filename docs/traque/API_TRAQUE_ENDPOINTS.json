@@ -3,7 +3,29 @@
   "version": "1.0.0",
   "base_path": "/traque",
   "auth": "JWT Bearer obligatoire sur tous les endpoints",
+  "error_format": {
+    "note": "Toutes les erreurs retournent { success: false, message: '...', errors: { error: '<code>' } }. Le code d'erreur machine est dans errors.error.",
+    "example": { "success": false, "message": "Consentement GPS requis", "errors": { "error": "gps_consent_required" } }
+  },
   "endpoints": [
+    {
+      "method": "POST",
+      "path": "/users/register",
+      "description": "Enregistrement utilisateur — champ birthdate optionnel mais obligatoire pour jouer à Traque.",
+      "auth": "aucune",
+      "request": {
+        "name": "string (requis)",
+        "email": "string (requis)",
+        "password": "string (requis)",
+        "birthdate": "YYYY-MM-DD (optionnel — requis pour Traque)"
+      },
+      "response_201": { "user_id": 42 },
+      "errors": {
+        "422_age": { "error": "age_restriction", "message": "Vous devez avoir 16 ans ou plus." },
+        "422_format": "Format birthdate invalide (attendu YYYY-MM-DD)",
+        "409": "Email déjà utilisé"
+      }
+    },
     {
       "method": "GET",
       "path": "/traque/monsters/nearby",
@@ -17,9 +39,13 @@
       "headers": {
         "X-Player-Level": "int (1–20) — niveau courant du joueur, fallback 1 si absent"
       },
+      "notes": [
+        "Monstres is_alive=0 exclus.",
+        "Scaling appliqué selon X-Player-Level : level_eff = level_base * (player_level / level_base) arrondi."
+      ],
       "response_200": [
         {
-          "id": 12,
+          "id": 2,
           "name": "Loup-garou",
           "asset_key": "werewolf",
           "level": 7,
@@ -38,20 +64,21 @@
       "errors": {
         "400": "lat ou lng manquant/invalide",
         "401": "JWT absent ou expiré",
-        "422": "radius hors bornes"
+        "422": "radius hors bornes (max 2000)"
       }
     },
     {
       "method": "POST",
       "path": "/traque/monsters/{id}/respawn",
-      "description": "Marque le monstre comme mort et fixe respawn_at = NOW() + 2 heures.",
+      "description": "Marque le monstre comme mort et fixe respawn_at = NOW() + 6 heures.",
       "auth": "JWT Bearer",
       "response_200": {
-        "id": 12,
+        "id": 2,
         "is_alive": false,
-        "respawn_at": "2026-06-05T20:00:00"
+        "respawn_at": "2026-06-05T23:45:00"
       },
       "errors": {
+        "401": "JWT absent ou expiré",
         "404": "Monstre introuvable"
       }
     },
@@ -60,15 +87,29 @@
       "path": "/traque/combat/start",
       "description": "Initialise une session de combat contre un monstre.",
       "auth": "JWT Bearer",
-      "request": { "monster_id": 12 },
+      "request": { "monster_id": 2 },
       "response_201": {
         "session_id": 99,
-        "monster": { "id": 12, "name": "Loup-garou", "level": 7, "hp_current": 84, "hp_max": 84, "ac": 14, "damage_dice": "2d6+2" },
-        "player": { "hp_current": 32, "hp_max": 42, "ac": 13, "stat_for": 14, "stat_dex": 12, "stat_con": 13 }
+        "monster": {
+          "id": 2, "name": "Loup-garou", "level": 7,
+          "hp_current": 84, "hp_max": 84, "ac": 14, "damage_dice": "2d6+2"
+        },
+        "player": {
+          "hp_current": 32, "hp_max": 42, "ac": 13,
+          "stat_for": 14, "stat_dex": 12, "stat_con": 13
+        }
       },
       "errors": {
-        "404": "Monstre introuvable / personnage introuvable",
-        "409": "Monstre mort ou session déjà active"
+        "400": "monster_id manquant",
+        "401": "JWT absent ou expiré",
+        "404_monster": "Monstre introuvable",
+        "404_player": { "error": "player_not_found", "note": "Le joueur n'a pas encore créé de personnage." },
+        "409_dead": { "error": "monster_dead", "note": "Le monstre est mort, attendre son respawn." },
+        "409_active": {
+          "error": "session_already_active",
+          "note": "Une session est déjà ouverte. Le session_id est retourné pour reconnexion.",
+          "data": { "session_id": 99 }
+        }
       }
     },
     {
@@ -76,36 +117,212 @@
       "path": "/traque/combat/attack",
       "description": "Le client envoie le résultat de son jet ; CMEM2 valide, applique dégâts et calcule contre-attaque.",
       "auth": "JWT Bearer",
-      "request": { "session_id": 99, "attack_roll": 17, "damage_roll": 9, "stat_mod": 2 },
+      "request": {
+        "session_id": 99,
+        "attack_roll": 17,
+        "damage_roll": 9,
+        "stat_mod": 2
+      },
       "response_200": {
         "hit": true,
         "damage_dealt": 9,
         "monster_hp_current": 75,
         "monster_dead": false,
-        "counter_attack": { "hit": true, "attack_roll": 14, "damage_dealt": 8, "player_hp_current": 24 },
+        "counter_attack": {
+          "hit": true,
+          "attack_roll": 14,
+          "damage_dealt": 8,
+          "player_hp_current": 24
+        },
         "player_dead": false,
-        "log": [],
+        "log": [
+          { "actor": "player", "action": "attack", "roll": 17, "result": 9, "text": "Vous touchez Loup-garou pour 9 dégâts." },
+          { "actor": "monster", "action": "attack", "roll": 14, "result": 8, "text": "Loup-garou vous attaque pour 8 dégâts." }
+        ],
         "xp_earned": 0,
         "new_achievements": null,
         "new_level": null
       },
+      "response_200_victory": {
+        "note": "Quand monster_dead=true : counter_attack=null, xp_earned > 0, new_achievements tableau ou null, new_level int ou null."
+      },
+      "response_200_player_dead": {
+        "note": "Quand player_dead=true : HP restaurés à 30% de hp_max, session status=defeat."
+      },
       "errors": {
-        "404": "Session introuvable",
-        "409": "Session déjà terminée",
-        "422": "attack_roll hors [1,20] ou damage_roll < 0"
+        "400": "session_id, attack_roll ou damage_roll manquant",
+        "401": "JWT absent ou expiré",
+        "404": "Session introuvable ou appartient à un autre joueur",
+        "409": "Session déjà terminée (status != active)",
+        "422_roll": "attack_roll hors [1,20]",
+        "422_damage": "damage_roll < 0"
       }
     },
     {
       "method": "POST",
       "path": "/traque/combat/flee",
-      "description": "Tentative de fuite. Succès si dex_roll + dex_mod >= 10.",
+      "description": "Tentative de fuite. Succès si dex_roll + floor((stat_dex-10)/2) >= 10.",
       "auth": "JWT Bearer",
       "request": { "session_id": 99, "dex_roll": 14, "stat_dex": 12 },
-      "response_200_success": { "fled": true, "session_status": "fled", "log": "Vous prenez la fuite avec succès." },
-      "response_200_fail": { "fled": false, "counter_attack": {}, "log": "La fuite échoue." },
+      "response_200_success": {
+        "fled": true,
+        "session_status": "fled",
+        "log": "Vous prenez la fuite avec succès."
+      },
+      "response_200_fail": {
+        "fled": false,
+        "counter_attack": {
+          "hit": true,
+          "attack_roll": 11,
+          "damage_dealt": 5,
+          "player_hp_current": 18
+        },
+        "log": "La fuite échoue. Loup-garou vous attaque."
+      },
       "errors": {
-        "404": "Session introuvable",
+        "400": "session_id ou dex_roll manquant",
+        "401": "JWT absent ou expiré",
+        "404": "Session introuvable ou appartient à un autre joueur",
         "409": "Session déjà terminée"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/traque/players/create",
+      "description": "Crée le personnage du joueur connecté (une seule fois). Les validations sont appliquées avant le check doublon.",
+      "auth": "JWT Bearer",
+      "request": {
+        "class": "warrior | mage | ranger | cleric | rogue",
+        "race": "human | elf | dwarf | half_orc",
+        "gps_consent": true,
+        "stat_distribution": {
+          "stat_for": 10, "stat_dex": 14, "stat_con": 11,
+          "stat_int": 10, "stat_sag": 11, "stat_cha": 10,
+          "note": "Somme des deltas depuis 10 = exactement 6. Chaque stat 10–18."
+        }
+      },
+      "race_bonuses": {
+        "elf": "stat_dex += 1",
+        "dwarf": "stat_con += 1",
+        "half_orc": "stat_for += 1",
+        "human": "skill_points_available += 1 au niveau 1"
+      },
+      "response_201": {
+        "player_id": 42,
+        "class": "ranger",
+        "race": "elf",
+        "level": 1,
+        "xp": 0,
+        "hp_max": 11,
+        "hp_current": 11,
+        "stat_for": 10,
+        "stat_dex": 15,
+        "stat_con": 11,
+        "stat_int": 10,
+        "stat_sag": 11,
+        "stat_cha": 10,
+        "skill_points_available": 0,
+        "gems": 0,
+        "location_visibility": "friends",
+        "pvp_enabled": false,
+        "gps_consent": true
+      },
+      "errors": {
+        "401": "JWT absent ou expiré",
+        "409": { "error": "character_exists", "note": "Personnage déjà existant pour ce joueur." },
+        "422_gps": { "error": "gps_consent_required" },
+        "422_stats": { "error": "invalid_stat_distribution", "expected_delta": 6 },
+        "422_class": "Classe invalide",
+        "422_race": "Race invalide"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/traque/players/me",
+      "description": "Profil complet du joueur connecté.",
+      "auth": "JWT Bearer",
+      "response_200": {
+        "player_id": 42,
+        "email": "joueur@exemple.com",
+        "class": "ranger",
+        "race": "elf",
+        "level": 3,
+        "xp": 1200,
+        "xp_next_level": 2100,
+        "hp_current": 24,
+        "hp_max": 30,
+        "stat_for": 10,
+        "stat_dex": 15,
+        "stat_con": 11,
+        "stat_int": 10,
+        "stat_sag": 11,
+        "stat_cha": 10,
+        "skill_points_available": 1,
+        "gems": 50,
+        "location_visibility": "friends",
+        "pvp_enabled": false,
+        "gps_consent": true
+      },
+      "errors": {
+        "401": "JWT absent ou expiré",
+        "404": "Personnage introuvable (joueur n'a pas encore appelé /players/create)"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/traque/players/me/levelup",
+      "description": "Monte de niveau si XP suffisant. Appelé automatiquement après victoire au combat, ou manuellement.",
+      "auth": "JWT Bearer",
+      "response_200_leveled": {
+        "new_level": 4,
+        "hp_max": 37,
+        "hp_gained": 7,
+        "skill_points_available": 2,
+        "new_achievements": ["level_5"]
+      },
+      "response_200_no_level": {
+        "already_max": true,
+        "note": "XP insuffisant pour le prochain niveau, ou niveau 20 atteint."
+      },
+      "errors": {
+        "401": "JWT absent ou expiré",
+        "404": "Personnage introuvable"
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/traque/players/me/settings",
+      "description": "Modifie les préférences du personnage. Retourne le profil complet mis à jour.",
+      "auth": "JWT Bearer",
+      "request": {
+        "location_visibility": "all | group | friends (optionnel)",
+        "pvp_enabled": "boolean (optionnel)"
+      },
+      "response_200": {
+        "note": "Retourne le même objet que GET /traque/players/me avec les valeurs mises à jour.",
+        "player_id": 42,
+        "location_visibility": "group",
+        "pvp_enabled": true
+      },
+      "errors": {
+        "401": "JWT absent ou expiré",
+        "404": "Personnage introuvable",
+        "422": "location_visibility invalide (attendu: all | group | friends)"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/traque/players/me/push-token",
+      "description": "Enregistre ou met à jour le token FCM pour notifications push (A3).",
+      "auth": "JWT Bearer",
+      "request": {
+        "fcm_token": "string (requis)",
+        "device_id": "string (optionnel)"
+      },
+      "response_200": { "registered": true },
+      "errors": {
+        "400": "fcm_token manquant",
+        "401": "JWT absent ou expiré"
       }
     },
     {
@@ -114,8 +331,18 @@
       "description": "50 dernières entrées du journal du joueur (A1).",
       "auth": "JWT Bearer",
       "response_200": [
-        { "id": 201, "monster_name": "Loup-garou", "monster_level": 7, "outcome": "victory", "xp_earned": 210, "occurred_at": "2026-06-05T17:45:00" }
-      ]
+        {
+          "id": 201,
+          "monster_name": "Loup-garou",
+          "monster_level": 7,
+          "outcome": "victory | defeat | fled",
+          "xp_earned": 210,
+          "occurred_at": "2026-06-05T17:45:00"
+        }
+      ],
+      "errors": {
+        "401": "JWT absent ou expiré"
+      }
     },
     {
       "method": "GET",
@@ -123,54 +350,37 @@
       "description": "Tous les achievements avec statut débloqué/verrouillé (A2).",
       "auth": "JWT Bearer",
       "response_200": [
-        { "slug": "first_blood", "title_fr": "Premier sang", "description_fr": "...", "icon_key": "sword_red", "unlocked": true, "unlocked_at": "2026-06-05T17:45:00" }
-      ]
-    },
-    {
-      "method": "POST",
-      "path": "/traque/players/create",
-      "description": "Crée le personnage du joueur connecté (une seule fois).",
-      "auth": "JWT Bearer",
-      "request": {
-        "class": "ranger",
-        "race": "elf",
-        "gps_consent": true,
-        "stat_distribution": { "stat_for": 10, "stat_dex": 14, "stat_con": 11, "stat_int": 12, "stat_sag": 13, "stat_cha": 10 }
-      },
-      "response_201": { "player_id": 42, "class": "ranger", "race": "elf", "level": 1, "xp": 0, "hp_max": 11, "hp_current": 11 },
+        {
+          "slug": "first_blood",
+          "title_fr": "Premier sang",
+          "description_fr": "Tuer un monstre pour la première fois.",
+          "icon_key": "sword_red",
+          "unlocked": true,
+          "unlocked_at": "2026-06-05T17:45:00"
+        }
+      ],
       "errors": {
-        "409": "Personnage déjà existant",
-        "422": "gps_consent false / distribution stats invalide / classe ou race invalide"
+        "401": "JWT absent ou expiré"
       }
     },
     {
       "method": "GET",
-      "path": "/traque/players/me",
-      "description": "Profil complet du joueur connecté.",
+      "path": "/traque/players/me/bestiary",
+      "description": "Monstres vaincus avec lore débloqué (A8). Seuls les monstres avec kills >= 1 sont retournés.",
       "auth": "JWT Bearer",
-      "response_200": { "player_id": 42, "email": "...", "class": "ranger", "race": "elf", "level": 3, "xp": 1200, "xp_next_level": 2100 }
-    },
-    {
-      "method": "POST",
-      "path": "/traque/players/me/levelup",
-      "description": "Monte de niveau si XP suffisant.",
-      "auth": "JWT Bearer",
-      "response_200": { "new_level": 4, "hp_max": 37, "hp_gained": 7, "skill_points_available": 2, "new_achievements": null }
-    },
-    {
-      "method": "PUT",
-      "path": "/traque/players/me/settings",
-      "description": "Modifie location_visibility et pvp_enabled.",
-      "auth": "JWT Bearer",
-      "request": { "location_visibility": "group", "pvp_enabled": true }
-    },
-    {
-      "method": "POST",
-      "path": "/traque/players/me/push-token",
-      "description": "Enregistre ou met à jour le token FCM (A3).",
-      "auth": "JWT Bearer",
-      "request": { "fcm_token": "abc123...", "device_id": "android-uuid-xyz" },
-      "response_200": { "registered": true }
+      "response_200": [
+        {
+          "monster_id": 2,
+          "name": "Loup-garou",
+          "asset_key": "werewolf",
+          "lore": "Créature nocturne issue des forêts maudites...",
+          "kills": 3,
+          "first_kill_at": "2026-06-05T17:45:00"
+        }
+      ],
+      "errors": {
+        "401": "JWT absent ou expiré"
+      }
     },
     {
       "method": "GET",
@@ -178,28 +388,24 @@
       "description": "Classement par XP (A7). Types : global, biome, class.",
       "auth": "JWT Bearer",
       "query_params": {
-        "type": "global | biome | class",
-        "value": "valeur du filtre (ex: forest, ranger)",
-        "limit": "int (défaut 20, max 100)"
+        "type": "global | biome | class (requis)",
+        "value": "valeur du filtre — requis si type=biome ou class (ex: forest, ranger)",
+        "limit": "int (optionnel, défaut 20, max 100)"
       },
       "response_200": [
-        { "rank": 1, "player_id": 42, "display_name": "jrobitaille04", "level": 8, "xp": 15200, "class": "ranger" }
-      ]
-    },
-    {
-      "method": "GET",
-      "path": "/traque/players/me/bestiary",
-      "description": "Monstres vaincus avec lore débloqué (A8).",
-      "auth": "JWT Bearer",
-      "response_200": [
-        { "monster_id": 12, "name": "Loup-garou", "asset_key": "werewolf", "lore": "...", "kills": 3, "first_kill_at": "2026-06-05T17:45:00" }
-      ]
+        {
+          "rank": 1,
+          "player_id": 42,
+          "display_name": "jrobitaille04",
+          "level": 8,
+          "xp": 15200,
+          "class": "ranger"
+        }
+      ],
+      "errors": {
+        "401": "JWT absent ou expiré",
+        "422": "type invalide (attendu: global | biome | class)"
+      }
     }
-  ],
-  "register_birthdate": {
-    "endpoint": "POST /users/register",
-    "new_field": "birthdate (YYYY-MM-DD, optionnel mais obligatoire pour jeu Traque)",
-    "rule": "age = floor(days_since_birthdate / 365.25) — refus 422 si < 16",
-    "error": { "code": 422, "error": "age_restriction", "message": "Vous devez avoir 16 ans ou plus." }
-  }
+  ]
 }
