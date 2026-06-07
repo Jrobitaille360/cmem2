@@ -288,10 +288,20 @@ class TraqueRouteHandler extends BaseRouteHandler
 
         $input = Response::getRequestParams();
 
-        $class      = $input['class'] ?? '';
-        $race       = $input['race']  ?? '';
-        $gpsConsent = $input['gps_consent'] ?? false;
-        $dist       = $input['stat_distribution'] ?? [];
+        $characterName = trim($input['character_name'] ?? '');
+        $class         = $input['class'] ?? '';
+        $race          = $input['race']  ?? '';
+        $gpsConsent    = $input['gps_consent'] ?? false;
+        $dist          = $input['stat_distribution'] ?? [];
+
+        if ($characterName === '') {
+            Response::error('character_name requis', ['error' => 'character_name_required'], 422);
+            return;
+        }
+        if (mb_strlen($characterName) > 50) {
+            Response::error('character_name doit faire 50 caractères max', ['error' => 'character_name_required'], 422);
+            return;
+        }
 
         $validClasses = ['warrior','mage','ranger','cleric','rogue'];
         $validRaces   = ['human','elf','dwarf','half_orc'];
@@ -341,6 +351,7 @@ class TraqueRouteHandler extends BaseRouteHandler
 
         $data = array_merge($dist, [
             'player_id'              => $playerId,
+            'character_name'         => $characterName,
             'class'                  => $class,
             'race'                   => $race,
             'hp_max'                 => $hpMax,
@@ -525,6 +536,7 @@ class TraqueRouteHandler extends BaseRouteHandler
 
         return [
             'player_id'               => (int) $p['player_id'],
+            'character_name'          => $p['character_name'],
             'email'                   => $email,
             'class'                   => $p['class'],
             'race'                    => $p['race'],

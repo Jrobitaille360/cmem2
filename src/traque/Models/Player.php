@@ -58,16 +58,17 @@ class Player
     {
         $stmt = $this->db->prepare("
             INSERT INTO traque_players
-              (player_id, class, race, level, xp, hp_max, hp_current,
+              (player_id, character_name, class, race, level, xp, hp_max, hp_current,
                stat_for, stat_dex, stat_con, stat_int, stat_sag, stat_cha,
                skill_points_available, gems, gps_consent)
             VALUES
-              (:pid, :class, :race, 1, 0, :hpmax, :hpcur,
+              (:pid, :cname, :class, :race, 1, 0, :hpmax, :hpcur,
                :for, :dex, :con, :int, :sag, :cha,
                :sp, 0, :gps)
         ");
         return $stmt->execute([
             ':pid'   => $data['player_id'],
+            ':cname' => $data['character_name'],
             ':class' => $data['class'],
             ':race'  => $data['race'],
             ':hpmax' => $data['hp_max'],

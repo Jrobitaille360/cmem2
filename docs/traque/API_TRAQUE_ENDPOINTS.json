@@ -192,6 +192,7 @@
       "description": "Crée le personnage du joueur connecté (une seule fois). Les validations sont appliquées avant le check doublon.",
       "auth": "JWT Bearer",
       "request": {
+        "character_name": "string (requis, max 50 chars)",
         "class": "warrior | mage | ranger | cleric | rogue",
         "race": "human | elf | dwarf | half_orc",
         "gps_consent": true,
@@ -209,6 +210,7 @@
       },
       "response_201": {
         "player_id": 42,
+        "character_name": "Thorin le Sombre",
         "class": "ranger",
         "race": "elf",
         "level": 1,
@@ -232,6 +234,7 @@
         "409": { "error": "character_exists", "note": "Personnage déjà existant pour ce joueur." },
         "422_gps": { "error": "gps_consent_required" },
         "422_stats": { "error": "invalid_stat_distribution", "expected_delta": 6 },
+        "422_character_name": { "error": "character_name_required" },
         "422_class": "Classe invalide",
         "422_race": "Race invalide"
       }
@@ -243,6 +246,7 @@
       "auth": "JWT Bearer",
       "response_200": {
         "player_id": 42,
+        "character_name": "Thorin le Sombre",
         "email": "joueur@exemple.com",
         "class": "ranger",
         "race": "elf",

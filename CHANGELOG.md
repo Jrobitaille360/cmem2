@@ -7,6 +7,17 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-06-07]
+
+### Ajout — `character_name` dans le module `traque`
+
+- **`src/traque/Models/Player.php`** — colonne `character_name` ajoutée dans `INSERT` de `create()`
+- **`src/traque/Routing/TraqueRouteHandler.php`** — validation `character_name` (requis, max 50 chars, 422 `character_name_required`) dans `playerCreate()` ; retourné dans `formatPlayer()`
+- **`docs/20260607_traque_character_name.sql`** — migration `ALTER TABLE traque_players ADD character_name VARCHAR(50) NOT NULL DEFAULT ''`
+- **`docs/traque/API_TRAQUE_ENDPOINTS.json`** — `character_name` ajouté dans requête et réponse de `POST /traque/players/create` et `GET /traque/players/me`
+
+---
+
 ## [Unreleased 2026-06-05]
 
 ### Ajout — Module `traque` (gamification géolocalisée)
