@@ -46,6 +46,13 @@ class Player
         $this->db = \Database::getInstance()->getConnection();
     }
 
+    public function isCharacterNameTaken(string $name): bool
+    {
+        $stmt = $this->db->prepare('SELECT 1 FROM traque_players WHERE character_name = :name LIMIT 1');
+        $stmt->execute([':name' => $name]);
+        return $stmt->fetchColumn() !== false;
+    }
+
     public function findById(int $playerId): ?array
     {
         $stmt = $this->db->prepare('SELECT * FROM traque_players WHERE player_id = :id');

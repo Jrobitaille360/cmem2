@@ -98,6 +98,10 @@ class TraqueRouteHandler extends BaseRouteHandler
             ($s1 === 'players' && $s2 === 'me' && $s3 === 'bestiary' && $method === 'GET') =>
                 $this->playerBestiary($user),
 
+            // GET /traque/players/check-name
+            ($s1 === 'players' && $s2 === 'check-name' && $method === 'GET') =>
+                $this->playerCheckName($user),
+
             // POST /traque/players/create
             ($s1 === 'players' && $s2 === 'create' && $method === 'POST') =>
                 $this->playerCreate($user),
@@ -336,6 +340,11 @@ class TraqueRouteHandler extends BaseRouteHandler
             return;
         }
 
+        if ($model->isCharacterNameTaken($characterName)) {
+            Response::error('Nom de personnage déjà utilisé.', ['error' => 'character_name_taken'], 422);
+            return;
+        }
+
         if ($model->findById($playerId)) {
             Response::error('Personnage déjà existant', ['error' => 'character_exists'], 409);
             return;
@@ -522,6 +531,17 @@ class TraqueRouteHandler extends BaseRouteHandler
         ], $rows);
 
         Response::success('leaderboard', $result);
+    }
+
+    private function playerCheckName(array $user): void
+    {
+        $name = trim($_GET['name'] ?? '');
+        if ($name === '') {
+            Response::error('Paramètre name requis', null, 400);
+            return;
+        }
+        $model = new Player();
+        Response::success('check_name', ['available' => !$model->isCharacterNameTaken($name)]);
     }
 
     // =========================================================================
