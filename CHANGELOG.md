@@ -9,6 +9,10 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased 2026-06-07]
 
+### Fix — leaderboard `traque` : `character_name` au lieu du courriel
+
+- **`src/traque/Models/Player.php`** — `getLeaderboard` : `display_name` utilise désormais `tp.character_name` dans les 3 requêtes (`class`, `biome`, `global`) ; JOIN `users` retiré des requêtes `biome` et `global` où il était inutile
+
 ### Ajout — `character_name` dans le module `traque`
 
 - **`src/traque/Models/Player.php`** — colonne `character_name` ajoutée dans `INSERT` de `create()`

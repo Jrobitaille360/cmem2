@@ -203,10 +203,9 @@ class Player
         if ($type === 'class' && $value) {
             $stmt = $this->db->prepare("
                 SELECT ROW_NUMBER() OVER (ORDER BY (tp.level * 10000 + tp.xp) DESC) AS `rank`,
-                       tp.player_id, u.name AS display_name,
+                       tp.player_id, tp.character_name AS display_name,
                        tp.level, tp.xp, tp.class
                 FROM traque_players tp
-                JOIN users u ON u.id = tp.player_id
                 WHERE tp.class = :val
                 ORDER BY (tp.level * 10000 + tp.xp) DESC
                 LIMIT :lim
@@ -221,14 +220,13 @@ class Player
             $stmt = $this->db->prepare("
                 SELECT ROW_NUMBER() OVER (ORDER BY SUM(j.xp_earned) DESC) AS `rank`,
                        tp.player_id,
-                       SUBSTRING_INDEX(u.email, '@', 1) AS display_name,
+                       tp.character_name AS display_name,
                        tp.level, SUM(j.xp_earned) AS xp, tp.class
                 FROM traque_players tp
-                JOIN users u ON u.id = tp.player_id
                 JOIN traque_player_journal j ON j.player_id = tp.player_id
                 JOIN monsters m ON m.id = j.monster_id
                 WHERE m.biome = :val AND j.outcome = 'victory'
-                GROUP BY tp.player_id, u.email, tp.level, tp.class
+                GROUP BY tp.player_id, tp.character_name, tp.level, tp.class
                 ORDER BY xp DESC
                 LIMIT :lim
             ");
@@ -242,10 +240,9 @@ class Player
         $stmt = $this->db->prepare("
             SELECT ROW_NUMBER() OVER (ORDER BY (tp.level * 10000 + tp.xp) DESC) AS `rank`,
                    tp.player_id,
-                   SUBSTRING_INDEX(u.email, '@', 1) AS display_name,
+                   tp.character_name AS display_name,
                    tp.level, tp.xp, tp.class
             FROM traque_players tp
-            JOIN users u ON u.id = tp.player_id
             ORDER BY (tp.level * 10000 + tp.xp) DESC
             LIMIT :lim
         ");
