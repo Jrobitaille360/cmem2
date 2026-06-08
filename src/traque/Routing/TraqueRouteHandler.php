@@ -340,13 +340,13 @@ class TraqueRouteHandler extends BaseRouteHandler
             return;
         }
 
-        if ($model->isCharacterNameTaken($characterName)) {
-            Response::error('Nom de personnage déjà utilisé.', ['error' => 'character_name_taken'], 422);
+        if ($model->findById($playerId)) {
+            Response::error('Personnage déjà existant', ['error' => 'character_exists'], 409);
             return;
         }
 
-        if ($model->findById($playerId)) {
-            Response::error('Personnage déjà existant', ['error' => 'character_exists'], 409);
+        if ($model->isCharacterNameTaken($characterName)) {
+            Response::error('Nom de personnage déjà utilisé.', ['error' => 'character_name_taken'], 422);
             return;
         }
 
