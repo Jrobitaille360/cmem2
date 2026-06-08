@@ -9,6 +9,12 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased 2026-06-07]
 
+### Ajout — `character_name` unique dans `traque`
+
+- **`src/traque/Models/Player.php`** — méthode `isCharacterNameTaken(string $name): bool`
+- **`src/traque/Routing/TraqueRouteHandler.php`** — `playerCreate()` retourne 422 `character_name_taken` si nom pris ; nouvelle route `GET /traque/players/check-name?name=X` → `{ "available": true/false }`
+- **`docs/20260607_traque_character_name_unique.sql`** — migration `ALTER TABLE traque_players ADD CONSTRAINT uq_traque_players_character_name UNIQUE (character_name)` (appliquée sur dev)
+
 ### Fix — leaderboard `traque` : `character_name` au lieu du courriel
 
 - **`src/traque/Models/Player.php`** — `getLeaderboard` : `display_name` utilise désormais `tp.character_name` dans les 3 requêtes (`class`, `biome`, `global`) ; JOIN `users` retiré des requêtes `biome` et `global` où il était inutile
