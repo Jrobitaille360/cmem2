@@ -7,6 +7,17 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-06-12]
+
+### Ajout — Phase 1.4 : repos hors combat + régénération passive (`traque`)
+
+- **`src/traque/Models/Player.php`** — `rest(playerId, type)` : repos actif (50 % HP manquants, cooldown 30 min) ou complet (100 % HP, cooldown 4 h) ; `applyPassiveRegen(playerId)` : 1 HP / 5 min depuis `last_combat_at` (calcul SQL timezone-safe) ; `updateLastCombatAt(playerId)`
+- **`src/traque/Routing/TraqueRouteHandler.php`** — route `POST /traque/players/me/rest?type=active|full` ; `playerMe()` applique la régén passive avant retour ; `formatPlayer()` expose `rest_available_at` (ISO 8601 UTC, nullable)
+- **`src/traque/Services/CombatService.php`** — `last_combat_at` mis à jour après victoire (`attack`) et fuite réussie (`flee`)
+- **`docs/20260612_traque_rest.sql`** — migration `ALTER TABLE traque_players ADD COLUMN rest_available_at DATETIME NULL, ADD COLUMN last_combat_at DATETIME NULL`
+
+---
+
 ## [Unreleased 2026-06-07]
 
 ### Ajout — `character_name` unique dans `traque`
