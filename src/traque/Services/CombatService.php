@@ -141,6 +141,9 @@ class CombatService
             );
             $this->playerModel->upsertBestiary($playerId, (int) $monster['id']);
 
+            // Régén passive — marquer fin de combat
+            $this->playerModel->updateLastCombatAt($playerId);
+
             // Achievements
             $newAchievements = $this->achievementService->checkAfterVictory($playerId, (int) $monster['id'], (int) $updatedPlayer['level']);
 
@@ -254,6 +257,7 @@ class CombatService
                 $monster['name'], (int) $session['monster_level'], 'fled', 0
             );
             $this->sessionModel->addLog($sessionId, $turn, 'player', 'flee', $dexRoll, $dexMod, null, 'Vous prenez la fuite avec succès.');
+            $this->playerModel->updateLastCombatAt($playerId);
             return ['fled' => true, 'session_status' => 'fled', 'log' => 'Vous prenez la fuite avec succès.'];
         }
 

@@ -97,6 +97,70 @@ class Player
         return $stmt->execute([':hp' => max(0, $hpCurrent), ':id' => $playerId]);
     }
 
+    public function rest(int $playerId, string $type): array
+    {
+        $player = $this->findById($playerId);
+        if (!$player) return ['error' => 'player_not_found', 'code' => 404];
+
+        if (!empty($player['rest_available_at'])) {
+            $until = strtotime($player['rest_available_at']);
+            if ($until > time()) {
+                return [
+                    'error'             => 'rest_cooldown',
+                    'code'              => 409,
+                    'rest_available_at' => gmdate('Y-m-d\TH:i:s\Z', $until),
+                ];
+            }
+        }
+
+        $hpMax     = (int) $player['hp_max'];
+        $hpCurrent = (int) $player['hp_current'];
+
+        if ($type === 'full') {
+            $newHp = $hpMax;
+            $stmt  = $this->db->prepare("
+                UPDATE traque_players
+                SET hp_current = :hp, rest_available_at = DATE_ADD(NOW(), INTERVAL 4 HOUR)
+                WHERE player_id = :pid
+            ");
+        } else {
+            $missing = $hpMax - $hpCurrent;
+            $heal    = max(1, (int) floor($missing * 0.5));
+            $newHp   = min($hpMax, $hpCurrent + $heal);
+            $stmt    = $this->db->prepare("
+                UPDATE traque_players
+                SET hp_current = :hp, rest_available_at = DATE_ADD(NOW(), INTERVAL 30 MINUTE)
+                WHERE player_id = :pid
+            ");
+        }
+
+        $stmt->execute([':hp' => $newHp, ':pid' => $playerId]);
+        return ['player' => $this->findById($playerId)];
+    }
+
+    public function applyPassiveRegen(int $playerId): void
+    {
+        // Calcul entièrement en SQL pour éviter tout décalage timezone PHP/MySQL
+        $stmt = $this->db->prepare("
+            UPDATE traque_players
+            SET hp_current     = LEAST(hp_max,
+                                       hp_current + FLOOR(TIMESTAMPDIFF(MINUTE, last_combat_at, NOW()) / 5)),
+                last_combat_at = DATE_ADD(last_combat_at,
+                                          INTERVAL FLOOR(TIMESTAMPDIFF(MINUTE, last_combat_at, NOW()) / 5) * 5 MINUTE)
+            WHERE player_id    = :pid
+              AND last_combat_at IS NOT NULL
+              AND hp_current    < hp_max
+              AND FLOOR(TIMESTAMPDIFF(MINUTE, last_combat_at, NOW()) / 5) > 0
+        ");
+        $stmt->execute([':pid' => $playerId]);
+    }
+
+    public function updateLastCombatAt(int $playerId): void
+    {
+        $stmt = $this->db->prepare('UPDATE traque_players SET last_combat_at = NOW() WHERE player_id = :pid');
+        $stmt->execute([':pid' => $playerId]);
+    }
+
     public function addXp(int $playerId, int $xp): array
     {
         $stmt = $this->db->prepare('UPDATE traque_players SET xp = xp + :xp WHERE player_id = :id');

@@ -82,6 +82,10 @@ class TraqueRouteHandler extends BaseRouteHandler
             ($s1 === 'players' && $s2 === 'me' && $s3 === 'achievements' && $method === 'GET') =>
                 $this->playerAchievements($user),
 
+            // POST /traque/players/me/rest
+            ($s1 === 'players' && $s2 === 'me' && $s3 === 'rest' && $method === 'POST') =>
+                $this->playerRest($user),
+
             // POST /traque/players/me/levelup
             ($s1 === 'players' && $s2 === 'me' && $s3 === 'levelup' && $method === 'POST') =>
                 $this->playerLevelUp($user),
@@ -381,7 +385,10 @@ class TraqueRouteHandler extends BaseRouteHandler
     {
         $playerId = (int) $user['user_id'];
         $model    = new Player();
-        $player   = $model->findById($playerId);
+
+        $model->applyPassiveRegen($playerId);
+
+        $player = $model->findById($playerId);
 
         if (!$player) {
             Response::error('Personnage introuvable', null, 404);
@@ -393,6 +400,35 @@ class TraqueRouteHandler extends BaseRouteHandler
         $userData = $userStmt->fetch(\PDO::FETCH_ASSOC);
 
         Response::success('player_profile', $this->formatPlayer($player, $userData['email'] ?? null));
+    }
+
+    private function playerRest(array $user): void
+    {
+        $playerId = (int) $user['user_id'];
+        $type     = $_GET['type'] ?? 'active';
+        $model    = new Player();
+
+        if (!$model->findById($playerId)) {
+            Response::error('Personnage introuvable', null, 404);
+            return;
+        }
+
+        $result = $model->rest($playerId, $type);
+
+        if (isset($result['error'])) {
+            if ($result['error'] === 'rest_cooldown') {
+                Response::error(
+                    "Repos en cooldown jusqu'à {$result['rest_available_at']}",
+                    ['error' => 'rest_cooldown'],
+                    409
+                );
+                return;
+            }
+            Response::error($result['error'], null, $result['code']);
+            return;
+        }
+
+        Response::success('rest_applied', $this->formatPlayer($result['player'], null));
     }
 
     private function playerLevelUp(array $user): void
@@ -554,6 +590,10 @@ class TraqueRouteHandler extends BaseRouteHandler
         $xp         = (int) $p['xp'];
         $xpNext     = Player::xpNextLevel($level);
 
+        $restAt = !empty($p['rest_available_at'])
+            ? gmdate('Y-m-d\TH:i:s\Z', strtotime($p['rest_available_at']))
+            : null;
+
         return [
             'player_id'               => (int) $p['player_id'],
             'character_name'          => $p['character_name'],
@@ -575,6 +615,7 @@ class TraqueRouteHandler extends BaseRouteHandler
             'gems'                    => (int) $p['gems'],
             'location_visibility'     => $p['location_visibility'],
             'pvp_enabled'             => (bool) $p['pvp_enabled'],
+            'rest_available_at'       => $restAt,
         ];
     }
 }
