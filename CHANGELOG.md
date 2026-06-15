@@ -7,6 +7,18 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-06-15]
+
+### Ajout — Phase 2.1 : détection biome OSM pour monstres (`traque`)
+
+- **`src/traque/Services/OverpassService.php`** (nouveau) — `detect(lat, lng)` : interroge l'API Overpass dans un rayon de 100 m, applique les priorités OSM (`landuse=forest/cemetery/industrial`, `natural=wood/peak/cliff/water`, `waterway=river`, `amenity=place_of_worship`) et retourne l'un des 7 biomes Flutter (`forest|peak|water|cemetery|worship|industrial|urban`). Échec réseau → `urban` (défaut)
+- **`src/traque/Models/Monster.php`** — `respawn()` appelle `OverpassService::detect()` et met à jour `biome` en DB ; `biomeMultiplier` : `'mountain'` renommé `'peak'` (×1,2) pour aligner sur l'enum Flutter
+- **`docs/20260615_traque_biome_osm.sql`** — migration : `ALTER TABLE monsters MODIFY biome ENUM('forest','peak','water','cemetery','worship','industrial','urban')` ; `UPDATE` `mountain` → `peak` (ordre UPDATE avant ALTER pour éviter troncation MySQL)
+- **`docs/traque/API_TRAQUE_ENDPOINTS.json`** — note biome ajoutée sur `GET /traque/monsters/nearby` : valeurs et source OSM documentées
+- **`private/tests/test_traque.php`** — section 3.4 : vérification que chaque biome retourné appartient à l'enum Flutter (régression `mountain` détectée et corrigée)
+
+---
+
 ## [Unreleased 2026-06-12]
 
 ### Ajout — Phase 1.4 : repos hors combat + régénération passive (`traque`)

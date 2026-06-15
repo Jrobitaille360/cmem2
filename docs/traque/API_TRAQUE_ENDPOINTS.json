@@ -41,7 +41,8 @@
       },
       "notes": [
         "Monstres is_alive=0 exclus.",
-        "Scaling appliqué selon X-Player-Level : level_eff = level_base * (player_level / level_base) arrondi."
+        "Scaling appliqué selon X-Player-Level : level_eff = level_base * (player_level / level_base) arrondi.",
+        "biome détecté via Overpass OSM au spawn/respawn. Valeurs possibles : forest | peak | water | cemetery | worship | industrial | urban (défaut)."
       ],
       "response_200": [
         {

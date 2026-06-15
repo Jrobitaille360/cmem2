@@ -3,6 +3,7 @@
 namespace Traque\Models;
 
 use PDO;
+use Traque\Services\OverpassService;
 
 class Monster
 {
@@ -86,15 +87,21 @@ class Monster
 
     /**
      * Remet le monstre vivant (utilisé par cron de respawn).
+     * Re-détecte le biome OSM et le persiste.
      */
     public function respawn(int $id): bool
     {
+        $monster = $this->findById($id);
+        $biome   = $monster
+            ? OverpassService::detect((float) $monster['lat'], (float) $monster['lng'])
+            : 'urban';
+
         $stmt = $this->db->prepare("
             UPDATE monsters
-            SET is_alive = 1, hp_current = hp_max, respawn_at = NULL
+            SET is_alive = 1, hp_current = hp_max, respawn_at = NULL, biome = :biome
             WHERE id = :id
         ");
-        return $stmt->execute([':id' => $id]);
+        return $stmt->execute([':biome' => $biome, ':id' => $id]);
     }
 
     /**
@@ -141,7 +148,7 @@ class Monster
 
     private static function biomeMultiplier(string $biome, ?int $spawnHourStart): float
     {
-        if ($biome === 'mountain') return 1.2;
+        if ($biome === 'peak') return 1.2;
         if ($biome === 'cemetery' && $spawnHourStart !== null) {
             if ($spawnHourStart >= 21 || $spawnHourStart <= 5) return 1.3;
         }
