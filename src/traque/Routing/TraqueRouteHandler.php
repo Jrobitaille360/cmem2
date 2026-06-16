@@ -170,11 +170,14 @@ class TraqueRouteHandler extends BaseRouteHandler
                 'hp_max'        => $scaled['hp_max'],
                 'hp_current'    => $scaled['hp_current'],
                 'ac'            => $scaled['ac'],
-                'damage_dice'   => $m['damage_dice'],
-                'xp_reward'     => $scaled['xp_reward'],
-                'behavior_type' => $m['behavior_type'],
-                'biome'         => $m['biome'],
-                'is_boss'       => (bool) $m['is_boss'],
+                'damage_dice'    => $m['damage_dice'],
+                'xp_reward'      => $scaled['xp_reward'],
+                'behavior_type'  => $m['behavior_type'],
+                'biome'          => $m['biome'],
+                'is_boss'        => (bool) $m['is_boss'],
+                'special_attack' => $m['special_attack'] ?? 'none',
+                'save_dc'        => (int) ($m['save_dc'] ?? 0),
+                'save_stat'      => $m['save_stat'] ?? 'con',
             ];
         }
 
