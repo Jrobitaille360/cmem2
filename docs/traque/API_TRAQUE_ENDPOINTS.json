@@ -59,7 +59,10 @@
           "xp_reward": 210,
           "behavior_type": "elusive",
           "biome": "forest",
-          "is_boss": false
+          "is_boss": false,
+          "special_attack": "none",
+          "save_dc": 0,
+          "save_stat": "con"
         }
       ],
       "errors": {

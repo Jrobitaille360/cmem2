@@ -7,6 +7,17 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-06-16]
+
+### Ajout — Phase 2 : attaques spéciales et jets de sauvegarde (`traque`)
+
+- **`docs/20260616_traque_special_attack.sql`** — migration : `ALTER TABLE monsters ADD COLUMN special_attack ENUM('none','poison','spell')`, `save_dc TINYINT UNSIGNED`, `save_stat ENUM('con','sag')` ; seeds Naga (poison DC 12 CON), Ratman (poison DC 10 CON), Liche (spell DC 14 SAG)
+- **`src/traque/Routing/TraqueRouteHandler.php`** — `GET /traque/monsters/nearby` expose `special_attack`, `save_dc`, `save_stat` sur chaque monstre ; défaut `'none' / 0 / 'con'` si colonnes absentes (rétrocompat)
+- **`docs/traque/API_TRAQUE_ENDPOINTS.json`** — exemple `response_200` de `/traque/monsters/nearby` complété avec les 3 nouveaux champs
+- **`private/tests/test_traque.php`** — section 3.4 : vérif présence et validité de `special_attack` / `save_dc` / `save_stat` sur chaque monstre retourné ; assertions spécifiques Naga/Ratman/Liche
+
+---
+
 ## [Unreleased 2026-06-15]
 
 ### Ajout — Phase 2.1 : détection biome OSM pour monstres (`traque`)
