@@ -57,7 +57,7 @@ class UserManagerController {
                 }
                 $minBirthdate = (new \DateTime())->modify('-16 years');
                 if ($bd > $minBirthdate) {
-                    LogService::warning("Inscription refusée — âge insuffisant", ['age' => $age]);
+                    LogService::warning("Inscription refusée — âge insuffisant", ['birthdate' => $birthdate]);
                     LoggingMiddleware::logExit(422);
                     Response::error('Vous devez avoir 16 ans ou plus.', ['error' => 'age_restriction'], 422);
                     return false;
