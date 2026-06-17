@@ -55,7 +55,8 @@ class UserManagerController {
                     Response::error('Format birthdate invalide (YYYY-MM-DD)', null, 422);
                     return false;
                 }
-                $minBirthdate = (new \DateTime())->modify('-16 years');
+                $bd->setTime(0, 0, 0);
+                $minBirthdate = new \DateTime('today midnight -16 years');
                 if ($bd > $minBirthdate) {
                     LogService::warning("Inscription refusée — âge insuffisant", ['birthdate' => $birthdate]);
                     LoggingMiddleware::logExit(422);
