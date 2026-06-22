@@ -11,7 +11,7 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ### Ajout — Tags pour `quiz_questions` (directive kestyon)
 
-- **`docs/20260622_tags-quiz-questions.sql`** — migration : `ALTER TABLE tags MODIFY table_associate ENUM(…,'quiz_questions')` ; `CREATE TABLE quiz_question_tag_relations (quiz_question_id, tag_id, created_at, deleted_at)` avec FK CASCADE vers `quiz_questions` et `tags`
+- **`docs/20260622_tags-quiz-questions.sql`** — migration : `ALTER TABLE tags MODIFY table_associate ENUM(…,'quiz_questions')` ; `CREATE TABLE quiz_question_tag_relations (quiz_question_id, tag_id, created_at, updated_at, deleted_at)` avec FK CASCADE vers `quiz_questions` et `tags`
 - **`src/auth_groups/Models/Tag.php`** — `getRelationTable()` : case `quiz_questions` → `quiz_question_tag_relations` ; `getItemColumnName()` : case `quiz_questions` → `quiz_question_id` ; nouvelle méthode `findTagsByQuestionIds(array $ids): array` (batch, keyed by question_id)
 - **`src/auth_groups/Controllers/TagController.php`** — `quiz_questions` ajouté aux validators `in:` de `create()`, `update()`, `getOrCreate()`, `associateOrDissociate()` et à `$validTables` de `getMostUsed()`
 - **`src/auth_groups/Routing/RouteHandlers/TagRouteHandler.php`** — `quiz_questions` ajouté à la liste `handleByTableRoute()`
@@ -20,6 +20,11 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 ### Ajout — Upload grand-public dossier `kestyon` + `download_url` (directive kestyon)
 
 - **`src/auth_groups/Controllers/FileController.php`** — exception à la restriction `grand-public` : un utilisateur authentifié (non-admin) peut uploader dans le dossier `kestyon` avec `accessibility: grand-public` ; champ `download_url` ajouté à la réponse d'upload au format `{APP_URL}/files/{id}`
+
+### Fix — `quiz_question_tag_relations` : colonne `updated_at` manquante
+
+- **`docs/20260622_tags-quiz-questions.sql`** — `updated_at timestamp … ON UPDATE current_timestamp()` ajouté au `CREATE TABLE` (aligné sur `file_tag_relations` / `group_tag_relations`)
+- **`docs/20260622_tags-quiz-questions-updated_at.sql`** — migration correctif `ALTER TABLE … ADD COLUMN updated_at` pour environnements déjà migrés
 
 ### Fix — auth : comparaison de date de naissance
 
