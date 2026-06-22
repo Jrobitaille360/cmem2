@@ -92,6 +92,7 @@ class FileController
             $input         = Response::getRequestParams();
             $description   = $input['description'] ?? null;
             $accessibility = $input['accessibility'] ?? 'private';
+            $folderRaw     = trim($input['folder'] ?? '');
 
             if (!in_array($accessibility, ['public', 'private', 'grand-public'])) {
                 LoggingMiddleware::logExit(422);
@@ -99,14 +100,16 @@ class FileController
                 return false;
             }
 
-            if ($accessibility === 'grand-public' && strtolower($role) !== 'administrateur') {
+            if ($accessibility === 'grand-public'
+                && strtolower($role) !== 'administrateur'
+                && $folderRaw !== 'kestyon'
+            ) {
                 LoggingMiddleware::logExit(403);
                 Response::error('Seul un administrateur peut uploader un fichier grand-public', null, 403);
                 return false;
             }
 
             // Validation du paramètre folder (optionnel)
-            $folderRaw = trim($input['folder'] ?? '');
             if ($folderRaw !== '') {
                 if (!$this->validateFolder($folderRaw)) {
                     LoggingMiddleware::logExit(400);
@@ -188,6 +191,7 @@ class FileController
                     'upload_date'   => $fileModel->created_at,
                     'upload_ip'     => $fileModel->upload_ip,
                     'url'           => $fileModel->file_path,
+                    'download_url'  => rtrim(APP_URL, '/') . '/files/' . $fileModel->id,
                     'owner_id'      => $userId,
                 ]
             ];

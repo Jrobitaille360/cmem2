@@ -358,6 +358,8 @@ class Tag extends BaseModel {
                 return 'file_tag_relations';
             case 'groups':
                 return 'group_tag_relations';
+            case 'quiz_questions':
+                return 'quiz_question_tag_relations';
             case 'all':
             default:
                 return null;
@@ -502,9 +504,39 @@ class Tag extends BaseModel {
                 return 'file_id';
             case 'groups':
                 return 'group_id';
+            case 'quiz_questions':
+                return 'quiz_question_id';
             default:
                 throw new \InvalidArgumentException("Table associée non valide: {$tableAssociate}");
         }
+    }
+
+    /** @return array Associe quiz_question_id → [{id, name, color}] */
+    public function findTagsByQuestionIds(array $questionIds): array
+    {
+        if (empty($questionIds)) {
+            return [];
+        }
+        $placeholders = implode(',', array_fill(0, count($questionIds), '?'));
+        $stmt = $this->getDb()->prepare(
+            "SELECT r.quiz_question_id, t.id, t.name, t.color
+             FROM quiz_question_tag_relations r
+             JOIN tags t ON t.id = r.tag_id
+             WHERE r.quiz_question_id IN ($placeholders)
+               AND r.deleted_at IS NULL"
+        );
+        $stmt->execute($questionIds);
+        $rows   = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $result = [];
+        foreach ($rows as $row) {
+            $qid = $row['quiz_question_id'];
+            $result[$qid][] = [
+                'id'    => (int) $row['id'],
+                'name'  => $row['name'],
+                'color' => $row['color'],
+            ];
+        }
+        return $result;
     }
 
     /**

@@ -7,6 +7,26 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-06-22]
+
+### Ajout — Tags pour `quiz_questions` (directive kestyon)
+
+- **`docs/20260622_tags-quiz-questions.sql`** — migration : `ALTER TABLE tags MODIFY table_associate ENUM(…,'quiz_questions')` ; `CREATE TABLE quiz_question_tag_relations (quiz_question_id, tag_id, created_at, deleted_at)` avec FK CASCADE vers `quiz_questions` et `tags`
+- **`src/auth_groups/Models/Tag.php`** — `getRelationTable()` : case `quiz_questions` → `quiz_question_tag_relations` ; `getItemColumnName()` : case `quiz_questions` → `quiz_question_id` ; nouvelle méthode `findTagsByQuestionIds(array $ids): array` (batch, keyed by question_id)
+- **`src/auth_groups/Controllers/TagController.php`** — `quiz_questions` ajouté aux validators `in:` de `create()`, `update()`, `getOrCreate()`, `associateOrDissociate()` et à `$validTables` de `getMostUsed()`
+- **`src/auth_groups/Routing/RouteHandlers/TagRouteHandler.php`** — `quiz_questions` ajouté à la liste `handleByTableRoute()`
+- **`src/quiz/Controllers/QuizController.php`** — `attachQuestionsWithChoices()` charge les tags via `findTagsByQuestionIds()` et les expose sous `tags: [{id, name, color}]` par question dans `GET /quiz/{id}`
+
+### Ajout — Upload grand-public dossier `kestyon` + `download_url` (directive kestyon)
+
+- **`src/auth_groups/Controllers/FileController.php`** — exception à la restriction `grand-public` : un utilisateur authentifié (non-admin) peut uploader dans le dossier `kestyon` avec `accessibility: grand-public` ; champ `download_url` ajouté à la réponse d'upload au format `{APP_URL}/files/{id}`
+
+### Fix — auth : comparaison de date de naissance
+
+- **`src/auth_groups/`** — correction de la comparaison de date de naissance à minuit pour éviter les décalages de fuseau horaire (4 commits)
+
+---
+
 ## [Unreleased 2026-06-16]
 
 ### Ajout — Phase 2 : attaques spéciales et jets de sauvegarde (`traque`)

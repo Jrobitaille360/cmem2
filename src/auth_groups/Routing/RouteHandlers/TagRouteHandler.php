@@ -92,7 +92,7 @@ class TagRouteHandler extends BaseRouteHandler
     }
     
     private function handleByTableRoute($tableAssociate, array $user): void {
-        if (!in_array($tableAssociate, ['groups', 'files', 'all'])) {
+        if (!in_array($tableAssociate, ['groups', 'files', 'all', 'quiz_questions'])) {
             Response::error('Table associée invalide', null, 400);
             return;
         }

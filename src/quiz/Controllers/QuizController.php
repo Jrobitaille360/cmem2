@@ -4,6 +4,7 @@ namespace Quiz\Controllers;
 
 use AuthGroups\Middleware\LoggingMiddleware;
 use AuthGroups\Utils\Response;
+use AuthGroups\Models\Tag;
 use Quiz\Models\Quiz;
 use Quiz\Models\Question;
 use Quiz\Models\Choice;
@@ -249,6 +250,7 @@ class QuizController
         if (!empty($questions)) {
             $questionIds = array_column($questions, 'id');
             $choicesByQ  = (new Choice())->findByQuestionIds($questionIds);
+            $tagsByQ     = (new Tag())->findTagsByQuestionIds($questionIds);
 
             foreach ($questions as &$q) {
                 $q['content'] = is_string($q['content'])
@@ -261,6 +263,7 @@ class QuizController
                         : $c['content'];
                 }
                 unset($c);
+                $q['tags'] = $tagsByQ[$q['id']] ?? [];
             }
             unset($q);
         }

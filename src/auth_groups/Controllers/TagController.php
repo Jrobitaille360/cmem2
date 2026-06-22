@@ -216,7 +216,7 @@ class TagController {
             // Validation
             $validation = Validator::validate($input, [
                 'name' => 'required|string|min:1|max:100',
-                'table_associate' => 'in:groups,files,all',
+                'table_associate' => 'in:groups,files,all,quiz_questions',
                 'color' => 'color'
             ]);
             
@@ -324,7 +324,7 @@ class TagController {
             // Validation
             $validation = Validator::validate($input, [
                 'name' => 'string|min:1|max:100',
-                'table_associate' => 'in:groups,files,all',
+                'table_associate' => 'in:groups,files,all,quiz_questions',
                 'color' => 'color'
             ]);
             
@@ -466,7 +466,7 @@ class TagController {
             $limit = min((int)($params['limit'] ?? 10), 50); // Maximum 50
             
             // Valider la table associée
-            $validTables = ['files', 'groups', 'all'];
+            $validTables = ['files', 'groups', 'all', 'quiz_questions'];
             if (!in_array($tableAssociate, $validTables)) {
                 LogService::warning("Table associée invalide pour getMostUsed", [
                     'table_associate' => $tableAssociate,
@@ -518,7 +518,7 @@ class TagController {
             // Validation
             $validation = Validator::validate($input, [
                 'name' => 'required|string|min:1|max:100',
-                'table_associate' => 'in:groups,files,all',
+                'table_associate' => 'in:groups,files,all,quiz_questions',
                 'color' => 'color'
             ]);
             
@@ -648,7 +648,7 @@ class TagController {
             
             // Validation
             $validation = Validator::validate($input, [
-                'table_associate' => 'required|in:groups,files'
+                'table_associate' => 'required|in:groups,files,quiz_questions'
             ]);
             
             if (!$validation['valid']) {
