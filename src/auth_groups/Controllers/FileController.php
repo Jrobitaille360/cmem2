@@ -72,10 +72,14 @@ class FileController
                 'files' => $_FILES
             ]);
 
-            if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK)
-            {
+            $uploadError = $_FILES['file']['error'] ?? null;
+            if (!isset($_FILES['file']) || $uploadError !== UPLOAD_ERR_OK) {
                 LoggingMiddleware::logExit(400);
-                Response::error('Aucun fichier valide uploadé', null, 400);
+                if ($uploadError === UPLOAD_ERR_INI_SIZE || $uploadError === UPLOAD_ERR_FORM_SIZE) {
+                    Response::error('Fichier trop volumineux — maximum 20 MB', null, 400);
+                } else {
+                    Response::error('Aucun fichier valide uploadé', null, 400);
+                }
                 return false;
             }
 
