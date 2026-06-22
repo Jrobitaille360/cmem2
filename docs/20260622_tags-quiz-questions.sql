@@ -8,8 +8,9 @@ ALTER TABLE `tags`
 CREATE TABLE IF NOT EXISTS `quiz_question_tag_relations` (
   `quiz_question_id` int(11) NOT NULL,
   `tag_id` int(11) NOT NULL,
-  `created_at` datetime DEFAULT current_timestamp(),
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `deleted_at` datetime DEFAULT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`quiz_question_id`, `tag_id`),
   KEY `tag_id` (`tag_id`),
   CONSTRAINT `fk_qqtr_question` FOREIGN KEY (`quiz_question_id`) REFERENCES `quiz_questions` (`id`) ON DELETE CASCADE,
