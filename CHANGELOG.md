@@ -27,8 +27,7 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ### Fix — `quiz_question_tag_relations` : colonne `updated_at` manquante
 
-- **`docs/20260622_tags-quiz-questions.sql`** — `updated_at timestamp … ON UPDATE current_timestamp()` ajouté au `CREATE TABLE` (aligné sur `file_tag_relations` / `group_tag_relations`)
-- **`docs/20260622_tags-quiz-questions-updated_at.sql`** — migration correctif `ALTER TABLE … ADD COLUMN updated_at` pour environnements déjà migrés
+- **`docs/v-2-8-0/20260622_tags-quiz-questions.sql`** — `updated_at timestamp … ON UPDATE current_timestamp()` ajouté au `CREATE TABLE` (aligné sur `file_tag_relations` / `group_tag_relations`)
 
 ### Fix — auth : comparaison de date de naissance
 
