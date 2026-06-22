@@ -7,7 +7,11 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-06-22]
+## [Unreleased]
+
+---
+
+## [2.8.0] — 2026-06-22
 
 ### Ajout — Tags pour `quiz_questions` (directive kestyon)
 
@@ -30,9 +34,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 - **`src/auth_groups/`** — correction de la comparaison de date de naissance à minuit pour éviter les décalages de fuseau horaire (4 commits)
 
----
-
-## [Unreleased 2026-06-16]
 
 ### Ajout — Phase 2 : attaques spéciales et jets de sauvegarde (`traque`)
 
@@ -41,9 +42,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - **`docs/traque/API_TRAQUE_ENDPOINTS.json`** — exemple `response_200` de `/traque/monsters/nearby` complété avec les 3 nouveaux champs
 - **`private/tests/test_traque.php`** — section 3.4 : vérif présence et validité de `special_attack` / `save_dc` / `save_stat` sur chaque monstre retourné ; assertions spécifiques Naga/Ratman/Liche
 
----
-
-## [Unreleased 2026-06-15]
 
 ### Ajout — Phase 2.1 : détection biome OSM pour monstres (`traque`)
 
@@ -53,9 +51,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - **`docs/traque/API_TRAQUE_ENDPOINTS.json`** — note biome ajoutée sur `GET /traque/monsters/nearby` : valeurs et source OSM documentées
 - **`private/tests/test_traque.php`** — section 3.4 : vérification que chaque biome retourné appartient à l'enum Flutter (régression `mountain` détectée et corrigée)
 
----
-
-## [Unreleased 2026-06-12]
 
 ### Ajout — Phase 1.4 : repos hors combat + régénération passive (`traque`)
 
@@ -64,9 +59,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - **`src/traque/Services/CombatService.php`** — `last_combat_at` mis à jour après victoire (`attack`) et fuite réussie (`flee`)
 - **`docs/20260612_traque_rest.sql`** — migration `ALTER TABLE traque_players ADD COLUMN rest_available_at DATETIME NULL, ADD COLUMN last_combat_at DATETIME NULL`
 
----
-
-## [Unreleased 2026-06-07]
 
 ### Ajout — `character_name` unique dans `traque`
 
@@ -85,9 +77,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - **`docs/20260607_traque_character_name.sql`** — migration `ALTER TABLE traque_players ADD character_name VARCHAR(50) NOT NULL DEFAULT ''`
 - **`docs/traque/API_TRAQUE_ENDPOINTS.json`** — `character_name` ajouté dans requête et réponse de `POST /traque/players/create` et `GET /traque/players/me`
 
----
-
-## [Unreleased 2026-06-05]
 
 ### Ajout — Module `traque` (gamification géolocalisée)
 
