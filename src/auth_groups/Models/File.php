@@ -40,9 +40,9 @@ class File extends BaseModel
         $stmt = $this->getDb()->prepare($query);
 
         // Nettoyage des données
-        $this->original_name = htmlspecialchars(strip_tags($this->original_name));
-        $this->file_name = htmlspecialchars(strip_tags($this->file_name));
-        $this->description = htmlspecialchars(strip_tags($this->description));
+        $this->original_name = htmlspecialchars(strip_tags($this->original_name ?? ''));
+        $this->file_name = htmlspecialchars(strip_tags($this->file_name ?? ''));
+        $this->description = htmlspecialchars(strip_tags($this->description ?? ''));
         $this->accessibility = in_array($this->accessibility, ['public', 'private', 'grand-public']) ? $this->accessibility : 'private';
 
         $stmt->bindParam(':original_name', $this->original_name);

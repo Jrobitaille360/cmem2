@@ -7,7 +7,11 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased]
+## [Unreleased 2026-06-26 14:00]
+
+### Fix — `strip_tags(null)` dans `File.php` brisait le JSON de réponse (directive kestyon)
+
+- **`src/auth_groups/Models/File.php`** — `strip_tags($var)` → `strip_tags($var ?? '')` sur `original_name`, `file_name` et `description` : PHP 8.1+ déprécie `strip_tags(null)`, ce qui émettait un warning HTML en préfixe du JSON et causait une `FormatException` côté Flutter
 
 ---
 
