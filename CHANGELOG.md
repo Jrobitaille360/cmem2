@@ -7,11 +7,25 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-06-26 14:00]
+## [Unreleased 2026-06-26 12:00]
 
 ### Fix — `strip_tags(null)` dans `File.php` brisait le JSON de réponse (directive kestyon)
 
 - **`src/auth_groups/Models/File.php`** — `strip_tags($var)` → `strip_tags($var ?? '')` sur `original_name`, `file_name` et `description` : PHP 8.1+ déprécie `strip_tags(null)`, ce qui émettait un warning HTML en préfixe du JSON et causait une `FormatException` côté Flutter
+
+### Fix — `MAIL_FROM` → `MAIL_FROM_ADDRESS` dans `InvitationService`
+
+- **`src/auth_groups/Services/InvitationService.php`** — `$_ENV['MAIL_FROM']` → `$_ENV['MAIL_FROM_ADDRESS']` avec fallback `no_reply@journauxdebord.com`
+
+### Fix — biome vide pour `young_dragon` (`traque`)
+
+- **`docs/20260626_fix_dragon_biome.sql`** — `UPDATE monsters SET biome = 'peak' WHERE asset_key = 'young_dragon' AND (biome IS NULL OR biome = '')`
+
+### Docs — `CLAUDE.md` complet
+
+- Liste de tests complète et triée alphabétiquement (13 fichiers ajoutés)
+- Table des modules : `access`, `stripe`, `playstore`, `traque`, `webdevice`, `notifications`, `cron` ajoutés
+- Chemin DB init : `docs/build_cmem2_DB.sql` → `docs/v-2-8-0/build_DB-v-2.8.0.sql`
 
 ---
 
