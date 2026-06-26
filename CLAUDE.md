@@ -16,24 +16,37 @@ composer serve
 Run a single module:
 
 ```bash
-php private/tests/test_items.php
-php private/tests/test_quiz.php
+php private/tests/test_access.php
+php private/tests/test_auth_otp.php
 php private/tests/test_calendars.php
-php private/tests/test_pomo.php
-php private/tests/test_tags.php
-php private/tests/test_groups.php
 php private/tests/test_files.php
-php private/tests/test_public.php
-php private/tests/test_users.php
-php private/tests/test_stats.php
-php private/tests/test_plans.php
-php private/tests/test_subscriptions.php
+php private/tests/test_files_accessibility.php
+php private/tests/test_groups.php
+php private/tests/test_items.php
+php private/tests/test_kestyon_tags.php
+php private/tests/test_kestyon_upload.php
+php private/tests/test_link_device_e2e.php
 php private/tests/test_maintenance.php
-php private/tests/test_secret_admin.php
+php private/tests/test_plans.php
+php private/tests/test_playstore.php
+php private/tests/test_pomo.php
+php private/tests/test_pseudo.php
+php private/tests/test_public.php
 php private/tests/test_puzzle_admin.php
+php private/tests/test_puzzle_backup.php
 php private/tests/test_puzzle_share.php
+php private/tests/test_quiz.php
 php private/tests/test_quiz2.php
 php private/tests/test_quiz3.php
+php private/tests/test_secret_admin.php
+php private/tests/test_stats.php
+php private/tests/test_stripe_v2.php
+php private/tests/test_stripe_webhooks.php
+php private/tests/test_subscriptions.php
+php private/tests/test_tags.php
+php private/tests/test_traque.php
+php private/tests/test_traque_rest.php
+php private/tests/test_users.php
 ```
 
 Run all tests:
@@ -47,7 +60,7 @@ Tests execute real HTTP requests via cURL against a running server. Each test fi
 ### Database initialization
 
 ```bash
-mysql -u root -p < docs/build_cmem2_DB.sql
+mysql -u root -p < docs/v-2-8-0/build_DB-v-2.8.0.sql
 ```
 
 ## Architecture
@@ -78,6 +91,13 @@ src/<module>/
 | `src/items/` | `Items\` | Generic item manager — private / public / shared |
 | `src/pomo/` | `Pomo\` | Engagement waitlist and support forms |
 | `src/puzzle/` | `Puzzle\` | Collaborative puzzle with pick/drop mechanics |
+| `src/access/` | `Access\` | Subscription access control (Stripe + Playstore cross-check) |
+| `src/stripe/` | `Stripe\` | Stripe payment and subscription processing |
+| `src/playstore/` | `Playstore\` | Google Play Store subscription verification |
+| `src/traque/` | `Traque\` | Game plugin: combat, monsters, OSM biomes, achievements |
+| `src/webdevice/` | `WebDevice\` | Web push device token management |
+| `src/notifications/` | *(scripts)* | Email notification scripts (no routing) |
+| `src/cron/` | *(scripts)* | Backup cron scripts (no routing) |
 | `src/Core/` | `Core\` | `PluginInterface`, `PluginManager`, `AbstractPlugin` |
 
 Plugins are activated in `.env` and loaded dynamically; they register their own routes through `PluginManager`.

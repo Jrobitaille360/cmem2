@@ -215,7 +215,7 @@ class InvitationService {
         $headers = [
             'MIME-Version: 1.0',
             'Content-type: text/html; charset=UTF-8',
-            'From: ' . ($_ENV['MAIL_FROM'] ?? 'noreply@authgroups.local'),
+            'From: ' . ($_ENV['MAIL_FROM_ADDRESS'] ?? 'no_reply@journauxdebord.com'),
             'Reply-To: ' . ($_ENV['MAIL_REPLY_TO'] ?? 'support@authgroups.local'),
         ];
         
