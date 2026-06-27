@@ -7,6 +7,17 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-06-27 10:00]
+
+### Refactor — limites d'upload par type extraites vers `.env` / `environment.php`
+
+- **`src/auth_groups/Controllers/FileController.php`** — `$maxFileSizes` tableau hardcodé remplacé par les constantes `MAX_IMAGE_SIZE`, `MAX_DOCUMENT_SIZE`, `MAX_AUDIO_SIZE`, `MAX_VIDEO_SIZE`, `MAX_EXECUTABLE_SIZE` ; même remplacement sur la limite 200 MB inline des exécutables/archives
+- **`src/auth_groups/environment.php`** — `MAX_IMAGE_SIZE` défaut 5 MB → **10 MB** ; `MAX_AUDIO_SIZE` défaut 10 MB → **20 MB** ; ajout `MAX_EXECUTABLE_SIZE` 200 MB ; suppression de `MAX_FILE_SIZE` (constante morte)
+- **`src/auth_groups/Utils/FileValidator.php`** — `getMaxSizeForType()` étendu aux cinq catégories (`image`, `document`, `audio`, `video`, `default`) avec les constantes typées ; référence à `MAX_FILE_SIZE` supprimée
+- **Tous les fichiers `.env`** (`.env`, `.env.example`, `private/.env`, `private/utilitaires/.env*`) — `MAX_FILE_SIZE` retiré ; `MAX_IMAGE_SIZE`, `MAX_DOCUMENT_SIZE`, `MAX_AUDIO_SIZE`, `MAX_VIDEO_SIZE`, `MAX_EXECUTABLE_SIZE` ajoutés
+
+---
+
 ## [Unreleased 2026-06-26 12:00]
 
 ### Fix — `strip_tags(null)` dans `File.php` brisait le JSON de réponse (directive kestyon)
@@ -51,14 +62,12 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 - **`src/auth_groups/`** — correction de la comparaison de date de naissance à minuit pour éviter les décalages de fuseau horaire (4 commits)
 
-
 ### Ajout — Phase 2 : attaques spéciales et jets de sauvegarde (`traque`)
 
 - **`docs/20260616_traque_special_attack.sql`** — migration : `ALTER TABLE monsters ADD COLUMN special_attack ENUM('none','poison','spell')`, `save_dc TINYINT UNSIGNED`, `save_stat ENUM('con','sag')` ; seeds Naga (poison DC 12 CON), Ratman (poison DC 10 CON), Liche (spell DC 14 SAG)
 - **`src/traque/Routing/TraqueRouteHandler.php`** — `GET /traque/monsters/nearby` expose `special_attack`, `save_dc`, `save_stat` sur chaque monstre ; défaut `'none' / 0 / 'con'` si colonnes absentes (rétrocompat)
 - **`docs/traque/API_TRAQUE_ENDPOINTS.json`** — exemple `response_200` de `/traque/monsters/nearby` complété avec les 3 nouveaux champs
 - **`private/tests/test_traque.php`** — section 3.4 : vérif présence et validité de `special_attack` / `save_dc` / `save_stat` sur chaque monstre retourné ; assertions spécifiques Naga/Ratman/Liche
-
 
 ### Ajout — Phase 2.1 : détection biome OSM pour monstres (`traque`)
 
@@ -68,14 +77,12 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - **`docs/traque/API_TRAQUE_ENDPOINTS.json`** — note biome ajoutée sur `GET /traque/monsters/nearby` : valeurs et source OSM documentées
 - **`private/tests/test_traque.php`** — section 3.4 : vérification que chaque biome retourné appartient à l'enum Flutter (régression `mountain` détectée et corrigée)
 
-
 ### Ajout — Phase 1.4 : repos hors combat + régénération passive (`traque`)
 
 - **`src/traque/Models/Player.php`** — `rest(playerId, type)` : repos actif (50 % HP manquants, cooldown 30 min) ou complet (100 % HP, cooldown 4 h) ; `applyPassiveRegen(playerId)` : 1 HP / 5 min depuis `last_combat_at` (calcul SQL timezone-safe) ; `updateLastCombatAt(playerId)`
 - **`src/traque/Routing/TraqueRouteHandler.php`** — route `POST /traque/players/me/rest?type=active|full` ; `playerMe()` applique la régén passive avant retour ; `formatPlayer()` expose `rest_available_at` (ISO 8601 UTC, nullable)
 - **`src/traque/Services/CombatService.php`** — `last_combat_at` mis à jour après victoire (`attack`) et fuite réussie (`flee`)
 - **`docs/20260612_traque_rest.sql`** — migration `ALTER TABLE traque_players ADD COLUMN rest_available_at DATETIME NULL, ADD COLUMN last_combat_at DATETIME NULL`
-
 
 ### Ajout — `character_name` unique dans `traque`
 
@@ -93,7 +100,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - **`src/traque/Routing/TraqueRouteHandler.php`** — validation `character_name` (requis, max 50 chars, 422 `character_name_required`) dans `playerCreate()` ; retourné dans `formatPlayer()`
 - **`docs/20260607_traque_character_name.sql`** — migration `ALTER TABLE traque_players ADD character_name VARCHAR(50) NOT NULL DEFAULT ''`
 - **`docs/traque/API_TRAQUE_ENDPOINTS.json`** — `character_name` ajouté dans requête et réponse de `POST /traque/players/create` et `GET /traque/players/me`
-
 
 ### Ajout — Module `traque` (gamification géolocalisée)
 

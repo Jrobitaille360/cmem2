@@ -41,11 +41,11 @@ class FileController
     ];
 
     private array $maxFileSizes = [
-        'image'    => 5 * 1024 * 1024,    // 5 MB
-        'document' => 10 * 1024 * 1024,   // 10 MB
-        'audio'    => 20 * 1024 * 1024,   // 20 MB
-        'video'    => 50 * 1024 * 1024,   // 50 MB
-        'default'  => 200 * 1024 * 1024,  // 200 MB
+        'image'    => MAX_IMAGE_SIZE,
+        'document' => MAX_DOCUMENT_SIZE,
+        'audio'    => MAX_AUDIO_SIZE,
+        'video'    => MAX_VIDEO_SIZE,
+        'default'  => MAX_EXECUTABLE_SIZE,
     ];
 
     private array $executableMimeTypes = [
@@ -672,7 +672,7 @@ class FileController
 
         // Vérifier la taille (les exécutables/archives ont leur propre limite)
         if (in_array($realMimeType, $this->executableMimeTypes)) {
-            $maxSize = 200 * 1024 * 1024; // 200 MB
+            $maxSize = MAX_EXECUTABLE_SIZE;
         } else {
             $fileType = $this->getFileCategory($realMimeType);
             $maxSize  = $this->maxFileSizes[$fileType] ?? $this->maxFileSizes['default'];

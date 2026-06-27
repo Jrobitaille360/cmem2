@@ -95,15 +95,13 @@ class FileValidator {
         return $extensions[strtolower($category)] ?? [];
     }
     
-    /**
-     * Obtenir la taille maximale pour un type de fichier
-     */
     public static function getMaxSizeForType($type) {
         switch (strtolower($type)) {
-            case 'image':
-                return MAX_AVATAR_SIZE;
-            default:
-                return MAX_FILE_SIZE;
+            case 'image':    return MAX_AVATAR_SIZE;
+            case 'document': return MAX_DOCUMENT_SIZE;
+            case 'audio':    return MAX_AUDIO_SIZE;
+            case 'video':    return MAX_VIDEO_SIZE;
+            default:         return MAX_EXECUTABLE_SIZE;
         }
     }
     

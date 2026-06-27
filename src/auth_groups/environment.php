@@ -83,7 +83,6 @@ date_default_timezone_set($_ENV['APP_TIMEZONE'] ?? 'America/Montreal');
 // Configuration des uploads généraux
 define('UPLOAD_DIR', __DIR__ . '/../../' . ($_ENV['UPLOAD_DIR'] ?? 'uploads/'));
 if (!defined('TMP_ASSETS_DIR')) define('TMP_ASSETS_DIR', __DIR__ . '/../../' . ($_ENV['TMP_ASSETS_DIR'] ?? 'tmp_assets/'));
-define('MAX_FILE_SIZE', (int)($_ENV['MAX_FILE_SIZE'] ?? 10485760)); // 10MB par défaut
 
 // Configuration de sécurité
 define('ENABLE_RATE_LIMITING', filter_var($_ENV['ENABLE_RATE_LIMITING'] ?? 'true', FILTER_VALIDATE_BOOLEAN));
@@ -95,10 +94,11 @@ define('MAINTENANCE_MODE', filter_var($_ENV['MAINTENANCE_MODE'] ?? 'false', FILT
 define('MAINTENANCE_MESSAGE', $_ENV['MAINTENANCE_MESSAGE'] ?? 'Application en maintenance. Veuillez réessayer plus tard.');
 
 // Configuration des uploads spécifiques
-define('MAX_IMAGE_SIZE', (int)($_ENV['MAX_IMAGE_SIZE'] ?? 5242880)); // 5MB par défaut
+define('MAX_IMAGE_SIZE', (int)($_ENV['MAX_IMAGE_SIZE'] ?? 10485760)); // 10MB par défaut
 define('MAX_VIDEO_SIZE', (int)($_ENV['MAX_VIDEO_SIZE'] ?? 52428800)); // 50MB par défaut
-define('MAX_AUDIO_SIZE', (int)($_ENV['MAX_AUDIO_SIZE'] ?? 10485760)); // 10MB par défaut
+define('MAX_AUDIO_SIZE', (int)($_ENV['MAX_AUDIO_SIZE'] ?? 20971520)); // 20MB par défaut
 define('MAX_DOCUMENT_SIZE', (int)($_ENV['MAX_DOCUMENT_SIZE'] ?? 10485760)); // 10MB par défaut
+define('MAX_EXECUTABLE_SIZE', (int)($_ENV['MAX_EXECUTABLE_SIZE'] ?? 209715200)); // 200MB par défaut
 
 // Types de fichiers autorisés
 define('ALLOWED_IMAGE_TYPES', explode(',', $_ENV['ALLOWED_IMAGE_TYPES'] ?? 'image/jpeg,image/png,image/gif'));
