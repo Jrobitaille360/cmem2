@@ -32,8 +32,10 @@ class FileRouteHandler extends BaseRouteHandler
                 $method = $request['method'] ?? '';
 
                 $isOptionalAuth = $method === 'GET'
-                    && ctype_digit((string) $action)
-                    && (!$id || $id === 'info');
+                    && (
+                        (ctype_digit((string) $action) && (!$id || $id === 'info'))
+                        || $action === 'png-from-svg'
+                    );
 
                 $user = $this->authService?->authenticate();
 
@@ -93,10 +95,14 @@ class FileRouteHandler extends BaseRouteHandler
                     $this->controller->updateAccessibility($fileId, $user['user_id'], $user['role'])),
                 
             // GET /files/user/{user_id}
-            ($action === 'user' && $method === 'GET' && $id) => 
-                $this->validateIdAndCall($id, fn($userId) => 
+            ($action === 'user' && $method === 'GET' && $id) =>
+                $this->validateIdAndCall($id, fn($userId) =>
                     $this->controller->getUserFiles($userId, $user['user_id'], $user['role']), 'ID utilisateur'),
-                
+
+            // GET /files/png-from-svg?id=<id>[&width=..&height=..&dpi=..&bg=..&scale=..]
+            ($action === 'png-from-svg' && $method === 'GET') =>
+                $this->controller->svgToPng($user['user_id'] ?? null, $user['role'] ?? 'guest'),
+
             default => Response::error('Route fichier non trouvée', null, 404)
         };
     }

@@ -7,6 +7,16 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-06-29 20:45]
+
+### Ajout — `GET /files/png-from-svg` : conversion SVG→PNG à la demande (directive kestyon)
+
+- **`src/auth_groups/Controllers/FileController.php`** — nouveau endpoint `svgToPng()` : détecte le convertisseur disponible (`rsvg-convert` > `inkscape` > `convert`) via `detectSvgConverter()`, exécute la commande via `runSvgConversion()` avec `proc_open` (tableau d'args, zéro interpolation shell) ; paramètres : `id` (requis), `width` (1–4096 px), `height` (1–4096 px), `dpi` (1–600, défaut 96), `bg` (hex sans `#`, regex validée), `scale` (0.01–10, défaut 1.0) ; réponse `image/png` avec `Cache-Control: public, max-age=86400` ; erreurs 400/404/422/500 en JSON ; contrôle d'accès identique à `download()` (grand-public sans JWT, public avec JWT, private propriétaire/admin)
+- **`src/auth_groups/Controllers/FileController.php`** — `image/svg+xml` ajouté aux types MIME autorisés ; `svg` ajouté aux extensions autorisées dans `validateFile()`
+- **`src/auth_groups/Routing/RouteHandlers/FileRouteHandler.php`** — middleware : `isOptionalAuth` étendu à `action === 'png-from-svg'` (JWT optionnel comme pour `GET /files/{id}`) ; route `GET /files/png-from-svg` ajoutée au match
+
+---
+
 ## [Unreleased 2026-06-27 10:00]
 
 ### Refactor — limites d'upload par type extraites vers `.env` / `environment.php`

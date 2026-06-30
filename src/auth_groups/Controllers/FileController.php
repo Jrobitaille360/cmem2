@@ -16,6 +16,7 @@ class FileController
         'image/png',
         'image/gif',
         'image/webp',
+        'image/svg+xml',
         'application/pdf',
         'text/plain',
         'application/msword',
@@ -270,13 +271,20 @@ class FileController
         // Déterminer le type MIME
         $mimeType = $fileInfo['mime_type'] ?? mime_content_type($filePath) ?? 'application/octet-stream';
         
-        // Configurer les en-têtes pour le téléchargement
-        header('Content-Description: File Transfer');
+        $isImage = str_starts_with($mimeType, 'image/');
+
         header('Content-Type: ' . $mimeType);
-        header('Content-Disposition: attachment; filename="' . $fileInfo['original_name'] . '"');
-        header('Expires: 0');
-        header('Cache-Control: must-revalidate');
-        header('Pragma: public');
+        // Images: inline + long cache (ID immuable = safe). Autres: attachment, no-cache.
+        if ($isImage) {
+            header('Content-Disposition: inline; filename="' . $fileInfo['original_name'] . '"');
+            header('Cache-Control: public, max-age=31536000, immutable');
+            header('Expires: ' . gmdate('D, d M Y H:i:s', time() + 31536000) . ' GMT');
+        } else {
+            header('Content-Description: File Transfer');
+            header('Content-Disposition: attachment; filename="' . $fileInfo['original_name'] . '"');
+            header('Cache-Control: no-cache, must-revalidate');
+            header('Expires: 0');
+        }
         header('Content-Length: ' . filesize($filePath));
         
         // Nettoyer les buffers de sortie
@@ -686,7 +694,7 @@ class FileController
 
         // Vérifier l'extension
         $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-        $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'txt', 'doc', 'docx', 'xls', 'xlsx', 'mp3', 'wav', 'ogg', 'mp4', 'avi', 'mov', 'exe', 'msi', 'zip', '7z'];
+        $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'pdf', 'txt', 'doc', 'docx', 'xls', 'xlsx', 'mp3', 'wav', 'ogg', 'mp4', 'avi', 'mov', 'exe', 'msi', 'zip', '7z'];
 
         if (!in_array($extension, $allowedExtensions))
         {
@@ -703,6 +711,202 @@ class FileController
     private function getFileCategory(string $mimeType): string
     {
         return File::getFileCategory($mimeType);
+    }
+
+    /**
+     * GET /files/png-from-svg?id=<id>[&width=..&height=..&dpi=..&bg=..&scale=..]
+     * Convertit un SVG stocké en PNG via rsvg-convert, Inkscape ou ImageMagick.
+     */
+    public function svgToPng(?int $userId, ?string $role): void
+    {
+        $id     = isset($_GET['id'])     ? (int) $_GET['id']     : 0;
+        $width  = isset($_GET['width'])  ? (int) $_GET['width']  : null;
+        $height = isset($_GET['height']) ? (int) $_GET['height'] : null;
+        $dpi    = isset($_GET['dpi'])    ? (int) $_GET['dpi']    : 96;
+        $bg     = $_GET['bg'] ?? '';
+        $scale  = isset($_GET['scale'])  ? (float) $_GET['scale'] : 1.0;
+
+        if ($id <= 0) {
+            Response::error('Paramètre id requis', null, 400);
+            return;
+        }
+        if ($width !== null && ($width < 1 || $width > 4096)) {
+            Response::error('width invalide (1-4096 px)', null, 422);
+            return;
+        }
+        if ($height !== null && ($height < 1 || $height > 4096)) {
+            Response::error('height invalide (1-4096 px)', null, 422);
+            return;
+        }
+        if ($dpi < 1 || $dpi > 600) {
+            Response::error('dpi invalide (1-600)', null, 422);
+            return;
+        }
+        if ($bg !== '' && !preg_match('/^[0-9a-fA-F]{1,8}$/', $bg)) {
+            Response::error('bg invalide — format hex sans #, ex: ffffff', null, 422);
+            return;
+        }
+        if ($scale <= 0 || $scale > 10) {
+            Response::error('scale invalide (0.01-10)', null, 422);
+            return;
+        }
+
+        $fileModel = new File();
+        $fileInfo  = $fileModel->findById($id);
+        if (!$fileInfo) {
+            Response::error('Fichier SVG introuvable', null, 404);
+            return;
+        }
+
+        $accessibility = $fileInfo['accessibility'] ?? 'private';
+        if ($accessibility === 'grand-public') {
+            // accès libre
+        } elseif ($accessibility === 'public') {
+            if (!$userId) {
+                Response::error('Authentification requise', null, 401);
+                return;
+            }
+        } else {
+            $isAdmin = strtolower($role ?? '') === 'administrateur';
+            $isOwner = $userId && (int) $fileInfo['uploaded_by'] === (int) $userId;
+            if (!$isOwner && !$isAdmin) {
+                Response::error('Accès non autorisé', null, 403);
+                return;
+            }
+        }
+
+        $mime  = $fileInfo['mime_type'] ?? '';
+        $ext   = strtolower(pathinfo($fileInfo['file_name'] ?? '', PATHINFO_EXTENSION));
+        $isSvg = $mime === 'image/svg+xml' || $ext === 'svg';
+        if (!$isSvg) {
+            Response::error('Le fichier n\'est pas un SVG', null, 422);
+            return;
+        }
+
+        $svgPath = __DIR__ . '/../../..' . $fileInfo['file_path'];
+        if (!file_exists($svgPath) || !is_readable($svgPath)) {
+            Response::error('Fichier SVG introuvable sur le serveur', null, 404);
+            return;
+        }
+
+        $outPath = tempnam(sys_get_temp_dir(), 'cmem2_png_') . '.png';
+        $opts    = compact('width', 'height', 'dpi', 'bg', 'scale');
+
+        try {
+            $ok = $this->runSvgConversion($svgPath, $outPath, $opts);
+        } catch (Exception $e) {
+            if (file_exists($outPath)) unlink($outPath);
+            LogService::error('Erreur conversion SVG→PNG', ['id' => $id, 'error' => $e->getMessage()]);
+            Response::error('Erreur lors de la conversion SVG', null, 500);
+            return;
+        }
+
+        if (!$ok || !file_exists($outPath) || filesize($outPath) === 0) {
+            if (file_exists($outPath)) unlink($outPath);
+            Response::error('Conversion SVG→PNG impossible — outil de conversion indisponible sur le serveur', null, 500);
+            return;
+        }
+
+        $pngData = file_get_contents($outPath);
+        unlink($outPath);
+
+        if (ob_get_level()) ob_end_clean();
+        header('Content-Type: image/png');
+        header('Cache-Control: public, max-age=86400');
+        header('Content-Disposition: inline');
+        header('Content-Length: ' . strlen($pngData));
+        echo $pngData;
+        exit;
+    }
+
+    private function detectSvgConverter(): string
+    {
+        foreach (['rsvg-convert', 'inkscape', 'convert'] as $cmd) {
+            $desc = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+            $proc = @proc_open(['which', $cmd], $desc, $pipes);
+            if (!is_resource($proc)) {
+                continue;
+            }
+            $out  = stream_get_contents($pipes[1]);
+            fclose($pipes[0]);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            $code = proc_close($proc);
+            if ($code === 0 && trim($out) !== '') {
+                return $cmd;
+            }
+        }
+        return '';
+    }
+
+    private function runSvgConversion(string $svgPath, string $outPath, array $opts): bool
+    {
+        $converter = $this->detectSvgConverter();
+        if ($converter === '') {
+            return false;
+        }
+
+        $width  = $opts['width']  ?? null;
+        $height = $opts['height'] ?? null;
+        $dpi    = $opts['dpi']    ?? 96;
+        $bg     = $opts['bg']     ?? '';
+        $scale  = $opts['scale']  ?? 1.0;
+
+        switch ($converter) {
+            case 'rsvg-convert':
+                $args = ['rsvg-convert'];
+                if ($width !== null)  { $args[] = '--width';  $args[] = (string) $width;  }
+                if ($height !== null) { $args[] = '--height'; $args[] = (string) $height; }
+                $args[] = '--dpi-x'; $args[] = (string) $dpi;
+                $args[] = '--dpi-y'; $args[] = (string) $dpi;
+                if ($bg !== '') { $args[] = '--background-color'; $args[] = '#' . $bg; }
+                if ($scale != 1.0 && $width === null && $height === null) {
+                    $args[] = '--zoom'; $args[] = (string) $scale;
+                }
+                $args[] = '--format'; $args[] = 'png';
+                $args[] = '--output'; $args[] = $outPath;
+                $args[] = $svgPath;
+                break;
+
+            case 'inkscape':
+                $args = ['inkscape', '--export-type=png'];
+                if ($width !== null)  { $args[] = '--export-width='  . $width;  }
+                if ($height !== null) { $args[] = '--export-height=' . $height; }
+                $args[] = '--export-dpi=' . $dpi;
+                if ($bg !== '') { $args[] = '--export-background=#' . $bg; }
+                $args[] = '--export-filename=' . $outPath;
+                $args[] = $svgPath;
+                break;
+
+            default: // ImageMagick convert
+                $args = ['convert', '-density', (string) $dpi];
+                if ($bg !== '') { $args[] = '-background'; $args[] = '#' . $bg; }
+                if ($width !== null && $height !== null) {
+                    $args[] = '-resize'; $args[] = "{$width}x{$height}!";
+                } elseif ($width !== null) {
+                    $args[] = '-resize'; $args[] = (string) $width;
+                } elseif ($height !== null) {
+                    $args[] = '-resize'; $args[] = 'x' . $height;
+                } elseif ($scale != 1.0) {
+                    $pct = (int) round($scale * 100);
+                    $args[] = '-resize'; $args[] = "{$pct}%";
+                }
+                $args[] = $svgPath;
+                $args[] = $outPath;
+                break;
+        }
+
+        $desc = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+        $proc = proc_open($args, $desc, $pipes);
+        if (!is_resource($proc)) {
+            return false;
+        }
+        fclose($pipes[0]);
+        stream_get_contents($pipes[1]);
+        stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        return proc_close($proc) === 0;
     }
 
 
