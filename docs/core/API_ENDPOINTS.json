@@ -786,7 +786,7 @@
       "auth_required": true,
       "auth_header": "Authorization: Bearer {jwt_token}",
       "notes": [
-        "Types MIME acceptés : image (jpeg/png/gif/webp), pdf, txt, doc/docx, xls/xlsx, mp3/wav/ogg, mp4/avi/mov, exe, msi, zip, 7z",
+        "Types MIME acceptés : image (jpeg/png/gif/webp/svg+xml), pdf, txt, doc/docx, xls/xlsx, mp3/wav/ogg, mp4/avi/mov, exe, msi, zip, 7z",
         "Tailles max : image 5 MB, document 10 MB, audio 20 MB, vidéo 50 MB, exécutable/archive (exe/msi/zip/7z) 200 MB"
       ],
       "routes": [
@@ -882,6 +882,35 @@
             "401": "fichier public/private sans JWT",
             "403": "fichier private — accès refusé",
             "404": "introuvable"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/files/png-from-svg",
+          "description": "Convertir un fichier SVG en PNG à la demande (rsvg-convert / inkscape / convert, auto-détecté côté serveur)",
+          "auth_required": false,
+          "query": {
+            "id": "integer (required) — ID du fichier SVG",
+            "width": "integer (optional, 1-4096) — largeur de sortie en px",
+            "height": "integer (optional, 1-4096) — hauteur de sortie en px",
+            "dpi": "integer (optional, 1-600, défaut 96)",
+            "bg": "string (optional) — couleur de fond hex sans # (ex. ffffff) ; défaut transparent",
+            "scale": "float (optional, 0.01-10, défaut 1.0) — ignoré si width/height fourni"
+          },
+          "notes": [
+            "Mêmes règles d'accessibilité que le téléchargement (grand-public sans JWT, public/private avec JWT)",
+            "404 si fichier introuvable, 422 si le fichier n'est pas un SVG ou si un paramètre est hors limites",
+            "500 si aucun convertisseur SVG n'est disponible sur le serveur"
+          ],
+          "response": "Image PNG binaire avec Content-Type: image/png",
+          "http_codes": {
+            "200": "succès",
+            "400": "id manquant",
+            "401": "fichier public/private sans JWT",
+            "403": "fichier private — accès refusé",
+            "404": "fichier introuvable",
+            "422": "fichier non-SVG ou paramètre invalide",
+            "500": "conversion impossible (convertisseur indisponible)"
           }
         },
         {

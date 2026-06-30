@@ -272,6 +272,7 @@ Un email de vérification est envoyé. La connexion est bloquée (403) tant que 
 | GET | `/files` | JWT ADMIN | Lister les fichiers d'un dossier (`?folder=<slug>`) |
 | POST | `/files` | JWT | Uploader un fichier |
 | GET | `/files/{id}` | JWT | Télécharger le contenu binaire |
+| GET | `/files/png-from-svg` | JWT* | Convertir un SVG en PNG à la demande (`?id=`) |
 | GET | `/files/{id}/info` | JWT | Métadonnées d'un fichier |
 | PATCH | `/files/{id}/accessibility` | JWT propriétaire/admin | Changer l'accessibilité |
 | DELETE | `/files/{id}` | JWT | Soft delete (`force_delete: true` pour suppression physique) |
@@ -282,7 +283,7 @@ Un email de vérification est envoyé. La connexion est bloquée (403) tant que 
 
 | Catégorie | Extensions | Taille max |
 | --- | --- | --- |
-| Image | jpeg, png, gif, webp | 5 MB |
+| Image | jpeg, png, gif, webp, svg | 5 MB |
 | Document | pdf, txt, doc, docx, xls, xlsx | 10 MB |
 | Audio | mp3, wav, ogg | 20 MB |
 | Vidéo | mp4, avi, mov | 50 MB |
@@ -339,6 +340,26 @@ Le champ `url` de la réponse reflète le chemin réel :
 ```json
 { "url": "/uploads/mon-app/setup.exe" }
 ```
+
+### GET /files/png-from-svg
+
+Convertit un fichier SVG stocké en PNG, côté serveur (rsvg-convert > inkscape > convert, auto-détecté). Mêmes règles d'accessibilité que le téléchargement — JWT optionnel (`grand-public` accessible sans authentification).
+
+```http
+GET /files/png-from-svg?id=42&width=400&dpi=192&bg=ffffff
+```
+
+| Paramètre | Type | Défaut | Description |
+| - | - | - | - |
+| `id` | int (requis) | — | ID du fichier SVG |
+| `width` | int | taille naturelle | 1-4096 px |
+| `height` | int | proportionnel | 1-4096 px |
+| `dpi` | int | 96 | 1-600 |
+| `bg` | string | transparent | hex sans `#`, ex. `ffffff` |
+| `scale` | float | 1.0 | 0.01-10 ; ignoré si width/height fourni |
+
+Réponse `200` : octets PNG, `Content-Type: image/png`, `Cache-Control: public, max-age=86400`.
+Retourne `404` si le fichier est introuvable, `422` si ce n'est pas un SVG ou si un paramètre est hors limites, `500` si aucun convertisseur n'est disponible sur le serveur.
 
 ### GET /files?folder=`<slug>`
 
