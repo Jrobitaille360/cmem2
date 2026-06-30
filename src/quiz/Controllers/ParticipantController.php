@@ -113,10 +113,11 @@ class ParticipantController
 
         $quiz = (new Quiz())->findById((int) $session['quiz_id']);
         $quizSettings = [
-            'result_visibility' => $quiz['result_visibility'] ?? 'immediate',
-            'time_mode'         => $quiz['time_mode']         ?? 'per_question',
-            'total_time_sec'    => isset($quiz['total_time_sec']) ? (int) $quiz['total_time_sec'] : null,
-            'show_leaderboard'  => (bool) ($quiz['show_leaderboard'] ?? true),
+            'result_visibility'      => $quiz['result_visibility'] ?? 'immediate',
+            'time_mode'              => $quiz['time_mode']         ?? 'per_question',
+            'total_time_sec'         => isset($quiz['total_time_sec']) ? (int) $quiz['total_time_sec'] : null,
+            'show_leaderboard'       => (bool) ($quiz['show_leaderboard'] ?? true),
+            'show_question_to_player' => (bool) ($quiz['show_question_to_player'] ?? true),
         ];
 
         $data = [

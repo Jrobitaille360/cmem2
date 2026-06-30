@@ -7,6 +7,17 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-06-30 19:30]
+
+### Ajout — `show_question_to_player` dans les quiz (directive kestyon)
+
+- **`docs/20260630_show_question_to_player.sql`** — migration : `ALTER TABLE quiz_quizzes ADD COLUMN show_question_to_player TINYINT(1) NOT NULL DEFAULT 1 AFTER show_leaderboard`
+- **`src/quiz/Models/Quiz.php`** — propriété `$show_question_to_player` ajoutée ; `createFromData()` : colonne insérée (défaut 1) ; `updateFromData()` : champ mis à jour si présent dans le body
+- **`src/quiz/Controllers/ParticipantController.php`** — `getSession()` : `show_question_to_player` ajouté dans `quiz_settings` (GET `/quiz/session/{sid}`) ; défaut `true` pour quiz existants sans la colonne
+- `GET /quiz/{id}` retourne automatiquement `show_question_to_player` via `SELECT *`
+
+---
+
 ## [Unreleased 2026-06-29 20:45]
 
 ### Ajout — `GET /files/png-from-svg` : conversion SVG→PNG à la demande (directive kestyon)
