@@ -1,6 +1,6 @@
 # Guide — Plugin Puzzle (client mobile)
 
-Version 1.1.0 · Base URL : `/puzzle`
+Version 2.0.0 · Base URL : `/v2/puzzle`
 
 > Référence complète : [API_PUZZLE_ENDPOINTS.json](API_PUZZLE_ENDPOINTS.json)
 > Guide admin images : [guide_image_manager.md](guide_image_manager.md)
@@ -12,6 +12,7 @@ Version 1.1.0 · Base URL : `/puzzle`
 - [Démarrage rapide](#démarrage-rapide)
 - [Abonnement premium](#abonnement-premium)
 - [Pseudonyme](#pseudonyme)
+- [Liaison à un compte cmem2](#liaison-à-un-compte-cmem2)
 - [Carrousel d'images](#carrousel-dimages)
 - [Thèmes](#thèmes)
 - [Livraison des images](#livraison-des-images)
@@ -19,6 +20,7 @@ Version 1.1.0 · Base URL : `/puzzle`
 - [Casse-têtes partagés](#casse-têtes-partagés)
 - [Codes d'erreur](#codes-derreur)
 - [Intégration client Flutter](#intégration-client-flutter)
+- [Routes dépréciées](#routes-dépréciées)
 
 ---
 
@@ -28,11 +30,23 @@ Le plugin Puzzle fournit une API REST pour une application mobile de puzzle (Flu
 **Aucun compte utilisateur n'est requis** : l'authentification repose sur un token d'appareil opaque,
 généré une fois à l'installation.
 
-Fonctionnalités disponibles :
+Depuis v2.7.0, l'enregistrement d'appareil, le pseudonyme et l'abonnement sont gérés par les
+modules transverses :
+
+| Besoin | Module | Endpoints |
+| --- | --- | --- |
+| Enregistrer l'appareil | Playstore | `POST /v2/devices/android/register` |
+| Pseudonyme | Playstore | `GET/POST/DELETE /v2/devices/android/pseudonym` |
+| Valider l'abonnement | Playstore | `POST /v2/subscriptions/playstore/verify` |
+| Statut d'accès premium | Access | `GET /v2/access/status` |
+
+Voir [../playstore/GUIDE.md](../playstore/GUIDE.md) pour le détail de ces endpoints.
+
+Fonctionnalités du plugin :
 
 - Carrousel de 30 images (gratuit)
 - Banque d'images par thèmes (premium)
-- Sauvegarde de la progression en ligne (premium)
+- Sauvegarde de la progression en ligne + récupération par pseudonyme (premium)
 - Casse-têtes partagés en temps réel entre deux abonnés (premium)
 
 ---
@@ -41,7 +55,7 @@ Fonctionnalités disponibles :
 
 ### Token d'appareil
 
-Toutes les routes `/puzzle/*` (sauf l'enregistrement initial) exigent un `device_token` :
+Toutes les routes `/v2/puzzle/*` exigent un `device_token` :
 
 ```txt
 Authorization: Bearer {device_token}
@@ -51,16 +65,19 @@ Authorization: Bearer {device_token}
 | --- | --- |
 | Type | Bearer opaque (64 chars hex) |
 | Durée de vie | 365 jours |
-| Renouvellement | Automatique via `POST /puzzle/auth/register-device` |
+| Obtention / renouvellement | `POST /v2/devices/android/register` avec le même `device_uuid` |
 | Stockage client | `SharedPreferences` — clé `puzzle_device_token` |
 
 ### Modes d'accès
 
 | Mode | Condition | Endpoints accessibles |
 | --- | --- | --- |
-| Public | Aucun | `POST /puzzle/auth/register-device` uniquement |
-| Gratuit | `device_token` valide | Auth, carrousel, livraison images, pseudonyme |
-| Premium | `device_token` + `is_premium = 1` non expiré | Tout, y compris thèmes, backup, partagé |
+| Public | Aucun | `POST /v2/devices/android/register` uniquement |
+| Gratuit | `device_token` valide | Carrousel, livraison images, pseudonyme |
+| Premium | `device_token` + abonnement actif | Tout, y compris thèmes, backup, partagé |
+
+Le statut premium est vérifié côté serveur via la table `subscriptions`
+(Play Store ou Stripe). Erreur `403 SUBSCRIPTION_REQUIRED` si aucun abonnement actif.
 
 ---
 
@@ -69,7 +86,7 @@ Authorization: Bearer {device_token}
 ### 1 — Enregistrer l'appareil
 
 ```txt
-POST /puzzle/auth/register-device
+POST /v2/devices/android/register
 Content-Type: application/json
 
 {
@@ -91,7 +108,7 @@ Réponses :
 ### 2 — Charger le carrousel
 
 ```txt
-GET /puzzle/carousel
+GET /v2/puzzle/carousel
 Authorization: Bearer {device_token}
 Accept-Language: fr
 ```
@@ -107,8 +124,8 @@ Réponse :
       {
         "uid": "img-uid-abc",
         "label": "Coucher de soleil",
-        "thumb_url": "/puzzle/thumb/img-uid-abc",
-        "full_url": "/puzzle/image/img-uid-abc",
+        "thumb_url": "/v2/puzzle/thumb/img-uid-abc",
+        "full_url": "/v2/puzzle/image/img-uid-abc",
         "themes": ["nature"],
         "created_at": "2026-01-15T10:00:00Z"
       }
@@ -129,7 +146,7 @@ L'accès premium est ensuite retrouvé par `purchase_token` — il **survit à u
 ### Valider un achat
 
 ```txt
-POST /puzzle/auth/verify-subscription
+POST /v2/subscriptions/playstore/verify
 Authorization: Bearer {device_token}
 Content-Type: application/json
 
@@ -139,57 +156,64 @@ Content-Type: application/json
 }
 ```
 
-Valeurs acceptées pour `product_id` :
+Voir [../playstore/GUIDE.md](../playstore/GUIDE.md) pour les réponses détaillées,
+l'upgrade/downgrade et la réinstallation.
 
-- `premium_monthly`
-- `premium_yearly`
+### Connaître le statut d'accès
 
-Réponses :
+```txt
+GET /v2/access/status?app_id=puzzle&platform=android
+Authorization: Bearer {device_token}
+```
 
-| Code | Signification |
-| --- | --- |
-| 200 | `{ data: { is_premium: true, product_id: "...", expires_at: "..." } }` — abonné actif |
-| 200 | `{ data: { is_premium: false, ... } }` — abonnement expiré |
-| 401 | Token d'appareil absent ou expiré |
-| 422 | `purchase_token` ou `product_id` manquant, ou `product_id` invalide |
-
-> Si `is_premium = false`, repasser l'app en mode gratuit sans afficher d'erreur.
-> Si `is_premium = true`, déverrouiller les fonctionnalités premium.
-
-**Upgrade / downgrade** : Google Play génère un nouveau `purchaseToken` lors d'un changement
-de plan et inclut `linkedPurchaseToken` pointant vers l'ancien. Le serveur expire automatiquement
-l'ancien abonnement — aucun traitement particulier côté client.
-
-**Réinstallation** : Google Play restaure l'achat au premier lancement. Re-soumettre le même
-`purchase_token` restaure l'accès premium sur le nouvel appareil.
+À appeler à chaque `AppLifecycleState.resumed`. Si `is_premium = false`, repasser l'app
+en mode gratuit sans afficher d'erreur.
 
 ---
 
 ## Pseudonyme
 
-Le pseudonyme est **requis** avant de créer ou rejoindre un casse-tête partagé.
-Il est unique sur tout le serveur.
+Le pseudonyme est **requis** avant de créer ou rejoindre un casse-tête partagé, et pour
+récupérer une sauvegarde par pseudonyme. Il est unique sur tout le serveur.
 
-### Définir ou modifier le pseudonyme
+Géré par le module Playstore :
+
+| Méthode | Route | Usage |
+| --- | --- | --- |
+| GET | `/v2/devices/android/pseudonym` | Lire le pseudonyme courant |
+| POST | `/v2/devices/android/pseudonym` | Définir ou modifier |
+| DELETE | `/v2/devices/android/pseudonym` | Supprimer |
+| GET | `/v2/devices/android/pseudonym/check/{pseudo}` | Vérifier la disponibilité |
+
+Erreur `409 PSEUDONYM_TAKEN` si déjà utilisé. Détails : [../playstore/GUIDE.md](../playstore/GUIDE.md).
+
+---
+
+## Liaison à un compte cmem2
+
+Un appareil peut être lié à un compte cmem2 pour hériter de l'abonnement du compte
+(utile multi-appareils ou après achat Stripe web).
 
 ```txt
-POST /puzzle/auth/pseudonym
-Authorization: Bearer {device_token}
+POST /puzzle/auth/link-device
+Authorization: Bearer {jwt_token}
 Content-Type: application/json
 
 {
-  "pseudonym": "JoueurDuDimanche"
+  "device_token": "abc...64chars"
 }
 ```
+
+> Seule route `/puzzle/auth/*` encore active — authentifiée par **JWT cmem2**, pas par device_token.
 
 Réponses :
 
 | Code | Signification |
 | --- | --- |
-| 200 | `{ data: { pseudonym: "JoueurDuDimanche" } }` |
-| 401 | Token d'appareil absent ou expiré |
-| 409 | Pseudonyme déjà utilisé — code `PSEUDONYM_TAKEN` |
-| 422 | Pseudonyme vide, trop court (< 3) ou trop long (> 50) |
+| 200 | `{ data: { device_id: 12 } }` — appareil lié au compte |
+| 401 | JWT absent ou invalide |
+| 404 | Token d'appareil inconnu ou expiré — code `DEVICE_NOT_FOUND` |
+| 422 | `device_token` manquant |
 
 ---
 
@@ -201,7 +225,7 @@ Les labels sont traduits selon le header `Accept-Language` (`fr` | `en` | `es`, 
 ### Charger le carrousel
 
 ```txt
-GET /puzzle/carousel
+GET /v2/puzzle/carousel
 Authorization: Bearer {device_token}
 Accept-Language: fr
 ```
@@ -211,7 +235,7 @@ Accept-Language: fr
 Maximum **un remplacement par jour** par appareil.
 
 ```txt
-POST /puzzle/carousel/replace-one
+POST /v2/puzzle/carousel/replace-one
 Authorization: Bearer {device_token}
 Content-Type: application/json
 
@@ -236,7 +260,7 @@ Réponses :
 ### Remplacer toutes les images complétées (premium)
 
 ```txt
-POST /puzzle/carousel/replace-all
+POST /v2/puzzle/carousel/replace-all
 Authorization: Bearer {device_token}
 Content-Type: application/json
 
@@ -264,7 +288,7 @@ Réponses :
 ### Lister les thèmes
 
 ```txt
-GET /puzzle/themes
+GET /v2/puzzle/themes
 Authorization: Bearer {device_token}
 Accept-Language: fr
 ```
@@ -279,7 +303,7 @@ Réponse :
       {
         "slug": "nature",
         "label": "Nature",
-        "thumb_url": "/puzzle/thumb/theme/nature",
+        "thumb_url": "/v2/puzzle/thumb/theme/nature",
         "image_count": 12
       }
     ]
@@ -290,7 +314,7 @@ Réponse :
 ### Charger les images d'un thème
 
 ```txt
-GET /puzzle/themes/{slug}/images
+GET /v2/puzzle/themes/{slug}/images
 Authorization: Bearer {device_token}
 Accept-Language: fr
 ```
@@ -315,9 +339,9 @@ Toutes les URLs `thumb_url` et `full_url` retournées par l'API exigent le heade
 
 | Route | Dimensions | Format |
 | --- | --- | --- |
-| `GET /puzzle/thumb/{uid}` | 200 × 200 px | JPEG |
-| `GET /puzzle/image/{uid}` | max 1920 px (côté long) | JPEG qualité 85 |
-| `GET /puzzle/thumb/theme/{slug}` | miniature thème | JPEG |
+| `GET /v2/puzzle/thumb/{uid}` | 200 × 200 px | JPEG |
+| `GET /v2/puzzle/image/{uid}` | max 1920 px (côté long) | JPEG qualité 85 |
+| `GET /v2/puzzle/thumb/theme/{slug}` | miniature thème | JPEG |
 
 > En Flutter : utiliser `Image.network(url, headers: {'Authorization': 'Bearer $deviceToken'})`.
 > Le serveur envoie `Cache-Control: private, max-age=86400` — laisser Flutter/HTTP mettre en cache.
@@ -334,7 +358,7 @@ Il contient typiquement la progression, les exploits, les paramètres locaux de 
 ### Sauvegarder
 
 ```txt
-POST /puzzle/backup
+POST /v2/puzzle/backup
 Authorization: Bearer {device_token}
 Content-Type: application/json
 
@@ -356,7 +380,7 @@ Réponses :
 ### Restaurer
 
 ```txt
-GET /puzzle/backup
+GET /v2/puzzle/backup
 Authorization: Bearer {device_token}
 ```
 
@@ -369,16 +393,44 @@ Réponses :
 | 403 | Abonnement requis — code `SUBSCRIPTION_REQUIRED` |
 | 404 | Aucune sauvegarde disponible |
 
+### Récupérer la sauvegarde d'un autre appareil (claim)
+
+Copie la sauvegarde du propriétaire d'un pseudonyme sur l'appareil courant
+(migration d'appareil, passage Android ↔ web). Le serveur cherche l'appareil
+le plus récent (Android puis web) du propriétaire du pseudonyme.
+
+```txt
+POST /v2/puzzle/backup/claim
+Authorization: Bearer {device_token}
+Content-Type: application/json
+
+{
+  "pseudonym": "JoueurDuDimanche"
+}
+```
+
+Réponses :
+
+| Code | Signification |
+| --- | --- |
+| 200 | `{ data: { pseudonym: "JoueurDuDimanche", backup: {...} } }` |
+| 401 | Token d'appareil absent ou expiré |
+| 403 | Abonnement requis — code `SUBSCRIPTION_REQUIRED` |
+| 404 | Codes `PSEUDONYM_NOT_FOUND` ou `BACKUP_NOT_FOUND` |
+| 422 | Champ `pseudonym` absent — code `PSEUDONYM_REQUIRED` |
+
 ---
 
 ## Casse-têtes partagés
 
 > Réservé aux abonnés premium. Requiert un pseudonyme défini. Synchronisation par polling (2–3 s).
+> L'état des pièces est **autoritaire côté serveur** : chaque déplacement suit la séquence
+> `pick` (prise, verrou exclusif) → `drop` (pose).
 
 ### Créer un casse-tête partagé
 
 ```txt
-POST /puzzle/shared
+POST /v2/puzzle/shared
 Authorization: Bearer {device_token}
 Content-Type: application/json
 
@@ -390,7 +442,8 @@ Content-Type: application/json
 ```
 
 Le champ `initial_pieces` est optionnel — s'il est fourni, il sert d'état de départ
-(le serveur n'en génère pas de nouveau). S'il est absent, le serveur génère un seed aléatoire.
+(le serveur n'en génère pas de nouveau, `seed = null`). S'il est absent, le serveur
+génère un seed aléatoire.
 
 Réponses :
 
@@ -406,7 +459,7 @@ Réponses :
 ### Lister ses casse-têtes partagés actifs
 
 ```txt
-GET /puzzle/shared
+GET /v2/puzzle/shared
 Authorization: Bearer {device_token}
 ```
 
@@ -421,7 +474,7 @@ Réponse :
         "shared_uid": "sh-uid-xyz",
         "image_uid": "img-uid-abc",
         "image_label": "Coucher de soleil",
-        "thumb_url": "/puzzle/thumb/img-uid-abc",
+        "thumb_url": "/v2/puzzle/thumb/img-uid-abc",
         "piece_count": 100,
         "completion": 42,
         "partner_pseudonym": "AutreJoueur",
@@ -438,7 +491,7 @@ Réponse :
 à utiliser pour le polling incrémental.
 
 ```txt
-GET /puzzle/shared/{shared_uid}/state
+GET /v2/puzzle/shared/{shared_uid}/state
 Authorization: Bearer {device_token}
 ```
 
@@ -460,10 +513,42 @@ Réponse :
 }
 ```
 
-### Envoyer un mouvement de pièce
+### Prendre une pièce (pick)
+
+À appeler quand le joueur saisit une pièce. Pose un **verrou exclusif** : la pièce passe
+à l'état `held` pour cet utilisateur. Refusé si la pièce est verrouillée (placée) ou
+déjà tenue par le partenaire.
 
 ```txt
-POST /puzzle/shared/{shared_uid}/move
+POST /v2/puzzle/shared/{shared_uid}/pick
+Authorization: Bearer {device_token}
+Content-Type: application/json
+
+{
+  "piece_id": 0
+}
+```
+
+Réponses :
+
+| Code | Signification |
+| --- | --- |
+| 200 | `{ data: { piece_id: 0, state: "held", held_by: "JoueurDuDimanche", event_id: 319 } }` |
+| 401 | Token d'appareil absent ou expiré |
+| 403 | Abonnement requis |
+| 404 | Casse-tête introuvable ou archivé — code `SHARED_NOT_FOUND` |
+| 409 | Pièce déjà tenue par le partenaire |
+| 422 | `piece_id` manquant |
+| 423 | Pièce déjà placée définitivement — code `LOCKED` |
+
+> Si 409 ou 423 : refuser la saisie localement.
+
+### Poser une pièce (drop)
+
+Pose une pièce précédemment prise via `/pick`. La pièce doit être tenue par l'appelant.
+
+```txt
+POST /v2/puzzle/shared/{shared_uid}/drop
 Authorization: Bearer {device_token}
 Content-Type: application/json
 
@@ -476,24 +561,39 @@ Content-Type: application/json
 }
 ```
 
+Champs du body :
+
+| Champ | Type | Détail |
+| --- | --- | --- |
+| `piece_id` | integer, requis | Index de la pièce (0 à piece_count−1) |
+| `x`, `y` | float, requis sauf si `to_tray=true` | Position sur le plateau |
+| `rotation` | integer, optionnel (défaut 0) | 0 \| 90 \| 180 \| 270 |
+| `to_tray` | boolean, optionnel (défaut false) | `true` pour renvoyer la pièce dans le bac |
+| `locked` | boolean, optionnel (défaut false) | `true` si pièce correctement placée |
+
 Réponses :
 
 | Code | Signification |
 | --- | --- |
-| 200 | `{ data: { event_id: 319, completion: 43 } }` |
+| 200 | `{ data: { piece_id: 0, state: "...", x, y, rotation, event_id: 320, completion: 43 } }` |
 | 401 | Token d'appareil absent ou expiré |
 | 403 | Abonnement requis |
 | 404 | Casse-tête introuvable ou archivé — code `SHARED_NOT_FOUND` |
-| 422 | `piece_id`, `x` ou `y` manquant |
+| 409 | Pièce non tenue par l'appelant — refaire `/pick` |
+| 422 | `piece_id` requis ; `x` et `y` requis sauf si `to_tray=true` |
 
-> Appliquer le mouvement localement **avant** d'envoyer la requête (fire-and-forget UI).
+> Séquence : `/pick` à la saisie, `/drop` au relâchement. Appliquer le mouvement localement
+> **avant** d'attendre la réponse (fire-and-forget UI).
 
 ### Polling des événements du partenaire
 
 ```txt
-GET /puzzle/shared/{shared_uid}/events?after={last_event_id}
+GET /v2/puzzle/shared/{shared_uid}/events?after={last_event_id}
 Authorization: Bearer {device_token}
 ```
+
+N'inclut pas les événements de l'appelant. `partner_active = true` si le partenaire
+a été vu il y a moins de 10 s.
 
 Réponses :
 
@@ -516,7 +616,7 @@ Flux de polling recommandé :
 ### Quitter un casse-tête partagé
 
 ```txt
-POST /puzzle/shared/{shared_uid}/leave
+POST /v2/puzzle/shared/{shared_uid}/leave
 Authorization: Bearer {device_token}
 ```
 
@@ -534,7 +634,7 @@ Réponses :
 ### Supprimer définitivement un casse-tête partagé
 
 ```txt
-DELETE /puzzle/shared/{shared_uid}
+DELETE /v2/puzzle/shared/{shared_uid}
 Authorization: Bearer {device_token}
 ```
 
@@ -555,16 +655,19 @@ Réponses :
 
 | Code | HTTP | Description |
 | --- | --- | --- |
-| `DEVICE_NOT_FOUND` | 401 | Token d'appareil inconnu ou expiré |
+| `DEVICE_NOT_FOUND` | 401 / 404 | Token d'appareil inconnu ou expiré |
 | `SUBSCRIPTION_REQUIRED` | 403 | Endpoint réservé aux abonnés actifs |
-| `SUBSCRIPTION_INVALID` | 422 | Reçu Google Play invalide ou abonnement expiré |
 | `PSEUDONYM_TAKEN` | 409 | Pseudonyme déjà utilisé par un autre appareil |
+| `PSEUDONYM_NOT_FOUND` | 404 | Pseudonyme introuvable (backup/claim) |
+| `PSEUDONYM_REQUIRED` | 422 | Champ `pseudonym` absent (backup/claim) |
+| `BACKUP_NOT_FOUND` | 404 | Aucune sauvegarde pour ce pseudonyme (backup/claim) |
 | `NO_REPLACEMENT_AVAILABLE` | 404 | Aucune image de remplacement disponible |
 | `ALREADY_REPLACED_TODAY` | 429 | Un remplacement a déjà eu lieu aujourd'hui |
 | `THEME_NOT_FOUND` | 404 | Slug de thème inexistant ou inactif |
 | `PARTNER_NOT_FOUND` | 404 | Pseudonyme partenaire introuvable ou non abonné |
 | `SHARED_NOT_FOUND` | 404 | Casse-tête partagé introuvable ou archivé |
 | `NOT_CREATOR` | 403 | Action réservée au créateur du partagé |
+| `LOCKED` | 423 | Pièce déjà placée définitivement (pick) |
 
 ---
 
@@ -576,13 +679,13 @@ Réponses :
 | --- | --- | --- |
 | `puzzle_device_uuid` | UUID v4 (string) | Généré une fois à l'installation, ne change jamais |
 | `puzzle_device_token` | Token 64 chars hex | Remplacé à chaque renouvellement |
-| `puzzle_pseudonym` | Pseudonyme (string) | Optionnel — requis pour le mode partagé |
+| `puzzle_pseudonym` | Pseudonyme (string) | Optionnel — requis pour le mode partagé et le claim |
 
 ### Renouvellement du token
 
 ```txt
 Si 401 reçu sur n'importe quel endpoint :
-  → POST /puzzle/auth/register-device { device_uuid }
+  → POST /v2/devices/android/register { device_uuid }
   → Stocker le nouveau device_token
   → Relancer la requête originale
 ```
@@ -596,7 +699,7 @@ les labels traduits des images et des thèmes.
 
 ```dart
 Image.network(
-  '$apiBase/puzzle/thumb/$uid',
+  '$apiBase/v2/puzzle/thumb/$uid',
   headers: {'Authorization': 'Bearer $deviceToken'},
 )
 ```
@@ -608,11 +711,30 @@ Laisser le cache HTTP de Flutter gérer la mise en cache.
 
 ```txt
 1. Lire puzzle_device_uuid depuis SharedPreferences
-   Si absent : génerer un UUID v4, le stocker
-2. POST /puzzle/auth/register-device { device_uuid }
+   Si absent : générer un UUID v4, le stocker
+2. POST /v2/devices/android/register { device_uuid }
    → Stocker device_token et expires_at
 3. Si abonnement Google Play détecté :
-   POST /puzzle/auth/verify-subscription { purchase_token, product_id }
+   POST /v2/subscriptions/playstore/verify { purchase_token, product_id }
+4. GET /v2/access/status?app_id=puzzle&platform=android
    → Activer ou désactiver les fonctionnalités premium selon is_premium
-4. GET /puzzle/carousel → afficher les images
+5. GET /v2/puzzle/carousel → afficher les images
 ```
+
+---
+
+## Routes dépréciées
+
+Migrées en v2.7.0 vers les modules `/v2/devices/*` et `/v2/subscriptions/*`.
+
+| Ancienne route | Remplacée par |
+| --- | --- |
+| `POST /puzzle/auth/register-device` | `POST /v2/devices/android/register` |
+| `POST /puzzle/auth/pseudonym` | `POST /v2/devices/android/pseudonym` |
+| `POST /puzzle/auth/verify-subscription` | `POST /v2/subscriptions/playstore/verify` |
+| `POST /puzzle/shared/{uid}/move` | `POST /v2/puzzle/shared/{uid}/pick` + `/drop` |
+
+> Les routes `/puzzle/*` (sans `/v2`) restent techniquement routées vers le même gestionnaire,
+> mais les clients doivent utiliser exclusivement le préfixe `/v2/puzzle/*`.
+> Seule exception : `POST /puzzle/auth/link-device` (JWT), voir
+> [Liaison à un compte cmem2](#liaison-à-un-compte-cmem2).

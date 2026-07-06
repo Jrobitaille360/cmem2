@@ -15,7 +15,6 @@ Version 2.2.4 · Base URL : `/`
 - [Endpoints — Fichiers](#endpoints--fichiers)
 - [Endpoints — Tags](#endpoints--tags)
 - [Endpoints — Statistiques](#endpoints--statistiques)
-- [Endpoints — Webhooks](#endpoints--webhooks)
 - [Endpoints — Public](#endpoints--public)
 - [Abonnements Premium](#abonnements-premium)
 - [Erreurs](#erreurs)
@@ -33,7 +32,6 @@ Le module core gère :
 - **Fichiers** : upload, soft delete, restauration
 - **Tags** : catégorisation flexible avec couleurs
 - **Statistiques** : analytics utilisateurs et groupes
-- **Webhooks** : notifications HTTP sur événements
 
 ---
 
@@ -392,19 +390,14 @@ Tags avec couleurs (nom ou `#RRGGBB`), associables à groupes et fichiers.
 
 | Méthode | Endpoint | Auth | Description |
 | --- | --- | --- | --- |
-| GET | `/stats/user/{id}` | JWT | Stats d'un utilisateur |
+| POST | `/stats/build` | JWT | Construire/rafraîchir les statistiques |
+| GET | `/stats/platform` | JWT | Stats globales de la plateforme |
+| GET | `/stats/groups` | JWT | Stats des groupes |
+| GET | `/stats/users` | JWT | Stats de tous les utilisateurs |
+| GET | `/stats/users/{id}` | JWT | Stats d'un utilisateur |
+| GET | `/stats/my-stats` | JWT | Stats de l'utilisateur courant |
 | GET | `/stats/online` | JWT | Utilisateurs en ligne |
-
----
-
-## Endpoints — Webhooks
-
-| Méthode | Endpoint | Auth | Description |
-| --- | --- | --- | --- |
-| POST | `/webhooks` | JWT | Créer un webhook |
-| GET | `/webhooks` | JWT | Liste |
-| PUT | `/webhooks/{id}` | JWT | Modifier |
-| DELETE | `/webhooks/{id}` | JWT | Supprimer |
+| POST | `/stats/cleanup-sessions` | JWT | Nettoyer les sessions expirées |
 
 ---
 
@@ -471,9 +464,11 @@ La table `subscriptions` est la **source unique de vérité** pour tous les prov
 | GET | `/subscription/status` | JWT | Statut Premium de toutes les apps |
 | GET | `/subscription/status?app_id={app}` | JWT | Statut Premium d'une app spécifique |
 | POST | `/subscription/verify` | JWT | Valider un achat provider et activer le Premium |
-| POST | `/subscription/checkout` | JWT | Créer une session Stripe Checkout (paiement web) |
-| POST | `/subscription/portal` | JWT | Ouvrir le portail Stripe pour gérer l'abonnement |
 | DELETE | `/subscription/cancel` | JWT | Annuler un abonnement |
+
+> **Dépréciées depuis v2.7.0** : `POST /subscription/checkout` et `POST /subscription/portal`
+> retournent `410 Gone`. Utiliser `POST /v2/billing/checkout` et `POST /v2/billing/portal`
+> — voir [../stripe/GUIDE.md](../stripe/GUIDE.md).
 
 ### Structure de réponse
 
@@ -486,44 +481,16 @@ Chaque entrée `app_id` dans `subscriptions{}` retourne :
 | `expires_at` | datetime\|null | Date d'expiration UTC (`Y-m-d H:i:s`) |
 | `provider` | string\|null | `stripe`, `google_play`, `apple`, `microsoft` |
 | `plan` | string\|null | `monthly` (+31 j) ou `yearly` (+365 j) |
-
 | `is_trial` | boolean | `true` si l'abonnement est en période d'essai |
 | `trial_end` | datetime\|null | Fin de la période d'essai UTC, ou `null` |
 
 > Utiliser `show_ads` (et non `is_premium`) pour décider d'afficher les publicités.
 
-### POST /subscription/checkout
+### Checkout et portail Stripe
 
-Crée une session Stripe Checkout avec essai gratuit de 7 jours. Retourne une URL à ouvrir dans le navigateur.
-
-```json
-{ "app_id": "puzzle", "plan": "monthly" }
-```
-
-Réponse `200` :
-
-```json
-{
-  "checkout_url": "https://checkout.stripe.com/c/pay/cs_test_...",
-  "session_id": "cs_test_..."
-}
-```
-
-### POST /subscription/portal
-
-Ouvre le Stripe Billing Portal pour qu'un utilisateur puisse gérer (modifier, annuler) son abonnement existant.
-
-```json
-{ "app_id": "puzzle" }
-```
-
-Réponse `200` :
-
-```json
-{ "portal_url": "https://billing.stripe.com/p/session/..." }
-```
-
-Retourne `404` avec `errors.error = "NO_SUBSCRIPTION"` si aucun `stripe_customer_id` n'est trouvé en base pour cet utilisateur + `app_id`.
+Le paiement web (Checkout) et le portail de gestion Stripe sont gérés par le module Stripe :
+`POST /v2/billing/checkout` et `POST /v2/billing/portal`.
+Voir [../stripe/GUIDE.md](../stripe/GUIDE.md).
 
 ### Providers supportés
 

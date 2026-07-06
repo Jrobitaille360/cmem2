@@ -36,10 +36,14 @@ Le plugin Pomo est intégré dans cmem2 via le système de plugins. Il couvre :
 
 | Phase | Contenu | Statut |
 | --- | --- | --- |
-| Ph1A | Engagement public (waitlist, sondage) | Actif |
-| Ph1B | Support (formulaire, email confirmation) | Actif (si `SUPPORT_FORM_ENABLED=true`) |
-| Ph2 | Sync cloud sessions/tâches/paramètres | À venir |
-| Ph3 | Abonnements Stripe | À venir |
+| Ph1A | Engagement public (waitlist, sondage) | **Actif** |
+| Ph1B | Support (formulaire, email confirmation) | À venir — non implémenté |
+| Ph2 | Sync cloud sessions/tâches/paramètres | À venir — non implémenté |
+| Ph3 | Abonnements Stripe | À venir — non implémenté |
+
+> Seul `POST /pomo/engagement` est routé par le serveur. Toute autre route `/pomo/*`
+> retourne actuellement `404`. Les sections Ph1B, Ph2 et Ph3 ci-dessous décrivent le
+> contrat **prévu** et peuvent changer avant implémentation.
 
 ---
 
@@ -124,11 +128,13 @@ Réponse `201` :
 
 ## Endpoints — Support (Ph1B)
 
+> **Non implémenté** — cette route retourne actuellement `404`. Contrat prévu ci-dessous.
+
 ### POST /pomo/support
 
 Soumettre un formulaire de support. Envoie un email à l'équipe et une confirmation à l'utilisateur. Enregistre la demande avec un `reference_id` unique.
 
-**Auth** : JWT requis — activé uniquement si `SUPPORT_FORM_ENABLED=true` en configuration
+**Auth** : JWT requis — sera activé uniquement si `SUPPORT_FORM_ENABLED=true` en configuration
 
 ```json
 {
@@ -167,7 +173,8 @@ Réponse `201` :
 
 ## Endpoints — Sync cloud (Ph2)
 
-> Disponible quand `POMO_SYNC_ENABLED=true`. Nécessite JWT.
+> **Non implémenté** — ces routes retournent actuellement `404`. Contrat prévu :
+> disponible quand `POMO_SYNC_ENABLED=true`, JWT requis.
 
 | Méthode | Endpoint | Description |
 | --- | --- | --- |
@@ -186,6 +193,8 @@ Réponse `201` :
 ---
 
 ## Endpoints — Stripe (Ph3)
+
+> **Non implémenté** — cette route retourne actuellement `404`. Contrat prévu ci-dessous.
 
 | Méthode | Endpoint | Description |
 | --- | --- | --- |
@@ -207,10 +216,9 @@ La requête doit inclure le header `Stripe-Signature` pour validation HMAC. Voir
 
 | Code | Signification |
 | --- | --- |
-| 401 | JWT absent ou invalide |
+| 404 | Route non implémentée (Ph1B, Ph2, Ph3) |
 | 409 | Email déjà dans la waitlist (`type=waitlist`) |
 | 422 | Validation échouée — détail dans `errors[{ field, code, message }]` |
-| 503 | Fonctionnalité désactivée (`SUPPORT_FORM_ENABLED=false`) |
 
 ---
 

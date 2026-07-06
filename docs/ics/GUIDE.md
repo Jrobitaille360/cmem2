@@ -146,7 +146,8 @@ Auth   : Basic  (email + mot de passe) ou Bearer JWT
 | GET | `/calendars/{id}/events` | Lister les événements |
 | GET | `/calendars/{id}/events/{eventId}` | Détails |
 | PUT | `/calendars/{id}/events/{eventId}` | Modifier |
-| DELETE | `/calendars/{id}/events/{eventId}` | Supprimer |
+| DELETE | `/calendars/{id}/events/{eventId}` | Supprimer (soft) |
+| DELETE | `/calendars/{id}/events/{eventId}/hard` | Suppression définitive |
 
 ### POST /calendars/{id}/events — exemple complet
 
@@ -214,7 +215,8 @@ Auth   : Basic  (email + mot de passe) ou Bearer JWT
 
 | Méthode | Endpoint | Description |
 | --- | --- | --- |
-| GET | `/calendars/{id}/events/{eventId}/occurrences` | Lister les occurrences |
+| GET | `/calendars/{id}/events/{eventId}/occurrences` | Lister les occurrences d'un événement |
+| GET | `/calendars/{id}/events/occurrences` | Occurrences de tous les événements du calendrier (`?start=&end=`) |
 | PUT | `/calendars/{id}/events/{eventId}/occurrences` | Modifier une occurrence |
 | DELETE | `/calendars/{id}/events/{eventId}/occurrences` | Supprimer/annuler une occurrence |
 

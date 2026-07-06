@@ -403,7 +403,7 @@
       "interval_ms": 2500,
       "endpoint": "GET /v2/puzzle/shared/{shared_uid}/events?after={last_event_id}",
       "stop_conditions": "Arrêter le polling quand completion = 100, partagé archivé (404), ou destroy du widget.",
-      "move_flow": "À chaque action : 1) appliquer localement, 2) POST /move (fire-and-forget UI), 3) stocker event_id retourné comme nouveau last_event_id."
+      "move_flow": "À chaque action : 1) appliquer localement, 2) POST /pick à la saisie puis POST /drop au relâchement (fire-and-forget UI), 3) stocker event_id retourné comme nouveau last_event_id."
     }
   }
 }

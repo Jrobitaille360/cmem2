@@ -23,4 +23,4 @@ Chaque module expose sa documentation d'API au format JSON. Ces fichiers décriv
 - Routes legacy actives : section `deprecated_routes` avec `replaced_by`.
 - Routes supprimées (404/410) : section `removed_routes`.
 - Les routes `secret-admin` ne sont volontairement pas documentées.
-- Guides narratifs par module : `docs/<module>/GUIDE.md` quand présent.
+- Guides narratifs par module : `docs/<module>/GUIDE.md` — disponibles pour core, ics, items, quiz, puzzle, playstore, webdevice, stripe, access, traque et pomo (audit guides ↔ JSON ↔ code : 2026-07-06).

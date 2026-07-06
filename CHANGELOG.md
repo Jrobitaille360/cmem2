@@ -7,6 +7,22 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-07-06 14:30]
+
+### Docs — alignement des GUIDE.md sur les JSON et le code + 3 nouveaux guides (audit complet)
+
+- **`docs/puzzle/GUIDE.md`** — réécriture v2.0.0 (était resté pré-v2.7.0) : chemins migrés vers `/v2/puzzle/*` ; routes fictives retirées (`POST /puzzle/auth/pseudonym`, `POST /puzzle/auth/verify-subscription`, `POST .../shared/{uid}/move`) ; documentation des vraies routes `pick`/`drop` (verrou exclusif, 409/423, `to_tray`), `POST /v2/puzzle/backup/claim` et `POST /puzzle/auth/link-device` (JWT) ; auth/pseudonyme/abonnement renvoient vers les modules playstore et access ; section « Routes dépréciées » ajoutée
+- **`docs/core/GUIDE.md`** — section Webhooks retirée (aucune route `/webhooks/*` dans le code) ; `POST /subscription/checkout` et `POST /subscription/portal` marqués dépréciés 410 Gone (v2.7.0) avec renvoi vers `/v2/billing/*` ; table Statistiques alignée sur le code (`/stats/users/{id}` au lieu de `/stats/user/{id}`, ajout build/platform/groups/users/my-stats/cleanup-sessions) ; table `is_trial`/`trial_end` réparée (ligne vide qui cassait le tableau)
+- **`docs/pomo/GUIDE.md`** — Ph1B support marqué « À venir — non implémenté » (était annoncé actif alors que la route répond 404) ; avertissements 404 explicites sur les sections Ph1B/Ph2/Ph3 (contrat prévisionnel) ; table d'erreurs corrigée (404 au lieu de 503/401)
+- **`docs/ics/GUIDE.md`** — routes manquantes ajoutées : `DELETE /calendars/{id}/events/{eventId}/hard` et `GET /calendars/{id}/events/occurrences` (occurrences globales du calendrier)
+- **`docs/puzzle/API_PUZZLE_ENDPOINTS.json`** — reliquat `POST /move` corrigé en `pick`/`drop` dans `client_integration.shared_polling.move_flow`
+- **`docs/access/GUIDE.md`** — nouveau guide : `GET /v2/access/status` (matrice d'accès premium par plateforme, sources Stripe, filtre `platform`)
+- **`docs/webdevice/GUIDE.md`** — nouveau guide : `/v2/devices/web/*` et alias `/v2/devices/windows/*` (register JWT-optionnel, pseudonyme unique par app_id partagé entre plateformes)
+- **`docs/traque/GUIDE.md`** — nouveau guide : création de personnage (classes/races/stats), monstres géolocalisés (biomes OSM, scaling `X-Player-Level`), combat (start/attack/flee, contre-attaque serveur), repos, journal/achievements/bestiaire, leaderboard
+- Vérifié conformes sans changement : `docs/items/GUIDE.md`, `docs/playstore/GUIDE.md`, `docs/stripe/GUIDE.md`, `docs/quiz/GUIDE.md` (export CSV clairement sous Roadmap)
+
+---
+
 ## [Unreleased 2026-07-06 12:00]
 
 ### Docs — alignement des JSON d'endpoints sur le code réel (audit complet docs ↔ src)
