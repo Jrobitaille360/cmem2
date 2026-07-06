@@ -17,10 +17,29 @@ Chaque module expose sa documentation d'API au format JSON. Ces fichiers décriv
 | [traque/API_TRAQUE_ENDPOINTS.json](traque/API_TRAQUE_ENDPOINTS.json) | 17 | Jeu Traque : monstres géolocalisés (OSM), combat, personnage (création, repos, level-up), bestiaire, leaderboard. |
 | [pomo/API_POMO_ENDPOINTS_v1_0_0.json](pomo/API_POMO_ENDPOINTS_v1_0_0.json) | 1 | Plugin Pomodoro — phase 1A seulement : `POST /pomo/engagement` (waitlist/sondage public). Phases 1B/2/3 planifiées. |
 
+## Guides narratifs par module
+
+Chaque guide complète le JSON avec les flux d'intégration, exemples et codes d'erreur
+(audit guides ↔ JSON ↔ code : 2026-07-06).
+
+| Guide | Contenu |
+| - | - |
+| [core/GUIDE.md](core/GUIDE.md) | Auth JWT/OTP, device tokens, users, groupes, fichiers (accessibilité, SVG→PNG), tags, stats, abonnements. |
+| [ics/GUIDE.md](ics/GUIDE.md) | Calendriers, événements récurrents, occurrences, VTODO/VJOURNAL/VFREEBUSY, partage public, CalDAV. |
+| [items/GUIDE.md](items/GUIDE.md) | Items privés/publics/partagés, catégories, permissions par utilisateur. |
+| [quiz/GUIDE.md](quiz/GUIDE.md) | Flux animateur (JWT) et participant (participant_token), sessions, leaderboard. |
+| [puzzle/GUIDE.md](puzzle/GUIDE.md) | Client mobile Flutter : carrousel, thèmes, backup/claim, casse-têtes partagés (pick/drop). |
+| [puzzle/guide_image_manager.md](puzzle/guide_image_manager.md) | SPA React d'administration des images et thèmes. |
+| [playstore/GUIDE.md](playstore/GUIDE.md) | Devices Android, pseudonyme, abonnements Google Play (verify/status/cancel). |
+| [webdevice/GUIDE.md](webdevice/GUIDE.md) | Devices web/Windows (alias `/v2/devices/windows/*`), pseudonyme multi-plateforme. |
+| [stripe/GUIDE.md](stripe/GUIDE.md) | Checkout, portail, webhook `/v2/billing/*`, routes legacy dépréciées. |
+| [access/GUIDE.md](access/GUIDE.md) | `GET /v2/access/status` — matrice d'accès premium par plateforme. |
+| [traque/GUIDE.md](traque/GUIDE.md) | Personnage, monstres géolocalisés, combat, repos, bestiaire, leaderboard. |
+| [pomo/GUIDE.md](pomo/GUIDE.md) | Engagement public (Ph1A actif) ; support/sync/Stripe = contrat prévisionnel (404). |
+
 ## Conventions
 
 - Format commun des entrées : `method`, `path`, `description`, `body`/`query_params`, `responses`.
 - Routes legacy actives : section `deprecated_routes` avec `replaced_by`.
 - Routes supprimées (404/410) : section `removed_routes`.
 - Les routes `secret-admin` ne sont volontairement pas documentées.
-- Guides narratifs par module : `docs/<module>/GUIDE.md` — disponibles pour core, ics, items, quiz, puzzle, playstore, webdevice, stripe, access, traque et pomo (audit guides ↔ JSON ↔ code : 2026-07-06).

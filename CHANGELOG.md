@@ -20,6 +20,7 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - **`docs/webdevice/GUIDE.md`** — nouveau guide : `/v2/devices/web/*` et alias `/v2/devices/windows/*` (register JWT-optionnel, pseudonyme unique par app_id partagé entre plateformes)
 - **`docs/traque/GUIDE.md`** — nouveau guide : création de personnage (classes/races/stats), monstres géolocalisés (biomes OSM, scaling `X-Player-Level`), combat (start/attack/flee, contre-attaque serveur), repos, journal/achievements/bestiaire, leaderboard
 - Vérifié conformes sans changement : `docs/items/GUIDE.md`, `docs/playstore/GUIDE.md`, `docs/stripe/GUIDE.md`, `docs/quiz/GUIDE.md` (export CSV clairement sous Roadmap)
+- **`docs/entrypoints.md`** — nouvelle section « Guides narratifs par module » : table des 12 guides avec lien et résumé du contenu
 
 ---
 
