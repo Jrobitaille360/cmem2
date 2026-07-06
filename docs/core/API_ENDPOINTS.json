@@ -1,9 +1,9 @@
 {
   "api": {
     "name": "AuthGroups API",
-    "version": "2.2.4",
+    "version": "2.8.0",
     "description": "API REST complète pour la gestion d'authentification, groupes, fichiers, tags et abonnements Premium",
-    "generated": "2026-04-09",
+    "generated": "2026-07-06",
     "base_url": "/",
     "authentication": {
       "type": "JWT_BEARER",
@@ -625,6 +625,27 @@
             "app_id": "string (required)"
           },
           "response": "{ deleted: true }"
+        },
+        {
+          "method": "GET",
+          "path": "/users/me/notification-preferences",
+          "description": "Récupérer les préférences de notifications email de l'utilisateur (fournies par le plugin ICS)",
+          "response": "Objet des préférences de notifications",
+          "errors": {
+            "503": "Plugin de notifications non disponible"
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/users/me/notification-preferences",
+          "description": "Mettre à jour les préférences de notifications email de l'utilisateur (fournies par le plugin ICS)",
+          "body": {
+            "preferences": "object — champs de préférences à modifier"
+          },
+          "response": "Objet des préférences mises à jour",
+          "errors": {
+            "503": "Plugin de notifications non disponible"
+          }
         }
       ]
     },
@@ -1292,67 +1313,6 @@
             "ADMINISTRATEUR"
           ],
           "response": "Nombre de sessions nettoyées"
-        }
-      ]
-    },
-    "secret-admin": {
-      "description": "Endpoints d'administration — double authentification requise : JWT ADMINISTRATEUR + ADMIN_SECRET_KEY",
-      "base_path": "/secret-admin",
-      "auth_required": true,
-      "auth_header": "Authorization: Bearer {jwt_token}",
-      "roles": [
-        "ADMINISTRATEUR"
-      ],
-      "additional_security": "ADMIN_SECRET_KEY obligatoire — body JSON (POST) ou query param admin_secret (GET)",
-      "routes": [
-        {
-          "method": "POST",
-          "path": "/secret-admin/execute-procedure",
-          "description": "Exécuter une procédure stockée MySQL",
-          "body": {
-            "admin_secret": "string (required) — ADMIN_SECRET_KEY",
-            "procedure": "string (required) — nom PascalCase de la procédure",
-            "parameters": "array (optional)"
-          },
-          "allowed_procedures": [
-            "AddCalDAVSupport",
-            "CleanupExpiredSessions",
-            "CleanupOldStats",
-            "GenerateGroupStats",
-            "GeneratePlatformStats",
-            "GenerateUserStats",
-            "ResetAuthenticationGroups",
-            "ResetICSTables"
-          ],
-          "response": "{ procedure, parameters, result, executed_at, executed_by: { admin_id, admin_email } }",
-          "errors": {
-            "400": "Procédure manquante ou non autorisée",
-            "403": "admin_secret invalide ou absent"
-          }
-        },
-        {
-          "method": "GET",
-          "path": "/secret-admin/procedures",
-          "description": "Lister les procédures disponibles avec leur description et niveau de danger",
-          "query": {
-            "admin_secret": "string (required) — ADMIN_SECRET_KEY"
-          },
-          "response": "{ count, procedures: Array, authentication_info, usage }",
-          "errors": {
-            "403": "admin_secret invalide ou absent"
-          }
-        },
-        {
-          "method": "GET",
-          "path": "/secret-admin/plugins",
-          "description": "Lister les plugins chargés",
-          "query": {
-            "admin_secret": "string (required) — ADMIN_SECRET_KEY"
-          },
-          "response": "{ plugins: object, count: integer }",
-          "errors": {
-            "403": "admin_secret invalide ou absent"
-          }
         }
       ]
     },

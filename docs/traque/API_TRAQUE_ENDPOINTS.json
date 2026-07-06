@@ -245,6 +245,20 @@
     },
     {
       "method": "GET",
+      "path": "/traque/players/check-name",
+      "description": "Vérifie la disponibilité d'un nom de personnage avant création.",
+      "auth": "JWT Bearer",
+      "query": {
+        "name": "string (requis) — nom de personnage à vérifier"
+      },
+      "response_200": { "available": true },
+      "errors": {
+        "400": "Paramètre name requis",
+        "401": "JWT absent ou expiré"
+      }
+    },
+    {
+      "method": "GET",
       "path": "/traque/players/me",
       "description": "Profil complet du joueur connecté.",
       "auth": "JWT Bearer",
@@ -295,6 +309,23 @@
       "errors": {
         "401": "JWT absent ou expiré",
         "404": "Personnage introuvable"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/traque/players/me/rest",
+      "description": "Repos du personnage : soigne les PV et déclenche un cooldown. type=active (défaut) : soigne 50% des PV manquants (min 1), cooldown 30 min. type=full : PV au maximum, cooldown 4 h. Retourne le profil complet mis à jour.",
+      "auth": "JWT Bearer",
+      "query": {
+        "type": "active | full (optionnel, défaut active)"
+      },
+      "response_200": {
+        "note": "Retourne le même objet que GET /traque/players/me avec hp_current mis à jour et rest_available_at renseigné (ISO 8601 UTC)."
+      },
+      "errors": {
+        "401": "JWT absent ou expiré",
+        "404": "Personnage introuvable",
+        "409": { "error": "rest_cooldown", "rest_available_at": "ISO 8601 UTC — prochain repos possible" }
       }
     },
     {

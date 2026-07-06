@@ -136,11 +136,19 @@
     "unified_status": "GET /v2/access/status — endpoint consolidé Stripe (JWT). Android : GET /v2/subscriptions/playstore/status (X-Device-Token)"
   },
   "deprecated_routes": {
-    "description": "Routes legacy actives avant v2.7.0. Écrivent dans la table subscriptions (générique). Migrer vers /v2/billing/*.",
+    "description": "Routes legacy /subscription/* encore fonctionnelles (écrivent dans la table subscriptions générique). Migrer vers /v2/billing/* et /v2/subscriptions/stripe/*.",
     "routes": [
-      { "method": "POST", "path": "/subscription/checkout", "replaced_by": "POST /v2/billing/checkout" },
-      { "method": "POST", "path": "/subscription/portal",   "replaced_by": "POST /v2/billing/portal" },
-      { "method": "POST", "path": "/stripe/webhook",        "replaced_by": "POST /v2/billing/webhook" }
+      { "method": "GET",    "path": "/subscription/status",   "status": "active", "replaced_by": "GET /v2/subscriptions/stripe/status (ou GET /v2/access/status)" },
+      { "method": "POST",   "path": "/subscription/verify",   "status": "active", "description": "Enregistre un abonnement générique — body { app_id, provider, product_id, plan, purchase_token?, stripe_sub_id? }", "replaced_by": "flux /v2/billing/webhook (Stripe) ou POST /v2/subscriptions/playstore/verify (Android)" },
+      { "method": "DELETE", "path": "/subscription/cancel",   "status": "active", "replaced_by": "DELETE /v2/subscriptions/stripe" }
+    ]
+  },
+  "removed_routes": {
+    "description": "Routes supprimées ou neutralisées depuis v2.7.0.",
+    "routes": [
+      { "method": "POST", "path": "/subscription/checkout", "response": "410 Gone", "replaced_by": "POST /v2/billing/checkout" },
+      { "method": "POST", "path": "/subscription/portal",   "response": "410 Gone", "replaced_by": "POST /v2/billing/portal" },
+      { "method": "POST", "path": "/stripe/webhook",        "response": "404 Not Found", "replaced_by": "POST /v2/billing/webhook" }
     ]
   }
 }

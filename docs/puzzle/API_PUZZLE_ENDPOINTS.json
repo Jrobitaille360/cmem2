@@ -190,6 +190,45 @@
             "403": "SUBSCRIPTION_REQUIRED",
             "404": "Aucune sauvegarde disponible"
           }
+        },
+        {
+          "method": "POST",
+          "path": "/v2/puzzle/backup/claim",
+          "description": "Récupère la sauvegarde d'un autre appareil identifié par son pseudonyme, et la copie sur l'appareil courant. Cherche le device le plus récent (Android puis web) du propriétaire du pseudonyme.",
+          "body": {
+            "pseudonym": "string (required) — Pseudonyme du propriétaire de la sauvegarde"
+          },
+          "responses": {
+            "200": "{ success: true, message: 'Progression récupérée', data: { pseudonym: string, backup: object } }",
+            "401": "device_token absent ou expiré",
+            "403": "SUBSCRIPTION_REQUIRED",
+            "404": "{ errors: { code: 'PSEUDONYM_NOT_FOUND' } } ou { errors: { code: 'BACKUP_NOT_FOUND' } }",
+            "422": "{ errors: { code: 'PSEUDONYM_REQUIRED' } } — champ pseudonym absent"
+          }
+        }
+      ]
+    },
+    "auth": {
+      "description": "Liaison appareil ↔ compte cmem2. Seule route /puzzle/auth/* encore active — les autres répondent 410 (migrées vers /v2/devices/* et /v2/subscriptions/* en v2.7.0).",
+      "auth_required": true,
+      "auth_type": "JWT_BEARER",
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/puzzle/auth/link-device",
+          "description": "Lie un device_token (android_devices ou web_devices) au compte cmem2 authentifié par JWT. Permet à l'appareil d'hériter de l'abonnement du compte.",
+          "headers": {
+            "Authorization": "Bearer {jwt_token}"
+          },
+          "body": {
+            "device_token": "string (required) — Token opaque de l'appareil à lier"
+          },
+          "responses": {
+            "200": "{ success: true, message: 'Appareil lié au compte', data: { device_id: integer } }",
+            "401": "JWT absent ou invalide",
+            "404": "{ errors: { code: 'DEVICE_NOT_FOUND' } } — token d'appareil inconnu ou expiré",
+            "422": "device_token manquant"
+          }
         }
       ]
     },
@@ -245,26 +284,49 @@
         },
         {
           "method": "POST",
-          "path": "/v2/puzzle/shared/{shared_uid}/move",
-          "description": "Envoie un placement de pièce au serveur. Mise à jour atomique de puzzle_shared_pieces + insertion dans puzzle_shared_events. Retourne le nouveau pourcentage de complétion.",
+          "path": "/v2/puzzle/shared/{shared_uid}/pick",
+          "description": "Prend une pièce (verrou exclusif). La pièce passe à l'état held pour cet utilisateur et un événement held est inséré dans puzzle_shared_events. Refusé si la pièce est verrouillée (placée) ou déjà tenue par le partenaire.",
+          "params": {
+            "shared_uid": "string (required)"
+          },
+          "body": {
+            "piece_id": "integer (required) — Index de la pièce (0 à piece_count-1)"
+          },
+          "responses": {
+            "200": "{ success: true, message: 'Pièce prise', data: { piece_id: integer, state: 'held', held_by: string, event_id: integer } }",
+            "401": "device_token absent ou expiré",
+            "403": "SUBSCRIPTION_REQUIRED",
+            "404": "SHARED_NOT_FOUND",
+            "409": "Pièce déjà tenue par le partenaire",
+            "422": "piece_id manquant",
+            "423": "{ success: false, errors: { code: 'LOCKED' } } — pièce déjà placée définitivement"
+          },
+          "client_notes": "Appeler quand le joueur saisit une pièce. Si 409/423, refuser la saisie localement."
+        },
+        {
+          "method": "POST",
+          "path": "/v2/puzzle/shared/{shared_uid}/drop",
+          "description": "Pose une pièce précédemment prise via /pick. Mise à jour atomique de puzzle_shared_pieces + insertion dans puzzle_shared_events. La pièce doit être tenue par l'appelant.",
           "params": {
             "shared_uid": "string (required)"
           },
           "body": {
             "piece_id": "integer (required) — Index de la pièce (0 à piece_count-1)",
-            "x":        "float (required) — Position X sur le plateau",
-            "y":        "float (required) — Position Y sur le plateau",
+            "x":        "float (required sauf si to_tray=true) — Position X sur le plateau",
+            "y":        "float (required sauf si to_tray=true) — Position Y sur le plateau",
             "rotation": "integer (optional, default 0) — 0 | 90 | 180 | 270",
+            "to_tray":  "boolean (optional, default false) — true pour renvoyer la pièce dans le bac",
             "locked":   "boolean (optional, default false) — true si pièce correctement placée"
           },
           "responses": {
-            "200": "{ success: true, message: 'Mouvement enregistré', data: { event_id: integer, completion: integer } }",
+            "200": "{ success: true, message: 'Pièce posée', data: { piece_id: integer, state: string, x: float, y: float, rotation: integer, event_id: integer, completion: integer } }",
             "401": "device_token absent ou expiré",
             "403": "SUBSCRIPTION_REQUIRED",
             "404": "SHARED_NOT_FOUND",
-            "422": "piece_id, x ou y manquant"
+            "409": "Pièce non tenue par l'appelant — refaire /pick",
+            "422": "piece_id requis ; x et y requis sauf si to_tray=true"
           },
-          "client_notes": "Appeler immédiatement à chaque action du joueur (placement, rotation). Ne pas attendre la réponse avant d'afficher le mouvement localement."
+          "client_notes": "Séquence : /pick à la saisie, /drop au relâchement. Ne pas attendre la réponse avant d'afficher le mouvement localement."
         },
         {
           "method": "GET",

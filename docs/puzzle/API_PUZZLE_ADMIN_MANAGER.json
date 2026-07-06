@@ -1,11 +1,11 @@
 {
   "api": {
     "name": "Puzzle Admin API",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "description": "API d'administration du plugin Puzzle. Destinée au SPA React puzzle_images_manager. Permet la gestion complète des images du carrousel et des thèmes premium (CRUD, upload GD, tri, association image-thème).",
     "generated": "2026-04-06",
-    "reviewed": "2026-05-05",
-    "review_notes": "v1.0.4 — aucun changement de contrat endpoint ; révision suite simplification subscriptions (v1.1.0 Puzzle API). v1.0.3 — livraison images admin via /puzzle/admin/thumb|image (JWT) au lieu de /puzzle/thumb|image (device_token). v1.0.2 — per_page default 50 (min 10), PUT reorder attend [{uid,sort_order}] et retourne {updated}, PUT image/{uid} retourne l'objet complet + champs sort_order/is_carousel acceptés, DELETE messages avec point final, GET/POST themes incluent sort_order+status (pas created_at), PUT theme/{slug} retourne objet complet, PUT themes/{slug}/images retourne {count}.",
+    "reviewed": "2026-07-06",
+    "review_notes": "v1.0.5 — documentation complétée (aucun changement de code) : GET themes/{slug}, POST/DELETE themes/{slug}/images/{uid}, section image_delivery (GET admin/thumb/{uid}, admin/thumb/theme/{slug}, admin/image/{uid}). v1.0.4 — aucun changement de contrat endpoint ; révision suite simplification subscriptions (v1.1.0 Puzzle API). v1.0.3 — livraison images admin via /puzzle/admin/thumb|image (JWT) au lieu de /puzzle/thumb|image (device_token). v1.0.2 — per_page default 50 (min 10), PUT reorder attend [{uid,sort_order}] et retourne {updated}, PUT image/{uid} retourne l'objet complet + champs sort_order/is_carousel acceptés, DELETE messages avec point final, GET/POST themes incluent sort_order+status (pas created_at), PUT theme/{slug} retourne objet complet, PUT themes/{slug}/images retourne {count}.",
     "base_url": "/puzzle/admin",
     "authentication": {
       "types": ["JWT_BEARER"],
@@ -191,6 +191,20 @@
           }
         },
         {
+          "method": "GET",
+          "path": "/puzzle/admin/themes/{slug}",
+          "description": "Charger un thème avec la liste des UIDs d'images associées (triés par sort_order).",
+          "params": {
+            "slug": "string (required) - Identifiant du thème"
+          },
+          "responses": {
+            "200": "{ success: true, message: 'Thème chargé', data: { slug: string, thumb_url: string, sort_order: integer, status: string, image_count: integer, translations: object, image_uids: string[] } }",
+            "401": "Token absent ou invalide",
+            "403": "Rôle insuffisant",
+            "404": "Slug introuvable"
+          }
+        },
+        {
           "method": "PUT",
           "path": "/puzzle/admin/themes/{slug}",
           "description": "Modifier un thème existant. Corps multipart/form-data. Tous les champs sont optionnels — seuls les champs fournis sont mis à jour. Si thumb est fournie, elle remplace la miniature existante. Retourne l'objet thème complet après modification.",
@@ -245,6 +259,80 @@
             "422": "Champ image_uids manquant ou non-tableau"
           },
           "notes": "'count' indique le nombre d'images effectivement associées (UIDs invalides ou introuvables sont ignorés silencieusement)."
+        },
+        {
+          "method": "POST",
+          "path": "/puzzle/admin/themes/{slug}/images/{uid}",
+          "description": "Associer une image existante à un thème (ajout unitaire, sans toucher aux autres associations).",
+          "params": {
+            "slug": "string (required) - Identifiant du thème",
+            "uid": "string (required) - UUID v4 de l'image"
+          },
+          "responses": {
+            "200": "{ success: true, message: 'Image ajoutée au thème.' }",
+            "401": "Token absent ou invalide",
+            "403": "Rôle insuffisant",
+            "404": "Slug ou UID introuvable",
+            "409": "Image déjà dans le thème"
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/puzzle/admin/themes/{slug}/images/{uid}",
+          "description": "Retirer une image d'un thème (suppression unitaire de l'association).",
+          "params": {
+            "slug": "string (required) - Identifiant du thème",
+            "uid": "string (required) - UUID v4 de l'image"
+          },
+          "responses": {
+            "200": "{ success: true, message: 'Image retirée du thème.' }",
+            "401": "Token absent ou invalide",
+            "403": "Rôle insuffisant",
+            "404": "Slug introuvable, UID introuvable ou association inexistante"
+          }
+        }
+      ]
+    },
+    "image_delivery": {
+      "description": "Livraison des fichiers image pour le SPA admin — mêmes fichiers que /v2/puzzle/thumb|image mais authentifiés par JWT ADMINISTRATEUR au lieu du device_token.",
+      "auth_required": true,
+      "auth_type": "JWT_BEARER",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/puzzle/admin/thumb/{uid}",
+          "description": "Retourne le thumbnail d'une image (JPEG).",
+          "params": { "uid": "string (required) - UUID v4 de l'image" },
+          "responses": {
+            "200": "Content-Type: image/jpeg — Corps : binaire JPEG",
+            "401": "Token absent ou invalide",
+            "403": "Rôle insuffisant",
+            "404": "UID introuvable"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/puzzle/admin/thumb/theme/{slug}",
+          "description": "Retourne la miniature d'un thème (JPEG).",
+          "params": { "slug": "string (required) - Identifiant du thème" },
+          "responses": {
+            "200": "Content-Type: image/jpeg — Corps : binaire JPEG",
+            "401": "Token absent ou invalide",
+            "403": "Rôle insuffisant",
+            "404": "Slug introuvable"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/puzzle/admin/image/{uid}",
+          "description": "Retourne l'image complète (JPEG).",
+          "params": { "uid": "string (required) - UUID v4 de l'image" },
+          "responses": {
+            "200": "Content-Type: image/jpeg — Corps : binaire JPEG",
+            "401": "Token absent ou invalide",
+            "403": "Rôle insuffisant",
+            "404": "UID introuvable"
+          }
         }
       ]
     }

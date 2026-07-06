@@ -7,6 +7,21 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-07-06 12:00]
+
+### Docs — alignement des JSON d'endpoints sur le code réel (audit complet docs ↔ src)
+
+- **`docs/core/API_ENDPOINTS.json`** — version 2.2.4 → 2.8.0, date regénérée ; section `secret-admin` retirée (le handler exige que ces routes ne soient pas documentées publiquement) ; ajout `GET/PUT /users/me/notification-preferences` (fournies par le plugin ICS, 503 si absent)
+- **`docs/stripe/API_STRIPE_ENDPOINTS.json`** — `deprecated_routes` corrigé : `GET /subscription/status`, `POST /subscription/verify`, `DELETE /subscription/cancel` documentées (actives, jamais documentées auparavant) ; nouvelle section `removed_routes` : `POST /subscription/checkout` et `POST /subscription/portal` répondent 410 Gone depuis v2.7.0, `POST /stripe/webhook` répond 404
+- **`docs/puzzle/API_PUZZLE_ENDPOINTS.json`** — route fictive `POST /v2/puzzle/shared/{uid}/move` remplacée par les vraies routes `POST .../pick` (verrou exclusif, 409/423) et `POST .../drop` (pose, `to_tray`, 409) ; ajout `POST /v2/puzzle/backup/claim` (récupération de sauvegarde par pseudonyme) et `POST /puzzle/auth/link-device` (liaison device ↔ compte JWT)
+- **`docs/puzzle/API_PUZZLE_ADMIN_MANAGER.json`** — v1.0.5 : ajout `GET /puzzle/admin/themes/{slug}`, `POST/DELETE /puzzle/admin/themes/{slug}/images/{uid}`, section `image_delivery` (`GET /puzzle/admin/thumb/{uid}`, `GET /puzzle/admin/thumb/theme/{slug}`, `GET /puzzle/admin/image/{uid}`)
+- **`docs/traque/API_TRAQUE_ENDPOINTS.json`** — ajout `POST /traque/players/me/rest` (soin 50 % ou full, cooldown 30 min/4 h) et `GET /traque/players/check-name` (disponibilité d'un nom de personnage)
+- **`docs/pomo/API_POMO_ENDPOINTS_v1_0_0.json`** — v1.0.1 : routes non implémentées retirées (support, sync/*, stripe/webhook — phases 1B/2/3) ; seul `POST /pomo/engagement` existe ; en-tête et notes clarifiés, `db_tables` conservées comme schéma prévisionnel
+- **`docs/webdevice/API_WEBDEVICE_ENDPOINTS.json`** — nouveau fichier : documente `/v2/devices/web/*` et `/v2/devices/windows/*` (register JWT-optionnel + pseudonym GET/POST/DELETE/check), jusqu'ici sans doc JSON
+- **`docs/entrypoints.md`** — nouveau fichier : index des 12 docs JSON d'endpoints avec lien, nombre de routes et description par module
+
+---
+
 ## [Unreleased 2026-06-30 19:30]
 
 ### Ajout — `show_question_to_player` dans les quiz (directive kestyon)
