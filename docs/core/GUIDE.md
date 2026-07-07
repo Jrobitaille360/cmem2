@@ -60,6 +60,14 @@ En passant `device_id` (UUID stable côté client) lors du login ou de la vérif
 
 5 tentatives maximum par email+IP toutes les 10 minutes sur `/auth/login` et `/auth/send-code`. HTTP 429 au dépassement.
 
+### CORS
+
+L'API répond aux préflights `OPTIONS` sans authentification (`204`, `Access-Control-Max-Age: 86400`). Si l'en-tête `Origin` figure dans la liste blanche du serveur (`ALLOWED_ORIGINS`), il est renvoyé tel quel dans `Access-Control-Allow-Origin` (+ `Vary: Origin`) ; sinon la réponse porte `Access-Control-Allow-Origin: *`. `Access-Control-Allow-Headers` inclut `Authorization` et `Content-Type` ; `Access-Control-Allow-Methods` inclut `GET, POST, PUT, PATCH, DELETE, OPTIONS`.
+
+### Compte de test E2E (dev seulement)
+
+Sur `dev-cmem2` uniquement, un compte de test à code OTP fixe est disponible pour les tests automatisés (Playwright) : `send-code` sur cet email n'envoie **aucun** email, stocke un code fixe et est exempt du rate limit ; `verify-code` émet un JWT + device token normaux. Activé par les variables d'environnement `OTP_TEST_ACCOUNT_EMAIL` / `OTP_TEST_ACCOUNT_CODE`, absentes en production (le compte s'y comporte comme un compte ordinaire).
+
 ---
 
 ## Flux typiques

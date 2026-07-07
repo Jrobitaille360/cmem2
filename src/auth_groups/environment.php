@@ -74,7 +74,7 @@ if (isset($GLOBALS['pending_config_loads'])) {
 // Configuration CORS - Variables d'environnement
 $allowedOrigins = $_ENV['ALLOWED_ORIGINS'] ?? 'https://cmem1.journauxdebord.com,http://localhost:3000,http://localhost:8080,http://127.0.0.1:3000';
 define('ALLOWED_ORIGINS', explode(',', $allowedOrigins));
-define('ALLOWED_METHODS', explode(',', $_ENV['ALLOWED_METHODS'] ?? 'GET,POST,PUT,DELETE,OPTIONS'));
+define('ALLOWED_METHODS', explode(',', $_ENV['ALLOWED_METHODS'] ?? 'GET,POST,PUT,PATCH,DELETE,OPTIONS'));
 define('ALLOWED_HEADERS', explode(',', $_ENV['ALLOWED_HEADERS'] ?? 'Content-Type,Authorization,X-Requested-With'));
 
 // Configuration du timezone
@@ -261,6 +261,9 @@ define('JWT_EXPIRY_DAYS', (int)($_ENV['JWT_EXPIRY_DAYS'] ?? 15));
 define('OTP_EXPIRY_MINUTES', (int)($_ENV['OTP_EXPIRY_MINUTES'] ?? 15));
 define('OTP_MAX_ATTEMPTS', (int)($_ENV['OTP_MAX_ATTEMPTS'] ?? 5));
 define('TMP_CODE', $_ENV['TMP_CODE'] ?? '');
+// Compte de test E2E à code OTP fixe (dev seulement — vars absentes en prod)
+define('OTP_TEST_ACCOUNT_EMAIL', strtolower(trim($_ENV['OTP_TEST_ACCOUNT_EMAIL'] ?? '')));
+define('OTP_TEST_ACCOUNT_CODE', trim($_ENV['OTP_TEST_ACCOUNT_CODE'] ?? ''));
 
 // ============================================
 // DEVICE TOKENS - Appareils de confiance

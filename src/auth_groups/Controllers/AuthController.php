@@ -111,7 +111,13 @@ class AuthController
 
         $email = strtolower(trim($input['email']));
 
-        if (!RateLimitService::check($email, 'send-code')) {
+        // Compte de test E2E (dev seulement) : code fixe, aucun email envoyé,
+        // exempt du rate limit. Inactif si les vars d'env sont absentes (prod).
+        $isTestAccount = OTP_TEST_ACCOUNT_EMAIL !== ''
+            && OTP_TEST_ACCOUNT_CODE !== ''
+            && $email === OTP_TEST_ACCOUNT_EMAIL;
+
+        if (!$isTestAccount && !RateLimitService::check($email, 'send-code')) {
             LogService::warning('Rate limit send-code dépassé', ['email' => $email]);
             LoggingMiddleware::logExit(429);
             Response::error('Trop de demandes de code', [
@@ -121,7 +127,9 @@ class AuthController
             return;
         }
 
-        RateLimitService::record($email, 'send-code');
+        if (!$isTestAccount) {
+            RateLimitService::record($email, 'send-code');
+        }
 
         $userModel = new User();
         $userData  = $userModel->findByEmail($email);
@@ -166,6 +174,15 @@ class AuthController
         }
 
         try {
+            if ($isTestAccount) {
+                // Code fixe, aucun email envoyé — flux E2E déterministe
+                OtpService::generateAndStore($email, OTP_TEST_ACCOUNT_CODE);
+                LogService::info('Code OTP fixe stocké pour compte de test E2E', ['email' => $email]);
+                LoggingMiddleware::logExit(200);
+                Response::success('Code envoyé', $genericOk);
+                return;
+            }
+
             $forceCode    = (defined('APP_ENV') && APP_ENV === 'development' && defined('TMP_CODE') && TMP_CODE !== '') ? TMP_CODE : null;
             $code         = OtpService::generateAndStore($email, $forceCode);
             $emailService = new EmailService();

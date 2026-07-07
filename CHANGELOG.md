@@ -7,6 +7,22 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-07-07 08:45]
+
+### CORS pour la SPA cmem-web + compte de test OTP à code fixe (dev) — directive `20260707_064207_cmem_web_vers_cmem2_API`
+
+- **`index.php`** — CORS : écho de l'origin exact quand `Origin` figure dans `ALLOWED_ORIGINS` (+ `Vary: Origin`), fallback `*` sinon (compat clients existants) ; préflight `OPTIONS` répond désormais `204` (au lieu de 200) sans authentification ; bloc CORS dupliqué retiré (il écrasait `Allow-Methods`/`Allow-Headers` sans PATCH ni X-API-Key)
+- **`environment.php`** — défaut `ALLOWED_METHODS` inclut `PATCH` ; nouvelles constantes `OTP_TEST_ACCOUNT_EMAIL` / `OTP_TEST_ACCOUNT_CODE` (vides par défaut)
+- **`AuthController::sendCode()`** — compte de test E2E (dev seulement, activé par les deux vars d'env) : code OTP fixe stocké, **aucun email envoyé**, exempt du rate limit anti-brute-force ; `verify-code` émet JWT + device token normaux ; inactif en prod (vars absentes)
+- **`.env` / `.env.dev.online` / `.env.dev.local`** — `ALLOWED_ORIGINS` += `https://cmem-web.journauxdebord.com`, `http://localhost:5173` ; `OTP_TEST_ACCOUNT_EMAIL=e2e@test.local`, `OTP_TEST_ACCOUNT_CODE=000000`
+- **`.env.prod`** — `ALLOWED_ORIGINS` += `https://cmem-web.journauxdebord.com` seulement (pas de compte de test)
+- **`.env.example`** — vars `OTP_TEST_ACCOUNT_*` documentées (commentées, dev seulement)
+- **`docs/core/GUIDE.md`** — sections « CORS » et « Compte de test E2E (dev seulement) » ajoutées
+- **`private/tests/test_cors_e2e_account.php`** — nouveau : 18 tests (préflight OPTIONS, écho origin, Vary, fallback `*`, origin non listé, code fixe, exemption rate limit ×7, JWT/device token, `GET /auth/me` cross-origin) ; ajouté à `run_all_tests.php` et `CLAUDE.md`
+- Audit `email_verified=0` (prod) : **0 compte** concerné (`deleted_at IS NULL`) — aucune migration nécessaire en phase 8
+
+---
+
 ## [Unreleased 2026-07-06 14:30]
 
 ### Docs — alignement des GUIDE.md sur les JSON et le code + 3 nouveaux guides (audit complet)

@@ -19,37 +19,28 @@ use AuthGroups\Utils\Response;
 
 LoggingMiddleware::logEntry();
 
-// Configuration CORS (maintenant gérée par la configuration modulaire)
-//$allowedOrigins = ALLOWED_ORIGINS;
-//$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-
-/* if (in_array($origin, $allowedOrigins) || in_array('*', $allowedOrigins)) {
-    header('Access-Control-Allow-Origin: ' . ($origin ?: '*'));
-} */
-
-header('Access-Control-Allow-Origin: *');
+// CORS : écho de l'origin exact s'il figure dans ALLOWED_ORIGINS (requis pour les
+// clients navigateur qui envoient Authorization), sinon fallback '*' (compat clients existants)
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+if ($origin !== '' && in_array($origin, ALLOWED_ORIGINS, true)) {
+    header('Access-Control-Allow-Origin: ' . $origin);
+} else {
+    header('Access-Control-Allow-Origin: *');
+}
+header('Vary: Origin');
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Methods: ' . implode(', ', ALLOWED_METHODS));
 header('Access-Control-Allow-Headers: ' . implode(', ', ALLOWED_HEADERS));
 header('Access-Control-Max-Age: 86400');
 
-// Gérer les requêtes OPTIONS (sauf pour CalDAV qui nécessite des headers spécifiques)
+// Gérer les requêtes OPTIONS (préflight, sans auth) — sauf CalDAV qui a ses propres headers
 $requestUri = $_SERVER['REQUEST_URI'] ?? '';
 $isCalDAVRequest = strpos($requestUri, '/caldav') !== false;
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS' && !$isCalDAVRequest) {
-    LoggingMiddleware::logExit(200);
-    http_response_code(200);
+    LoggingMiddleware::logExit(204);
+    http_response_code(204);
     exit();
-}
-
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
-
-// Gérer les requêtes OPTIONS (preflight) sauf CalDAV
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS' && !$isCalDAVRequest) {
-    http_response_code(200);
-    exit;
 }
 
 // Vérifier le mode maintenance
