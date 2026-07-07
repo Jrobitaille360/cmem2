@@ -3,7 +3,7 @@
     "name": "AuthGroups API",
     "version": "2.8.0",
     "description": "API REST complète pour la gestion d'authentification, groupes, fichiers, tags et abonnements Premium",
-    "generated": "2026-07-06",
+    "generated": "2026-07-07",
     "base_url": "/",
     "authentication": {
       "type": "JWT_BEARER",
@@ -12,6 +12,14 @@
       "expiry": "15 jours",
       "obtain": "POST /auth/login  ou  POST /auth/send-code + POST /auth/verify-code",
       "refresh": "POST /auth/refresh (device token longue durée — sans re-login)"
+    },
+    "cors": {
+      "preflight": "OPTIONS sans authentification → 204 No Content, Access-Control-Max-Age: 86400",
+      "allow_origin": "Écho de l'origin exact si présent dans la liste blanche serveur (ALLOWED_ORIGINS) + Vary: Origin ; sinon fallback '*'",
+      "allow_methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+      "allow_headers": "X-API-Key, Content-Type, Authorization, X-Requested-With, Accept, Origin",
+      "credentials": "Pas de cookies — Access-Control-Allow-Credentials non émis ; utiliser Authorization: Bearer",
+      "whitelisted_origins_note": "dev-cmem2 : https://cmem-web.journauxdebord.com + http://localhost:5173 ; prod : https://cmem-web.journauxdebord.com"
     },
     "breaking_changes_since_v1": [
       "Suppression de X-API-Key — remplacée par JWT Bearer",
@@ -68,7 +76,8 @@
           "notes": [
             "Réponse toujours générique (HTTP 200) pour protéger l'énumération d'emails, sauf 403 si l'email existe mais n'est pas vérifié",
             "Auto-register Option A : si l'email est inconnu, un compte est créé immédiatement (name=partie gauche de l'email, email_verified=1, mot de passe aléatoire inutilisable) et un code OTP est envoyé",
-            "Si le compte est soft-deleted : retour générique 200 sans recréation"
+            "Si le compte est soft-deleted : retour générique 200 sans recréation",
+            "Compte de test E2E (dev-cmem2 seulement) : e2e@test.local — aucun email envoyé, code OTP fixe 000000, exempt du rate limit ; inactif en production (vars OTP_TEST_ACCOUNT_* absentes)"
           ],
           "response": {
             "message": "string — réponse générique (même si email inconnu, pour protéger l'énumération)"

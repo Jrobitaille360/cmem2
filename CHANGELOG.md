@@ -18,6 +18,7 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - **`.env.prod`** — `ALLOWED_ORIGINS` += `https://cmem-web.journauxdebord.com` seulement (pas de compte de test)
 - **`.env.example`** — vars `OTP_TEST_ACCOUNT_*` documentées (commentées, dev seulement)
 - **`docs/core/GUIDE.md`** — sections « CORS » et « Compte de test E2E (dev seulement) » ajoutées
+- **`docs/core/API_ENDPOINTS.json`** — bloc `api.cors` (préflight 204, écho origin whitelist + Vary, fallback `*`, headers/méthodes) ; note compte de test E2E sur `/auth/send-code` ; date regénérée
 - **`private/tests/test_cors_e2e_account.php`** — nouveau : 18 tests (préflight OPTIONS, écho origin, Vary, fallback `*`, origin non listé, code fixe, exemption rate limit ×7, JWT/device token, `GET /auth/me` cross-origin) ; ajouté à `run_all_tests.php` et `CLAUDE.md`
 - Audit `email_verified=0` (prod) : **0 compte** concerné (`deleted_at IS NULL`) — aucune migration nécessaire en phase 8
 
