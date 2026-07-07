@@ -239,14 +239,31 @@ class EventOccurrence extends BaseModel
     }
 
     /**
+     * Normalise une borne de fin date-seule en fin de journée incluse.
+     * 'YYYY-MM-DD'          → 'YYYY-MM-DD 23:59:59'
+     * valeur déjà horodatée → inchangée
+     */
+    private static function endOfDayIfDateOnly(string $endDate): string
+    {
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $endDate)) {
+            return $endDate . ' 23:59:59';
+        }
+        return $endDate;
+    }
+
+    /**
      * Récupère les occurrences d'un événement dans une période
      * Génère à la volée si date demandée > 2099-12-31
      */
     public static function getByEventId(int $eventId, ?string $startDate = null, ?string $endDate = null): array
     {
+        if ($endDate !== null) {
+            $endDate = self::endOfDayIfDateOnly($endDate);
+        }
+
         try {
             $db = (new static())->getDb();
-            
+
             // Vérifier si on demande des dates au-delà de 2099-12-31
             if ($endDate && $endDate > ICS_OCCURRENCES_MAX_DATE . ' 23:59:59') {
                 // Générer à la volée pour cette plage
@@ -303,9 +320,13 @@ class EventOccurrence extends BaseModel
             return [];
         }
 
+        if ($endDate !== null) {
+            $endDate = self::endOfDayIfDateOnly($endDate);
+        }
+
         try {
             $db = (new static())->getDb();
-            
+
             $placeholders = implode(',', array_fill(0, count($eventIds), '?'));
             $query = "SELECT eo.*, 
                       ce.title, ce.description, ce.location, ce.all_day, ce.color, 
@@ -354,6 +375,10 @@ class EventOccurrence extends BaseModel
      */
     public static function getByCalendarId(int $calendarId, ?string $startDate = null, ?string $endDate = null, $expand_multi_jour = true): array
     {
+        if ($endDate !== null) {
+            $endDate = self::endOfDayIfDateOnly($endDate);
+        }
+
         try {
             $db = (new static())->getDb();
 

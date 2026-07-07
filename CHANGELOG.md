@@ -7,6 +7,16 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-07-07 14:42]
+
+### Fix — frontière `end_date` date-seule sur les occurrences (directive `20260707_082006_cmem_web_vers_cmem2_API`)
+
+- **`src/ics/Models/EventOccurrence.php`** — `end_date` date-seule (`YYYY-MM-DD`) était comparé par MySQL à `00:00:00`, écartant toute occurrence horaire du dernier jour de la fenêtre demandée ; nouveau helper `endOfDayIfDateOnly()` normalise en `YYYY-MM-DD 23:59:59`, appliqué en tête de `getByCalendarId`, `getByEventId`, `getByEventIds` ; `start_date` inchangé (déjà inclusif) ; bascule de génération à la volée `> 2099-12-31` préservée ; bornes déjà horodatées non affectées
+- **`private/tests/test_calendars.php`** — section 9bis (4 tests) : occurrence horaire dernier jour incluse (calendrier + événement récurrent), borne horodatée inchangée, bascule 2099 non altérée
+- Suite complète : 1332/1332 tests verts (aucune régression)
+
+---
+
 ## [Unreleased 2026-07-07 08:45]
 
 ### CORS pour la SPA cmem-web + compte de test OTP à code fixe (dev) — directive `20260707_064207_cmem_web_vers_cmem2_API`
