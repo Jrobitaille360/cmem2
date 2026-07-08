@@ -928,6 +928,228 @@ class EventOccurrence extends BaseModel
     }
 
     /**
+     * Résout une occurrence par sa date (clé naturelle RECURRENCE-ID, RFC 5545 §3.8.4.4).
+     * Ligne matérialisée réutilisée si présente ; sinon la date est validée contre la grille
+     * RRULE (expansion TZID-aware, même moteur que /expand) puis la ligne est matérialisée.
+     *
+     * @param array  $event          Ligne calendar_events complète (recurrence_rule, timezone…)
+     * @param string $occurrenceDate 'YYYY-MM-DD' ou 'YYYY-MM-DD HH:MM:SS' (dans le TZ de l'événement)
+     * @return array|null La ligne event_occurrences, ou null si la date n'est pas sur la grille
+     */
+    public static function resolveOrMaterializeByDate(array $event, string $occurrenceDate): ?array
+    {
+        $dateOnly = substr($occurrenceDate, 0, 10);
+        $timePart = strlen($occurrenceDate) > 10 ? substr($occurrenceDate, 11, 8) : null;
+
+        try {
+            $db = self::getDbConnection();
+            $stmt = $db->prepare(
+                "SELECT * FROM event_occurrences WHERE event_id = ? AND occurrence_date = ?
+                 ORDER BY start_datetime ASC"
+            );
+            $stmt->execute([$event['id'], $dateOnly]);
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                if ($timePart === null || substr($row['start_datetime'], 11, 8) === $timePart) {
+                    return $row;
+                }
+            }
+
+            // Aucune ligne : valider la date contre la grille RRULE puis matérialiser l'exception
+            $grid = \ICS\Services\RecurrenceService::expandInRangeTzAware(
+                $event, $dateOnly . ' 00:00:00', $dateOnly . ' 23:59:59'
+            );
+            $match = null;
+            foreach ($grid as $occ) {
+                if ($timePart === null || substr($occ['start_datetime'], 11, 8) === $timePart) {
+                    $match = $occ;
+                    break;
+                }
+            }
+            if ($match === null) {
+                return null;
+            }
+
+            $occModel = new static();
+            $occModel->eventId = $event['id'];
+            $occModel->calendarId = $event['calendar_id'];
+            $occModel->occurrenceDate = $match['occurrence_date'];
+            $occModel->startDatetime = $match['start_datetime'];
+            $occModel->endDatetime = $match['end_datetime'];
+            // Index relatif à la plage du jour ; recalé au prochain passage du cron de maintenance
+            $occModel->recurrenceIndex = $match['recurrence_index'] ?? null;
+            if (!$occModel->createOrIgnore()) {
+                return null;
+            }
+
+            $stmt = $db->prepare(
+                "SELECT * FROM event_occurrences
+                 WHERE event_id = ? AND occurrence_date = ? AND start_datetime = ? LIMIT 1"
+            );
+            $stmt->execute([$event['id'], $match['occurrence_date'], $match['start_datetime']]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $row ?: null;
+        } catch (\Exception $e) {
+            LogService::error("Erreur lors de la résolution d'occurrence par date", [
+                'event_id' => $event['id'] ?? null,
+                'occurrence_date' => $occurrenceDate,
+                'error' => $e->getMessage()
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Matérialise les occurrences de la grille RRULE absentes de la table sur une plage donnée.
+     * Utilisé par les opérations all_future par date avant l'UPDATE de masse, pour que le
+     * résultat soit visible via /expand. L'index de récurrence inséré est relatif à la plage ;
+     * le cron de maintenance le recale.
+     *
+     * @return int Nombre de lignes créées
+     */
+    private static function materializeMissingInRange(array $event, string $fromDate, string $toDate): int
+    {
+        $grid = \ICS\Services\RecurrenceService::expandInRangeTzAware(
+            $event, $fromDate . ' 00:00:00', $toDate . ' 23:59:59'
+        );
+        if (empty($grid)) {
+            return 0;
+        }
+
+        $db = self::getDbConnection();
+        $stmt = $db->prepare(
+            "SELECT occurrence_date FROM event_occurrences
+             WHERE event_id = ? AND occurrence_date BETWEEN ? AND ?"
+        );
+        $stmt->execute([$event['id'], $fromDate, $toDate]);
+        $existing = array_flip($stmt->fetchAll(PDO::FETCH_COLUMN));
+
+        $missing = [];
+        foreach ($grid as $occ) {
+            if (!isset($existing[$occ['occurrence_date']])) {
+                $missing[] = [
+                    'event_id' => $event['id'],
+                    'calendar_id' => $event['calendar_id'],
+                    'occurrence_date' => $occ['occurrence_date'],
+                    'start_datetime' => $occ['start_datetime'],
+                    'end_datetime' => $occ['end_datetime'],
+                    'recurrence_index' => $occ['recurrence_index'] ?? null,
+                ];
+            }
+        }
+
+        if (!empty($missing)) {
+            self::createUpdateBatch($missing);
+        }
+
+        return count($missing);
+    }
+
+    /**
+     * Annule toutes les occurrences d'un événement à partir d'une date (incluse).
+     * Matérialise d'abord les occurrences manquantes sur un horizon de 2 ans pour que
+     * l'annulation soit visible via /expand. Les occurrences antérieures et leurs
+     * exceptions restent intactes.
+     */
+    public static function cancelFromDate(array $event, string $fromDate): int
+    {
+        try {
+            $horizon = date('Y-m-d', strtotime($fromDate . ' +2 years'));
+            self::materializeMissingInRange($event, $fromDate, $horizon);
+
+            $db = self::getDbConnection();
+            $stmt = $db->prepare(
+                "UPDATE event_occurrences SET is_cancelled = 1, updated_at = CURRENT_TIMESTAMP
+                 WHERE event_id = ? AND occurrence_date >= ? AND is_cancelled = 0"
+            );
+            $stmt->execute([$event['id'], $fromDate]);
+
+            $affectedRows = $stmt->rowCount();
+
+            LogService::info("Occurrences annulées à partir d'une date (clé occurrence_date)", [
+                'event_id' => $event['id'],
+                'from_date' => $fromDate,
+                'cancelled_count' => $affectedRows
+            ]);
+
+            return $affectedRows;
+        } catch (\Exception $e) {
+            LogService::error("Erreur lors de l'annulation des occurrences futures par date", [
+                'event_id' => $event['id'] ?? null,
+                'from_date' => $fromDate,
+                'error' => $e->getMessage()
+            ]);
+            return 0;
+        }
+    }
+
+    /**
+     * Modifie toutes les occurrences d'un événement à partir d'une date (incluse).
+     * Matérialise d'abord les occurrences manquantes sur un horizon de 2 ans.
+     * Miroir de modifyFromId avec un filtre occurrence_date >= au lieu de id >=.
+     */
+    public static function modifyFromDate(array $event, string $fromDate, array $modifications): int
+    {
+        try {
+            $horizon = date('Y-m-d', strtotime($fromDate . ' +2 years'));
+            self::materializeMissingInRange($event, $fromDate, $horizon);
+
+            $db = self::getDbConnection();
+
+            $fields = ['is_modified = 1'];
+            $params = [];
+
+            if (isset($modifications['title'])) {
+                $fields[] = 'modified_title = ?';
+                $params[] = $modifications['title'];
+            }
+            if (isset($modifications['description'])) {
+                $fields[] = 'modified_description = ?';
+                $params[] = $modifications['description'];
+            }
+            if (isset($modifications['location'])) {
+                $fields[] = 'modified_location = ?';
+                $params[] = $modifications['location'];
+            }
+            if (isset($modifications['start_datetime'])) {
+                $fields[] = 'modified_start_datetime = ?';
+                $params[] = $modifications['start_datetime'];
+            }
+            if (isset($modifications['end_datetime'])) {
+                $fields[] = 'modified_end_datetime = ?';
+                $params[] = $modifications['end_datetime'];
+            }
+
+            $fields[] = 'updated_at = CURRENT_TIMESTAMP';
+            $params[] = $event['id'];
+            $params[] = $fromDate;
+
+            $query = "UPDATE event_occurrences SET " . implode(', ', $fields) .
+                     " WHERE event_id = ? AND occurrence_date >= ? AND is_cancelled = 0";
+
+            $stmt = $db->prepare($query);
+            $stmt->execute($params);
+
+            $affectedRows = $stmt->rowCount();
+
+            LogService::info("Occurrences modifiées à partir d'une date (clé occurrence_date)", [
+                'event_id' => $event['id'],
+                'from_date' => $fromDate,
+                'modified_count' => $affectedRows,
+                'modifications' => array_keys($modifications)
+            ]);
+
+            return $affectedRows;
+        } catch (\Exception $e) {
+            LogService::error("Erreur lors de la modification des occurrences futures par date", [
+                'event_id' => $event['id'] ?? null,
+                'from_date' => $fromDate,
+                'error' => $e->getMessage()
+            ]);
+            return 0;
+        }
+    }
+
+    /**
      * Annule une occurrence spécifique
      */
     public function cancel(): bool

@@ -252,6 +252,35 @@ GET /calendars/12/events/occurrences/expand?start=2026-03-01&end=2026-03-31
 | Le 1er lundi du mois | `FREQ=MONTHLY;BYDAY=1MO` |
 | Chaque année le 25 décembre | `FREQ=YEARLY;BYMONTH=12;BYMONTHDAY=25` |
 
+### Exceptions d'occurrence — double clé (`occurrence_id` XOR `occurrence_date`)
+
+`PUT` et `DELETE /calendars/{id}/events/{eventId}/occurrences` acceptent **exactement une**
+des deux clés (les deux présentes ou aucune → `400`) :
+
+| Clé | Type | Usage |
+| --- | --- | --- |
+| `occurrence_id` | integer | Id de ligne `event_occurrences` — chemin historique (Flutter) |
+| `occurrence_date` | string | Clé naturelle RECURRENCE-ID (RFC 5545 §3.8.4.4) — chemin `/expand` (client React) |
+
+Comportement de `occurrence_date` :
+
+- Formats acceptés : `YYYY-MM-DD` (cas courant) ou `YYYY-MM-DD HH:MM:SS` (désambiguïsation
+  si plusieurs occurrences le même jour). Interprétée dans le `TZID` de l'événement.
+- Ligne matérialisée existante pour `event_id` + date → réutilisée (pas de doublon).
+- Aucune ligne : la date est validée contre la grille RRULE (même moteur d'expansion que
+  `/expand`, exceptions appliquées) puis la ligne d'exception est **matérialisée à la demande**.
+- Date hors grille RRULE → `404` (jamais de `500`, aucune ligne créée).
+- `scope=all_future` opère sur `occurrence_date >= date` (et non `id >=`) : les occurrences
+  antérieures et leurs exceptions restent intactes ; les occurrences futures non matérialisées
+  sont matérialisées sur un horizon de 2 ans pour que l'annulation soit visible via `/expand`.
+- Les réponses des deux endpoints incluent `occurrence_date`.
+
+```txt
+DELETE /calendars/12/events/45/occurrences?occurrence_date=2026-08-11&scope=only_this
+PUT    /calendars/12/events/45/occurrences?occurrence_date=2026-08-18
+       body { "title": "Réunion déplacée", "scope": "only_this" }
+```
+
 ### Portée de modification / suppression
 
 ```json

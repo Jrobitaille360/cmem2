@@ -7,6 +7,20 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-07-08 14:25]
+
+### Exceptions d'occurrence par date — double clé `occurrence_date` (directive `20260708_105308_cmem_web_vers_cmem2_API`)
+
+- **`PUT` / `DELETE /calendars/{id}/events/{eventId}/occurrences`** — acceptent désormais `occurrence_date` (clé naturelle RECURRENCE-ID, RFC 5545 §3.8.4.4) comme alternative à `occurrence_id` : exactement une des deux clés requise (les deux ou aucune → `400` explicite) ; formats `YYYY-MM-DD` ou `YYYY-MM-DD HH:MM:SS` (désambiguïsation), interprétés dans le `TZID` de l'événement ; ligne matérialisée existante réutilisée (pas de doublon), sinon date validée contre la grille RRULE (même moteur TZID-aware que `/expand`) puis ligne d'exception **matérialisée à la demande** ; date hors grille → `404`, jamais de `500` ; chemin `occurrence_id` strictement inchangé (client Flutter) ; réponses des deux endpoints enrichies de `occurrence_date`
+- **`scope=all_future` par date** — opère sur `occurrence_date >= date` (au lieu de `id >=`) : occurrences antérieures et leurs exceptions intactes ; occurrences futures non matérialisées matérialisées sur un horizon de 2 ans pour que le résultat soit visible via `/expand`
+- **`src/ics/Controllers/CalendarController.php`** — helper `extractOccurrenceKey()` (XOR + validation de format) ; branchement double clé dans `deleteEventOccurrence()` / `updateEventOccurrence()`
+- **`src/ics/Models/EventOccurrence.php`** — nouvelles méthodes `resolveOrMaterializeByDate()`, `cancelFromDate()`, `modifyFromDate()`, `materializeMissingInRange()` (privée) ; méthodes par id inchangées
+- **`docs/ics/API_ICS_ENDPOINTS.json`** / **`docs/ics/GUIDE.md`** — contrat double clé documenté ; divergence doc/code du `PUT` corrigée (le JSON documentait `occurrence_date` alors que le code exigeait `occurrence_id`)
+- **`private/tests/test_ics_occurrences_exceptions_by_date.php`** — nouveau : 66 tests (XOR des clés, DELETE/PUT par date matérialisée et non matérialisée, réutilisation de ligne, format datetime TZ, hors grille → 404, `all_future` par date avec exceptions antérieures intactes, non-régression chemin `occurrence_id`) ; ajouté à `run_all_tests.php` et `CLAUDE.md`
+- Suite complète : 1365/1365 tests verts (aucune régression) ; déployé sur dev (prod attendue avant la fin de la phase 4 cmem_web)
+
+---
+
 ## [Unreleased 2026-07-08 07:46]
 
 ### Nouvel endpoint — expansion d'occurrences RRULE à la demande (directive `20260707_082007_cmem_web_vers_cmem2_API`)

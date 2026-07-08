@@ -1645,15 +1645,49 @@ class CalendarController
     }
 
     /**
+     * Extrait et valide la clé d'occurrence : exactement une des deux clés
+     * occurrence_id XOR occurrence_date. La clé date accepte 'YYYY-MM-DD' et
+     * 'YYYY-MM-DD HH:MM:SS' (désambiguïsation, interprétée dans le TZ de l'événement).
+     *
+     * @return array [occurrenceId|null, occurrenceDate|null] ; $error rempli si invalide
+     */
+    private static function extractOccurrenceKey(array $input, ?string &$error): array
+    {
+        $error = null;
+        $occurrenceId = $input['occurrence_id'] ?? null;
+        $occurrenceDate = isset($input['occurrence_date']) ? trim((string)$input['occurrence_date']) : null;
+        if ($occurrenceDate === '') {
+            $occurrenceDate = null;
+        }
+
+        if (($occurrenceId === null) === ($occurrenceDate === null)) {
+            $error = 'Fournir exactement une des deux clés : occurrence_id ou occurrence_date';
+            return [null, null];
+        }
+
+        if ($occurrenceDate !== null) {
+            $format = strlen($occurrenceDate) > 10 ? 'Y-m-d H:i:s' : 'Y-m-d';
+            $dt = \DateTime::createFromFormat($format, $occurrenceDate);
+            if (!$dt || $dt->format($format) !== $occurrenceDate) {
+                $error = 'occurrence_date invalide — formats acceptés : YYYY-MM-DD ou YYYY-MM-DD HH:MM:SS';
+                return [null, null];
+            }
+        }
+
+        return [$occurrenceId, $occurrenceDate];
+    }
+
+    /**
      * Supprime (annule) une occurrence spécifique d'un événement récurrent
      */
     public function deleteEventOccurrence($calendarId, $eventId, $userId): void
     {
         LoggingMiddleware::logEntry();
-        
+
         $input = Response::getRequestParams();
         $validation = Validator::validate($input, [
-            'occurrence_id' => 'required|integer',
+            'occurrence_id' => 'optional|integer',
+            'occurrence_date' => 'optional|string',
             'scope' => 'optional|string|in:only_this,all_future,all',
         ]);
         if (!$validation['valid']) {
@@ -1665,8 +1699,14 @@ class CalendarController
             return;
         }
 
-        $occurrenceId = $input['occurrence_id'] ?? null;
-                
+        [$occurrenceId, $occurrenceDate] = self::extractOccurrenceKey($input, $keyError);
+        if ($keyError !== null) {
+            LogService::warning("Clé d'occurrence invalide (DELETE)", ['error' => $keyError]);
+            LoggingMiddleware::logExit(400);
+            Response::error($keyError, null, 400);
+            return;
+        }
+
         $cal = new Calendar();
         
         // Vérifier l'accès en écriture au calendrier
@@ -1734,20 +1774,25 @@ class CalendarController
             }
             
             $cancelledCount = 0;
-            
+            $responseOccurrenceDate = $occurrenceDate !== null ? substr($occurrenceDate, 0, 10) : null;
+
             if ($scope === 'only_this') {
-                // Annuler seulement cette occurrence
-                $occurrence = \ICS\Models\EventOccurrence::findOccurrenceWithId($occurrenceId);
+                // Annuler seulement cette occurrence (clé id, ou clé date = RECURRENCE-ID)
+                $occurrence = $occurrenceDate !== null
+                    ? \ICS\Models\EventOccurrence::resolveOrMaterializeByDate($existingEvent, $occurrenceDate)
+                    : \ICS\Models\EventOccurrence::findOccurrenceWithId((int)$occurrenceId);
                 if (!$occurrence) {
                     LogService::warning("Occurrence non trouvée", [
                         'occurrence_id' => $occurrenceId,
+                        'occurrence_date' => $occurrenceDate,
                         'scope' => $scope,
                     ]);
                     LoggingMiddleware::logExit(404);
                     Response::error('Occurrence non trouvée', null, 404);
                     return;
                 }
-                
+                $responseOccurrenceDate = $occurrence['occurrence_date'] ?? $responseOccurrenceDate;
+
                 $occModel = new \ICS\Models\EventOccurrence();
                 $occModel->id = $occurrence['id'];
                 $occModel->eventId = $eventId;
@@ -1758,13 +1803,16 @@ class CalendarController
                 }
                 $cancelledCount = 1;
             } elseif ($scope === 'all_future') {
-                // Annuler toutes les occurrences à partir de cette date
-                $cancelledCount = \ICS\Models\EventOccurrence::cancelFromId($eventId, $occurrenceId);
-                
+                // Annuler toutes les occurrences à partir de cette date (clé id ou clé date)
+                $cancelledCount = $occurrenceDate !== null
+                    ? \ICS\Models\EventOccurrence::cancelFromDate($existingEvent, substr($occurrenceDate, 0, 10))
+                    : \ICS\Models\EventOccurrence::cancelFromId($eventId, $occurrenceId);
+
                 if ($cancelledCount == 0) {
                     LogService::warning("Aucune occurrence future trouvée", [
                         'event_id' => $eventId,
-                        'occurrence_id' => $occurrenceId
+                        'occurrence_id' => $occurrenceId,
+                        'occurrence_date' => $occurrenceDate
                     ]);
                     LoggingMiddleware::logExit(404);
                     Response::error('Aucune occurrence future trouvée', null, 404);
@@ -1786,15 +1834,17 @@ class CalendarController
                 'event_id' => $eventId,
                 'scope' => $scope,
                 'occurrence_id' => $occurrenceId,
+                'occurrence_date' => $responseOccurrenceDate,
                 'cancelled_count' => $cancelledCount,
                 'user_id' => $userId
             ]);
-            
+
             LoggingMiddleware::logExit(200);
             Response::success("Occurrences annulées avec succès ($scopeLabel)", [
                 'event_id' => $eventId,
                 'scope' => $scope,
                 'occurrence_id' => $occurrenceId,
+                'occurrence_date' => $responseOccurrenceDate,
                 'cancelled_count' => $cancelledCount,
                 'cancelled_at' => date('Y-m-d H:i:s')
             ]);
@@ -1816,7 +1866,8 @@ class CalendarController
         
         $input = Response::getRequestParams();
         $validation = Validator::validate($input, [
-            'occurrence_id' => 'required|string',
+            'occurrence_id' => 'optional|string',
+            'occurrence_date' => 'optional|string',
             'title' => 'optionnal|string',
             'description' => 'optionnal|string',
             'location' => 'optionnal|string',
@@ -1834,8 +1885,14 @@ class CalendarController
             return;
         }
 
-        $occurrenceId = $input['occurrence_id'] ?? null;
-      
+        [$occurrenceId, $occurrenceDate] = self::extractOccurrenceKey($input, $keyError);
+        if ($keyError !== null) {
+            LogService::warning("Clé d'occurrence invalide (PUT)", ['error' => $keyError]);
+            LoggingMiddleware::logExit(400);
+            Response::error($keyError, null, 400);
+            return;
+        }
+
         // Vérifier que des modifications sont fournies
         $modifications = array_intersect_key($input, array_flip(['title', 'description', 'location', 'start_datetime', 'end_datetime']));
         if (empty($modifications)) {
@@ -1927,13 +1984,16 @@ class CalendarController
             }
             
             if ($scope === 'all_future') {
-                // Modifier toutes les occurrences à partir de cette date
-                $modifiedCount = \ICS\Models\EventOccurrence::modifyFromId($eventId, $occurrenceId, $modifications);
-                
+                // Modifier toutes les occurrences à partir de cette date (clé id ou clé date)
+                $modifiedCount = $occurrenceDate !== null
+                    ? \ICS\Models\EventOccurrence::modifyFromDate($existingEvent, substr($occurrenceDate, 0, 10), $modifications)
+                    : \ICS\Models\EventOccurrence::modifyFromId($eventId, $occurrenceId, $modifications);
+
                 if ($modifiedCount == 0) {
                     LogService::warning("Aucune occurrence future trouvée pour modification", [
                         'event_id' => $eventId,
-                        'occurrence_id' => $occurrenceId
+                        'occurrence_id' => $occurrenceId,
+                        'occurrence_date' => $occurrenceDate
                     ]);
                     LoggingMiddleware::logExit(404);
                     Response::error('Aucune occurrence future trouvée', null, 404);
@@ -1953,20 +2013,24 @@ class CalendarController
                     'event_id' => $eventId,
                     'scope' => $scope,
                     'occurrence_id' => $occurrenceId,
+                    'occurrence_date' => $occurrenceDate !== null ? substr($occurrenceDate, 0, 10) : null,
                     'modified_count' => $modifiedCount,
                     'modifications' => $modifications,
                     'updated_at' => date('Y-m-d H:i:s')
                 ]);
                 return;
             }
-            
-            // Scope 'only_this' - modifier seulement cette occurrence
-            $occurrence = \ICS\Models\EventOccurrence::findOccurrenceWithId( $occurrenceId);
-            
+
+            // Scope 'only_this' - modifier seulement cette occurrence (clé id, ou clé date = RECURRENCE-ID)
+            $occurrence = $occurrenceDate !== null
+                ? \ICS\Models\EventOccurrence::resolveOrMaterializeByDate($existingEvent, $occurrenceDate)
+                : \ICS\Models\EventOccurrence::findOccurrenceWithId((int)$occurrenceId);
+
             if (!$occurrence) {
                 LogService::warning("Occurrence non trouvée", [
                     'event_id' => $eventId,
-                    'occurrence_id' => $occurrenceId
+                    'occurrence_id' => $occurrenceId,
+                    'occurrence_date' => $occurrenceDate
                 ]);
                 LoggingMiddleware::logExit(404);
                 Response::error('Occurrence non trouvée', null, 404);
@@ -1991,6 +2055,7 @@ class CalendarController
                 'event_id' => $eventId,
                 'scope' => $scope,
                 'occurrence_id' => $occurrenceId,
+                'occurrence_date' => $occurrence['occurrence_date'] ?? null,
                 'modified_count' => $modifiedCount,
                 'modifications' => $modifications,
                 'updated_at' => date('Y-m-d H:i:s')

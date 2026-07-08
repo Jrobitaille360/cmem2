@@ -346,7 +346,7 @@ class RecurrenceService
         $index = 0;
         foreach ($recurrences as $recurrence) {
             $occurrenceStart = $recurrence->getStart();
-            $occurrenceEnd = (clone $occurrenceStart)->add($duration);
+            $occurrenceEnd = \DateTime::createFromInterface($occurrenceStart)->add($duration);
 
             $occurrence = $event;
             unset($occurrence['id']);

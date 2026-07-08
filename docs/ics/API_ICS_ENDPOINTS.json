@@ -344,27 +344,33 @@
         {
           "method": "DELETE",
           "path": "/calendars/{id}/events/{eventId}/occurrences",
-          "description": "Supprimer/annuler une occurrence d'événement récurrent",
+          "description": "Supprimer/annuler une occurrence d'événement récurrent. Double clé : fournir exactement UNE des deux clés occurrence_id OU occurrence_date (les deux ou aucune → 400).",
           "params": {
             "id": "integer (required) - ID du calendrier",
             "eventId": "integer (required) - ID de l'événement récurrent"
           },
           "query_params": {
-            "occurrence_id": "string (required) - ID de l'occurrence à annuler. for futur occurrences id>= this id",
+            "occurrence_id": "integer (optional*) - ID de ligne event_occurrences. scope=all_future annule id >= cet id",
+            "occurrence_date": "string (optional*) - Clé naturelle RECURRENCE-ID (RFC 5545 §3.8.4.4). Formats : YYYY-MM-DD ou YYYY-MM-DD HH:MM:SS (désambiguïsation), interprétée dans le TZID de l'événement. Si l'occurrence n'est pas matérialisée, la date est validée contre la grille RRULE (même moteur que /expand) puis la ligne d'exception est créée. Date hors grille → 404. scope=all_future annule occurrence_date >= cette date (occurrences antérieures et leurs exceptions intactes ; occurrences manquantes matérialisées sur un horizon de 2 ans)",
             "scope": "optional|string|in:only_this,all_future,all - Portée de l'annulation (note all pour supprimer l'événement entier)"
           },
-          "response": "Confirmation d'annulation de l'occurrence"
+          "response": "Confirmation d'annulation — inclut event_id, scope, occurrence_id, occurrence_date, cancelled_count, cancelled_at",
+          "errors": {
+            "400": "Les deux clés fournies, aucune clé, ou occurrence_date de format invalide",
+            "404": "Occurrence non trouvée / date hors grille RRULE"
+          }
         },
         {
           "method": "PUT",
           "path": "/calendars/{id}/events/{eventId}/occurrences",
-          "description": "Modifier une occurrence d'événement récurrent",
+          "description": "Modifier une occurrence d'événement récurrent. Double clé : fournir exactement UNE des deux clés occurrence_id OU occurrence_date (les deux ou aucune → 400).",
           "params": {
             "id": "integer (required) - ID du calendrier",
             "eventId": "integer (required) - ID de l'événement récurrent"
           },
           "query_params": {
-            "occurrence_date": "string (required) - Date de l'occurrence à modifier (YYYY-MM-DD)"
+            "occurrence_id": "integer (optional*) - ID de ligne event_occurrences. scope=all_future modifie id >= cet id",
+            "occurrence_date": "string (optional*) - Clé naturelle RECURRENCE-ID (RFC 5545 §3.8.4.4). Formats : YYYY-MM-DD ou YYYY-MM-DD HH:MM:SS (désambiguïsation), interprétée dans le TZID de l'événement. Matérialisation à la demande si absente de la table. Date hors grille → 404. scope=all_future modifie occurrence_date >= cette date"
           },
           "body": {
             "title": "string (optional) - Nouveau titre de l'occurrence",
@@ -374,7 +380,11 @@
             "end_datetime": "string (optional) - Nouvelle date/heure de fin",
             "scope": "optional|string|in:only_this,all_future,all - Portée de la modification"
           },
-          "response": "Occurrence modifiée avec succès"
+          "response": "Occurrence modifiée — inclut event_id, scope, occurrence_id, occurrence_date, modified_count, modifications, updated_at",
+          "errors": {
+            "400": "Les deux clés fournies, aucune clé, occurrence_date invalide, ou aucune modification fournie",
+            "404": "Occurrence non trouvée / date hors grille RRULE"
+          }
         }
       ]
     },
