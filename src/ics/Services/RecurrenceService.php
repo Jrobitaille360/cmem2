@@ -7,6 +7,7 @@ use AuthGroups\Services\LogService;
 use Recurr\Rule;
 use Recurr\Transformer\ArrayTransformer;
 use Recurr\Transformer\ArrayTransformerConfig;
+use Recurr\Transformer\Constraint\BetweenConstraint;
 
 /**
  * Service pour gérer les événements récurrents
@@ -303,8 +304,68 @@ class RecurrenceService
     }
 
     /**
+     * Expanse une RRULE à la volée sur une plage donnée, dans le TZID de l'événement.
+     *
+     * Contrairement à calculateOccurrences() (chemin CRON, timezone serveur implicite),
+     * cette méthode construit la Rule avec le fuseau de l'événement et une BetweenConstraint
+     * pour ne matérialiser que les occurrences de la plage demandée (pas de virtual limit).
+     * Ne lit/écrit jamais event_occurrences — usage endpoint "à la demande" uniquement.
+     *
+     * @param array  $event L'événement récurrent (doit contenir recurrence_rule, start_datetime,
+     *                      end_datetime, timezone)
+     * @param string $start Début de la plage (Y-m-d H:i:s ou Y-m-d)
+     * @param string $end   Fin de la plage (Y-m-d H:i:s ou Y-m-d)
+     * @return array Tableau d'occurrences (mêmes clés que $event + start_datetime/end_datetime/occurrence_date/recurrence_index)
+     * @throws \Recurr\Exception Si la RRULE est invalide ou hors du sous-ensemble supporté par recurr
+     */
+    public static function expandInRangeTzAware(array $event, string $start, string $end): array
+    {
+        if (empty($event['recurrence_rule'])) {
+            return [];
+        }
+
+        $timezone = $event['timezone'] ?? 'America/Montreal';
+        $tz = new \DateTimeZone($timezone);
+
+        $startDateTime = new \DateTime($event['start_datetime'], $tz);
+        $endDateTime = new \DateTime($event['end_datetime'], $tz);
+        $duration = $startDateTime->diff($endDateTime);
+
+        $rule = new Rule('RRULE:' . $event['recurrence_rule'], $startDateTime, null, $timezone);
+
+        $constraint = new BetweenConstraint(
+            new \DateTime($start, $tz),
+            new \DateTime($end, $tz),
+            true
+        );
+
+        $transformer = new ArrayTransformer();
+        $recurrences = $transformer->transform($rule, $constraint);
+
+        $expanded = [];
+        $index = 0;
+        foreach ($recurrences as $recurrence) {
+            $occurrenceStart = $recurrence->getStart();
+            $occurrenceEnd = (clone $occurrenceStart)->add($duration);
+
+            $occurrence = $event;
+            unset($occurrence['id']);
+            $expanded[] = array_merge($occurrence, [
+                'event_id'         => $event['id'],
+                'start_datetime'   => $occurrenceStart->format('Y-m-d H:i:s'),
+                'end_datetime'     => $occurrenceEnd->format('Y-m-d H:i:s'),
+                'occurrence_date'  => $occurrenceStart->format('Y-m-d'),
+                'recurrence_index' => $index,
+            ]);
+            $index++;
+        }
+
+        return $expanded;
+    }
+
+    /**
      * Expanse un événement récurrent en ses occurrences pour une période donnée.
-     * 
+     *
      * Méthode publique qui utilise calculateOccurrences en interne.
      * 
      * @param array $event L'événement avec sa règle de récurrence

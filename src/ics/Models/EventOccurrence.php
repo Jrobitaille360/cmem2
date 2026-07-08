@@ -193,7 +193,7 @@ class EventOccurrence extends BaseModel
     /**
      * Applique les modifications d'une occurrence aux données de l'événement
      */
-    private static function applyModifications(array $occurrence): array
+    public static function applyModifications(array $occurrence): array
     {
         // Si l'occurrence n'est pas modifiée, retourner telle quelle
         if (empty($occurrence['is_modified'])) {
@@ -243,7 +243,7 @@ class EventOccurrence extends BaseModel
      * 'YYYY-MM-DD'          → 'YYYY-MM-DD 23:59:59'
      * valeur déjà horodatée → inchangée
      */
-    private static function endOfDayIfDateOnly(string $endDate): string
+    public static function endOfDayIfDateOnly(string $endDate): string
     {
         if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $endDate)) {
             return $endDate . ' 23:59:59';
@@ -587,6 +587,114 @@ class EventOccurrence extends BaseModel
             ]);
             return [];
         }
+    }
+
+    /**
+     * Expanse à la volée les occurrences d'un événement sur une plage donnée (endpoint "expand").
+     * Applique les exceptions existantes (is_cancelled/is_modified) depuis event_occurrences.
+     * Lecture seule — n'écrit jamais dans event_occurrences. Ne touche pas au chemin CRON.
+     *
+     * @throws \Recurr\Exception Si la RRULE est invalide (remonté tel quel à l'appelant)
+     */
+    public static function getExpandedByEventId(int $eventId, int $calendarId, string $start, string $end): array
+    {
+        $end = self::endOfDayIfDateOnly($end);
+
+        $db = self::getDbConnection();
+        $stmt = $db->prepare("SELECT * FROM calendar_events WHERE id = ? AND calendar_id = ? AND deleted_at IS NULL");
+        $stmt->execute([$eventId, $calendarId]);
+        $event = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$event) {
+            return [];
+        }
+
+        return self::expandEventInRange($event, $start, $end);
+    }
+
+    /**
+     * Expanse à la volée les occurrences de tous les événements d'un calendrier sur une plage
+     * donnée (endpoint "expand"). Événements récurrents : RRULE TZID-aware + exceptions.
+     * Non récurrents : inclus tels quels s'ils chevauchent la plage.
+     * Lecture seule — n'écrit jamais dans event_occurrences. Ne touche pas au chemin CRON.
+     *
+     * @throws \Recurr\Exception Si une RRULE est invalide (remonté tel quel à l'appelant)
+     */
+    public static function getExpandedByCalendarId(int $calendarId, string $start, string $end): array
+    {
+        $end = self::endOfDayIfDateOnly($end);
+
+        $db = self::getDbConnection();
+        $stmt = $db->prepare("SELECT * FROM calendar_events WHERE calendar_id = ? AND deleted_at IS NULL");
+        $stmt->execute([$calendarId]);
+        $events = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $allOccurrences = [];
+        foreach ($events as $event) {
+            $allOccurrences = array_merge($allOccurrences, self::expandEventInRange($event, $start, $end));
+        }
+
+        usort($allOccurrences, fn($a, $b) => strcmp($a['start_datetime'], $b['start_datetime']));
+
+        return $allOccurrences;
+    }
+
+    /**
+     * Expanse un seul événement (récurrent ou non) sur une plage, exceptions appliquées.
+     */
+    private static function expandEventInRange(array $event, string $start, string $end): array
+    {
+        if (empty($event['recurrence_rule'])) {
+            if ($event['end_datetime'] >= $start && $event['start_datetime'] <= $end) {
+                $occurrence = $event;
+                unset($occurrence['id']);
+                return [array_merge($occurrence, [
+                    'event_id' => $event['id'],
+                    'occurrence_date' => substr($event['start_datetime'], 0, 10),
+                    'is_cancelled' => false,
+                    'is_modified' => false,
+                ])];
+            }
+            return [];
+        }
+
+        $occurrences = \ICS\Services\RecurrenceService::expandInRangeTzAware($event, $start, $end);
+
+        if (empty($occurrences)) {
+            return [];
+        }
+
+        $db = self::getDbConnection();
+        $stmt = $db->prepare(
+            "SELECT occurrence_date, is_cancelled, is_modified, modified_title, modified_description,
+                    modified_location, modified_start_datetime, modified_end_datetime
+             FROM event_occurrences
+             WHERE event_id = ? AND (is_cancelled = 1 OR is_modified = 1)"
+        );
+        $stmt->execute([$event['id']]);
+
+        $exceptionsByDate = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $exception) {
+            $exceptionsByDate[$exception['occurrence_date']] = $exception;
+        }
+
+        if (empty($exceptionsByDate)) {
+            return $occurrences;
+        }
+
+        $result = [];
+        foreach ($occurrences as $occurrence) {
+            $exception = $exceptionsByDate[$occurrence['occurrence_date']] ?? null;
+            if ($exception) {
+                if (!empty($exception['is_cancelled'])) {
+                    continue;
+                }
+                $occurrence = self::applyModifications(array_merge($occurrence, $exception));
+            }
+            $result[] = $occurrence;
+        }
+
+        return $result;
     }
 
     /**

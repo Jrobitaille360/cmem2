@@ -7,6 +7,20 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-07-08 07:46]
+
+### Nouvel endpoint — expansion d'occurrences RRULE à la demande (directive `20260707_082007_cmem_web_vers_cmem2_API`)
+
+- **`GET /calendars/{id}/events/occurrences/expand`** et **`GET /calendars/{id}/events/{eventId}/occurrences/expand`** (nouveau, additif) — expanse les RRULE à la volée sur la seule plage `[start, end]` demandée, dans le `TZID` de l'événement (DST-safe), sans dépendre de la table pré-calculée `event_occurrences` ni du CRON ; `start`/`end` requis, date-seule acceptée (fin de journée inclusive pour `end`) ; occurrences annulées absentes, occurrences modifiées retournées avec leurs `modified_*` appliqués ; RRULE non supportée par `simshaun/recurr` → `422` explicite (jamais `500`) ; ancien chemin (`/events/occurrences` sans `/expand`), CRON et table `event_occurrences` strictement inchangés (client Flutter non affecté)
+- **`src/ics/Services/RecurrenceService.php`** — nouvelle méthode `expandInRangeTzAware()` (Rule construite avec le `TZID` de l'événement + `BetweenConstraint` de `simshaun/recurr`, isolée de `calculateOccurrences()` existant)
+- **`src/ics/Models/EventOccurrence.php`** — nouvelles méthodes `getExpandedByCalendarId()` / `getExpandedByEventId()` (lecture seule : `calendar_events` + exceptions `event_occurrences`) ; `endOfDayIfDateOnly()` et `applyModifications()` rendues `public` pour réutilisation
+- **`src/ics/Routing/RouteHandlers/CalendarRouteHandler.php`** — 2 routes additives, insérées avant les routes `.../occurrences` existantes (garde `!isset($segments[5])` ajoutée aux anciennes routes pour éviter toute ambiguïté de matching)
+- **`docs/ics/API_ICS_ENDPOINTS.json`** / **`docs/ics/GUIDE.md`** — contrat documenté (paramètres, réponse, codes d'erreur, sous-ensemble RRULE supporté)
+- **`private/tests/test_ics_occurrences_expand.php`** — nouveau : 33 tests (DST mars + novembre America/Toronto, exceptions annulée/modifiée, bornes inclusives + plage vide, RRULE invalide, non-régression ancien chemin) ; ajouté à `run_all_tests.php`
+- Suite complète : 1365/1365 tests verts (aucune régression) ; déployé sur dev uniquement (prod hors scope — le client React n'est pas encore en phase 4)
+
+---
+
 ## [Unreleased 2026-07-07 14:42]
 
 ### Fix — frontière `end_date` date-seule sur les occurrences (directive `20260707_082006_cmem_web_vers_cmem2_API`)

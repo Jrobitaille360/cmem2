@@ -2063,6 +2063,126 @@ class CalendarController
         }
     }
 
+    /**
+     * GET /calendars/{id}/events/occurrences/expand?start=&end=
+     *
+     * Expanse à la volée les occurrences (récurrentes + non récurrentes) d'un calendrier sur
+     * la plage [start, end], TZID-aware, sans dépendre de la table pré-calculée
+     * event_occurrences. Endpoint additif — n'affecte pas getEventsOccurrences() ni le CRON.
+     */
+    public function getEventsOccurrencesExpand($calendarId, $userId): void
+    {
+        LoggingMiddleware::logEntry();
+
+        $cal = new Calendar();
+        if (!$cal->canUserWrite($calendarId, $userId)) {
+            LoggingMiddleware::logExit(403);
+            Response::error('Permission insuffisante pour accéder à ce calendrier', null, 403);
+            return;
+        }
+
+        $input = Response::getRequestParams();
+        $validation = Validator::validate($input, [
+            'start' => 'required|date_or_datetime',
+            'end' => 'required|date_or_datetime',
+        ]);
+
+        if (!$validation['valid']) {
+            LoggingMiddleware::logExit(400);
+            Response::error('Données invalides', $validation['errors'], 400);
+            return;
+        }
+
+        try {
+            $occurrences = \ICS\Models\EventOccurrence::getExpandedByCalendarId(
+                $calendarId, $input['start'], $input['end']
+            );
+
+            LoggingMiddleware::logExit(200);
+            Response::success('Occurrences récupérées avec succès', [
+                'occurrences' => $occurrences,
+                'count' => count($occurrences)
+            ]);
+        } catch (\Recurr\Exception $e) {
+            LogService::warning("RRULE non supportée lors de l'expansion à la demande", [
+                'calendar_id' => $calendarId,
+                'error' => $e->getMessage()
+            ]);
+            LoggingMiddleware::logExit(422);
+            Response::error('Règle de récurrence non supportée : ' . $e->getMessage(), null, 422);
+        } catch (\Exception $e) {
+            LogService::error("Erreur lors de l'expansion des occurrences", [
+                'calendar_id' => $calendarId,
+                'error' => $e->getMessage()
+            ]);
+            LoggingMiddleware::logExit(500);
+            Response::error('Erreur lors de la récupération des occurrences', null, 500);
+        }
+    }
+
+    /**
+     * GET /calendars/{id}/events/{eventId}/occurrences/expand?start=&end=
+     *
+     * Variante par événement de getEventsOccurrencesExpand().
+     */
+    public function getEventOccurrenceExpand($eventId, $calendarId, $userId): void
+    {
+        LoggingMiddleware::logEntry();
+
+        $cal = new Calendar();
+        if (!$cal->canUserWrite($calendarId, $userId)) {
+            LoggingMiddleware::logExit(403);
+            Response::error('Permission insuffisante pour accéder à ce calendrier', null, 403);
+            return;
+        }
+
+        $event = new CalendarEvent();
+        $existingEvent = $event->findById($eventId);
+        if (!$existingEvent || $existingEvent['calendar_id'] != $calendarId) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Événement non trouvé', null, 404);
+            return;
+        }
+
+        $input = Response::getRequestParams();
+        $validation = Validator::validate($input, [
+            'start' => 'required|date_or_datetime',
+            'end' => 'required|date_or_datetime',
+        ]);
+
+        if (!$validation['valid']) {
+            LoggingMiddleware::logExit(400);
+            Response::error('Données invalides', $validation['errors'], 400);
+            return;
+        }
+
+        try {
+            $occurrences = \ICS\Models\EventOccurrence::getExpandedByEventId(
+                $eventId, $calendarId, $input['start'], $input['end']
+            );
+
+            LoggingMiddleware::logExit(200);
+            Response::success('Occurrences récupérées avec succès', [
+                'occurrences' => $occurrences,
+                'count' => count($occurrences)
+            ]);
+        } catch (\Recurr\Exception $e) {
+            LogService::warning("RRULE non supportée lors de l'expansion à la demande", [
+                'event_id' => $eventId,
+                'error' => $e->getMessage()
+            ]);
+            LoggingMiddleware::logExit(422);
+            Response::error('Règle de récurrence non supportée : ' . $e->getMessage(), null, 422);
+        } catch (\Exception $e) {
+            LogService::error("Erreur lors de l'expansion des occurrences", [
+                'event_id' => $eventId,
+                'error' => $e->getMessage()
+            ]);
+            LoggingMiddleware::logExit(500);
+            Response::error('Erreur lors de la récupération des occurrences', null, 500);
+        }
+    }
+
     // ----------------------------------------------------------------
     // Phase 5.3 — GET /calendars/{id}/freebusy?start=...&end=...
     // ----------------------------------------------------------------

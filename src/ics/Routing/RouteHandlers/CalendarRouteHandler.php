@@ -65,8 +65,12 @@ class CalendarRouteHandler extends BaseRouteHandler
             ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && !isset($segments[3]) && $method === 'POST') => 
                 $this->controller->createEvent((int)$action, $user['user_id']),
 
+            // GET /calendars/{id}/events/{eventId}/occurrences/expand - Expansion RRULE à la demande (variante par événement)
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && isset($segments[3]) && ctype_digit($segments[3]) && isset($segments[4]) && $segments[4] === 'occurrences' && isset($segments[5]) && $segments[5] === 'expand' && $method === 'GET') =>
+                $this->controller->getEventOccurrenceExpand((int)$segments[3], (int)$action, $user['user_id']),
+
             // GET /calendars/{id}/events/{eventId}/occurrences - Obtenir les occurrences d'un événement récurrent spécifique
-            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && isset($segments[3]) && ctype_digit($segments[3]) && isset($segments[4]) && $segments[4] === 'occurrences' && $method === 'GET') => 
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && isset($segments[3]) && ctype_digit($segments[3]) && isset($segments[4]) && $segments[4] === 'occurrences' && !isset($segments[5]) && $method === 'GET') =>
                 $this->controller->getEventOccurrences((int)$segments[3], (int)$action, $user['user_id']),
 
             // DELETE /calendars/{id}/events/{eventId}/occurrences - Supprimer/annuler une occurrence
@@ -77,8 +81,12 @@ class CalendarRouteHandler extends BaseRouteHandler
             ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && isset($segments[3]) && ctype_digit($segments[3]) && isset($segments[4]) && $segments[4] === 'occurrences' && $method === 'PUT') => 
                 $this->controller->updateEventOccurrence((int)$action, (int)$segments[3], $user['user_id']),
 
+            // GET /calendars/{id}/events/occurrences/expand - Expansion RRULE à la demande (calendrier entier)
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && isset($segments[3]) && $segments[3] === 'occurrences' && isset($segments[4]) && $segments[4] === 'expand' && $method === 'GET') =>
+                $this->controller->getEventsOccurrencesExpand((int)$action, $user['user_id']),
+
             // GET /calendars/{id}/events/occurrences - Obtenir toutes les occurrences du calendrier entre deux dates
-            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && isset($segments[3]) && $segments[3] === 'occurrences' && !isset($segments[4]) && $method === 'GET') => 
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && isset($segments[3]) && $segments[3] === 'occurrences' && !isset($segments[4]) && $method === 'GET') =>
                 $this->controller->getEventsOccurrences((int)$action, $user['user_id']),
 
             // GET /calendars/{id}/events/{eventId} - get a unique event

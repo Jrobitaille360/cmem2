@@ -219,6 +219,29 @@ Auth   : Basic  (email + mot de passe) ou Bearer JWT
 | GET | `/calendars/{id}/events/occurrences` | Occurrences de tous les événements du calendrier (`?start=&end=`) |
 | PUT | `/calendars/{id}/events/{eventId}/occurrences` | Modifier une occurrence |
 | DELETE | `/calendars/{id}/events/{eventId}/occurrences` | Supprimer/annuler une occurrence |
+| GET | `/calendars/{id}/events/occurrences/expand` | Expansion RRULE à la demande, timezone-aware (`?start=&end=`) |
+| GET | `/calendars/{id}/events/{eventId}/occurrences/expand` | Variante par événement de l'expansion à la demande |
+
+### Expansion à la demande (`/occurrences/expand`)
+
+Route additive (phase 3 rewrite cmem_web) : expanse la RRULE **à la volée sur la seule plage
+demandée**, dans le `TZID` de l'événement (DST-safe), sans dépendre de la table
+pré-calculée `event_occurrences` ni du CRON. Coexiste avec l'ancien chemin
+(`/events/occurrences` sans `/expand`) qui reste inchangé pour le client Flutter — les deux
+chemins lisent les mêmes exceptions (`is_cancelled`/`is_modified`).
+
+```txt
+GET /calendars/12/events/occurrences/expand?start=2026-03-01&end=2026-03-31
+```
+
+- `start`/`end` **requis** (contrairement à l'ancien chemin qui tolère leur absence grâce à
+  la table pré-calculée) ; date-seule acceptée (`start` = minuit inclusif, `end` = fin de
+  journée 23:59:59 inclusive).
+- Occurrence annulée (EXDATE) → absente de la réponse ; occurrence modifiée (RECURRENCE-ID)
+  → retournée avec ses `modified_*` déjà appliqués.
+- Réponse : mêmes champs que l'ancien endpoint, sauf pas de champ `id` (occurrence non
+  stockée) ni `is_on_demand`.
+- RRULE hors du sous-ensemble supporté par `simshaun/recurr` → `422` explicite (jamais `500`).
 
 ### Exemples de RRULE
 

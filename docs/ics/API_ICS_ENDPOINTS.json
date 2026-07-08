@@ -306,6 +306,41 @@
           },
           "response": "Liste des occurrences avec dates"
         },
+        { "method": "GET", "path": "/calendars/{id}/events/occurrences/expand",
+          "description": "Phase 3 rewrite cmem_web — expansion RRULE À LA DEMANDE (timezone-aware, RFC 5545) sur la seule plage demandée, sans dépendre de la table pré-calculée event_occurrences ni du CRON. Route additive : coexiste avec /calendars/{id}/events/occurrences (chemin CRON, client Flutter) qui reste strictement inchangé. Les deux chemins lisent les mêmes exceptions (is_cancelled/is_modified) — une occurrence annulée/modifiée par un client est vue par l'autre.",
+          "params": {
+            "id": "integer (required) - ID du calendrier"
+          },
+          "query_params": {
+            "start": "string (required) - Début de la plage (YYYY-MM-DD ou YYYY-MM-DD HH:MM:SS / ISO 8601). Date-seule = minuit inclusif.",
+            "end": "string (required) - Fin de la plage (YYYY-MM-DD ou YYYY-MM-DD HH:MM:SS / ISO 8601). Date-seule = fin de journée 23:59:59 inclusive."
+          },
+          "response": "{ occurrences: [...], count: N } — mêmes champs que l'ancien endpoint (event_id, title, description, start_datetime, end_datetime, timezone, is_cancelled, is_modified, modified_*, etc.), SAUF : pas de champ 'id' (occurrence non stockée, générée à la volée) ni 'is_on_demand' (tout l'endpoint est par définition à la demande). Occurrences annulées absentes ; occurrences modifiées retournées avec leurs modified_* déjà appliqués. Événements non récurrents de la plage inclus (même sémantique que l'ancien chemin).",
+          "rrule_support": "Sous-ensemble supporté = tout ce que simshaun/recurr v5 accepte sans lever d'exception (FREQ, INTERVAL, COUNT, UNTIL, BYDAY, BYMONTH, BYMONTHDAY, BYYEARDAY, BYWEEKNO, BYSETPOS, BYHOUR/MINUTE/SECOND, WKST). Une RRULE hors sous-ensemble (ou une combinaison invalide) déclenche une erreur de validation explicite (422), jamais un 500. En pratique la plupart des RRULE invalides sont déjà rejetées à la création de l'événement (CalendarEvent::isValidRecurrenceRule) — ce 422 est un filet de sécurité pour les cas plus subtils que recurr rejette au moment de l'expansion.",
+          "errors": {
+            "400": "start ou end manquant/invalide",
+            "403": "Permission insuffisante sur le calendrier",
+            "422": "RRULE non supportée par recurr (message d'erreur explicite inclus)"
+          }
+        },
+        { "method": "GET", "path": "/calendars/{id}/events/{eventId}/occurrences/expand",
+          "description": "Variante par événement de GET /calendars/{id}/events/occurrences/expand — mêmes règles, limité à un seul événement.",
+          "params": {
+            "id": "integer (required) - ID du calendrier",
+            "eventId": "integer (required) - ID de l'événement"
+          },
+          "query_params": {
+            "start": "string (required) - voir /calendars/{id}/events/occurrences/expand",
+            "end": "string (required) - voir /calendars/{id}/events/occurrences/expand"
+          },
+          "response": "Identique à /calendars/{id}/events/occurrences/expand, limité à cet événement",
+          "errors": {
+            "400": "start ou end manquant/invalide",
+            "403": "Permission insuffisante sur le calendrier",
+            "404": "Événement non trouvé ou non associé au calendrier",
+            "422": "RRULE non supportée par recurr (message d'erreur explicite inclus)"
+          }
+        },
         {
           "method": "DELETE",
           "path": "/calendars/{id}/events/{eventId}/occurrences",
