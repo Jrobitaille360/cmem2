@@ -7,6 +7,21 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-07-08 20:25]
+
+### Fix — freebusy : récurrence non expansée + troncature borne `end` (directive `20260708_200813_cmem_web_vers_cmem2_API`)
+
+- **`GET /calendars/{id}/freebusy`** — un événement OPAQUE récurrent ne produisait qu'un seul créneau busy (la ligne parent), les autres occurrences absentes ; borne `end` date-seule tronquée à minuit (`strtotime('2026-08-31')` = `00:00:00`), excluant tout événement du dernier jour commençant après minuit
+- **`src/ics/Models/EventOccurrence.php`** — nouvelle méthode `getExpandedOpaqueByCalendarId()` : réutilise le moteur d'expansion RRULE TZID-aware de `/occurrences/expand` (`expandEventInRange`), filtré en amont sur `status != 'cancelled'` et `transp IS NULL OR transp = 'OPAQUE'` ; un événement récurrent produit désormais un créneau busy par occurrence réelle, exceptions `is_cancelled`/`is_modified` appliquées
+- **`src/ics/Controllers/CalendarController.php::getFreeBusy`** — `end` passé par `EventOccurrence::endOfDayIfDateOnly()` avant `strtotime` (même correctif que la directive `20260707_082006`, étendu à ce chemin) ; appel remplacé par `getExpandedOpaqueByCalendarId()`
+- **`src/ics/Models/CalendarEvent.php`** — `getOpaqueEventsForFreeBusy()` (devenue morte, plus aucun appelant) supprimée
+- **`private/tests/test_ics_freebusy_recurrence.php`** — nouveau : 26 tests (expansion récurrence 4/6 puis 3/6 occ. après annulation, occurrence modifiée reflétée, dernier-jour inclus, TRANSPARENT exclu, réponse ICS `VFREEBUSY` alignée) ; ajouté à `run_all_tests.php` et `CLAUDE.md`
+- **`docs/ics/API_ICS_ENDPOINTS.json`** / **`docs/ics/GUIDE.md`** — contrat corrigé (réponse réelle `{ busy: [...] }` au lieu de l'ancien `{ freebusy: [...] }` documenté mais jamais implémenté ; comportement récurrence + borne `end` documenté)
+- Non bloquant pour cmem_web (contournait déjà via `/occurrences/expand` côté client) ; utile aux autres consommateurs (CalDAV free-busy-query, export ICS `VFREEBUSY`)
+- Suite complète : 1457/1457 tests verts (aucune régression) ; déployé sur dev et prod
+
+---
+
 ## [Unreleased 2026-07-08 14:25]
 
 ### Exceptions d'occurrence par date — double clé `occurrence_date` (directive `20260708_105308_cmem_web_vers_cmem2_API`)

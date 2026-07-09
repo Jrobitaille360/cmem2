@@ -346,17 +346,29 @@ Statuts : `DRAFT` | `FINAL` | `CANCELLED`.
 GET /calendars/{id}/freebusy?start=2026-04-01&end=2026-04-30
 ```
 
-Retourne les plages occupées (`TRANSP=OPAQUE`) sur la période demandée :
+Retourne les plages occupées (`TRANSP=OPAQUE`, ou sans `TRANSP`) sur la période demandée.
+Récurrence expansée à la volée (RRULE `TZID`-aware, même moteur que
+`/events/occurrences/expand`) : un événement récurrent OPAQUE produit **un créneau busy par
+occurrence réelle** dans la plage — occurrence annulée absente, occurrence modifiée reflète
+ses `modified_start_datetime`/`modified_end_datetime`. `end` date-seule normalisée en fin de
+journée avant la requête (même correctif que `/occurrences`, directive `20260707_082006`,
+étendu à ce chemin par la directive `20260708_200813`). `TRANSPARENT` toujours exclu.
 
 ```json
 {
-  "freebusy": [
-    { "dtstart": "2026-04-07T09:00:00", "dtend": "2026-04-07T10:00:00" }
-  ],
   "calendar_id": 12,
-  "period": { "start": "2026-04-01", "end": "2026-04-30" }
+  "start": "2026-04-01 00:00:00",
+  "end": "2026-04-30 23:59:59",
+  "timezone": "America/Toronto",
+  "busy": [
+    { "start": "2026-04-07 09:00:00", "end": "2026-04-07 10:00:00", "summary": "Réunion" }
+  ]
 }
 ```
+
+`summary` est masqué (`null`) si le calendrier est privé et l'appelant n'en est pas
+propriétaire. Avec l'en-tête `Accept: text/calendar`, la réponse est un `VCALENDAR`/`VFREEBUSY`
+(une propriété `FREEBUSY;FBTYPE=BUSY:` par occurrence).
 
 ---
 

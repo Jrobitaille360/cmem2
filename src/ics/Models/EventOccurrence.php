@@ -640,6 +640,38 @@ class EventOccurrence extends BaseModel
     }
 
     /**
+     * Expanse à la volée les événements OPAQUE (bloquants) d'un calendrier pour VFREEBUSY
+     * (RFC 5545 §3.8.2.7). Même moteur que getExpandedByCalendarId (RRULE TZID-aware +
+     * exceptions is_cancelled/is_modified) — un événement récurrent OPAQUE produit un
+     * créneau busy par occurrence réelle dans la plage, pas une seule ligne parent.
+     * Événements TRANSPARENT et annulés (status='cancelled') exclus en amont (SQL).
+     *
+     * @throws \Recurr\Exception Si une RRULE est invalide (remonté tel quel à l'appelant)
+     */
+    public static function getExpandedOpaqueByCalendarId(int $calendarId, string $start, string $end): array
+    {
+        $end = self::endOfDayIfDateOnly($end);
+
+        $db = self::getDbConnection();
+        $stmt = $db->prepare(
+            "SELECT * FROM calendar_events
+             WHERE calendar_id = ? AND deleted_at IS NULL AND status != 'cancelled'
+               AND (transp IS NULL OR transp = 'OPAQUE')"
+        );
+        $stmt->execute([$calendarId]);
+        $events = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $allOccurrences = [];
+        foreach ($events as $event) {
+            $allOccurrences = array_merge($allOccurrences, self::expandEventInRange($event, $start, $end));
+        }
+
+        usort($allOccurrences, fn($a, $b) => strcmp($a['start_datetime'], $b['start_datetime']));
+
+        return $allOccurrences;
+    }
+
+    /**
      * Expanse un seul événement (récurrent ou non) sur une plage, exceptions appliquées.
      */
     private static function expandEventInRange(array $event, string $start, string $end): array

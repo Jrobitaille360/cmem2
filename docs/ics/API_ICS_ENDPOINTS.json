@@ -532,14 +532,14 @@
         {
           "method": "GET",
           "path": "/calendars/{id}/freebusy",
-          "description": "Obtenir les plages occupées d'un calendrier — agrège les événements TRANSP=OPAQUE",
+          "description": "Obtenir les plages occupées d'un calendrier — agrège les événements TRANSP=OPAQUE. Récurrence expansée à la volée (RRULE TZID-aware, même moteur que /occurrences/expand) : un événement récurrent OPAQUE produit un créneau busy par occurrence réelle dans la plage (exceptions is_cancelled/is_modified appliquées). Borne end date-seule normalisée en fin de journée (23:59:59) avant la requête.",
           "params": { "id": "integer (required)" },
           "query": {
-            "start": "date (required) - Début de la période YYYY-MM-DD",
-            "end": "date (required) - Fin de la période YYYY-MM-DD"
+            "start": "date ou datetime (required) - Début de la période",
+            "end": "date ou datetime (required) - Fin de la période (date-seule → fin de journée incluse)"
           },
-          "response": "{ freebusy: [{ dtstart, dtend }], calendar_id, period: { start, end } }",
-          "notes": "Requiert TRANSP (Phase 2 — 2.4). Seuls les événements OPAQUE sont inclus. Exposé également via REPORT CalDAV.",
+          "response": "JSON (défaut) : { calendar_id, start, end, timezone, busy: [{ start, end, summary }] }. Avec en-tête `Accept: text/calendar` : VCALENDAR/VFREEBUSY (RFC 5545), une propriété FREEBUSY;FBTYPE=BUSY par occurrence.",
+          "notes": "Requiert TRANSP (Phase 2 — 2.4). Seuls les événements OPAQUE (ou sans TRANSP) sont inclus ; TRANSPARENT toujours exclu. `summary` masqué (null) si calendrier privé et non-owner.",
           "errors": {
             "400": "start ou end manquant/invalide, ou start > end",
             "403": "Accès non autorisé",

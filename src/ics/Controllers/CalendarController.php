@@ -2285,7 +2285,8 @@ class CalendarController
             $tz       = $calendar['timezone'] ?? 'America/Montreal';
 
             $start = date('Y-m-d H:i:s', strtotime($input['start']));
-            $end   = date('Y-m-d H:i:s', strtotime($input['end']));
+            $endRaw = \ICS\Models\EventOccurrence::endOfDayIfDateOnly($input['end']);
+            $end   = date('Y-m-d H:i:s', strtotime($endRaw));
 
             if ($end <= $start) {
                 LoggingMiddleware::logExit(400);
@@ -2293,9 +2294,9 @@ class CalendarController
                 return;
             }
 
-            // Récupérer les événements OPAQUE dans la période
-            $eventModel   = new CalendarEvent();
-            $opaqueEvents = $eventModel->getOpaqueEventsForFreeBusy($calendarId, $start, $end);
+            // Récupérer les événements OPAQUE dans la période — récurrence expansée (TZID-aware,
+            // exceptions appliquées), même moteur que /occurrences/expand
+            $opaqueEvents = \ICS\Models\EventOccurrence::getExpandedOpaqueByCalendarId($calendarId, $start, $end);
 
             $accept = $_SERVER['HTTP_ACCEPT'] ?? '';
             if (str_contains($accept, 'text/calendar')) {

@@ -871,29 +871,4 @@ class CalendarEvent extends BaseModel
         return ['created' => $created, 'updated' => $updated];
     }
 
-    /**
-     * Phase 5.3 — Récupère les événements OPAQUE (bloquants) d'un calendrier pour VFREEBUSY.
-     * Les événements sans TRANSP défini sont traités comme OPAQUE (RFC 5545 §3.8.2.7).
-     *
-     * @param int    $calendarId
-     * @param string $startDatetime Format 'Y-m-d H:i:s'
-     * @param string $endDatetime   Format 'Y-m-d H:i:s'
-     */
-    public function getOpaqueEventsForFreeBusy(int $calendarId, string $startDatetime, string $endDatetime): array
-    {
-        $stmt = $this->getDb()->prepare("
-            SELECT id, title, start_datetime, end_datetime, timezone, transp
-            FROM calendar_events
-            WHERE calendar_id = ?
-              AND deleted_at IS NULL
-              AND status != 'cancelled'
-              AND (transp IS NULL OR transp = 'OPAQUE')
-              AND start_datetime < ?
-              AND end_datetime > ?
-            ORDER BY start_datetime ASC
-        ");
-        $stmt->execute([$calendarId, $endDatetime, $startDatetime]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-
 }
