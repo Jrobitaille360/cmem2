@@ -336,6 +336,10 @@ PUT    /calendars/12/events/45/occurrences?occurrence_date=2026-08-18
 
 Statuts : `DRAFT` | `FINAL` | `CANCELLED`.
 
+`related_to` (optionnel, string max 255) — UID du journal parent (RFC 5545 §3.8.4.5), accepté
+sur `POST`/`PUT` ; envoyer `null` sur `PUT` retire le lien (directive
+`20260713_161125_cmem_web_vers_cmem2_API`).
+
 ---
 
 ## Endpoints — Disponibilités (VFREEBUSY)

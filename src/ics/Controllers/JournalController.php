@@ -41,6 +41,7 @@ class JournalController
             'categories'  => 'optional|array',
             'url'         => 'optional|string|max:2083',
             'timezone'    => 'optional|string|max:100',
+            'related_to'  => 'optional|string|max:255',
         ]);
 
         if (!$validation['valid']) {
@@ -67,6 +68,7 @@ class JournalController
             $journal->categories  = $input['categories'] ?? null;
             $journal->url         = $input['url'] ?? null;
             $journal->timezone    = $input['timezone'] ?? 'America/Montreal';
+            $journal->relatedTo   = $input['related_to'] ?? null;
 
             $result = $journal->create();
             LoggingMiddleware::logExit(201);
@@ -144,6 +146,7 @@ class JournalController
             'categories'  => 'optional|array',
             'url'         => 'optional|string|max:2083',
             'timezone'    => 'optional|string|max:100',
+            'related_to'  => 'optional|string|max:255',
         ]);
 
         if (!$validation['valid']) {
@@ -172,6 +175,13 @@ class JournalController
             }
             if (isset($input['categories'])) {
                 $journal->categories = $input['categories'];
+            }
+            if (array_key_exists('related_to', $input)) {
+                if ($input['related_to'] === null) {
+                    $journal->clearRelatedTo = true;
+                } else {
+                    $journal->relatedTo = $input['related_to'];
+                }
             }
 
             $journal->update();

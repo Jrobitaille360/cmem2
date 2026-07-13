@@ -7,6 +7,29 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-07-13 17:00]
+
+### Feat — `related_to` exposé sur VJOURNAL create/update (directive `20260713_161125_cmem_web_vers_cmem2_API`)
+
+- **`src/ics/Controllers/JournalController.php`** — `createJournal()` et `updateJournal()` acceptaient déjà `related_to` au niveau modèle/ICS mais ne le validaient/assignaient pas ; ajouté `'related_to' => 'optional|string|max:255'` aux règles et assignation explicite (hors boucle générique, comme `categories`/`dtstart`)
+- **`src/ics/Models/CalendarJournal.php::update()`** — `related_to` géré via `isset()` ne permettait pas la remise à `null` (retrait du lien) ; ajout du flag `clearRelatedTo` pour forcer `related_to = NULL` en SQL quand le client envoie explicitement `null`
+- **`docs/ics/API_ICS_ENDPOINTS.json`** — `related_to` documenté sur les routes `POST`/`PUT` journals
+- **`private/tests/test_calendars.php`** — 5 tests ajoutés (16e.12b–e : création avec `related_to`, validation max 255, mise à jour, remise à `null`) ; suite complète 213/213 en local
+
+---
+
+## [Unreleased 2026-07-13 08:50]
+
+### Fix — queue notifications email jamais alimentée (directive `20260713_084317_cmem_web_vers_cmem2_API`)
+
+- **`src/ics/Services/EmailNotificationService.php::scheduleEmailsForEvent`** — lisait `$notif['minutes']` (clé `minutes_before` documentée/envoyée par le client) et comparait `$notif['type'] !== 'email'` (client envoie `'EMAIL'`) ; skip silencieux, aucune ligne insérée dans `email_notification_queue`, aucun log d'erreur
+- Corrigé : `strtoupper($notif['type'] ?? '') !== 'EMAIL'` + `(int)($notif['minutes_before'] ?? 0)` — conforme au contrat `docs/ics/API_ICS_ENDPOINTS.json` (déjà correct, aucun changement de doc requis)
+- `rescheduleEmailsForEvent()` corrigé du même coup (même chemin de code)
+- `IcsGenerator.php` et `EventValidator.php` acceptaient déjà les deux clés — non affectés
+- **`private/tests/test_ics_email_notifications.php`** — nouveau : 12 tests (queue alimentée avec `minutes_before`/status corrects sur événement `EMAIL`, non-régression `DISPLAY` seul → aucune ligne email) ; vérifié en direct sur dev-cmem2 ; ajouté à `run_all_tests.php` et `CLAUDE.md`
+
+---
+
 ## [Unreleased 2026-07-08 20:25]
 
 ### Fix — freebusy : récurrence non expansée + troncature borne `end` (directive `20260708_200813_cmem_web_vers_cmem2_API`)

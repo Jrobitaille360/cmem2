@@ -301,10 +301,10 @@ class EmailNotificationService
         $calendarId     = (int)$event['calendar_id'];
 
         foreach ($notifications as $notif) {
-            if (($notif['type'] ?? '') !== 'email') {
+            if (strtoupper($notif['type'] ?? '') !== 'EMAIL') {
                 continue;
             }
-            $minutes = (int)($notif['minutes'] ?? 0);
+            $minutes = (int)($notif['minutes_before'] ?? 0);
             if ($minutes <= 0) {
                 continue;
             }

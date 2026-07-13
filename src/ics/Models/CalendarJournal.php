@@ -28,6 +28,7 @@ class CalendarJournal extends BaseModel
     public $organizerName;
     public $sequence;
     public $timezone;
+    public $clearRelatedTo = false; // true = remise à NULL explicite (retrait du lien)
 
     public function __construct()
     {
@@ -97,7 +98,6 @@ class CalendarJournal extends BaseModel
             'dtstart'        => 'dtstart',
             'status'         => 'status',
             'url'            => 'url',
-            'relatedTo'      => 'related_to',
             'organizerEmail' => 'organizer_email',
             'organizerName'  => 'organizer_name',
             'timezone'       => 'timezone',
@@ -113,6 +113,13 @@ class CalendarJournal extends BaseModel
         if (isset($this->categories)) {
             $fields[] = 'categories = ?';
             $params[] = json_encode($this->categories);
+        }
+
+        if ($this->clearRelatedTo) {
+            $fields[] = 'related_to = NULL';
+        } elseif (isset($this->relatedTo)) {
+            $fields[] = 'related_to = ?';
+            $params[] = $this->relatedTo;
         }
 
         if (empty($fields)) {

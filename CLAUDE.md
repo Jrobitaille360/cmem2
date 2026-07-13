@@ -23,6 +23,7 @@ php private/tests/test_cors_e2e_account.php
 php private/tests/test_files.php
 php private/tests/test_files_accessibility.php
 php private/tests/test_groups.php
+php private/tests/test_ics_email_notifications.php
 php private/tests/test_ics_freebusy_recurrence.php
 php private/tests/test_ics_occurrences_exceptions_by_date.php
 php private/tests/test_ics_occurrences_expand.php

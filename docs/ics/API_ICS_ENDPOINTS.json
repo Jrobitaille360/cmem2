@@ -477,7 +477,8 @@
             "status": "string (optional) - DRAFT | FINAL | CANCELLED (défaut: DRAFT)",
             "categories": "array of strings (optional)",
             "url": "string (optional)",
-            "timezone": "string (optional, default: America/Montreal)"
+            "timezone": "string (optional, default: America/Montreal)",
+            "related_to": "string (optional, max 255) - UID du journal parent (RFC 5545 §3.8.4.5)"
           },
           "response": "Journal object avec uid (UUID v4)",
           "errors": {
@@ -510,7 +511,8 @@
             "description": "string (optional)",
             "dtstart": "date ou datetime (optional)",
             "status": "string (optional) - DRAFT | FINAL | CANCELLED",
-            "categories": "array of strings (optional)"
+            "categories": "array of strings (optional)",
+            "related_to": "string ou null (optional, max 255) - UID du journal parent ; null retire le lien"
           },
           "response": "Journal object mis à jour",
           "errors": { "403": "Permission insuffisante", "404": "Non trouvé" }
