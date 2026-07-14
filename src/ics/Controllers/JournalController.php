@@ -219,4 +219,84 @@ class JournalController
             Response::error('Erreur lors de la suppression du journal', null, 500);
         }
     }
+
+    // ----------------------------------------------------------------
+    // GET /calendars/{calendarId}/journals/deleted — corbeille
+    // ----------------------------------------------------------------
+    public function getDeletedJournals(int $calendarId, int $userId): void
+    {
+        LoggingMiddleware::logEntry();
+
+        $permission = $this->calModel->getUserPermissionForCalendar($calendarId, $userId);
+        if (!$permission) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Calendrier non trouvé ou accès non autorisé', null, 404);
+            return;
+        }
+
+        $pagination = Response::getPaginationParams();
+
+        try {
+            $journals = $this->journalModel->getDeletedByCalendarId($calendarId, $pagination['page'], $pagination['limit']);
+            LoggingMiddleware::logExit(200);
+            Response::success('Journaux supprimés récupérés', [
+                'journals' => $journals,
+                'count'    => count($journals),
+                'page'     => $pagination['page'],
+                'limit'    => $pagination['limit'],
+            ]);
+        } catch (\Exception $e) {
+            LogService::error('Erreur récupération journaux supprimés', ['exception' => $e->getMessage()]);
+            LoggingMiddleware::logExit(500);
+            Response::error('Erreur lors de la récupération des journaux supprimés', null, 500);
+        }
+    }
+
+    // ----------------------------------------------------------------
+    // POST /calendars/{calendarId}/journals/{journalId}/restore
+    // ----------------------------------------------------------------
+    public function restoreJournal(int $calendarId, int $journalId, int $userId): void
+    {
+        LoggingMiddleware::logEntry();
+
+        $journal = new CalendarJournal();
+        $existing = $journal->findById($journalId, true);
+
+        if (!$existing || (int)$existing['calendar_id'] !== $calendarId) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Journal non trouvé', null, 404);
+            return;
+        }
+
+        if ((int)$existing['user_id'] !== $userId) {
+            LoggingMiddleware::logExit(403);
+            Response::error('Accès non autorisé', null, 403);
+            return;
+        }
+
+        if (empty($existing['deleted_at'])) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Ce journal n\'est pas supprimé', null, 404);
+            return;
+        }
+
+        if (strtotime($existing['deleted_at']) < strtotime('-' . CalendarJournal::RESTORE_RETENTION_DAYS . ' days')) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Fenêtre de restauration expirée', null, 404);
+            return;
+        }
+
+        try {
+            if ($journal->restore()) {
+                LoggingMiddleware::logExit(200);
+                Response::success('Journal restauré avec succès', ['journal_id' => $journalId]);
+            } else {
+                throw new \Exception('Échec de la restauration');
+            }
+        } catch (\Exception $e) {
+            LogService::error('Erreur restauration journal', ['exception' => $e->getMessage()]);
+            LoggingMiddleware::logExit(500);
+            Response::error('Erreur lors de la restauration du journal', null, 500);
+        }
+    }
 }

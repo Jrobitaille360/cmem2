@@ -107,9 +107,17 @@ class CalendarRouteHandler extends BaseRouteHandler
                 $this->controller->deleteEvent((int)$segments[3], (int)$action, $user['user_id']),
                 
             // DELETE /calendars/{id}/events/{eventId}/hard - Supprimer définitivement un événement
-            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && isset($segments[3]) && ctype_digit($segments[3]) && isset($segments[4]) && $segments[4] === 'hard' && $method === 'DELETE') => 
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && isset($segments[3]) && ctype_digit($segments[3]) && isset($segments[4]) && $segments[4] === 'hard' && $method === 'DELETE') =>
                 $this->controller->hardDeleteEvent((int)$segments[3], (int)$action, $user['user_id']),
-                
+
+            // GET /calendars/{id}/events/deleted - Lister les événements soft-deleted (corbeille)
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && isset($segments[3]) && $segments[3] === 'deleted' && $method === 'GET') =>
+                $this->controller->getDeletedEvents((int)$action, $user['user_id']),
+
+            // POST /calendars/{id}/events/{eventId}/restore - Restaurer un événement soft-deleted
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && isset($segments[3]) && ctype_digit($segments[3]) && isset($segments[4]) && $segments[4] === 'restore' && $method === 'POST') =>
+                $this->controller->restoreEvent((int)$segments[3], (int)$action, $user['user_id']),
+
             // GET /calendars/{id}/share - Récupérer les partages d'un calendrier
             ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'share' && $method === 'GET') => 
                 $this->controller->getCalendarShares((int)$action, $user['user_id']),
@@ -136,6 +144,14 @@ class CalendarRouteHandler extends BaseRouteHandler
             ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'todos' && !isset($segments[3]) && $method === 'POST') =>
                 $this->todoController->createTodo((int)$action, $user['user_id']),
 
+            // GET /calendars/{id}/todos/deleted - Lister les tâches soft-deleted (corbeille)
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'todos' && isset($segments[3]) && $segments[3] === 'deleted' && $method === 'GET') =>
+                $this->todoController->getDeletedTodos((int)$action, $user['user_id']),
+
+            // POST /calendars/{id}/todos/{todoId}/restore - Restaurer une tâche soft-deleted
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'todos' && isset($segments[3]) && ctype_digit($segments[3]) && isset($segments[4]) && $segments[4] === 'restore' && $method === 'POST') =>
+                $this->todoController->restoreTodo((int)$action, (int)$segments[3], $user['user_id']),
+
             // GET /calendars/{id}/todos
             ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'todos' && !isset($segments[3]) && $method === 'GET') =>
                 $this->todoController->getTodos((int)$action, $user['user_id']),
@@ -156,6 +172,14 @@ class CalendarRouteHandler extends BaseRouteHandler
             // POST /calendars/{id}/journals
             ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'journals' && !isset($segments[3]) && $method === 'POST') =>
                 $this->journalController->createJournal((int)$action, $user['user_id']),
+
+            // GET /calendars/{id}/journals/deleted - Lister les journaux soft-deleted (corbeille)
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'journals' && isset($segments[3]) && $segments[3] === 'deleted' && $method === 'GET') =>
+                $this->journalController->getDeletedJournals((int)$action, $user['user_id']),
+
+            // POST /calendars/{id}/journals/{journalId}/restore - Restaurer un journal soft-deleted
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'journals' && isset($segments[3]) && ctype_digit($segments[3]) && isset($segments[4]) && $segments[4] === 'restore' && $method === 'POST') =>
+                $this->journalController->restoreJournal((int)$action, (int)$segments[3], $user['user_id']),
 
             // GET /calendars/{id}/journals
             ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'journals' && !isset($segments[3]) && $method === 'GET') =>

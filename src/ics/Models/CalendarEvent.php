@@ -9,6 +9,9 @@ use PDO;
 class CalendarEvent extends BaseModel
 {
     protected $table = 'calendar_events';
+
+    /** Fenêtre (jours) au-delà de laquelle un élément soft-deleted n'est plus restaurable via l'API */
+    public const RESTORE_RETENTION_DAYS = 30;
     
     public $id;
     public $calendarId;
@@ -170,6 +173,30 @@ class CalendarEvent extends BaseModel
 
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         return $result ? $this->castEvent($result) : null;
+    }
+
+    /**
+     * Récupère les événements soft-deleted d'un calendrier (corbeille), triés deleted_at DESC.
+     * Limité à la fenêtre de rétention (RESTORE_RETENTION_DAYS) : au-delà, l'élément
+     * n'est plus proposé à la restauration côté client même si la purge physique
+     * (cron ICS\Services\MaintenanceService, 90 jours) n'a pas encore eu lieu.
+     */
+    public function getDeletedByCalendarId($calendarId, $page = 1, $limit = 50): array
+    {
+        $offset = ($page - 1) * $limit;
+        $stmt = $this->getDb()->prepare("
+            SELECT * FROM calendar_events
+            WHERE calendar_id = :calendar_id
+              AND deleted_at IS NOT NULL
+              AND deleted_at >= NOW() - INTERVAL " . self::RESTORE_RETENTION_DAYS . " DAY
+            ORDER BY deleted_at DESC
+            LIMIT :limit OFFSET :offset
+        ");
+        $stmt->bindValue(':calendar_id', $calendarId, PDO::PARAM_INT);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        return array_map([$this, 'castEvent'], $stmt->fetchAll(PDO::FETCH_ASSOC));
     }
 
     private function castEvent(array $row): array

@@ -1587,6 +1587,104 @@ class CalendarController
     }
 
     /**
+     * Liste les événements soft-deleted d'un calendrier (corbeille)
+     */
+    public function getDeletedEvents($calendarId, $userId): void
+    {
+        LoggingMiddleware::logEntry();
+        $input = Response::getRequestParams();
+
+        $cal = new Calendar();
+        $permission = $cal->getUserPermissionForCalendar($calendarId, $userId);
+
+        if (!$permission) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Calendrier non trouvé ou accès non autorisé', null, 404);
+            return;
+        }
+
+        $pagination = Response::getPaginationParams();
+
+        try {
+            $event = new CalendarEvent();
+            $events = $event->getDeletedByCalendarId($calendarId, $pagination['page'], $pagination['limit']);
+
+            LoggingMiddleware::logExit(200);
+            Response::success('Événements supprimés récupérés', [
+                'events' => $events,
+                'count'  => count($events),
+                'page'   => $pagination['page'],
+                'limit'  => $pagination['limit'],
+            ]);
+        } catch (\Exception $e) {
+            LogService::error("Erreur lors de la récupération des événements supprimés", [
+                'exception' => $e->getMessage()
+            ]);
+            LoggingMiddleware::logExit(500);
+            Response::error('Erreur lors de la récupération des événements supprimés', null, 500);
+        }
+    }
+
+    /**
+     * Restaure un événement soft-deleted
+     */
+    public function restoreEvent($eventId, $calendarId, $userId): void
+    {
+        LoggingMiddleware::logEntry();
+
+        $cal = new Calendar();
+
+        if (!$cal->canUserWrite($calendarId, $userId)) {
+            LoggingMiddleware::logExit(403);
+            Response::error('Permission insuffisante pour restaurer les événements de ce calendrier', null, 403);
+            return;
+        }
+
+        $event = new CalendarEvent();
+        $existingEvent = $event->findById($eventId, true);
+
+        if (!$existingEvent || $existingEvent['calendar_id'] != $calendarId) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Événement non trouvé', null, 404);
+            return;
+        }
+
+        if (empty($existingEvent['deleted_at'])) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Cet événement n\'est pas supprimé', null, 404);
+            return;
+        }
+
+        if (strtotime($existingEvent['deleted_at']) < strtotime('-' . CalendarEvent::RESTORE_RETENTION_DAYS . ' days')) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Fenêtre de restauration expirée', null, 404);
+            return;
+        }
+
+        try {
+            $result = $event->restore();
+
+            if (!$result) {
+                throw new \Exception("Échec de la restauration");
+            }
+
+            LogService::info("Événement restauré", [
+                'event_id' => $eventId,
+                'calendar_id' => $calendarId,
+                'restored_by' => $userId
+            ]);
+            LoggingMiddleware::logExit(200);
+            Response::success('Événement restauré avec succès', ['event_id' => (int)$eventId]);
+        } catch (\Exception $e) {
+            LogService::error("Erreur lors de la restauration de l'événement", [
+                'exception' => $e->getMessage()
+            ]);
+            LoggingMiddleware::logExit(500);
+            Response::error('Erreur lors de la restauration de l\'événement', null, 500);
+        }
+    }
+
+    /**
      * Obtient toutes les occurrences (un jour) d'un événement depuis la table pré-calculée
      */
     public function getEventOccurrences($eventId, $calendarId, $userId): void
@@ -1866,7 +1964,7 @@ class CalendarController
         
         $input = Response::getRequestParams();
         $validation = Validator::validate($input, [
-            'occurrence_id' => 'optional|string',
+            'occurrence_id' => 'optional|integer',
             'occurrence_date' => 'optional|string',
             'title' => 'optionnal|string',
             'description' => 'optionnal|string',

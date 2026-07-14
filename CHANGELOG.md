@@ -7,6 +7,24 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-07-14 12:00]
+
+### Feat — corbeille récupérable events/todos/journals (directive `20260714_120000_cmem_web_vers_cmem2_API`)
+
+- **`GET /calendars/{id}/events|todos|journals/deleted`** — liste les éléments soft-deleted d'un calendrier, triés `deleted_at DESC`, paginés (`page`/`limit`, pattern `Response::getPaginationParams()`), limités aux 30 derniers jours (fenêtre de restauration, cf. ci-dessous)
+- **`POST /calendars/{id}/events|todos|journals/{itemId}/restore`** — restaure un élément soft-deleted (`deleted_at = NULL` via `SoftDeleteTrait::restore()`), réplique du pattern `POST /tags/{id}/restore` ; répond `{ <type>_id }` ; 404 si non trouvé, pas supprimé, ou fenêtre de 30 jours dépassée ; autorisation alignée sur les routes `DELETE` existantes (`canUserWrite` pour events, propriétaire pour todos/journals)
+- **`src/ics/Models/CalendarEvent.php`, `CalendarTodo.php`, `CalendarJournal.php`** — constante `RESTORE_RETENTION_DAYS = 30` + `getDeletedByCalendarId()` ; `restore()`/`findById($id, true)` déjà fournis par `BaseModel`/`SoftDeleteTrait` (aucune nouvelle méthode de restauration à écrire)
+- **Rétention/purge** : la purge physique définitive reste sur le cron existant `ICS\Services\MaintenanceService` (90 jours) — aucune migration ni nouveau cron. La fenêtre RGPD 30 jours du plan de rewrite client est appliquée au niveau applicatif (liste + restore filtrent `deleted_at >= NOW() - 30 DAY`), pas au niveau de la purge physique (marge de sécurité serveur inchangée)
+- **`docs/ics/API_ICS_ENDPOINTS.json`** — 6 routes documentées (events/todos/journals × deleted + restore)
+- **`private/tests/test_calendars.php`** — 14 tests ajoutés (16e.17–30 : corbeille + restore + doublon 404 + inexistant 404, sur les 3 types) ; suite complète 466/466 en local (code local + DB dev-cmem2)
+
+### Fix — `PUT .../occurrences` rejetait `occurrence_id` entier (bug pré-existant, détecté en régression)
+
+- **`src/ics/Controllers/CalendarController.php::updateEventOccurrence`** — validateur exigeait `occurrence_id` de type `string` alors que la clé (id de `event_occurrences`) est un entier ; incohérent avec `deleteEventOccurrence` qui valide déjà `optional|integer` sur le même champ. Corrigé : `'occurrence_id' => 'optional|integer'`
+- Détecté via `test_ics_occurrences_expand.php` (test 3.3, 4 échecs sur 250) en régression du diff corbeille ci-dessus — aucun lien fonctionnel avec la corbeille, mais corrigé au passage. Suite ré-exécutée : 250/250
+
+---
+
 ## [Unreleased 2026-07-13 17:00]
 
 ### Feat — `related_to` exposé sur VJOURNAL create/update (directive `20260713_161125_cmem_web_vers_cmem2_API`)

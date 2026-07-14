@@ -13,6 +13,9 @@ class CalendarTodo extends BaseModel
 {
     protected $table = 'calendar_todos';
 
+    /** Fenêtre (jours) au-delà de laquelle un élément soft-deleted n'est plus restaurable via l'API */
+    public const RESTORE_RETENTION_DAYS = 30;
+
     public $id;
     public $calendarId;
     public $userId;
@@ -199,6 +202,28 @@ class CalendarTodo extends BaseModel
             WHERE id = ? AND deleted_at IS NULL
         ");
         return $stmt->execute([$id]);
+    }
+
+    /**
+     * Récupère les tâches soft-deleted d'un calendrier (corbeille), triées deleted_at DESC.
+     * Limité à la fenêtre de rétention (RESTORE_RETENTION_DAYS).
+     */
+    public function getDeletedByCalendarId(int $calendarId, int $page = 1, int $limit = 50): array
+    {
+        $offset = ($page - 1) * $limit;
+        $stmt = $this->getDb()->prepare("
+            SELECT * FROM {$this->table}
+            WHERE calendar_id = :calendar_id
+              AND deleted_at IS NOT NULL
+              AND deleted_at >= NOW() - INTERVAL " . self::RESTORE_RETENTION_DAYS . " DAY
+            ORDER BY deleted_at DESC
+            LIMIT :limit OFFSET :offset
+        ");
+        $stmt->bindValue(':calendar_id', $calendarId, PDO::PARAM_INT);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        return array_map([$this, 'decode'], $stmt->fetchAll(PDO::FETCH_ASSOC));
     }
 
     public function isOwner(int $todoId, int $calendarId, int $userId): bool

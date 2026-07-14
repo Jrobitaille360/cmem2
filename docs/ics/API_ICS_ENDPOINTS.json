@@ -287,6 +287,32 @@
           },
           "response": "Confirmation de suppression définitive"
         },
+        {
+          "method": "GET",
+          "path": "/calendars/{id}/events/deleted",
+          "description": "Lister les événements soft-deleted du calendrier (corbeille) — limité aux 30 derniers jours après deleted_at (fenêtre de restauration), triés deleted_at DESC. Purge physique définitive après 90 jours (cron ICS\\Services\\MaintenanceService).",
+          "params": { "id": "integer (required) - ID du calendrier" },
+          "query_params": {
+            "page": "integer (optional, défaut 1)",
+            "limit": "integer (optional, défaut 20, max 100)"
+          },
+          "response": "{ events: Array, count: integer, page: integer, limit: integer }",
+          "errors": { "404": "Calendrier non trouvé ou accès non autorisé" }
+        },
+        {
+          "method": "POST",
+          "path": "/calendars/{id}/events/{eventId}/restore",
+          "description": "Restaurer un événement soft-deleted (deleted_at remis à NULL). 404 si non soft-deleted, déjà restauré, hard-deleted, ou fenêtre de 30 jours dépassée.",
+          "params": {
+            "id": "integer (required) - ID du calendrier",
+            "eventId": "integer (required) - ID de l'événement"
+          },
+          "response": "{ event_id: integer }",
+          "errors": {
+            "403": "Permission insuffisante",
+            "404": "Non trouvé / pas supprimé / fenêtre de restauration expirée"
+          }
+        },
         { "method": "GET", "path": "/calendars/{id}/events/{eventId}/occurrences",
           "description": "Obtenir les occurrences d'un événement récurrent",
           "params": {
@@ -457,6 +483,29 @@
           "params": { "id": "integer (required)", "todoId": "integer (required)" },
           "response": "{ todo_id, deleted_at }",
           "errors": { "403": "Permission insuffisante", "404": "Non trouvé" }
+        },
+        {
+          "method": "GET",
+          "path": "/calendars/{id}/todos/deleted",
+          "description": "Lister les tâches soft-deleted du calendrier (corbeille) — limité aux 30 derniers jours après deleted_at (fenêtre de restauration), triées deleted_at DESC. Purge physique définitive après 90 jours (cron ICS\\Services\\MaintenanceService).",
+          "params": { "id": "integer (required)" },
+          "query_params": {
+            "page": "integer (optional, défaut 1)",
+            "limit": "integer (optional, défaut 20, max 100)"
+          },
+          "response": "{ todos: Array, count: integer, page: integer, limit: integer }",
+          "errors": { "404": "Calendrier non trouvé ou accès non autorisé" }
+        },
+        {
+          "method": "POST",
+          "path": "/calendars/{id}/todos/{todoId}/restore",
+          "description": "Restaurer une tâche soft-deleted (deleted_at remis à NULL). Réservé au créateur de la tâche (même modèle d'autorisation que DELETE). 404 si non soft-deleted, déjà restaurée, hard-deleted, ou fenêtre de 30 jours dépassée.",
+          "params": { "id": "integer (required)", "todoId": "integer (required)" },
+          "response": "{ todo_id: integer }",
+          "errors": {
+            "403": "Accès non autorisé (non créateur)",
+            "404": "Non trouvé / pas supprimé / fenêtre de restauration expirée"
+          }
         }
       ]
     },
@@ -524,6 +573,29 @@
           "params": { "id": "integer (required)", "journalId": "integer (required)" },
           "response": "{ journal_id, deleted_at }",
           "errors": { "403": "Permission insuffisante", "404": "Non trouvé" }
+        },
+        {
+          "method": "GET",
+          "path": "/calendars/{id}/journals/deleted",
+          "description": "Lister les journaux soft-deleted du calendrier (corbeille) — limité aux 30 derniers jours après deleted_at (fenêtre de restauration), triés deleted_at DESC. Purge physique définitive après 90 jours (cron ICS\\Services\\MaintenanceService).",
+          "params": { "id": "integer (required)" },
+          "query_params": {
+            "page": "integer (optional, défaut 1)",
+            "limit": "integer (optional, défaut 20, max 100)"
+          },
+          "response": "{ journals: Array, count: integer, page: integer, limit: integer }",
+          "errors": { "404": "Calendrier non trouvé ou accès non autorisé" }
+        },
+        {
+          "method": "POST",
+          "path": "/calendars/{id}/journals/{journalId}/restore",
+          "description": "Restaurer un journal soft-deleted (deleted_at remis à NULL). Réservé au créateur du journal (même modèle d'autorisation que DELETE). 404 si non soft-deleted, déjà restauré, hard-deleted, ou fenêtre de 30 jours dépassée.",
+          "params": { "id": "integer (required)", "journalId": "integer (required)" },
+          "response": "{ journal_id: integer }",
+          "errors": {
+            "403": "Accès non autorisé (non créateur)",
+            "404": "Non trouvé / pas supprimé / fenêtre de restauration expirée"
+          }
         }
       ]
     },

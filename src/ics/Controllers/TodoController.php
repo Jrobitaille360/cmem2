@@ -264,6 +264,86 @@ class TodoController
     }
 
     // ----------------------------------------------------------------
+    // GET /calendars/{calendarId}/todos/deleted — corbeille
+    // ----------------------------------------------------------------
+    public function getDeletedTodos(int $calendarId, int $userId): void
+    {
+        LoggingMiddleware::logEntry();
+
+        $permission = $this->calModel->getUserPermissionForCalendar($calendarId, $userId);
+        if (!$permission) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Calendrier non trouvé ou accès non autorisé', null, 404);
+            return;
+        }
+
+        $pagination = Response::getPaginationParams();
+
+        try {
+            $todos = $this->todoModel->getDeletedByCalendarId($calendarId, $pagination['page'], $pagination['limit']);
+            LoggingMiddleware::logExit(200);
+            Response::success('Tâches supprimées récupérées', [
+                'todos' => $todos,
+                'count' => count($todos),
+                'page'  => $pagination['page'],
+                'limit' => $pagination['limit'],
+            ]);
+        } catch (\Exception $e) {
+            LogService::error('Erreur récupération todos supprimés', ['exception' => $e->getMessage()]);
+            LoggingMiddleware::logExit(500);
+            Response::error('Erreur lors de la récupération des tâches supprimées', null, 500);
+        }
+    }
+
+    // ----------------------------------------------------------------
+    // POST /calendars/{calendarId}/todos/{todoId}/restore
+    // ----------------------------------------------------------------
+    public function restoreTodo(int $calendarId, int $todoId, int $userId): void
+    {
+        LoggingMiddleware::logEntry();
+
+        $todo = new CalendarTodo();
+        $existing = $todo->findById($todoId, true);
+
+        if (!$existing || (int)$existing['calendar_id'] !== $calendarId) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Tâche non trouvée', null, 404);
+            return;
+        }
+
+        if ((int)$existing['user_id'] !== $userId) {
+            LoggingMiddleware::logExit(403);
+            Response::error('Accès non autorisé', null, 403);
+            return;
+        }
+
+        if (empty($existing['deleted_at'])) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Cette tâche n\'est pas supprimée', null, 404);
+            return;
+        }
+
+        if (strtotime($existing['deleted_at']) < strtotime('-' . CalendarTodo::RESTORE_RETENTION_DAYS . ' days')) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Fenêtre de restauration expirée', null, 404);
+            return;
+        }
+
+        try {
+            if ($todo->restore()) {
+                LoggingMiddleware::logExit(200);
+                Response::success('Tâche restaurée avec succès', ['todo_id' => $todoId]);
+            } else {
+                throw new \Exception('Échec de la restauration');
+            }
+        } catch (\Exception $e) {
+            LogService::error('Erreur restauration todo', ['exception' => $e->getMessage()]);
+            LoggingMiddleware::logExit(500);
+            Response::error('Erreur lors de la restauration de la tâche', null, 500);
+        }
+    }
+
+    // ----------------------------------------------------------------
     // GET /calendars/{calendarId}/todos.ics  — export VTODO en ICS
     // ----------------------------------------------------------------
     public function exportTodosIcs(int $calendarId, int $userId): void
