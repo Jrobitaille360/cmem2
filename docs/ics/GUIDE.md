@@ -15,6 +15,7 @@ Version 2.0.0 · Base URL : `/calendars` (REST) · `/caldav` (CalDAV)
 - [Endpoints — Récurrence](#endpoints--récurrence)
 - [Endpoints — Tâches (VTODO)](#endpoints--tâches-vtodo)
 - [Endpoints — Journaux (VJOURNAL)](#endpoints--journaux-vjournal)
+- [Endpoints — Étiquettes (Tags)](#endpoints--étiquettes-tags)
 - [Endpoints — Disponibilités (VFREEBUSY)](#endpoints--disponibilités-vfreebusy)
 - [Endpoints — Notifications et RSVP](#endpoints--notifications-et-rsvp)
 - [CalDAV](#caldav)
@@ -339,6 +340,41 @@ Statuts : `DRAFT` | `FINAL` | `CANCELLED`.
 `related_to` (optionnel, string max 255) — UID du journal parent (RFC 5545 §3.8.4.5), accepté
 sur `POST`/`PUT` ; envoyer `null` sur `PUT` retire le lien (directive
 `20260713_161125_cmem_web_vers_cmem2_API`).
+
+---
+
+## Endpoints — Étiquettes (Tags)
+
+> Directive `20260715_090000_cmem_web_vers_cmem2_API` — entité distincte de `/tags` (scopée
+> utilisateur) : réservoir de noms d'étiquettes scopé par calendrier, partagé entre tous les
+> membres, appliqué via `categories[]` sur events/todos/journals.
+
+| Méthode | Endpoint | Description |
+| --- | --- | --- |
+| GET | `/calendars/{id}/tags` | Lister les étiquettes, triées par `name` |
+| POST | `/calendars/{id}/tags` | Créer une étiquette |
+| PUT | `/calendars/{id}/tags/{tagId}` | Renommer/recolorer — cascade sur `categories[]` |
+| DELETE | `/calendars/{id}/tags/{tagId}` | Supprimer — cascade sur `categories[]` |
+
+Autorisation identique aux autres sous-ressources du calendrier : lecture = tout membre avec
+accès (`getUserPermissionForCalendar`), écriture (create/rename/delete) = tout membre en
+écriture (`canUserWrite`), pas seulement le propriétaire.
+
+Renommer ou supprimer un tag propage le changement (transaction serveur) dans le tableau
+`categories[]` de tous les events/todos/journals du calendrier qui contiennent l'ancienne
+valeur — le client n'a plus à boucler un `PUT` par enregistrement.
+
+```http
+POST /calendars/42/tags
+{ "name": "urgent" }
+→ 201 { "tag": { "id": 9, "calendar_id": 42, "name": "urgent", "color": null } }
+
+POST /calendars/42/tags   { "name": "URGENT" }   (existe déjà, case-insensitive)
+→ 409 TAG_ALREADY_EXISTS
+
+PUT /calendars/42/tags/9   { "name": "priorité" }
+→ 200 (tout event/todo/journal du calendrier 42 avec "urgent" dans categories → "priorité")
+```
 
 ---
 

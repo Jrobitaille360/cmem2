@@ -7,6 +7,21 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-07-15 12:10]
+
+### Feat — étiquettes (tags) scopées par calendrier, partagées, cascade (directive `20260715_090000_cmem_web_vers_cmem2_API`)
+
+- **`GET/POST /calendars/{id}/tags`, `PUT/DELETE /calendars/{id}/tags/{tagId}`** — nouvelle entité `calendar_tags` (réservoir de noms d'étiquettes par calendrier, visible/modifiable par tout membre partagé, pas seulement le créateur) distincte de l'entité `/tags` existante (scopée utilisateur)
+- Autorisation alignée sur le modèle `Calendar::getUserPermissionForCalendar`/`canUserWrite` déjà utilisé par events/todos/journals : lecture = tout membre avec accès, écriture (create/rename/delete) = tout membre en écriture
+- 409 `TAG_ALREADY_EXISTS` sur nom dupliqué (case-insensitive, porté par la collation `utf8mb4_unicode_ci` de la colonne)
+- `PUT`/`DELETE` propagent (transaction serveur) le renommage/la suppression dans le tableau `categories[]` de tous les events/todos/journals du calendrier concernés — le client n'a plus à boucler un `PUT` par enregistrement
+- **`src/ics/Models/CalendarTag.php`, `src/ics/Controllers/TagController.php`** — nouveaux ; **`src/ics/Routing/RouteHandlers/CalendarRouteHandler.php`** — 4 routes ajoutées
+- **`docs/20260715_calendar_tags.sql`** — migration en attente (table `calendar_tags`), à intégrer au prochain `build_DB-v-x-x-x.sql`
+- **`docs/ics/API_ICS_ENDPOINTS.json`** — section `tags` documentée
+- **`private/tests/test_ics_tags.php`** — 37 tests (create/rename+cascade/delete+cascade, doublon, autorisation propriétaire/membre-écriture/membre-lecture/non-membre) — 37/37 en local (code local + DB dev-cmem2)
+
+---
+
 ## [Unreleased 2026-07-14 12:00]
 
 ### Feat — corbeille récupérable events/todos/journals (directive `20260714_120000_cmem_web_vers_cmem2_API`)

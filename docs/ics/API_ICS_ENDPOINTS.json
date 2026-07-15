@@ -509,6 +509,62 @@
         }
       ]
     },
+    "tags": {
+      "description": "Étiquettes (tags) scopées par calendrier, partagées entre membres, appliquées via categories[] sur events/todos/journals — directive 20260715_090000_cmem_web_vers_cmem2_API__tags-par-calendrier.md",
+      "base_path": "/calendars/{id}/tags",
+      "auth_required": true,
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/calendars/{id}/tags",
+          "description": "Lister les étiquettes d'un calendrier, triées par name. Accès lecture (propriétaire ou membre partagé, lecture ou écriture).",
+          "params": { "id": "integer (required)" },
+          "response": "{ tags: Array of { id, calendar_id, name, color }, count: integer }",
+          "errors": { "404": "Calendrier non trouvé ou accès non autorisé" }
+        },
+        {
+          "method": "POST",
+          "path": "/calendars/{id}/tags",
+          "description": "Créer une étiquette (réservoir, pas encore appliquée à un enregistrement). Accès écriture (propriétaire ou membre partagé en écriture).",
+          "params": { "id": "integer (required)" },
+          "body": {
+            "name": "string (required, max 191)",
+            "color": "string (optional, max 20)"
+          },
+          "response": "{ tag: { id, calendar_id, name, color } }",
+          "errors": {
+            "400": "Données invalides",
+            "403": "Permission insuffisante",
+            "409": "TAG_ALREADY_EXISTS — nom déjà utilisé sur ce calendrier (case-insensitive)"
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/calendars/{id}/tags/{tagId}",
+          "description": "Renommer/recolorer une étiquette. Si name change, remplace l'ancienne valeur par la nouvelle dans categories[] de tous les events/todos/journals du calendrier qui la contiennent (transaction serveur). Accès écriture.",
+          "params": { "id": "integer (required)", "tagId": "integer (required)" },
+          "body": {
+            "name": "string (optional, max 191)",
+            "color": "string (optional, max 20)"
+          },
+          "response": "{ tag: { id, calendar_id, name, color } } mis à jour",
+          "errors": {
+            "400": "Données invalides",
+            "403": "Permission insuffisante",
+            "404": "Étiquette non trouvée",
+            "409": "TAG_ALREADY_EXISTS — nouveau nom déjà utilisé sur ce calendrier"
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/calendars/{id}/tags/{tagId}",
+          "description": "Supprimer une étiquette. Retire sa valeur de categories[] de tous les events/todos/journals du calendrier qui la contiennent (transaction serveur). Accès écriture.",
+          "params": { "id": "integer (required)", "tagId": "integer (required)" },
+          "response": "204 No Content",
+          "errors": { "403": "Permission insuffisante", "404": "Étiquette non trouvée" }
+        }
+      ]
+    },
     "journals": {
       "description": "Journaux CalDAV VJOURNAL (RFC 5545 §3.6.3) — Phase 5.2",
       "base_path": "/calendars/{id}/journals",

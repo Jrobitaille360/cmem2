@@ -5,7 +5,7 @@
 ![Status](https://img.shields.io/badge/status-production%20ready-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 
-API REST modulaire pour la plateforme **Memories v2**. Elle regroupe cinq modules : authentification/groupes (core), calendriers ICS/CalDAV, Pomodoro, Quiz interactif et le gestionnaire générique Items.
+API REST modulaire pour la plateforme **Memories v2**. Elle regroupe les modules : authentification/groupes (core), calendriers ICS/CalDAV, Pomodoro, Quiz interactif, gestionnaire générique Items, puzzle collaboratif, jeu Traque, contrôle d'accès aux abonnements (Access), paiements Stripe, vérification Playstore et gestion des tokens push web (WebDevice).
 
 Authentification **JWT** HS256 (Bearer, 15 jours). Deux méthodes de connexion : **email + mot de passe** ou **email + code OTP**.
 
@@ -29,10 +29,16 @@ Authentification **JWT** HS256 (Bearer, 15 jours). Deux méthodes de connexion :
 cmem2 API fournit :
 
 - **Core (auth_groups)** : JWT, utilisateurs, groupes, fichiers, tags, statistiques, webhooks
-- **ICS/CalDAV** : Calendriers iCalendar, export `.ics`, synchronisation CalDAV RFC 5545
+- **ICS/CalDAV** : Calendriers iCalendar, tâches (VTODO), journaux (VJOURNAL), étiquettes par calendrier, export `.ics`, synchronisation CalDAV RFC 5545
 - **Pomo** : Plugin Pomodoro — engagement waitlist/sondage, support, sync cloud
 - **Quiz** : Quiz interactifs en temps réel (style Kahoot) — sessions, scoring dégressif, leaderboard
 - **Items** : Gestionnaire générique d'items (private/public/share), catégories JSON, partages utilisateurs
+- **Puzzle** : Puzzle collaboratif — pick/drop de pièces, sessions partagées
+- **Traque** : Jeu type combat/exploration — monstres, biomes OSM, achievements
+- **Access** : Contrôle d'accès aux abonnements — croisement Stripe / Playstore
+- **Stripe** : Paiements et abonnements Stripe
+- **Playstore** : Vérification des abonnements Google Play Store
+- **WebDevice** : Gestion des tokens de notification push web
 
 ## Technologies
 
@@ -149,6 +155,15 @@ cmem2_API/
 │   │   ├── Models/
 │   │   ├── Validators/        # QuizValidator
 │   │   └── Routing/
+│   ├── items/                 # Gestionnaire générique d'items
+│   ├── puzzle/                # Puzzle collaboratif
+│   ├── traque/                # Jeu combat/exploration
+│   ├── access/                # Contrôle d'accès abonnements
+│   ├── stripe/                # Paiements Stripe
+│   ├── playstore/             # Vérification Playstore
+│   ├── webdevice/             # Tokens push web
+│   ├── notifications/         # Scripts notifications email (pas de routing)
+│   ├── cron/                  # Scripts cron backup (pas de routing)
 │   └── logs/
 ├── docs/
 │   ├── core/                  # Documentation module core
@@ -162,8 +177,16 @@ cmem2_API/
 Namespaces PSR-4 :
 
 - `AuthGroups\` → `src/auth_groups/`
+- `ICS\` → `src/ics/`
 - `Pomo\` → `src/pomo/`
 - `Quiz\` → `src/quiz/`
+- `Items\` → `src/items/`
+- `Puzzle\` → `src/puzzle/`
+- `Traque\` → `src/traque/`
+- `Access\` → `src/access/`
+- `Stripe\` → `src/stripe/`
+- `Playstore\` → `src/playstore/`
+- `WebDevice\` → `src/webdevice/`
 
 ## Authentification
 
@@ -274,6 +297,7 @@ Authorization: Bearer eyJhbGci...
 | GET/POST/PUT/DELETE | `/calendars/*` | CRUD calendriers | JWT |
 | GET/POST/PUT/DELETE | `/events/*` | CRUD événements | JWT |
 | GET/POST/PUT/DELETE | `/attendees/*` | Participants (Ph3) | JWT |
+| GET/POST/PUT/DELETE | `/calendars/{id}/tags[/{tagId}]` | Étiquettes partagées par calendrier, cascade sur `categories[]` | JWT |
 | POST | `/calendars/import` | Import ICS (upsert par UID) | JWT |
 | * | `/caldav/*` | Protocole CalDAV complet | JWT |
 
@@ -341,29 +365,35 @@ Voir [docs/items/GUIDE.md](docs/items/GUIDE.md) pour la référence complète.
 | Pomo | [docs/pomo/API_POMO_ENDPOINTS_v1_0_0.json](docs/pomo/API_POMO_ENDPOINTS_v1_0_0.json) | [docs/pomo/GUIDE.md](docs/pomo/GUIDE.md) |
 | Quiz | [docs/quiz/API_QUIZ_ENDPOINTS_v1_0_0.json](docs/quiz/API_QUIZ_ENDPOINTS_v1_0_0.json) | [docs/quiz/GUIDE.md](docs/quiz/GUIDE.md) |
 | Items | [docs/items/API_ITEMS_ENDPOINTS.json](docs/items/API_ITEMS_ENDPOINTS.json) | [docs/items/GUIDE.md](docs/items/GUIDE.md) |
+| Puzzle | [docs/puzzle/API_PUZZLE_ENDPOINTS.json](docs/puzzle/API_PUZZLE_ENDPOINTS.json) | [docs/puzzle/GUIDE.md](docs/puzzle/GUIDE.md) |
+| Traque | [docs/traque/API_TRAQUE_ENDPOINTS.json](docs/traque/API_TRAQUE_ENDPOINTS.json) | [docs/traque/GUIDE.md](docs/traque/GUIDE.md) |
+| Access | [docs/access/API_ACCESS_ENDPOINTS.json](docs/access/API_ACCESS_ENDPOINTS.json) | [docs/access/GUIDE.md](docs/access/GUIDE.md) |
+| Stripe | [docs/stripe/API_STRIPE_ENDPOINTS.json](docs/stripe/API_STRIPE_ENDPOINTS.json) | [docs/stripe/GUIDE.md](docs/stripe/GUIDE.md) |
+| Playstore | [docs/playstore/API_PLAYSTORE_ENDPOINTS.json](docs/playstore/API_PLAYSTORE_ENDPOINTS.json) | [docs/playstore/GUIDE.md](docs/playstore/GUIDE.md) |
+| WebDevice | [docs/webdevice/API_WEBDEVICE_ENDPOINTS.json](docs/webdevice/API_WEBDEVICE_ENDPOINTS.json) | [docs/webdevice/GUIDE.md](docs/webdevice/GUIDE.md) |
 
 Migrations : [docs/core/](docs/core/) · Schéma initial : [docs/build_cmem2_DB.sql](docs/build_cmem2_DB.sql)
 
 ## Tests
 
 ```bash
-# Plugin Items (84 tests)
-php private/tests_mine/test_items.php
+# Plugin Items
+php private/tests/test_items.php
 
-# Plugin Quiz (104 tests)
-php private/tests_mine/test_quiz.php
+# Plugin Quiz
+php private/tests/test_quiz.php
 
-# Module ICS
-php private/tests_mine/test_new_calendar_entrypoints_1.php
+# Module ICS (calendriers, événements, récurrence, tags)
+php private/tests/test_calendars.php
 
 # Module Pomo
-php private/tests_mine/test_pomo.php
+php private/tests/test_pomo.php
 
 # Tous les tests
-php private/tests_mine/run_all_tests.php
+php private/tests/run_all_tests.php
 ```
 
-Les scripts de test utilisent les helpers de `private/tests_mine/test_new_base.php` (`callApiWithJWT`, `testNewResult`, `printNewSection`).
+Chaque module a son propre fichier `private/tests/test_<module>.php` (voir la liste complète dans `CLAUDE.md`). Les scripts utilisent les helpers de `private/tests/test_new_base.php` (`callNewApi`, `callApiWithJWT`, `testNewResult`, `printNewSection`).
 
 ## Conventions
 
@@ -381,6 +411,11 @@ Les scripts de test utilisent les helpers de `private/tests_mine/test_new_base.p
 - [x] Module ICS/CalDAV (Ph1–Ph5) (v2.2)
 - [x] Plugin Pomo Ph1 (v2.2)
 - [x] Plugin Quiz Ph1 — MVP REST (v2.2.3)
+- [x] Plugin Items — gestionnaire générique private/public/share
+- [x] Plugin Puzzle — collaboratif pick/drop
+- [x] Plugin Traque — combat/exploration, biomes OSM, achievements
+- [x] Access/Stripe/Playstore — abonnements croisés Stripe + Playstore
+- [x] Module ICS — tâches (VTODO), journaux (VJOURNAL), étiquettes par calendrier, corbeille récupérable
 - [ ] Plugin Quiz Ph2 — Variables dynamiques
 - [ ] Plugin Quiz Ph3 — Moteur math (mossadal/math-executor)
 - [ ] Plugin Quiz Ph4 — WebSocket Node.js (temps réel)
@@ -394,4 +429,4 @@ MIT — voir [LICENSE](LICENSE). Dépendances tierces : [THIRD_PARTY_LICENSES.md
 
 ---
 
-**Version** : 2.7.0 · **Mis à jour** : 2026-05-17 · **Auteur** : [Jrobitaille360](https://github.com/Jrobitaille360)
+**Version** : 2.8.0 · **Mis à jour** : 2026-07-15 · **Auteur** : [Jrobitaille360](https://github.com/Jrobitaille360)

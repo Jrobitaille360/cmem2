@@ -27,6 +27,7 @@ php private/tests/test_ics_email_notifications.php
 php private/tests/test_ics_freebusy_recurrence.php
 php private/tests/test_ics_occurrences_exceptions_by_date.php
 php private/tests/test_ics_occurrences_expand.php
+php private/tests/test_ics_tags.php
 php private/tests/test_items.php
 php private/tests/test_kestyon_tags.php
 php private/tests/test_kestyon_upload.php

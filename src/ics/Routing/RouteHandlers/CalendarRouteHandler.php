@@ -6,6 +6,7 @@ use AuthGroups\Routing\BaseRouteHandler;
 use ICS\Controllers\CalendarController;
 use ICS\Controllers\TodoController;
 use ICS\Controllers\JournalController;
+use ICS\Controllers\TagController;
 use AuthGroups\Utils\Response;
 
 class CalendarRouteHandler extends BaseRouteHandler
@@ -13,12 +14,14 @@ class CalendarRouteHandler extends BaseRouteHandler
     private CalendarController $controller;
     private TodoController $todoController;
     private JournalController $journalController;
+    private TagController $tagController;
 
     public function __construct($authService) {
         parent::__construct($authService);
         $this->controller        = new CalendarController();
         $this->todoController    = new TodoController();
         $this->journalController = new JournalController();
+        $this->tagController      = new TagController();
     }
     
     protected function getSupportedControllers(): array {
@@ -196,6 +199,23 @@ class CalendarRouteHandler extends BaseRouteHandler
             // DELETE /calendars/{id}/journals/{journalId}
             ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'journals' && isset($segments[3]) && ctype_digit($segments[3]) && !isset($segments[4]) && $method === 'DELETE') =>
                 $this->journalController->deleteJournal((int)$action, (int)$segments[3], $user['user_id']),
+
+            // ── Tags — étiquettes scopées par calendrier ──────────────────
+            // GET /calendars/{id}/tags
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'tags' && !isset($segments[3]) && $method === 'GET') =>
+                $this->tagController->getTags((int)$action, $user['user_id']),
+
+            // POST /calendars/{id}/tags
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'tags' && !isset($segments[3]) && $method === 'POST') =>
+                $this->tagController->createTag((int)$action, $user['user_id']),
+
+            // PUT /calendars/{id}/tags/{tagId}
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'tags' && isset($segments[3]) && ctype_digit($segments[3]) && $method === 'PUT') =>
+                $this->tagController->updateTag((int)$action, (int)$segments[3], $user['user_id']),
+
+            // DELETE /calendars/{id}/tags/{tagId}
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'tags' && isset($segments[3]) && ctype_digit($segments[3]) && $method === 'DELETE') =>
+                $this->tagController->deleteTag((int)$action, (int)$segments[3], $user['user_id']),
 
             default => Response::error('Endpoint non trouvé', 404)
         };
