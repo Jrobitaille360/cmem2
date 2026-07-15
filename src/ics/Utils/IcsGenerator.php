@@ -149,10 +149,11 @@ class IcsGenerator
         $uid = !empty($event['uid'])
             ? $event['uid']
             : ('event-' . ($event['id'] ?? '0') . '@cmem-calendar.local');
-        $vevent->add('UID', $uid);
+        // set (pas add) — sabre pose déjà un UID/DTSTAMP par défaut à la création du VEVENT
+        $vevent->UID = $uid;
 
         // DTSTAMP — toujours UTC (RFC 5545 §3.8.7.2)
-        $vevent->add('DTSTAMP', new \DateTime('now', new \DateTimeZone('UTC')));
+        $vevent->DTSTAMP = new \DateTime('now', new \DateTimeZone('UTC'));
 
         // Timezone effective de l'événement
         $eventTz = !empty($event['timezone']) ? $event['timezone'] : $calendarTimezone;
@@ -457,9 +458,10 @@ class IcsGenerator
         $uid = !empty($todo['uid'])
             ? $todo['uid']
             : ('todo-' . ($todo['id'] ?? '0') . '@cmem-calendar.local');
-        $vtodo->add('UID', $uid);
+        // set (pas add) — sabre pose déjà un UID/DTSTAMP par défaut à la création du VTODO
+        $vtodo->UID = $uid;
 
-        $vtodo->add('DTSTAMP', new \DateTime('now', new \DateTimeZone('UTC')));
+        $vtodo->DTSTAMP = new \DateTime('now', new \DateTimeZone('UTC'));
 
         $tz = new \DateTimeZone(!empty($todo['timezone']) ? $todo['timezone'] : $timezone);
         $isAllDay = !empty($todo['is_all_day']);
@@ -621,9 +623,10 @@ class IcsGenerator
         $uid = !empty($journal['uid'])
             ? $journal['uid']
             : ('journal-' . ($journal['id'] ?? '0') . '@cmem-calendar.local');
-        $vjournal->add('UID', $uid);
+        // set (pas add) — sabre pose déjà un UID/DTSTAMP par défaut à la création du VJOURNAL
+        $vjournal->UID = $uid;
 
-        $vjournal->add('DTSTAMP', new \DateTime('now', new \DateTimeZone('UTC')));
+        $vjournal->DTSTAMP = new \DateTime('now', new \DateTimeZone('UTC'));
 
         $tz = new \DateTimeZone(!empty($journal['timezone']) ? $journal['timezone'] : $timezone);
 

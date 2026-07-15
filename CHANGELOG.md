@@ -7,6 +7,17 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-07-15 19:50]
+
+### Fix — `UID`/`DTSTAMP` dupliqués dans export ICS VEVENT/VTODO/VJOURNAL (directive `20260715_194122_cmem_web_vers_cmem2_API`)
+
+- **`src/ics/Utils/IcsGenerator.php::buildVEvent/buildVTodo/buildVJournal`** — sabre/vobject pose déjà un `UID` (`sabre-vobject-...`) et un `DTSTAMP` par défaut à la création du composant (`VEvent::getDefaults()`/`VTodo::getDefaults()`/`VJournal::getDefaults()`) ; le générateur les ajoutait une deuxième fois via `->add()`, produisant deux propriétés `UID` et deux `DTSTAMP` par composant (invalide RFC 5545 §3.6.1-3, occurrence max 1) — parsers stricts (Google Calendar, Outlook) pouvaient rejeter l'import ou choisir arbitrairement le mauvais UID
+- Corrigé : `->add('UID'/'DTSTAMP', ...)` → `->UID = ...` / `->DTSTAMP = ...` (magic setter sabre = `remove()` puis `add()`, une seule occurrence garantie). `VFREEBUSY` non affecté (pas de `getDefaults()` sur ce composant)
+- **`private/tests/test_ics_generator_uid_dtstamp.php`** — nouveau test unitaire (sans serveur HTTP, instancie `IcsGenerator` directement) : 9/9 — assert 1 seule occurrence `UID`/`DTSTAMP` par composant + UID = valeur applicative (pas celle de sabre) sur VEVENT/VTODO/VJOURNAL
+- Suites ICS existantes ré-exécutées, toujours 100% vertes (`test_ics_freebusy_recurrence` 26/26, `test_ics_occurrences_expand` 33/33, `test_ics_occurrences_exceptions_by_date` 66/66, `test_ics_email_notifications`, `test_ics_tags` 37/37)
+
+---
+
 ## [Unreleased 2026-07-15 12:10]
 
 ### Feat — étiquettes (tags) scopées par calendrier, partagées, cascade (directive `20260715_090000_cmem_web_vers_cmem2_API`)
