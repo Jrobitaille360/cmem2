@@ -7,6 +7,15 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-07-15 22:15]
+
+### Fix — Webhook Stripe `app_id` manquant expose fallback silencieux vers `puzzle` (phase 7a, directive `20260715_140000_cmem_web_vers_cmem2_API`)
+
+- **`StripeService::handleCheckoutCompleted`/`handleSubscriptionUpdated`** — `metadata.app_id` absent défaultait silencieusement à `'puzzle'`, risquant de poser une ligne `stripe_subscriptions` avec le mauvais `app_id`. `app_id` étant obligatoire côté `BillingController::checkout()` depuis la phase 1, ce chemin ne devrait plus jamais se déclencher — rendu explicite (log `error`/`warning` + skip de l'upsert) plutôt que silencieux
+- Testé E2E sur dev-cmem2 : webhook `checkout.session.completed` avec `metadata.app_id=cmem` → ligne `stripe_subscriptions.app_id='cmem'` correcte ; même événement sans metadata → aucune ligne créée (avant : aurait posé `app_id='puzzle'`). `test_stripe_v2` 42/42 non-régression
+
+---
+
 ## [Unreleased 2026-07-15 22:12]
 
 ### Feat — CRON purge RGPD (hard delete comptes soft-deleted >30j) (phase 7a, directive `20260715_140000_cmem_web_vers_cmem2_API`)

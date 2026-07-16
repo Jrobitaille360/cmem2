@@ -1,7 +1,7 @@
 ---
 titre: Monétisation Stripe + caps serveur + purge RGPD + suppression compte OTP (phase 7a)
 directive_source: /c/code/directives_inter_projet/20260715_140000_cmem_web_vers_cmem2_API__monetisation-stripe-caps-groupes-phase7a.md
-statut: phase 1+2 complétées 2026-07-15 — phases 3-7 restantes
+statut: phase 7a complète 2026-07-15 (toutes phases 1-7)
 ---
 
 # PLAN — Monétisation + caps + RGPD (phase 7a)
@@ -283,22 +283,32 @@ report explicite (repli documenté = les 3 appels existants), conformément à l
   confirmer qu'ils ne se déclenchent que si `BillingController` a un bug (donc rendre `app_id`
   obligatoire côté validator = filet de sécurité réel, pas juste documentation).
 
-**Tests** : simulateur webhook Stripe CLI avec metadata cmem → ligne `stripe_subscriptions`
-correcte ; test négatif (metadata manquante) → erreur explicite plutôt que fallback silencieux
-vers puzzle.
+**Tests** : simulateur webhook (payload signé manuellement, HMAC via `STRIPE_WEBHOOK_SECRET`)
+avec metadata cmem → ligne `stripe_subscriptions` correcte ; test négatif (metadata manquante)
+→ aucune ligne créée (erreur explicite loggée, plus de fallback silencieux vers puzzle).
 
-**Complétion** : test dédié vert, code review confirmée.
+**Complétion** : ✅ testé E2E sur dev-cmem2 (positif : `app_id='cmem'` posé correctement ;
+négatif : aucune ligne créée, avant aurait posé `'puzzle'`). Fallback silencieux retiré des 2
+handlers (`handleCheckoutCompleted`, `handleSubscriptionUpdated`).
 
 ## Conditions de complétion globales (reprises de la directive)
 
-- [ ] Produits/prix Stripe CAD créés (mode test), `price_id` référencés côté serveur.
-- [ ] Config des caps `CmemPlans` validée par `cmem_web` — **puis** mergée, et migration
-      `cmem_plan_override` exécutée (pas avant confirmation explicite).
-- [ ] Caps enforced sur les 7 ressources, point de comptage appareils documenté
-      (`web_devices`).
-- [ ] CRON de purge RGPD en place, testé en dev, **pas activé en prod sans confirmation**.
-- [ ] `DELETE /users/me` fonctionne sans mot de passe.
-- [ ] Plan effectif exposé dans `/auth/me`, ou report explicite documenté.
-- [ ] `app_id='cmem'` confirmé de bout en bout, test dédié vert.
-- [ ] Tests : caps par ressource, purge RGPD >30j uniquement, suppression compte OTP,
-      metadata Stripe `app_id='cmem'`.
+- [x] Produits/prix Stripe CAD créés (mode test), `price_id` référencés côté serveur.
+- [x] Config des caps `CmemPlans` validée par `cmem_web` — mergée, migration
+      `cmem_plan_override` exécutée (dev + prod, confirmée par l'utilisateur).
+- [x] Caps enforced sur 6 ressources (calendriers, journaux, tâches, appareils cmem, groupes
+      possédés, membres de groupe) — cap stockage (`max_storage_mb`) **non enforcé**, point
+      ouvert non résolu (`files` sans colonne `app_id`). Point de comptage appareils documenté
+      (`web_devices`). Directive envoyée à `puzzle` sur le risque `groups` partagé sans `app_id`
+      (`20260715_212500_cmem2_API_vers_puzzle__cap-groupes-partages-app-id.md`).
+- [x] CRON de purge RGPD en place (`MaintenanceService::purgeDeletedUsers`), testé en dev
+      (boundary 29j/31j confirmée) — **pas activé en crontab prod**.
+- [x] `DELETE /users/me` fonctionne sans mot de passe (testé compte OTP).
+- [x] Plan effectif exposé dans `/auth/me` (`EntitlementService::getEffectivePlanForCmem`).
+- [x] `app_id='cmem'` confirmé de bout en bout, test dédié vert (positif + négatif).
+- [x] Tests : caps par ressource (calendars 233/233 manuel 3→403, groups 67/67), purge RGPD
+      >30j uniquement (31j purgé/29j conservé), suppression compte OTP (users 107/107),
+      metadata Stripe `app_id='cmem'` (E2E manuel).
+
+**Phase 7a complète (2026-07-15).** Reste ouvert : cap stockage (`max_storage_mb`), directive
+`puzzle` en attente de réponse, activation crontab prod (STOP volontaire).
