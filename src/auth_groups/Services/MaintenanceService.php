@@ -43,6 +43,7 @@ class MaintenanceService implements MaintenanceTaskInterface
         $this->purgeEmailVerifications($db, $result);
         $this->purgePasswordResets($db, $result);
         $this->cleanupSessions($db, $result);
+        $this->purgeDeletedUsers($db, $result);
         return $result;
     }
 
@@ -324,6 +325,32 @@ class MaintenanceService implements MaintenanceTaskInterface
         } catch (\Throwable $e) {
             $result['errors'][] = 'cleanupSessions: ' . $e->getMessage();
             LogService::error('Maintenance[auth_groups] cleanupSessions', ['exception' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Purge RGPD — hard delete des comptes soft-deleted depuis plus de 30 jours.
+     * Toutes les FK sur users.id sont CASCADE/SET NULL (vérifié 2026-07-15,
+     * voir docs/20260715_calendar_journals_todos_fk.sql) — pas de risque d'échec silencieux.
+     */
+    private function purgeDeletedUsers(\PDO $db, array &$result): void
+    {
+        try {
+            $sql = "DELETE FROM users WHERE deleted_at IS NOT NULL AND deleted_at < NOW() - INTERVAL 30 DAY";
+
+            if ($this->dryRun) {
+                $stmt = $db->prepare("SELECT COUNT(*) FROM users WHERE deleted_at IS NOT NULL AND deleted_at < NOW() - INTERVAL 30 DAY");
+                $stmt->execute();
+                $result['rows_deleted']['users (soft-deleted >30d, hard purge)'] = (int) $stmt->fetchColumn();
+                return;
+            }
+
+            $stmt = $db->prepare($sql);
+            $stmt->execute();
+            $result['rows_deleted']['users (soft-deleted >30d, hard purge)'] = $stmt->rowCount();
+        } catch (\Throwable $e) {
+            $result['errors'][] = 'purgeDeletedUsers: ' . $e->getMessage();
+            LogService::error('Maintenance[auth_groups] purgeDeletedUsers', ['exception' => $e->getMessage()]);
         }
     }
 

@@ -228,8 +228,18 @@ confirmer qu'aucune donnée cross-app n'est perdue par erreur pour un compte mul
 **Tests** : compte soft-deleted 31j → purgé ; compte soft-deleted 29j → conservé ; compte actif
 → jamais touché.
 
-**Complétion** : cron en place, testé en dev, **pas activé en cron prod sans confirmation**
-(changement `.env`/crontab serveur = STOP explicite selon règles du projet).
+**Complétion** : ✅ `MaintenanceService::purgeDeletedUsers()` codé et testé en dev (31j purgé,
+29j conservé, confirmé manuellement) — **crontab serveur non modifié, pas d'activation en
+prod sans confirmation explicite** (le script `src/cron/maintenance.php` existe déjà pour
+d'autres modules ; l'ajouter au crontab prod reste un STOP distinct).
+
+**Trouvaille additionnelle (2026-07-15)** : audit FK a révélé que `calendar_journals` et
+`calendar_todos` n'avaient **aucune** contrainte FK sur `calendar_id`/`user_id` (gap
+pré-existant, 9 lignes orphelines trouvées en dev). Migration
+`docs/20260715_calendar_journals_todos_fk.sql` ajoutée et appliquée (dev + prod, par
+l'utilisateur) — aligne les types (`INT(11)` signé, cohérent avec `calendars.id`/`users.id`)
+et ajoute les FK `ON DELETE CASCADE`. Toutes les FK sur `users.id` sont maintenant
+CASCADE/SET NULL — le hard delete RGPD est FK-safe.
 
 ### Phase 5 — `DELETE /users/me` sans mot de passe
 
