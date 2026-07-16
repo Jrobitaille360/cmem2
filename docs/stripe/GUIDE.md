@@ -11,6 +11,7 @@ Version 1.1.0 · Base URL : `/v2`
 - [Billing — Checkout et Portail](#billing--checkout-et-portail)
 - [Webhook Stripe](#webhook-stripe)
 - [Abonnements Stripe](#abonnements-stripe)
+- [Plan effectif cmem (/auth/me)](#plan-effectif-cmem-authme)
 - [URLs de redirection](#urls-de-redirection)
 - [Mapping plateforme](#mapping-plateforme)
 - [Routes dépréciées](#routes-dépréciées)
@@ -238,6 +239,42 @@ via l'API Stripe). L'accès reste actif jusqu'à `expires_at`.
 | 401 | JWT absent ou invalide |
 | 422 | `app_id` manquant ou aucun abonnement Stripe actif |
 | 500 | Erreur API Stripe |
+
+---
+
+## Plan effectif cmem (/auth/me)
+
+`GET /auth/me` retourne un champ `plan` calculé par `EntitlementService::getEffectivePlanForCmem()`
+(pas un appel Stripe séparé — évite d'agréger 3 appels côté client) :
+
+```json
+"plan": {
+  "code": "monthly",
+  "source": "stripe",
+  "status": "active",
+  "features": {
+    "max_calendars": 25,
+    "max_journals": 2500,
+    "max_tasks": 5000,
+    "max_devices": 5,
+    "max_storage_mb": 2000,
+    "max_groups": 10,
+    "max_group_members": 50
+  }
+}
+```
+
+Ordre de résolution (priorité décroissante) :
+
+1. **`stripe_subscriptions`** actif pour `app_id='cmem'` (`status` ∈ `trialing`/`active`/`past_due`) → `source: "stripe"`, `code` = `plan` (`monthly`/`yearly`).
+2. **`users.cmem_plan_override`** (override manuel, ex. `'ami'`, posé par un admin) → `source: "override"`.
+3. Par défaut → `code: "free"`, `source: "default"`.
+
+Un abonnement Stripe actif gagne toujours sur l'override — cas limite non tranché côté produit
+(à confirmer avec `cmem_web` si un jour un override doit primer sur un abonnement actif).
+
+Caps par plan : config statique `src/stripe/Config/CmemPlans.php` (pas de table DB). Règle
+verrouillée : `max_journals = max_tasks / 2`.
 
 ---
 

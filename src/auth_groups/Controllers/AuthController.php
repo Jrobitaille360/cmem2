@@ -14,6 +14,7 @@ use AuthGroups\Services\UserSessionService;
 use AuthGroups\Utils\Response;
 use AuthGroups\Utils\Validator;
 use AuthGroups\Middleware\LoggingMiddleware;
+use Stripe\Services\EntitlementService;
 use Exception;
 
 /**
@@ -399,6 +400,11 @@ class AuthController
         }
 
         unset($data['password_hash']);
+
+        $data['plan'] = EntitlementService::getEffectivePlanForCmem(
+            $userId,
+            $data['cmem_plan_override'] ?? null
+        );
 
         LoggingMiddleware::logExit(200);
         Response::success('Profil utilisateur', ['user' => $data]);
