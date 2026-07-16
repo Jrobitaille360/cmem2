@@ -223,6 +223,7 @@ Réponse `200` :
 | DELETE | `/users/me` | JWT | Supprimer compte |
 | POST | `/users/avatar` | JWT | Upload avatar (multipart) |
 | GET | `/users/{id}` | JWT | Profil d'un utilisateur |
+| PUT | `/users/{id}/plan-override` | JWT (ADMINISTRATEUR) | Poser/retirer l'assignation manuelle du plan cmem (`cmem_plan_override`, ex. `'ami'`, ou `null` pour retirer) |
 
 ### POST /users/register
 
