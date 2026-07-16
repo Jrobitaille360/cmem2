@@ -7,6 +7,17 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-07-15 22:12]
+
+### Feat — CRON purge RGPD (hard delete comptes soft-deleted >30j) (phase 7a, directive `20260715_140000_cmem_web_vers_cmem2_API`)
+
+- **`MaintenanceService::purgeDeletedUsers()`** — hard delete `users` où `deleted_at < NOW() - 30j`, ajouté au `run()` existant (`src/cron/maintenance.php`, orchestrateur déjà en place pour les autres modules)
+- **Trouvaille** : `calendar_journals`/`calendar_todos` n'avaient aucune FK sur `calendar_id`/`user_id` (gap pré-existant, 9 lignes orphelines trouvées en dev). `docs/20260715_calendar_journals_todos_fk.sql` — aligne les types (`INT(11)` signé) et ajoute les FK `ON DELETE CASCADE`. Appliquée dev + prod. Toutes les FK sur `users.id` sont désormais CASCADE/SET NULL
+- Testé en dev : compte soft-deleted 31j → purgé, 29j → conservé (vérifié manuellement, boundary exacte). Dry-run et run réel sans erreur
+- **Crontab serveur non modifié** — pas d'activation en prod sans confirmation explicite
+
+---
+
 ## [Unreleased 2026-07-15 21:25]
 
 ### Feat — Enforcement des caps cmem sur 6 ressources (phase 7a, directive `20260715_140000_cmem_web_vers_cmem2_API`)
