@@ -19,12 +19,11 @@ class StripeService
         string $userEmail,
         string $plan
     ): array {
-        $priceId = ($plan === 'yearly')
-            ? (defined('STRIPE_PRICE_PUZZLE_YEARLY')  ? \STRIPE_PRICE_PUZZLE_YEARLY  : '')
-            : (defined('STRIPE_PRICE_PUZZLE_MONTHLY') ? \STRIPE_PRICE_PUZZLE_MONTHLY : '');
+        $priceConst = 'STRIPE_PRICE_' . strtoupper($appId) . '_' . strtoupper($plan);
+        $priceId    = defined($priceConst) ? constant($priceConst) : '';
 
         if (!$priceId) {
-            throw new \RuntimeException("STRIPE_PRICE_PUZZLE_" . strtoupper($plan) . " non configuré");
+            throw new \RuntimeException("{$priceConst} non configuré");
         }
 
         $customerId = self::getOrCreateCustomer($userId, $appId, $userEmail);

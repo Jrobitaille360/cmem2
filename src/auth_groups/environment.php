@@ -368,3 +368,9 @@ if (!defined('STRIPE_PRICE_PUZZLE_MONTHLY')) {
 if (!defined('STRIPE_PRICE_PUZZLE_YEARLY')) {
     define('STRIPE_PRICE_PUZZLE_YEARLY',  $_ENV['STRIPE_PRICE_PUZZLE_YEARLY']  ?? '');
 }
+if (!defined('STRIPE_PRICE_CMEM_MONTHLY')) {
+    define('STRIPE_PRICE_CMEM_MONTHLY',   $_ENV['STRIPE_PRICE_CMEM_MONTHLY']   ?? '');
+}
+if (!defined('STRIPE_PRICE_CMEM_YEARLY')) {
+    define('STRIPE_PRICE_CMEM_YEARLY',    $_ENV['STRIPE_PRICE_CMEM_YEARLY']    ?? '');
+}

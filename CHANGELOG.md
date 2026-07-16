@@ -7,6 +7,19 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-07-15 21:05]
+
+### Feat — Stripe cmem (price_id CAD test) + config caps cmem (phase 7a, partiel) (directive `20260715_140000_cmem_web_vers_cmem2_API`)
+
+- **Produit + prix Stripe CAD (mode test)** créés (`prod_UtQMrxaTyklffA`) : `STRIPE_PRICE_CMEM_MONTHLY` (5$/30j), `STRIPE_PRICE_CMEM_YEARLY` (50$/365j) — ajoutés à `.env`, `.env.example`, `private/utilitaires/.env.dev.online`, `environment.php`
+- **`StripeService::createCheckoutSession`** — le `price_id` était hardcodé `puzzle` ; routage générique par `app_id` (`STRIPE_PRICE_{APP}_{PLAN}`), aucun changement de comportement pour puzzle
+- **`src/stripe/Config/CmemPlans.php`** — nouveau : caps cmem par plan (config PHP statique, pas de table DB), valeurs actées avec `cmem_web` le 2026-07-15 — règle verrouillée `max_journals = max_tasks / 2`
+- **`docs/20260715_users_cmem_plan_override.sql`** — migration `users.cmem_plan_override` (override manuel plan "Ami"), appliquée en dev
+- Déployé sur `dev-cmem2.journauxdebord.com` (commit `ddf6108`), suite `test_stripe_v2.php` 42/42 (non-régression puzzle), checkout `app_id=cmem` monthly/yearly validé manuellement (session Stripe test 200)
+- Reste de la phase 7a (enforcement caps, purge RGPD, `DELETE /users/me` sans mot de passe, `/auth/me` plan effectif) — voir `docs/PLAN_monetisation-stripe-caps-phase7a.md`
+
+---
+
 ## [Unreleased 2026-07-15 19:50]
 
 ### Fix — `UID`/`DTSTAMP` dupliqués dans export ICS VEVENT/VTODO/VJOURNAL (directive `20260715_194122_cmem_web_vers_cmem2_API`)
