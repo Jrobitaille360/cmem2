@@ -7,6 +7,19 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-07-15 21:25]
+
+### Feat — Enforcement des caps cmem sur 6 ressources (phase 7a, directive `20260715_140000_cmem_web_vers_cmem2_API`)
+
+- **`403 QUOTA_EXCEEDED`** avant création sur : calendriers (`CalendarController::createCalendar`), journaux (`JournalController::createJournal`), tâches tous calendriers confondus (`TodoController::createTodo`), appareils web `app_id=cmem` (`WebDeviceController::register`), groupes possédés (`GroupManagerController::create`)
+- **`max_group_members`** plafonné à la création du groupe selon le cap du plan du possédant (pas seulement à l'acceptation d'invitation, déjà en place) — empêche de contourner en demandant `max_members=1000` sur un compte Gratuit
+- **`EntitlementService::checkQuota()`/`getFeaturesForUser()`** — factorisation de la résolution plan → caps, réutilisée par tous les points d'enforcement
+- **Cap stockage (`max_storage_mb`) non enforcé** — point ouvert non résolu (`files` sans colonne `app_id`, risque de compter du stockage hors-cmem contre le quota cmem)
+- **`users.cmem_plan_override='ami'`** posé (dev + prod) sur les comptes admin/test (`jrobitaille04@pm.me`, `m-jprovost@outlook.com`) pour éviter que les caps gratuits ne bloquent les comptes internes
+- Testé sur dev-cmem2 : `test_calendars` 233/233, `test_groups` 67/67, `test_users` 107/107, suites ICS (freebusy/occurrences/tags) 100% — vérification manuelle E2E (compte gratuit frais : 3 calendriers acceptés, 4e → 403)
+
+---
+
 ## [Unreleased 2026-07-15 21:12]
 
 ### Feat — Plan effectif cmem exposé dans `GET /auth/me` (phase 7a, directive `20260715_140000_cmem_web_vers_cmem2_API`)
