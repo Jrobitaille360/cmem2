@@ -164,11 +164,19 @@ class StripeService
     public static function handleCheckoutCompleted(array $session): void
     {
         $userId = (int) ($session['client_reference_id'] ?? 0);
-        $appId  = $session['metadata']['app_id'] ?? 'puzzle';
+        $appId  = $session['metadata']['app_id'] ?? null;
         $subId  = $session['subscription'] ?? null;
         $custId = $session['customer']     ?? null;
 
         if (!$userId || !$subId) {
+            return;
+        }
+
+        if (!$appId) {
+            LogService::error('Stripe checkout.session.completed — metadata.app_id manquant, événement ignoré', [
+                'user_id' => $userId,
+                'sub_id'  => $subId,
+            ]);
             return;
         }
 
@@ -206,7 +214,7 @@ class StripeService
         $plan     = ($interval === 'year') ? 'yearly' : 'monthly';
 
         $userId = (int) ($sub['metadata']['user_id'] ?? 0);
-        $appId  = $sub['metadata']['app_id']  ?? 'puzzle';
+        $appId  = $sub['metadata']['app_id']  ?? null;
         $custId = $sub['customer']            ?? null;
 
         $isPremiumStatus = in_array($status, ['trialing', 'active', 'past_due'], true);
@@ -233,6 +241,11 @@ class StripeService
                 'stripe_subscription_id' => $subId,
             ]));
         } else {
+            if (!$appId) {
+                LogService::warning('Stripe subscription.updated — metadata.app_id manquant, mise à jour par stripe_subscription_id sans (re)poser app_id', [
+                    'sub_id' => $subId,
+                ]);
+            }
             $model->updateByStripeSubId($subId, $fields);
         }
 
