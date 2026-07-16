@@ -250,19 +250,15 @@ class UserManagerController {
                 Response::error('Accès non autorisé', null, 403);
                 return false;
             }
-            if($currentUserId==$userId){
-                $validation=Validator::validate($input, [
-                    'password' => 'required|string'
-                ]);
-            } else{
+            if($currentUserId!=$userId){
                 $validation=Validator::validate($input, [
                     "force_delete" => 'optional|boolean'
                 ]);
-            }
-            if(!$validation['valid']) {
-                LoggingMiddleware::logExit(400);
-                Response::error('Validation échouée', $validation['errors'], 400);
-                return false;
+                if(!$validation['valid']) {
+                    LoggingMiddleware::logExit(400);
+                    Response::error('Validation échouée', $validation['errors'], 400);
+                    return false;
+                }
             }
             $user = new User();
             $userData = $user->findById($userId);
@@ -273,15 +269,8 @@ class UserManagerController {
                 return false;
             }
             if($currentUserId==$userId){
-                // test password
-                if (!password_verify($input['password'], $userData['password_hash'])) {
-                    LogService::warning("Mot de passe incorrect pour suppression utilisateur", [
-                        'user_id' => $userId
-                    ]);
-                    LoggingMiddleware::logExit(403);
-                    Response::error('Mot de passe incorrect', null, 403);
-                    return false;
-                }
+                // JWT déjà validé par le middleware d'auth = premier facteur suffisant
+                // (aucun second facteur système pour les comptes OTP, mot de passe aléatoire jamais connu de l'utilisateur)
                 $force_delete = false;
             } else {
                 $force_delete = $input['force_delete']?? false; // Par défaut, on fait un soft delete
