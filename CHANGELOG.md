@@ -7,6 +7,15 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-07-15 21:10]
+
+### Fix — `DELETE /users/me` bloqué pour comptes OTP (phase 7a, directive `20260715_140000_cmem_web_vers_cmem2_API`)
+
+- **`UserManagerController::delete`** — l'auto-register OTP fixe `password_hash` à une valeur aléatoire jamais connue de l'utilisateur ; l'exigence `password` requis bloquait toute suppression de compte OTP. Retirée pour le chemin self-delete (`currentUserId === userId`) — JWT déjà validé par le middleware d'auth. `force_delete=false` inchangé (soft delete uniquement)
+- Suite `test_users.php` étendue (22.1) : suppression d'un compte auto-créé par OTP sans `password` dans le body → 200. 107/107 sur dev-cmem2
+
+---
+
 ## [Unreleased 2026-07-15 21:05]
 
 ### Feat — Stripe cmem (price_id CAD test) + config caps cmem (phase 7a, partiel) (directive `20260715_140000_cmem_web_vers_cmem2_API`)
