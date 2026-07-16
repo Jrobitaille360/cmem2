@@ -10,6 +10,7 @@ use AuthGroups\Utils\Response;
 use AuthGroups\Utils\Validator;
 use AuthGroups\Middleware\LoggingMiddleware;
 use AuthGroups\Services\LogService;
+use Stripe\Services\EntitlementService;
 
 /**
  * Contrôleur VTODO — Phase 5.1
@@ -65,6 +66,17 @@ class TodoController
         if (!$this->calModel->isOwner($calendarId, $userId)) {
             LoggingMiddleware::logExit(403);
             Response::error('Accès non autorisé', null, 403);
+            return;
+        }
+
+        $quotaError = EntitlementService::checkQuota(
+            $userId,
+            'max_tasks',
+            $this->todoModel->countByUserId($userId)
+        );
+        if ($quotaError) {
+            LoggingMiddleware::logExit(403);
+            Response::error('Quota de tâches atteint', $quotaError, 403);
             return;
         }
 

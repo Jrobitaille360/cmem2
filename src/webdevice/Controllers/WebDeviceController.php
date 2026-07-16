@@ -5,6 +5,7 @@ namespace WebDevice\Controllers;
 use AuthGroups\Middleware\LoggingMiddleware;
 use AuthGroups\Models\AppUserSettings;
 use AuthGroups\Utils\Response;
+use Stripe\Services\EntitlementService;
 use WebDevice\Models\WebDevice;
 
 class WebDeviceController
@@ -29,10 +30,26 @@ class WebDeviceController
             return;
         }
 
+        $deviceModel   = new WebDevice();
+        $existingDevice = $deviceModel->findByAppAndUuid($appId, $uuid);
+
+        if (!$existingDevice && $userId && $appId === 'cmem') {
+            $quotaError = EntitlementService::checkQuota(
+                $userId,
+                'max_devices',
+                $deviceModel->countByUserAndApp($userId, $appId)
+            );
+            if ($quotaError) {
+                LoggingMiddleware::logExit(403);
+                Response::error('Quota d\'appareils atteint', $quotaError, 403);
+                return;
+            }
+        }
+
         $deviceToken    = bin2hex(random_bytes(32));
         $tokenExpiresAt = date('Y-m-d H:i:s', strtotime('+365 days'));
 
-        $device    = (new WebDevice())->upsertDevice($userId, $appId, $uuid, $deviceToken, $tokenExpiresAt);
+        $device    = $deviceModel->upsertDevice($userId, $appId, $uuid, $deviceToken, $tokenExpiresAt);
         $pseudonym = $userId ? (new AppUserSettings())->get($userId, $appId) : null;
 
         LoggingMiddleware::logExit(200);

@@ -9,6 +9,7 @@ use AuthGroups\Utils\Validator;
 use AuthGroups\Services\LogService;
 use AuthGroups\Services\AuthService;
 use AuthGroups\Middleware\LoggingMiddleware;
+use Stripe\Services\EntitlementService;
 use Exception;
 
 class GroupManagerController
@@ -38,8 +39,28 @@ class GroupManagerController
             }
             // default pour visibility
             $input['visibility'] = $input['visibility'] ?? 'private';
-            
+
             $group = new Group();
+
+            $features = EntitlementService::getFeaturesForUser($currentUserId);
+            $maxGroupMembers = $features['max_group_members'] ?? null;
+            if ($maxGroupMembers !== null) {
+                $input['max_members'] = isset($input['max_members'])
+                    ? min((int) $input['max_members'], $maxGroupMembers)
+                    : $maxGroupMembers;
+            }
+
+            $quotaError = EntitlementService::checkQuota(
+                $currentUserId,
+                'max_groups',
+                $group->countOwnedByUserId($currentUserId)
+            );
+            if ($quotaError) {
+                LoggingMiddleware::logExit(403);
+                Response::error('Quota de groupes atteint', $quotaError, 403);
+                return false;
+            }
+
             $groupId = $group->create2($input, $currentUserId); // Utiliser create2() qui accepte les paramètres
 
             if (!$groupId) {

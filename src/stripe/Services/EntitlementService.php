@@ -2,6 +2,7 @@
 
 namespace Stripe\Services;
 
+use AuthGroups\Models\User;
 use Stripe\Config\CmemPlans;
 use Stripe\Models\StripeSubscription;
 
@@ -12,6 +13,37 @@ use Stripe\Models\StripeSubscription;
 class EntitlementService
 {
     private const ACTIVE_STATUSES = ['trialing', 'active', 'past_due'];
+
+    /**
+     * Caps cmem effectifs pour un user (utilisé par les points d'enforcement).
+     */
+    public static function getFeaturesForUser(int $userId): array
+    {
+        $userData = (new User())->findById($userId);
+        $override = $userData['cmem_plan_override'] ?? null;
+        return self::getEffectivePlanForCmem($userId, $override)['features'];
+    }
+
+    /**
+     * Vérifie un quota cmem. Retourne null si sous la limite, sinon le payload d'erreur
+     * QUOTA_EXCEEDED (à passer tel quel dans Response::error(..., $payload, 403)).
+     */
+    public static function checkQuota(int $userId, string $resourceKey, int $currentCount): ?array
+    {
+        $features = self::getFeaturesForUser($userId);
+        $limit    = $features[$resourceKey] ?? null;
+
+        if ($limit !== null && $currentCount >= $limit) {
+            return [
+                'code'     => 'QUOTA_EXCEEDED',
+                'resource' => $resourceKey,
+                'limit'    => $limit,
+                'current'  => $currentCount,
+            ];
+        }
+
+        return null;
+    }
 
     public static function getEffectivePlanForCmem(int $userId, ?string $planOverride): array
     {

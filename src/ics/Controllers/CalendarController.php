@@ -14,6 +14,7 @@ use AuthGroups\Services\LogService;
 use AuthGroups\Services\EmailService;
 use AuthGroups\Models\User;
 use PharIo\Manifest\Email;
+use Stripe\Services\EntitlementService;
 
 class CalendarController
 {
@@ -53,7 +54,18 @@ class CalendarController
                 Response::error('Le timezone fourni est invalide', ['timezone' => 'Le timezone spécifié n\'est pas valide'], 400);
                 return;
             }
-       
+
+            $quotaError = EntitlementService::checkQuota(
+                $userId,
+                'max_calendars',
+                (new Calendar())->countOwnedByUserId($userId)
+            );
+            if ($quotaError) {
+                LoggingMiddleware::logExit(403);
+                Response::error('Quota de calendriers atteint', $quotaError, 403);
+                return;
+            }
+
         try {
             $cal = new Calendar();
             $cal->userId = $userId;

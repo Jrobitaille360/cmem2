@@ -38,6 +38,24 @@ class WebDevice extends BaseModel
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
+    public function findByAppAndUuid(string $appId, string $deviceUuid): ?array
+    {
+        $stmt = $this->getDb()->prepare(
+            "SELECT * FROM {$this->table} WHERE app_id = ? AND device_uuid = ?"
+        );
+        $stmt->execute([$appId, $deviceUuid]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    public function countByUserAndApp(int $userId, string $appId): int
+    {
+        $stmt = $this->getDb()->prepare(
+            "SELECT COUNT(*) FROM {$this->table} WHERE user_id = ? AND app_id = ?"
+        );
+        $stmt->execute([$userId, $appId]);
+        return (int) $stmt->fetchColumn();
+    }
+
     public function findByValidToken(string $token): ?array
     {
         $stmt = $this->getDb()->prepare(

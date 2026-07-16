@@ -138,6 +138,15 @@ class CalendarJournal extends BaseModel
         return $this->getDb()->prepare($sql)->execute($params);
     }
 
+    public function countByUserId(int $userId): int
+    {
+        $stmt = $this->getDb()->prepare(
+            "SELECT COUNT(*) FROM {$this->table} WHERE user_id = ? AND deleted_at IS NULL"
+        );
+        $stmt->execute([$userId]);
+        return (int) $stmt->fetchColumn();
+    }
+
     public function getById(int $id): ?array
     {
         $stmt = $this->getDb()->prepare("

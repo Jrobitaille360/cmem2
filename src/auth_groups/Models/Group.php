@@ -589,6 +589,17 @@ class Group extends BaseModel
     /**
      * Compter les groupes d'un utilisateur
      */
+    public function countOwnedByUserId(int $userId): int
+    {
+        $query = "SELECT COUNT(*) as total FROM {$this->table}
+                  WHERE owner_id = :user_id AND deleted_at IS NULL";
+
+        $stmt = $this->getDb()->prepare($query);
+        $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
+        $stmt->execute();
+        return (int) $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+    }
+
     public function countByUserId(int $userId): int
     {
         $query = "SELECT COUNT(*) as total

@@ -114,6 +114,15 @@ class Calendar extends BaseModel
         return $stmt->execute($params);
     }
 
+    public function countOwnedByUserId($userId): int
+    {
+        $stmt = $this->getDb()->prepare(
+            "SELECT COUNT(*) FROM calendars WHERE user_id = ? AND deleted_at IS NULL"
+        );
+        $stmt->execute([$userId]);
+        return (int) $stmt->fetchColumn();
+    }
+
     public function getUserCalendars($userId): array
     {
         $stmt = $this->getDb()->prepare("
