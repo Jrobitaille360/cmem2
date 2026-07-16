@@ -7,6 +7,17 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-07-15 21:12]
+
+### Feat — Plan effectif cmem exposé dans `GET /auth/me` (phase 7a, directive `20260715_140000_cmem_web_vers_cmem2_API`)
+
+- **`src/stripe/Services/EntitlementService.php`** — nouveau : résolution `stripe_subscriptions` actif (`app_id='cmem'`) > `users.cmem_plan_override` > `free`
+- **`AuthController::me()`** — ajoute `user.plan {code, source, status, features}`, évite au client d'agréger 3 appels
+- Documenté dans `docs/stripe/GUIDE.md` (section « Plan effectif cmem »)
+- Testé sur dev-cmem2 : `test_auth_otp.php` 25/25 (non-régression), champ `plan` vérifié manuellement (free/default par défaut)
+
+---
+
 ## [Unreleased 2026-07-15 21:10]
 
 ### Fix — `DELETE /users/me` bloqué pour comptes OTP (phase 7a, directive `20260715_140000_cmem_web_vers_cmem2_API`)
