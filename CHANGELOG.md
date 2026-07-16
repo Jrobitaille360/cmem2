@@ -7,6 +7,17 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-07-16 10:39]
+
+### Feat — Endpoint admin assignation manuelle du plan Ami (`cmem_plan_override`) (phase 7b, directive `20260716_090000_cmem_web_vers_cmem2_API`)
+
+- **`PUT /users/{id}/plan-override`** (nouveau, `ADMINISTRATEUR` seul) — pose/retire `users.cmem_plan_override` (`'ami'` ou `null`), 422 sur valeur inconnue, 403 pour tout rôle non-admin, 404 si utilisateur introuvable. Réponse renvoie l'utilisateur à jour pour rafraîchir l'UI admin sans appel supplémentaire
+- **`CmemPlans::overridableCodes()`** — liste des valeurs assignables manuellement (aujourd'hui `['ami']`), distincte de `codes()` qui inclut aussi `monthly`/`yearly` (résolus via Stripe, jamais assignés à la main)
+- `GET /users/{id}` reflétait déjà `cmem_plan_override` (colonne posée phase 7a, `SELECT *` existant dans `User::findById()`) — aucun changement nécessaire côté lecture
+- Testé sur dev-cmem2 : `test_users` section 9B (6 cas : pose, lecture, retrait, 403 rôle non-admin, 422 valeur inconnue, 404 utilisateur inexistant), suite complète 114/116 (2 échecs pré-existants sans lien, rate-limit OTP)
+
+---
+
 ## [Unreleased 2026-07-15 22:15]
 
 ### Fix — Webhook Stripe `app_id` manquant expose fallback silencieux vers `puzzle` (phase 7a, directive `20260715_140000_cmem_web_vers_cmem2_API`)

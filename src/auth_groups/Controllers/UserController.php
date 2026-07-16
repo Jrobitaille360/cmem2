@@ -89,6 +89,14 @@ class UserController {
         return $this->userManagerController->updateProfile($userId,$currentUserId, $currentUserRole);
     }
 
+    /**
+     * Poser/retirer l'assignation manuelle du plan cmem (ADMINISTRATEUR)
+     * PUT /users/{id}/plan-override
+     */
+    public function updatePlanOverride($userId,$currentUserId, $currentUserRole){
+        return $this->userManagerController->updatePlanOverride($userId,$currentUserId, $currentUserRole);
+    }
+
     public function confirmEmail(){
         return $this->userManagerController->confirmEmail();
     }

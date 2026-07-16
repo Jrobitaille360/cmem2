@@ -60,8 +60,13 @@ class UserRouteHandler extends BaseRouteHandler
 
             // PUT /users/{id}/password
             (isset($segments[2]) && $segments[2] === 'password' && $method === 'PUT') =>
-                $this->validateIdAndCall($action, fn($targetId) => 
+                $this->validateIdAndCall($action, fn($targetId) =>
                     $this->controller->changePassword($targetId, $user['user_id'], $user['role'])),
+
+            // PUT /users/{id}/plan-override
+            (isset($segments[2]) && $segments[2] === 'plan-override' && $method === 'PUT') =>
+                $this->validateIdAndCall($action, fn($targetId) =>
+                    $this->controller->updatePlanOverride($targetId, $user['user_id'], $user['role'])),
 
             // GET /users/choose-plan?token=xxx - Afficher invitation plan (public)
             ($action === 'choose-plan' && $method === 'GET') =>

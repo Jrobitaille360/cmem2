@@ -12,6 +12,7 @@ use AuthGroups\Utils\Database;
 use AuthGroups\Services\LogService;
 use AuthGroups\Services\UserSessionService;
 use AuthGroups\Middleware\LoggingMiddleware;
+use Stripe\Config\CmemPlans;
 use Exception;
 
 /**
@@ -440,6 +441,83 @@ class UserManagerController {
             ]);
             LoggingMiddleware::logExit(500);
             Response::error("Erreur serveur lors de la mise à jour du profil utilisateur");
+            return false;
+        }
+    }
+
+    /**
+     * Poser/retirer l'assignation manuelle du plan cmem (users.cmem_plan_override)
+     * PUT /users/{id}/plan-override — ADMINISTRATEUR seul
+     * Directive 20260716_090000_cmem_web_vers_cmem2_API__admin-assignation-plan-ami
+     */
+    public function updatePlanOverride($userId, $currentUserId, $currentUserRole){
+        try {
+            LoggingMiddleware::logEntry();
+
+            if ($currentUserRole !== 'ADMINISTRATEUR') {
+                LogService::warning("Tentative d'assignation de plan override par un non-admin", [
+                    'current_user_id' => $currentUserId,
+                    'target_user_id' => $userId,
+                    'role' => $currentUserRole
+                ]);
+                LoggingMiddleware::logExit(403);
+                Response::error('Accès non autorisé', null, 403);
+                return false;
+            }
+
+            $input = Response::getRequestParams();
+            if (!array_key_exists('cmem_plan_override', $input)) {
+                LoggingMiddleware::logExit(400);
+                Response::error('Données de validation invalides', ['cmem_plan_override' => ['champ requis']], 400);
+                return false;
+            }
+
+            $planOverride = $input['cmem_plan_override'];
+            if ($planOverride !== null && !in_array($planOverride, CmemPlans::overridableCodes(), true)) {
+                LoggingMiddleware::logExit(422);
+                Response::error('Données de validation invalides', ['cmem_plan_override' => ['valeur non reconnue']], 422);
+                return false;
+            }
+
+            $user = new User();
+            $userData = $user->findById($userId);
+            if (!$userData) {
+                LogService::warning("Utilisateur pour assignation de plan override non trouvé", ['user_id' => $userId]);
+                LoggingMiddleware::logExit(404);
+                Response::error('Utilisateur non trouvé', null, 404);
+                return false;
+            }
+
+            if ($user->updatePlanOverride($userId, $planOverride)) {
+                LogService::info("Plan override assigné", [
+                    'user_id' => $userId,
+                    'updated_by' => $currentUserId,
+                    'cmem_plan_override' => $planOverride
+                ]);
+                $updatedUser = $user->findById($userId);
+                unset($updatedUser['password_hash']);
+                LoggingMiddleware::logExit(200);
+                Response::success('Plan override mis à jour avec succès', $updatedUser);
+                return true;
+            } else {
+                LogService::error("Échec de l'assignation du plan override", [
+                    'user_id' => $userId,
+                    'updated_by' => $currentUserId
+                ]);
+                LoggingMiddleware::logExit(500);
+                Response::error('Erreur lors de la mise à jour du plan override', null, 500);
+                return false;
+            }
+        } catch (Exception $e) {
+            LogService::error("Erreur lors de l'assignation du plan override", [
+                'user_id' => $userId,
+                'current_user_id' => $currentUserId,
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine()
+            ]);
+            LoggingMiddleware::logExit(500);
+            Response::error("Erreur serveur lors de la mise à jour du plan override");
             return false;
         }
     }

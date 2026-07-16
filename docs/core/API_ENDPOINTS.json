@@ -590,6 +590,21 @@
           "response": "Message de confirmation"
         },
         {
+          "method": "PUT",
+          "path": "/users/{id}/plan-override",
+          "description": "Poser/retirer l'assignation manuelle du plan cmem (users.cmem_plan_override)",
+          "params": {
+            "id": "integer (required)"
+          },
+          "roles": [
+            "ADMINISTRATEUR"
+          ],
+          "body": {
+            "cmem_plan_override": "string|null (required, valeur connue: 'ami', ou null pour retirer)"
+          },
+          "response": "Utilisateur mis à jour (avec cmem_plan_override)"
+        },
+        {
           "method": "POST",
           "path": "/users/app",
           "description": "Créer une configuration d'application",

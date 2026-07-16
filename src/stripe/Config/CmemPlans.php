@@ -58,4 +58,13 @@ class CmemPlans
     {
         return array_keys(self::PLANS);
     }
+
+    /**
+     * Codes assignables manuellement via users.cmem_plan_override (admin).
+     * Distinct de codes() : 'monthly'/'yearly' viennent de Stripe, pas d'une assignation manuelle.
+     */
+    public static function overridableCodes(): array
+    {
+        return ['ami'];
+    }
 }

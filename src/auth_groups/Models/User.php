@@ -134,6 +134,22 @@ class User extends BaseModel {
     }
 
     /**
+     * Poser/retirer l'assignation manuelle de plan (users.cmem_plan_override)
+     */
+    public function updatePlanOverride($id, ?string $planOverride) {
+        $query = "UPDATE {$this->table} SET
+                 cmem_plan_override = :cmem_plan_override,
+                 updated_at = CURRENT_TIMESTAMP
+                 WHERE id = :id AND deleted_at IS NULL";
+
+        $stmt = $this->getDb()->prepare($query);
+        $stmt->bindParam(':id', $id, PDO::PARAM_INT);
+        $stmt->bindParam(':cmem_plan_override', $planOverride);
+
+        return $stmt->execute();
+    }
+
+    /**
      * Mettre à jour le mot de passe
      */
     public function updatePassword($newPasswordHash) {
