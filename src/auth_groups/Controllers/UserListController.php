@@ -38,13 +38,15 @@ class UserListController {
             $validate = Validator::validate($input, [
                 'email' => 'optional|email',
                 'page' => 'optional|integer|min:1',
-                'limit' => 'optional|integer|min:1|max:100'
+                'limit' => 'optional|integer|min:1|max:100',
+                'include_deleted' => 'optional|boolean'
             ]);
-            $pagination = Response::getPaginationParams();            
+            $pagination = Response::getPaginationParams();
             $email  = $input['email'] ?? null;
+            $includeDeleted = !empty($input['include_deleted']) && $input['include_deleted'] != '0';
             $user   = new User();
-            $users  = $user->getAll($pagination['limit'], ($pagination['page'] - 1) * $pagination['limit'], $email);
-            $total  = $user->countFiltered($email);
+            $users  = $user->getAll($pagination['limit'], ($pagination['page'] - 1) * $pagination['limit'], $email, $includeDeleted);
+            $total  = $user->countFiltered($email, $includeDeleted);
             $perPage = $pagination['limit'];
 
             LogService::info("Liste des utilisateurs récupérée avec succès", [

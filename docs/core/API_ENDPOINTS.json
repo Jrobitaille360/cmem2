@@ -425,7 +425,8 @@
             "SUPERADMINISTRATEUR"
           ],
           "query": {
-            "email": "string (optional)"
+            "email": "string (optional)",
+            "include_deleted": "boolean (optional) - inclut les comptes soft-deleted (deleted_at non nul) dans les résultats"
           },
           "response": "Array d'utilisateurs"
         },

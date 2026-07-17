@@ -7,6 +7,18 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-07-16 16:20]
+
+### Feat — `GET /users?include_deleted=1` — retrouver les comptes soft-deleted (directive `20260716_150000_cmem_web_vers_cmem2_API`)
+
+- **`GET /users`** accepte désormais `include_deleted` (bool, optionnel) — inclut les comptes `deleted_at` non nul dans la liste/recherche par email, réservé `ADMINISTRATEUR`/`SUPERADMINISTRATEUR` (même rôle que `POST /users/{id}/restore`). Sans le paramètre, comportement inchangé (comptes soft-deleted exclus)
+- `User::getAll()`/`User::countFiltered()` — nouveau paramètre `$includeDeleted`, colonne `deleted_at` désormais renvoyée pour que le client distingue visuellement et propose la restauration
+- Corrige un compte soft-deleted inatteignable en pratique : `POST /users/{id}/restore` était fonctionnel mais sans moyen de retrouver l'`id` côté client
+- Tests : `test_users.php` 10.4/10.5 — compte supprimé présent avec `deleted_at` renseigné quand `include_deleted=1`, absent par défaut
+- Doc : `docs/core/API_ENDPOINTS.json` mis à jour
+
+---
+
 ## [Unreleased 2026-07-16 15:45]
 
 ### Feat — Rôle `SUPERADMINISTRATEUR`, matrice d'autorité admin/superadmin (directive `20260716_113000_cmem_web_vers_cmem2_API`)

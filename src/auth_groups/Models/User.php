@@ -195,18 +195,19 @@ class User extends BaseModel {
     /**
      * Obtenir tous les utilisateurs (avec pagination)
      */
-    public function getAll($limit = 20, $offset = 0, $email = null) {
-        $query = "SELECT id, name, email, role, profile_image, bio, phone, date_of_birth, location, email_verified, last_login, created_at 
-                 FROM {$this->table} 
-                 WHERE deleted_at IS NULL 
-                 ORDER BY created_at DESC 
+    public function getAll($limit = 20, $offset = 0, $email = null, $includeDeleted = false) {
+        $deletedClause = $includeDeleted ? "" : "AND deleted_at IS NULL";
+        $query = "SELECT id, name, email, role, profile_image, bio, phone, date_of_birth, location, email_verified, last_login, created_at, deleted_at
+                 FROM {$this->table}
+                 WHERE 1=1 {$deletedClause}
+                 ORDER BY created_at DESC
                  LIMIT :limit OFFSET :offset";
-        
+
         if ($email) {
-            $query = "SELECT id, name, email, role, profile_image, bio, phone, date_of_birth, location, email_verified, last_login, created_at 
-                      FROM {$this->table} 
-                      WHERE deleted_at IS NULL AND email = :email
-                      ORDER BY created_at DESC 
+            $query = "SELECT id, name, email, role, profile_image, bio, phone, date_of_birth, location, email_verified, last_login, created_at, deleted_at
+                      FROM {$this->table}
+                      WHERE email = :email {$deletedClause}
+                      ORDER BY created_at DESC
                       LIMIT :limit OFFSET :offset";
         }
         $stmt = $this->getDb()->prepare($query);
@@ -233,14 +234,15 @@ class User extends BaseModel {
     /**
      * Compter les utilisateurs avec filtre optionnel (miroir de getAll)
      */
-    public function countFiltered(?string $email = null): int {
+    public function countFiltered(?string $email = null, bool $includeDeleted = false): int {
+        $deletedClause = $includeDeleted ? "" : "AND deleted_at IS NULL";
         if ($email) {
-            $query = "SELECT COUNT(*) as total FROM {$this->table} WHERE deleted_at IS NULL AND email = :email";
+            $query = "SELECT COUNT(*) as total FROM {$this->table} WHERE email = :email {$deletedClause}";
             $stmt = $this->getDb()->prepare($query);
             $stmt->bindParam(':email', $email);
             $stmt->execute();
         } else {
-            $stmt = $this->getDb()->query("SELECT COUNT(*) as total FROM {$this->table} WHERE deleted_at IS NULL");
+            $stmt = $this->getDb()->query("SELECT COUNT(*) as total FROM {$this->table} WHERE 1=1 {$deletedClause}");
         }
         return (int) $stmt->fetch(PDO::FETCH_ASSOC)['total'];
     }
