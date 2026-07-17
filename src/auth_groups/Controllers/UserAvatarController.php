@@ -4,6 +4,7 @@ namespace AuthGroups\Controllers;
 
 use AuthGroups\Models\User;
 use AuthGroups\Utils\Response;
+use AuthGroups\Utils\RoleHelper;
 use AuthGroups\Utils\FileValidator;
 use AuthGroups\Services\LogService;
 use AuthGroups\Middleware\LoggingMiddleware;
@@ -26,7 +27,7 @@ class UserAvatarController {
             $input = Response::getRequestParams();      
             
             // Vérifier l'authentification
-            if ( $currentUserRole !== 'ADMINISTRATEUR' && $userId !== $currentUserId) {
+            if ( !RoleHelper::isAtLeast($currentUserRole, 'ADMINISTRATEUR') && $userId !== $currentUserId) {
                 LogService::warning("Tentative de modification de mot de passe par un non-admin", [
                     'current_user_id' => $currentUserId,
                     'target_user_id' => $userId,

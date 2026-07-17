@@ -3,6 +3,7 @@
 namespace Items\Services;
 
 use Items\Models\ItemUserAccess;
+use AuthGroups\Utils\RoleHelper;
 
 /**
  * ItemAccessService — logique centralisée de contrôle d'accès aux items.
@@ -30,7 +31,7 @@ class ItemAccessService
 
     private function isAdmin(?array $user): bool
     {
-        return $user !== null && ($user['role'] ?? '') === 'ADMINISTRATEUR';
+        return $user !== null && RoleHelper::isAtLeast($user['role'] ?? null, 'ADMINISTRATEUR');
     }
 
     private function isOwner(?array $user, array $item): bool

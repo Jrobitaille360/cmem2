@@ -5,6 +5,7 @@ namespace AuthGroups\Controllers;
 use AuthGroups\Models\User;
 use AuthGroups\Services\EmailService;
 use AuthGroups\Utils\Response;
+use AuthGroups\Utils\RoleHelper;
 use AuthGroups\Utils\Validator;
 use AuthGroups\Utils\Database;
 use AuthGroups\Services\LogService;
@@ -130,7 +131,7 @@ class UserPasswordController {
             LoggingMiddleware::logEntry();
             $input = Response::getRequestParams();             
             // Vérifier l'authentification
-            if ( $currentUserRole !== 'ADMINISTRATEUR' && $userId !== $currentUserId) {
+            if ( !RoleHelper::isAtLeast($currentUserRole, 'ADMINISTRATEUR') && $userId !== $currentUserId) {
                 LogService::warning("Tentative de modification de mot de passe par un non-admin", [
                     'current_user_id' => $currentUserId,
                     'target_user_id' => $userId,

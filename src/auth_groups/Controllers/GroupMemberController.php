@@ -5,6 +5,7 @@ namespace AuthGroups\Controllers;
 use AuthGroups\Models\Group;
 use AuthGroups\Models\User;
 use AuthGroups\Utils\Response;
+use AuthGroups\Utils\RoleHelper;
 use AuthGroups\Utils\Validator;
 use AuthGroups\Services\LogService;
 use AuthGroups\Middleware\LoggingMiddleware;
@@ -29,7 +30,7 @@ class GroupMemberController
             $canViewMembers = (
                 $groupData['visibility'] === 'public' ||
                 $group->isMember($id, $currentUserId) ||
-                $currentUserRole === 'ADMINISTRATEUR'
+                RoleHelper::isAtLeast($currentUserRole, 'ADMINISTRATEUR')
             );
 
             if (!$canViewMembers) {
@@ -175,7 +176,7 @@ class GroupMemberController
             // Vérifier les permissions
             $currentUserGroupRole = $group->getMemberRole($groupId, $currentUserId);
             $canManageRoles = (
-                $currentUserRole === 'ADMINISTRATEUR' ||
+                RoleHelper::isAtLeast($currentUserRole, 'ADMINISTRATEUR') ||
                 $currentUserGroupRole === 'admin'
             );
 
@@ -279,7 +280,7 @@ class GroupMemberController
             // Vérifier les permissions - seuls les administrateurs système et les admins du groupe peuvent ajouter des membres
             $currentUserGroupRole = $group->getMemberRole($groupId, $currentUserId);
             $canAddMembers = (
-                $currentUserRole === 'ADMINISTRATEUR' ||
+                RoleHelper::isAtLeast($currentUserRole, 'ADMINISTRATEUR') ||
                 $currentUserGroupRole === 'admin'
             );
 

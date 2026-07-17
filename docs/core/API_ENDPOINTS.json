@@ -421,7 +421,8 @@
           "path": "/users",
           "description": "Liste de tous les utilisateurs",
           "roles": [
-            "ADMINISTRATEUR"
+            "ADMINISTRATEUR",
+            "SUPERADMINISTRATEUR"
           ],
           "query": {
             "email": "string (optional)"
@@ -472,12 +473,12 @@
           },
           "roles": [
             "ADMINISTRATEUR",
-            "MODERATEUR"
+            "SUPERADMINISTRATEUR"
           ],
           "body": {
             "name": "string (optional)",
             "email": "string (optional)",
-            "role": "string (optional)"
+            "role": "string (optional) — UTILISATEUR|ADMINISTRATEUR|SUPERADMINISTRATEUR ; matrice d'autorité : ADMINISTRATEUR ne peut que promouvoir UTILISATEUR→ADMINISTRATEUR (jamais toucher un pair ADMINISTRATEUR/SUPERADMINISTRATEUR ni élever vers SUPERADMINISTRATEUR) ; SUPERADMINISTRATEUR peut toute transition UTILISATEUR↔ADMINISTRATEUR ; SUPERADMINISTRATEUR ne s'attribue jamais via l'API (DB-only)"
           },
           "response": "User object mis à jour"
         },
@@ -489,8 +490,10 @@
             "id": "integer (required)"
           },
           "roles": [
-            "ADMINISTRATEUR"
+            "ADMINISTRATEUR",
+            "SUPERADMINISTRATEUR"
           ],
+          "roles_note": "matrice d'autorité : ADMINISTRATEUR peut révoquer un UTILISATEUR seulement ; SUPERADMINISTRATEUR peut révoquer un UTILISATEUR ou un ADMINISTRATEUR ; personne ne révoque un SUPERADMINISTRATEUR via l'API",
           "response": "{ deleted: true }"
         },
         {
@@ -501,7 +504,8 @@
             "id": "integer (required)"
           },
           "roles": [
-            "ADMINISTRATEUR"
+            "ADMINISTRATEUR",
+            "SUPERADMINISTRATEUR"
           ],
           "response": "{ restored: true }"
         },
@@ -514,6 +518,7 @@
           },
           "roles": [
             "ADMINISTRATEUR",
+            "SUPERADMINISTRATEUR",
             "self"
           ],
           "response": "Array de sessions actives + total"
@@ -527,6 +532,7 @@
           },
           "roles": [
             "ADMINISTRATEUR",
+            "SUPERADMINISTRATEUR",
             "self"
           ],
           "response": "Nombre de sessions terminées"
@@ -540,6 +546,7 @@
           },
           "roles": [
             "ADMINISTRATEUR",
+            "SUPERADMINISTRATEUR",
             "self"
           ],
           "response": "{ has_active_session, active_sessions_count, last_activity }"
@@ -559,7 +566,8 @@
             "id": "integer (required)"
           },
           "roles": [
-            "ADMINISTRATEUR"
+            "ADMINISTRATEUR",
+            "SUPERADMINISTRATEUR"
           ],
           "body": "multipart/form-data avec fichier image",
           "response": "URL de l'avatar"
@@ -582,7 +590,8 @@
             "id": "integer (required)"
           },
           "roles": [
-            "ADMINISTRATEUR"
+            "ADMINISTRATEUR",
+            "SUPERADMINISTRATEUR"
           ],
           "body": {
             "new_password": "string (required)"
@@ -597,8 +606,9 @@
             "id": "integer (required)"
           },
           "roles": [
-            "ADMINISTRATEUR"
+            "SUPERADMINISTRATEUR"
           ],
+          "roles_note": "resserré depuis ADMINISTRATEUR — décision de facturation, directive 20260716_113000",
           "body": {
             "cmem_plan_override": "string|null (required, valeur connue: 'ami', ou null pour retirer)"
           },
@@ -838,7 +848,7 @@
         { "method": "GET", "path": "/files",
           "description": "Lister les fichiers d'un sous-dossier uploads/<folder>/",
           "auth_required": true,
-          "roles": ["ADMINISTRATEUR"],
+          "roles": ["ADMINISTRATEUR", "SUPERADMINISTRATEUR"],
           "query": {
             "folder": "string (required) — slug du dossier ; caractères autorisés : a-z 0-9 - _ ; max 80 car."
           },
@@ -1263,7 +1273,8 @@
           "path": "/stats/build",
           "description": "Générer toutes les statistiques",
           "roles": [
-            "ADMINISTRATEUR"
+            "ADMINISTRATEUR",
+            "SUPERADMINISTRATEUR"
           ],
           "response": "Message de confirmation"
         },
@@ -1273,6 +1284,7 @@
           "description": "Statistiques globales de la plateforme",
           "roles": [
             "ADMINISTRATEUR",
+            "SUPERADMINISTRATEUR",
             "MODERATEUR"
           ],
           "response": "Object avec statistiques globales"
@@ -1283,6 +1295,7 @@
           "description": "Statistiques par groupe",
           "roles": [
             "ADMINISTRATEUR",
+            "SUPERADMINISTRATEUR",
             "MODERATEUR"
           ],
           "response": "Array de statistiques par groupe"
@@ -1293,6 +1306,7 @@
           "description": "Statistiques de tous les utilisateurs",
           "roles": [
             "ADMINISTRATEUR",
+            "SUPERADMINISTRATEUR",
             "MODERATEUR"
           ],
           "response": "Array de statistiques par utilisateur"
@@ -1305,7 +1319,8 @@
             "id": "integer (required)"
           },
           "roles": [
-            "ADMINISTRATEUR"
+            "ADMINISTRATEUR",
+            "SUPERADMINISTRATEUR"
           ],
           "response": "Object avec statistiques utilisateur"
         },
@@ -1325,7 +1340,8 @@
           "path": "/stats/online",
           "description": "Sessions actives en cours sur la plateforme",
           "roles": [
-            "ADMINISTRATEUR"
+            "ADMINISTRATEUR",
+            "SUPERADMINISTRATEUR"
           ],
           "response": "Statistiques des sessions actives"
         },
@@ -1334,7 +1350,8 @@
           "path": "/stats/cleanup-sessions",
           "description": "Nettoyer les sessions expirées",
           "roles": [
-            "ADMINISTRATEUR"
+            "ADMINISTRATEUR",
+            "SUPERADMINISTRATEUR"
           ],
           "response": "Nombre de sessions nettoyées"
         }

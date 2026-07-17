@@ -6,6 +6,7 @@ use Access\Services\AccessService;
 use AuthGroups\Middleware\LoggingMiddleware;
 use AuthGroups\Routing\BaseRouteHandler;
 use AuthGroups\Utils\Response;
+use AuthGroups\Utils\RoleHelper;
 use Playstore\Models\AndroidDevice;
 use Puzzle\Controllers\AdminController;
 use Puzzle\Controllers\CarouselController;
@@ -275,7 +276,7 @@ class PuzzleRouteHandler extends BaseRouteHandler
             Response::error('Authentification requise', null, 401);
             return null;
         }
-        if ($user['role'] !== 'ADMINISTRATEUR') {
+        if (!RoleHelper::isAtLeast($user['role'] ?? null, 'ADMINISTRATEUR')) {
             Response::error('Accès refusé : rôle ADMINISTRATEUR requis', null, 403);
             return null;
         }

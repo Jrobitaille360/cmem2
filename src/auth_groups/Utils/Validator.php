@@ -315,7 +315,7 @@ class Validator {
      * Valider les rôles d'utilisateur
      */
     public static  function validateUserRole($role) {
-        $allowedRoles = ['ADMINISTRATEUR', 'UTILISATEUR'];
+        $allowedRoles = ['SUPERADMINISTRATEUR', 'ADMINISTRATEUR', 'UTILISATEUR'];
         return in_array($role, $allowedRoles);
     }
     

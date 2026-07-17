@@ -3,6 +3,7 @@
 namespace AuthGroups\Controllers;
 
 use AuthGroups\Utils\Response;
+use AuthGroups\Utils\RoleHelper;
 use AuthGroups\Services\LogService;
 use AuthGroups\Services\ValidTokenService;
 use PDO;
@@ -30,7 +31,7 @@ class StatsController
             ]);
             
             // Vérification des permissions admin
-            if ($role !== 'ADMINISTRATEUR') {
+            if (!RoleHelper::isAtLeast($role, 'ADMINISTRATEUR')) {
                 LogService::warning('Tentative d\'accès non autorisée aux statistiques', [
                     'user_id' => $userId,
                     'role' => $role
@@ -75,7 +76,7 @@ class StatsController
     public function getPlatformStats(string $role): void {
         try {
             // Vérification des permissions admin
-            if ($role !== 'ADMINISTRATEUR') {
+            if (!RoleHelper::isAtLeast($role, 'ADMINISTRATEUR')) {
                 Response::error('Accès non autorisé', null, 403);
                 return;
             }
@@ -116,7 +117,7 @@ class StatsController
     public function getGroupsStats(string $role): void {
         try {
             // Vérification des permissions admin
-            if ($role !== 'ADMINISTRATEUR') {
+            if (!RoleHelper::isAtLeast($role, 'ADMINISTRATEUR')) {
                 Response::error('Accès non autorisé', null, 403);
                 return;
             }
@@ -166,7 +167,7 @@ class StatsController
     public function getUsersStats(string $role): void {
         try {
             // Vérification des permissions admin
-            if ($role !== 'ADMINISTRATEUR') {
+            if (!RoleHelper::isAtLeast($role, 'ADMINISTRATEUR')) {
                 Response::error('Accès non autorisé', null, 403);
                 return;
             }
@@ -252,7 +253,7 @@ class StatsController
     public function getUserStats(int $targetUserId, int $requestingUserId, string $role): void {
         try {
             // Vérification des permissions (admin uniquement)
-            if ($role !== 'ADMINISTRATEUR') {
+            if (!RoleHelper::isAtLeast($role, 'ADMINISTRATEUR')) {
                 Response::error('Accès non autorisé', null, 403);
                 return;
             }

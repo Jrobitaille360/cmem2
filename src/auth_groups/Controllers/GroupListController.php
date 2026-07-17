@@ -5,6 +5,7 @@ namespace AuthGroups\Controllers;
 use AuthGroups\Models\Group;
 use AuthGroups\Models\User;
 use AuthGroups\Utils\Response;
+use AuthGroups\Utils\RoleHelper;
 use AuthGroups\Utils\Validator;
 use AuthGroups\Services\LogService;
 use AuthGroups\Services\AuthService;
@@ -21,7 +22,7 @@ class GroupListController
             LoggingMiddleware::logEntry();
             
             // Vérifier les permissions (admin ou utilisateur lui-même)
-            if ($currentUserRole !== 'ADMINISTRATEUR' && $currentUserId != $userId) {
+            if (!RoleHelper::isAtLeast($currentUserRole, 'ADMINISTRATEUR') && $currentUserId != $userId) {
                 LogService::warning("Tentative d'accès non autorisé aux groupes", [
                     'requested_user_id' => $userId,
                     'current_user_id' => $currentUserId,
@@ -122,7 +123,7 @@ class GroupListController
 
             // Vérifier les permissions pour les groupes privés
             if ($groupData['visibility'] === 'private') {
-                if (!$group->isMember($id, $currentUserId) && $currentUserRole !== 'ADMINISTRATEUR') {
+                if (!$group->isMember($id, $currentUserId) && !RoleHelper::isAtLeast($currentUserRole, 'ADMINISTRATEUR')) {
                     LogService::warning("Tentative d'accès à un groupe privé", [
                         'group_id' => $id,
                         'user_id' => $currentUserId

@@ -7,6 +7,7 @@ use AuthGroups\Models\Plan;
 use AuthGroups\Services\EmailService;
 use AuthGroups\Services\AuthService;
 use AuthGroups\Utils\Response;
+use AuthGroups\Utils\RoleHelper;
 use AuthGroups\Utils\Validator;
 use AuthGroups\Utils\Database;
 use AuthGroups\Services\LogService;
@@ -240,27 +241,6 @@ class UserManagerController {
         try {
             LoggingMiddleware::logEntry();
             $input = Response::getRequestParams();
-            // Vérifier l'authentification
-            if ($currentUserRole !== 'ADMINISTRATEUR' && $userId !== $currentUserId) {
-                LogService::warning("Tentative de suppression non autorisée", [
-                    'current_user_id' => $currentUserId,
-                    'target_user_id' => $userId,
-                    'role' => $currentUserRole
-                ]);
-                LoggingMiddleware::logExit(403);
-                Response::error('Accès non autorisé', null, 403);
-                return false;
-            }
-            if($currentUserId!=$userId){
-                $validation=Validator::validate($input, [
-                    "force_delete" => 'optional|boolean'
-                ]);
-                if(!$validation['valid']) {
-                    LoggingMiddleware::logExit(400);
-                    Response::error('Validation échouée', $validation['errors'], 400);
-                    return false;
-                }
-            }
             $user = new User();
             $userData = $user->findById($userId);
             if (!$userData) {
@@ -274,6 +254,36 @@ class UserManagerController {
                 // (aucun second facteur système pour les comptes OTP, mot de passe aléatoire jamais connu de l'utilisateur)
                 $force_delete = false;
             } else {
+                // Matrice d'autorité de révocation (directive 20260716_113000) :
+                // - un SUPERADMINISTRATEUR ne peut être révoqué par personne via l'API ;
+                // - un ADMINISTRATEUR ne peut être révoqué que par un SUPERADMINISTRATEUR ;
+                // - un UTILISATEUR peut être révoqué par ADMINISTRATEUR ou plus.
+                $targetRole = $userData['role'];
+                $callerIsSuperadmin = $currentUserRole === 'SUPERADMINISTRATEUR';
+                $authorized = $targetRole === 'SUPERADMINISTRATEUR'
+                    ? false
+                    : ($targetRole === 'ADMINISTRATEUR' ? $callerIsSuperadmin : RoleHelper::isAtLeast($currentUserRole, 'ADMINISTRATEUR'));
+                if (!$authorized) {
+                    LogService::warning("Tentative de suppression non autorisée", [
+                        'current_user_id' => $currentUserId,
+                        'target_user_id' => $userId,
+                        'role' => $currentUserRole,
+                        'target_role' => $targetRole
+                    ]);
+                    LoggingMiddleware::logExit(403);
+                    Response::error('Accès non autorisé', null, 403);
+                    return false;
+                }
+
+                $validation = Validator::validate($input, [
+                    "force_delete" => 'optional|boolean'
+                ]);
+                if (!$validation['valid']) {
+                    LoggingMiddleware::logExit(400);
+                    Response::error('Validation échouée', $validation['errors'], 400);
+                    return false;
+                }
+
                 $force_delete = $input['force_delete']?? false; // Par défaut, on fait un soft delete
             }
             if( $user->delete($force_delete)){
@@ -311,7 +321,7 @@ class UserManagerController {
         try {
             LoggingMiddleware::logEntry();
             // Vérifier l'authentification
-            if ($currentUserRole !== 'ADMINISTRATEUR' ) {
+            if (!RoleHelper::isAtLeast($currentUserRole, 'ADMINISTRATEUR') ) {
                 LogService::warning("Tentative de suppression non autorisée", [
                     'current_user_id' => $currentUserId,
                     'target_user_id' => $userId,
@@ -369,15 +379,20 @@ class UserManagerController {
                 'phone' => 'nullable|string|max:20',
                 'date_of_birth' => 'nullable|date_format:Y-m-d',
                 'location' => 'nullable|string|max:100',
-            ]);     
+            ]);
             if (!$validation['valid']) {
                 LoggingMiddleware::logExit(400);
                 Response::error('Données de validation invalides', $validation['errors'], 400);
                 return false;
             }
+            if (array_key_exists('role', $input) && !Validator::validateUserRole($input['role'])) {
+                LoggingMiddleware::logExit(422);
+                Response::error('Données de validation invalides', ['role' => ['valeur non reconnue']], 422);
+                return false;
+            }
 
             // Vérifier l'authentification
-            if ( $currentUserRole !== 'ADMINISTRATEUR' && $userId !== $currentUserId) {
+            if ( !RoleHelper::isAtLeast($currentUserRole, 'ADMINISTRATEUR') && $userId !== $currentUserId) {
                 LogService::warning("Tentative de modification de profil par un non-admin", [
                     'current_user_id' => $currentUserId,
                     'target_user_id' => $userId,
@@ -396,10 +411,44 @@ class UserManagerController {
                 Response::error('Utilisateur non trouvé', null, 404);
                 return false;
             }
+            // Changement de rôle (matrice d'autorité — directive 20260716_113000)
+            if (array_key_exists('role', $input) && $input['role'] !== $userData['role']) {
+                $requestedRole = $input['role'];
+                if ($userData['role'] === 'SUPERADMINISTRATEUR' || $requestedRole === 'SUPERADMINISTRATEUR') {
+                    // Un superadmin ne peut être ni modifié, ni créé via l'API (DB-only).
+                    LogService::warning("Tentative de changement de rôle impliquant SUPERADMINISTRATEUR refusée", [
+                        'current_user_id' => $currentUserId,
+                        'target_user_id' => $userId,
+                        'target_current_role' => $userData['role'],
+                        'requested_role' => $requestedRole
+                    ]);
+                    LoggingMiddleware::logExit(403);
+                    Response::error('Accès non autorisé', null, 403);
+                    return false;
+                }
+                $callerIsSuperadmin = $currentUserRole === 'SUPERADMINISTRATEUR';
+                $isAdminPromotion = $userData['role'] === 'UTILISATEUR' && $requestedRole === 'ADMINISTRATEUR';
+                if (!$callerIsSuperadmin && !$isAdminPromotion) {
+                    LogService::warning("Tentative de changement de rôle non autorisée", [
+                        'current_user_id' => $currentUserId,
+                        'target_user_id' => $userId,
+                        'role' => $currentUserRole,
+                        'target_current_role' => $userData['role'],
+                        'requested_role' => $requestedRole
+                    ]);
+                    LoggingMiddleware::logExit(403);
+                    Response::error('Accès non autorisé', null, 403);
+                    return false;
+                }
+                $newRole = $requestedRole;
+            } else {
+                $newRole = $userData['role'];
+            }
+
             $user->id = $userId;
             $user->name = $input['name'] ?? $userData['name'];
             $user->email = $input['email'] ?? $userData['email'];
-            $user->role =  $userData['role'];
+            $user->role =  $newRole;
             $user->profile_image =  $userData['profile_image'];
             $user->bio = $input['bio'] ?? $userData['bio'];
             $user->phone = $input['phone'] ?? $userData['phone'];
@@ -447,15 +496,16 @@ class UserManagerController {
 
     /**
      * Poser/retirer l'assignation manuelle du plan cmem (users.cmem_plan_override)
-     * PUT /users/{id}/plan-override — ADMINISTRATEUR seul
+     * PUT /users/{id}/plan-override — SUPERADMINISTRATEUR seul (décision de facturation)
      * Directive 20260716_090000_cmem_web_vers_cmem2_API__admin-assignation-plan-ami
+     * Resserré depuis ADMINISTRATEUR par la directive 20260716_113000_cmem_web_vers_cmem2_API__role-superadministrateur
      */
     public function updatePlanOverride($userId, $currentUserId, $currentUserRole){
         try {
             LoggingMiddleware::logEntry();
 
-            if ($currentUserRole !== 'ADMINISTRATEUR') {
-                LogService::warning("Tentative d'assignation de plan override par un non-admin", [
+            if ($currentUserRole !== 'SUPERADMINISTRATEUR') {
+                LogService::warning("Tentative d'assignation de plan override par un non-superadmin", [
                     'current_user_id' => $currentUserId,
                     'target_user_id' => $userId,
                     'role' => $currentUserRole

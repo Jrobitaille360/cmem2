@@ -3,6 +3,7 @@
 namespace AuthGroups\Controllers;
 
 use AuthGroups\Utils\Response;
+use AuthGroups\Utils\RoleHelper;
 use AuthGroups\Services\LogService;
 use AuthGroups\Middleware\LoggingMiddleware;
 use AuthGroups\Models\File;
@@ -106,7 +107,7 @@ class FileController
             }
 
             if ($accessibility === 'grand-public'
-                && strtolower($role) !== 'administrateur'
+                && !RoleHelper::isAtLeast($role, 'ADMINISTRATEUR')
                 && $folderRaw !== 'kestyon'
             ) {
                 LoggingMiddleware::logExit(403);
@@ -250,7 +251,7 @@ class FileController
             }
         } else {
             // private
-            $isAdmin = strtolower($role ?? '') === 'administrateur';
+            $isAdmin = RoleHelper::isAtLeast($role ?? null, 'ADMINISTRATEUR');
             $isOwner = $userId && (int)$fileInfo['uploaded_by'] === (int)$userId;
             if (!$isOwner && !$isAdmin) {
                 Response::error('Accès non autorisé', null, 403);
@@ -324,7 +325,7 @@ class FileController
             }
         } else {
             // private
-            $isAdmin = strtolower($role ?? '') === 'administrateur';
+            $isAdmin = RoleHelper::isAtLeast($role ?? null, 'ADMINISTRATEUR');
             $isOwner = $userId && (int)$fileInfo['uploaded_by'] === (int)$userId;
             if (!$isOwner && !$isAdmin) {
                 Response::error('Accès non autorisé', null, 403);
@@ -351,7 +352,7 @@ class FileController
             return;
         }
 
-        $isAdmin = strtolower($role) === 'administrateur';
+        $isAdmin = RoleHelper::isAtLeast($role, 'ADMINISTRATEUR');
         $isOwner = (int)$fileInfo['uploaded_by'] === (int)$userId;
 
         if (!$isOwner && !$isAdmin) {
@@ -410,7 +411,7 @@ class FileController
 
             // 2. Vérifier les permissions (propriétaire ou admin)
             $isOwner = ((int)$fileInfo['uploaded_by'] === (int)$userId);
-            $isAdmin = (strtolower($role) === 'administrateur');
+            $isAdmin = RoleHelper::isAtLeast($role, 'ADMINISTRATEUR');
             if (!$isOwner && !$isAdmin) {
                 Response::error('Accès non autorisé pour supprimer ce fichier', null, 403);
                 return;
@@ -482,7 +483,7 @@ class FileController
 
             // 2. Vérifier les permissions (propriétaire ou admin)
             $isOwner = ((int)$fileInfo['uploaded_by'] === (int)$userId);
-            $isAdmin = (strtolower($role) === 'administrateur');
+            $isAdmin = RoleHelper::isAtLeast($role, 'ADMINISTRATEUR');
             if (!$isOwner && !$isAdmin) {
                 Response::error('Accès non autorisé pour restaurer ce fichier', null, 403);
                 return;
@@ -525,7 +526,7 @@ class FileController
         try
         {
             // Vérification des permissions
-            if ($targetUserId !== $requestingUserId && $role !== 'ADMINISTRATEUR')
+            if ($targetUserId !== $requestingUserId && !RoleHelper::isAtLeast($role, 'ADMINISTRATEUR'))
             {
                 Response::error('Accès non autorisé', null, 403);
                 return;
@@ -620,7 +621,7 @@ class FileController
      */
     public function listByFolder(int $userId, string $role): void
     {
-        if (strtolower($role) !== 'administrateur') {
+        if (!RoleHelper::isAtLeast($role, 'ADMINISTRATEUR')) {
             Response::error('Accès réservé aux administrateurs', null, 403);
             return;
         }
@@ -767,7 +768,7 @@ class FileController
                 return;
             }
         } else {
-            $isAdmin = strtolower($role ?? '') === 'administrateur';
+            $isAdmin = RoleHelper::isAtLeast($role ?? null, 'ADMINISTRATEUR');
             $isOwner = $userId && (int) $fileInfo['uploaded_by'] === (int) $userId;
             if (!$isOwner && !$isAdmin) {
                 Response::error('Accès non autorisé', null, 403);

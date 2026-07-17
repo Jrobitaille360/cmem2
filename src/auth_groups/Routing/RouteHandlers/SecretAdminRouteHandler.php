@@ -5,6 +5,7 @@ namespace AuthGroups\Routing\RouteHandlers;
 use AuthGroups\Routing\BaseRouteHandler;
 use AuthGroups\Controllers\SecretAdminController;
 use AuthGroups\Utils\Response;
+use AuthGroups\Utils\RoleHelper;
 
 /**
  * Gestionnaire de routes pour l'endpoint admin secret
@@ -40,7 +41,7 @@ class SecretAdminRouteHandler extends BaseRouteHandler
         $id = $id !== null ? (string)$id : null;
         
         // Vérification supplémentaire : l'utilisateur doit être ADMINISTRATEUR
-        if (!$user || $user['role'] !== 'ADMINISTRATEUR') {
+        if (!$user || !RoleHelper::isAtLeast($user['role'] ?? null, 'ADMINISTRATEUR')) {
             \AuthGroups\Services\LogService::warning('Tentative d\'accès admin secret sans privilèges admin', [
                 'user_id' => $user['user_id'] ?? null,
                 'role' => $user['role'] ?? 'inconnu',

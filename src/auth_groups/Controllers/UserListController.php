@@ -4,6 +4,7 @@ namespace AuthGroups\Controllers;
 
 use AuthGroups\Models\User;
 use AuthGroups\Utils\Response;
+use AuthGroups\Utils\RoleHelper;
 use AuthGroups\Utils\Validator;
 use AuthGroups\Services\LogService;
 use AuthGroups\Middleware\LoggingMiddleware;
@@ -22,7 +23,7 @@ class UserListController {
         try {
             LoggingMiddleware::logEntry();            
             // Vérifier les permissions admin
-            if ($currentUserRole !== 'ADMINISTRATEUR') {
+            if (!RoleHelper::isAtLeast($currentUserRole, 'ADMINISTRATEUR')) {
                 LogService::warning("Tentative d'accès non autorisé à la liste des utilisateurs", [
                     'role' => $currentUserRole
                 ]);
@@ -79,7 +80,7 @@ class UserListController {
         try {
             LoggingMiddleware::logEntry();          
             // Vérifier les permissions (admin ou utilisateur lui-même)
-            if ($currentUserRole !== 'ADMINISTRATEUR' && $currentUserId != $id) {
+            if (!RoleHelper::isAtLeast($currentUserRole, 'ADMINISTRATEUR') && $currentUserId != $id) {
                 LogService::warning("Tentative d'accès non autorisé aux données utilisateur", [
                     'requested_id' => $id,
                     'current_user_id' => $currentUserId,

@@ -5,6 +5,7 @@ namespace AuthGroups\Controllers;
 use AuthGroups\Models\Group;
 use AuthGroups\Models\User;
 use AuthGroups\Utils\Response;
+use AuthGroups\Utils\RoleHelper;
 use AuthGroups\Utils\Validator;
 use AuthGroups\Services\LogService;
 use AuthGroups\Services\AuthService;
@@ -112,7 +113,7 @@ class GroupManagerController
             }
 
             // Vérifier les permissions (propriétaire ou admin)
-            if (!$group->isGroupAdmin($id, $currentUserId) && $currentUserRole !== 'ADMINISTRATEUR') {
+            if (!$group->isGroupAdmin($id, $currentUserId) && !RoleHelper::isAtLeast($currentUserRole, 'ADMINISTRATEUR')) {
                 LogService::warning("Tentative de modification non autorisée", [
                     'group_id' => $id,
                     'current_user_id' => $currentUserId
@@ -187,7 +188,7 @@ class GroupManagerController
                 return false;
             }
             // Vérifier les permissions (propriétaire ou admin)
-            if (!$group->isGroupAdmin($id, $currentUserId) && $currentUserRole !== 'ADMINISTRATEUR') {
+            if (!$group->isGroupAdmin($id, $currentUserId) && !RoleHelper::isAtLeast($currentUserRole, 'ADMINISTRATEUR')) {
                 LogService::warning("Tentative de suppression non autorisée", [
                     'group_id' => $id,
                     'current_user_id' => $currentUserId
@@ -265,7 +266,7 @@ class GroupManagerController
                 return false;
             }
             // Vérifier les permissions (propriétaire ou admin)
-            if (!$group->isGroupAdmin($id, $currentUserId) && $currentUserRole !== 'ADMINISTRATEUR') {
+            if (!$group->isGroupAdmin($id, $currentUserId) && !RoleHelper::isAtLeast($currentUserRole, 'ADMINISTRATEUR')) {
                 LogService::warning("Tentative de restauration non autorisée", [
                     'group_id' => $id,
                     'current_user_id' => $currentUserId

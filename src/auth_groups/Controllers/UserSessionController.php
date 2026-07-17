@@ -5,6 +5,7 @@ namespace AuthGroups\Controllers;
 use AuthGroups\Services\UserSessionService;
 use AuthGroups\Services\LogService;
 use AuthGroups\Utils\Response;
+use AuthGroups\Utils\RoleHelper;
 use AuthGroups\Middleware\LoggingMiddleware;
 use Exception;
 
@@ -23,7 +24,7 @@ class UserSessionController {
             LoggingMiddleware::logEntry();
             
             // Vérifier les permissions
-            if ($currentUserRole !== 'ADMINISTRATEUR' && $userId != $currentUserId) {
+            if (!RoleHelper::isAtLeast($currentUserRole, 'ADMINISTRATEUR') && $userId != $currentUserId) {
                 LogService::warning("Accès refusé pour consultation des sessions", [
                     'requested_user_id' => $userId,
                     'current_user_id' => $currentUserId,
@@ -69,7 +70,7 @@ class UserSessionController {
             LoggingMiddleware::logEntry();
             
             // Vérifier les permissions
-            if ($currentUserRole !== 'ADMINISTRATEUR' && $userId != $currentUserId) {
+            if (!RoleHelper::isAtLeast($currentUserRole, 'ADMINISTRATEUR') && $userId != $currentUserId) {
                 LogService::warning("Accès refusé pour terminer les sessions", [
                     'requested_user_id' => $userId,
                     'current_user_id' => $currentUserId,
@@ -117,7 +118,7 @@ class UserSessionController {
             LoggingMiddleware::logEntry();
             
             // Seuls les admins peuvent voir ces stats
-            if ($currentUserRole !== 'ADMINISTRATEUR') {
+            if (!RoleHelper::isAtLeast($currentUserRole, 'ADMINISTRATEUR')) {
                 LogService::warning("Accès refusé pour les statistiques en ligne", [
                     'current_user_id' => $currentUserId,
                     'current_role' => $currentUserRole
@@ -157,7 +158,7 @@ class UserSessionController {
             LoggingMiddleware::logEntry();
             
             // Seuls les admins peuvent faire le nettoyage
-            if ($currentUserRole !== 'ADMINISTRATEUR') {
+            if (!RoleHelper::isAtLeast($currentUserRole, 'ADMINISTRATEUR')) {
                 LogService::warning("Accès refusé pour le nettoyage des sessions", [
                     'current_user_id' => $currentUserId,
                     'current_role' => $currentUserRole
@@ -202,7 +203,7 @@ class UserSessionController {
             LoggingMiddleware::logEntry();
             
             // Vérifier les permissions
-            if ($currentUserRole !== 'ADMINISTRATEUR' && $userId != $currentUserId) {
+            if (!RoleHelper::isAtLeast($currentUserRole, 'ADMINISTRATEUR') && $userId != $currentUserId) {
                 LogService::warning("Accès refusé pour vérification de session", [
                     'requested_user_id' => $userId,
                     'current_user_id' => $currentUserId,

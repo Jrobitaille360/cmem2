@@ -5,6 +5,7 @@ namespace AuthGroups\Controllers;
 use AuthGroups\Models\Group;
 use AuthGroups\Models\User;
 use AuthGroups\Utils\Response;
+use AuthGroups\Utils\RoleHelper;
 use AuthGroups\Utils\Validator;
 use AuthGroups\Services\LogService;
 use AuthGroups\Services\AuthService;
@@ -33,7 +34,7 @@ class GroupInvitationController
 
             $group = new Group();
             // Vérifier que l'utilisateur a les permissions pour inviter
-            if($currentUserRole !== 'ADMINISTRATEUR'){
+            if(!RoleHelper::isAtLeast($currentUserRole, 'ADMINISTRATEUR')){
                 $userRole = $group->getMemberRole($groupId, $currentUserId);
                 if ((!$userRole || ($userRole !== 'admin' && $userRole !== 'moderator'))) {
                     Response::error('Permissions insuffisantes pour inviter des utilisateurs', null, 403);

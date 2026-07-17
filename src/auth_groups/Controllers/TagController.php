@@ -4,6 +4,7 @@ namespace AuthGroups\Controllers;
 
 use AuthGroups\Models\Tag;
 use AuthGroups\Utils\Response;
+use AuthGroups\Utils\RoleHelper;
 use AuthGroups\Utils\Validator;
 use AuthGroups\Utils\ColorName;
 use AuthGroups\Services\LogService;
@@ -28,7 +29,7 @@ class TagController {
             LoggingMiddleware::logEntry();
             
             // Vérifier les permissions (admin ou utilisateur lui-même)
-            if ($currentUserRole !== 'ADMINISTRATEUR' && $currentUserId != $userId) {
+            if (!RoleHelper::isAtLeast($currentUserRole, 'ADMINISTRATEUR') && $currentUserId != $userId) {
                 LogService::warning("Tentative d'accès non autorisé aux tags", [
                     'requested_user_id' => $userId,
                     'current_user_id' => $currentUserId,
@@ -79,7 +80,7 @@ class TagController {
             $tag = new Tag();
             
             // Seuls les tags de l'utilisateur actuel (sauf admin qui peut voir tous)
-            $tagOwner = ($currentUserRole === 'ADMINISTRATEUR') ? null : $currentUserId;
+            $tagOwner = RoleHelper::isAtLeast($currentUserRole, 'ADMINISTRATEUR') ? null : $currentUserId;
             $tags = $tag->findByTable($tableAssociate, $tagOwner, $pagination['page'], $pagination['limit']);
             
             LogService::info("Tags récupérés par table", [
@@ -128,7 +129,7 @@ class TagController {
             $tag = new Tag();
             
             // Seuls les tags de l'utilisateur actuel (sauf admin)
-            $tagOwner = ($currentUserRole === 'ADMINISTRATEUR') ? null : $currentUserId;
+            $tagOwner = RoleHelper::isAtLeast($currentUserRole, 'ADMINISTRATEUR') ? null : $currentUserId;
             $tags = $tag->search($searchTerm, $tableAssociate, $tagOwner, $pagination['page'], $pagination['limit']);
             
             LogService::info("Recherche de tags effectuée", [
@@ -175,7 +176,7 @@ class TagController {
             }
             
             // Vérifier les permissions
-            if (!$tag->canView($currentUserId) && $currentUserRole !== 'ADMINISTRATEUR') {
+            if (!$tag->canView($currentUserId) && !RoleHelper::isAtLeast($currentUserRole, 'ADMINISTRATEUR')) {
                 LogService::warning("Tentative d'accès non autorisé au tag", [
                     'tag_id' => $id,
                     'user_id' => $currentUserId,
@@ -309,7 +310,7 @@ class TagController {
             }
             
             // Vérifier les permissions
-            if (!$tag->canEdit($currentUserId) && $currentUserRole !== 'ADMINISTRATEUR') {
+            if (!$tag->canEdit($currentUserId) && !RoleHelper::isAtLeast($currentUserRole, 'ADMINISTRATEUR')) {
                 LogService::warning("Tentative de modification non autorisée", [
                     'tag_id' => $id,
                     'user_id' => $currentUserId,
@@ -404,7 +405,7 @@ class TagController {
             }
             
             // Vérifier les permissions
-            if (!$tag->canEdit($currentUserId) && $currentUserRole !== 'ADMINISTRATEUR') {
+            if (!$tag->canEdit($currentUserId) && !RoleHelper::isAtLeast($currentUserRole, 'ADMINISTRATEUR')) {
                 LogService::warning("Tentative de suppression non autorisée", [
                     'tag_id' => $id,
                     'user_id' => $currentUserId,
@@ -479,7 +480,7 @@ class TagController {
             $tag = new Tag();
             
             // Seuls les tags de l'utilisateur actuel (sauf admin)
-            $tagOwner = ($currentUserRole === 'ADMINISTRATEUR') ? null : $currentUserId;
+            $tagOwner = RoleHelper::isAtLeast($currentUserRole, 'ADMINISTRATEUR') ? null : $currentUserId;
             $tags = $tag->getMostUsed($tableAssociate, $tagOwner, $limit);
             
             LogService::info("Tags les plus utilisés récupérés", [
@@ -599,7 +600,7 @@ class TagController {
             }
             
             // Vérifier les permissions
-            if ($tagData['tag_owner'] != $currentUserId && $currentUserRole !== 'ADMINISTRATEUR') {
+            if ($tagData['tag_owner'] != $currentUserId && !RoleHelper::isAtLeast($currentUserRole, 'ADMINISTRATEUR')) {
                 LogService::warning("Tentative de restauration non autorisée", [
                     'tag_id' => $id,
                     'user_id' => $currentUserId,
@@ -674,7 +675,7 @@ class TagController {
             }
             
             // Vérifier les permissions sur le tag
-            if (!$tag->canEdit($currentUserId) && $currentUserRole !== 'ADMINISTRATEUR') {
+            if (!$tag->canEdit($currentUserId) && !RoleHelper::isAtLeast($currentUserRole, 'ADMINISTRATEUR')) {
                 LogService::warning("Tentative d'association de tag non autorisée", [
                     'tag_id' => $tagId,
                     'item_id' => $itemId,

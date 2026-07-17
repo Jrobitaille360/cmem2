@@ -7,6 +7,20 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-07-16 15:45]
+
+### Feat — Rôle `SUPERADMINISTRATEUR`, matrice d'autorité admin/superadmin (directive `20260716_113000_cmem_web_vers_cmem2_API`)
+
+- **`RoleHelper::isAtLeast()`** (`src/auth_groups/Utils/RoleHelper.php`, nouveau) — point de vérité unique pour la hiérarchie `UTILISATEUR(10) < ADMINISTRATEUR(20) < SUPERADMINISTRATEUR(30)` (valeurs espacées pour insertion future d'un rôle intermédiaire). Remplace les 25 vérifications `role === 'ADMINISTRATEUR'` dupliquées dans `auth_groups`, `items`, `puzzle` — toute route déjà gardée par `ADMINISTRATEUR` reste accessible à `SUPERADMINISTRATEUR` sans changement de logique
+- **`PUT /users/{id}`** — accepte désormais `role` dans le body (auparavant ignoré). Matrice : `ADMINISTRATEUR` peut seulement promouvoir `UTILISATEUR → ADMINISTRATEUR`, jamais toucher un pair `ADMINISTRATEUR`/`SUPERADMINISTRATEUR` ; `SUPERADMINISTRATEUR` peut toute transition `UTILISATEUR ↔ ADMINISTRATEUR` ; personne ne peut attribuer `SUPERADMINISTRATEUR` via l'API (posé manuellement en DB uniquement)
+- **`DELETE /users/{id}`** — `ADMINISTRATEUR` révoque un `UTILISATEUR` seulement ; `SUPERADMINISTRATEUR` révoque `UTILISATEUR` ou `ADMINISTRATEUR` ; personne ne révoque un `SUPERADMINISTRATEUR` via l'API
+- **`PUT /users/{id}/plan-override`** resserré de `ADMINISTRATEUR` à `SUPERADMINISTRATEUR` seul (décision de facturation, pas de modération courante) — durcit la directive `20260716_090000`
+- **Risque cross-app tranché** : toutes les vérifications de rôle `ADMINISTRATEUR` trouvées vivent dans ce repo (`auth_groups`, `items`, `puzzle`) — pas de repo externe consommant ce rôle, donc pas de directive retour nécessaire
+- **STOP migration DB non exécutée** — `docs/20260716_add_superadmin_role.sql` (pendante) ajoute `SUPERADMINISTRATEUR` à l'enum `users.role` ; à exécuter (dev puis prod) après confirmation explicite, puis assigner manuellement au moins un compte de test
+- Tests : `test_users.php` section 9C (matrice complète promotion/rétrogradation/révocation) + section 9B réécrite pour `plan-override`. Les cas nécessitant un compte `SUPERADMINISTRATEUR` (`CMEM2_TEST_SUPERADMIN_EMAIL`/`PASSWORD`) sont `SKIP` tant que la migration + le compte de test ne sont pas posés
+
+---
+
 ## [Unreleased 2026-07-16 10:39]
 
 ### Feat — Endpoint admin assignation manuelle du plan Ami (`cmem_plan_override`) (phase 7b, directive `20260716_090000_cmem_web_vers_cmem2_API`)
