@@ -33,6 +33,7 @@ class StripeService
             'mode'                 => 'subscription',
             'payment_method_types' => ['card'],
             'line_items'           => [['price' => $priceId, 'quantity' => 1]],
+            'metadata'             => ['user_id' => (string) $userId, 'app_id' => $appId],
             'subscription_data'    => [
                 'trial_period_days' => 7,
                 'metadata'          => ['user_id' => (string) $userId, 'app_id' => $appId],

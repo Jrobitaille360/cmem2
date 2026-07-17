@@ -7,6 +7,16 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-07-17 12:30]
+
+### Fix — Checkout Stripe : `stripe_subscriptions` jamais créée après paiement réussi (directive `20260717_122030_cmem_web_vers_cmem2_API`)
+
+- **`StripeService::createCheckoutSession()`** (`src/stripe/Services/StripeService.php`) — la session Stripe créée n'avait de `metadata` (`user_id`, `app_id`) que sous `subscription_data.metadata` (copiée sur l'objet subscription), jamais au niveau racine de la session. `handleCheckoutCompleted()` lit `$session['metadata']['app_id']`, trouvait `null`, journalisait une erreur et retournait sans écrire en base — aucune exception levée, donc l'événement webhook restait marqué "processed" côté Stripe malgré l'échec silencieux
+- Ajout de `metadata` au niveau racine des paramètres de session (`'metadata' => ['user_id' => ..., 'app_id' => ...]`), en plus de `subscription_data.metadata` déjà utilisé par `handleSubscriptionUpdated()`
+- Tests : `test_stripe_v2.php` 42/42 (pas de régression — le test ne couvrait pas la lecture de `metadata` côté webhook)
+
+---
+
 ## [Unreleased 2026-07-16 16:20]
 
 ### Feat — `GET /users?include_deleted=1` — retrouver les comptes soft-deleted (directive `20260716_150000_cmem_web_vers_cmem2_API`)
