@@ -7,6 +7,15 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-07-18 17:55]
+
+### Docs — lecture d'avatar clarifiée (GUIDE + API_ENDPOINTS.json)
+
+- Aucune route `GET` avatar n'existe : `POST /users/avatar` retourne `avatar_url` (`/uploads/avatars/<fichier>`) et le profil expose `profile_image` — fichier statique servi directement par Apache (`.htaccess` route vers `index.php` seulement si le fichier n'existe pas), sans JWT
+- Note ajoutée dans `docs/core/GUIDE.md` (section Utilisateurs) et `docs/core/API_ENDPOINTS.json` (route `POST /users/avatar`)
+
+---
+
 ## [Unreleased 2026-07-18 17:45]
 
 ### Docs — `docs/core/GUIDE.md` réaligné sur le code (audit vs `API_ENDPOINTS.json`)

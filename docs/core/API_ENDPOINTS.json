@@ -574,7 +574,8 @@
           "path": "/users/avatar",
           "description": "Uploader son avatar",
           "body": "multipart/form-data avec fichier image (JPEG/PNG/WebP, max 2 MB)",
-          "response": "URL de l'avatar"
+          "response": "{ avatar_url: '/uploads/avatars/<fichier>' }",
+          "notes": "Pas de route GET pour l'avatar : avatar_url (et users.profile_image dans le profil) pointe vers un fichier statique servi directement par le serveur web, sans JWT — charger {base_url}/uploads/avatars/... tel quel"
         },
         {
           "method": "POST",

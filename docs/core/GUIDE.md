@@ -258,6 +258,14 @@ Réponse `200` :
 
 Un email de vérification est envoyé. La connexion est bloquée (403) tant que l'email n'est pas vérifié.
 
+### Lecture de l'avatar (pas d'endpoint GET)
+
+Il n'existe pas de route `GET /users/avatar`. L'upload (`POST /users/avatar`) retourne
+`avatar_url` (ex. `/uploads/avatars/avatar_42_xxx.png`) et le profil (`GET /users/me`,
+`GET /users/{id}`) expose `profile_image`. Ce chemin est un **fichier statique** servi
+directement par le serveur web, sans JWT — le client le charge tel quel
+(`{base_url}/uploads/avatars/...`).
+
 ### Rôles utilisateur
 
 | Rôle | Accès |
