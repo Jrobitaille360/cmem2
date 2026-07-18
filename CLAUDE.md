@@ -20,6 +20,7 @@ php private/tests/test_access.php
 php private/tests/test_auth_otp.php
 php private/tests/test_calendars.php
 php private/tests/test_cors_e2e_account.php
+php private/tests/test_entrypoints.php
 php private/tests/test_files.php
 php private/tests/test_files_accessibility.php
 php private/tests/test_groups.php

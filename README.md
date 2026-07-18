@@ -355,6 +355,8 @@ Voir [docs/items/GUIDE.md](docs/items/GUIDE.md) pour la référence complète.
 | --- | --- | --- |
 | GET | `/` | Informations API |
 | GET | `/health` | Statut de l'API |
+| GET | `/entrypoints` | Liste des modules avec documentation JSON des endpoints |
+| GET | `/entrypoints/{module}` | Contenu JSON des endpoints du module |
 
 ## Documentation
 
@@ -429,4 +431,4 @@ MIT — voir [LICENSE](LICENSE). Dépendances tierces : [THIRD_PARTY_LICENSES.md
 
 ---
 
-**Version** : 2.8.0 · **Mis à jour** : 2026-07-15 · **Auteur** : [Jrobitaille360](https://github.com/Jrobitaille360)
+**Version** : 2.8.0 · **Mis à jour** : 2026-07-18 · **Auteur** : [Jrobitaille360](https://github.com/Jrobitaille360)

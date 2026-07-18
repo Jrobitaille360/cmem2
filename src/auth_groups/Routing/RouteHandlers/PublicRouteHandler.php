@@ -56,7 +56,7 @@ class PublicRouteHandler extends BaseRouteHandler
     }
     
     protected function getSupportedControllers(): array {
-        return ['help', 'health', 'users', 'groups', 'secret-admin', 'test'];
+        return ['help', 'health', 'users', 'groups', 'secret-admin', 'test', 'entrypoints'];
     }
     
     protected function handleRoute(array $request) {
@@ -84,9 +84,17 @@ class PublicRouteHandler extends BaseRouteHandler
             ($controller === 'help' && $action === '' && $method === 'GET') => 
                 $this->showHelpInfo(),
                 
-            ($controller === 'health' && $action === '' && $method === 'GET') => 
-                $this->showHealthInfo(),                
-                   
+            ($controller === 'health' && $action === '' && $method === 'GET') =>
+                $this->showHealthInfo(),
+
+            // Entrypoints publics (JSON des endpoints par module)
+            ($controller === 'entrypoints' && $action === '' && $method === 'GET') =>
+                $this->listEntrypoints(),
+
+            ($controller === 'entrypoints' && $action !== '' && $method === 'GET') =>
+                $this->showEntrypoint($action),
+
+
             // Routes publiques des groupes
             ($controller === 'groups' && $action === '' && $method === 'GET') => 
                 $this->controllers['groups']->getPublicGroups(),
@@ -120,6 +128,47 @@ class PublicRouteHandler extends BaseRouteHandler
         return $res;
     }
     
+    /**
+     * Carte module → fichiers d'entrypoints publics (docs/<module>/API_*ENDPOINTS*.json)
+     */
+    private function entrypointFiles(): array {
+        $docsDir = dirname(__DIR__, 4) . '/docs';
+        $map = [];
+        foreach (glob($docsDir . '/*/API_*ENDPOINTS*.json') ?: [] as $path) {
+            $module = basename(dirname($path));
+            $map[$module][] = $path;
+        }
+        ksort($map);
+        return $map;
+    }
+
+    private function listEntrypoints(): void {
+        $modules = [];
+        foreach ($this->entrypointFiles() as $module => $paths) {
+            $modules[] = [
+                'module' => $module,
+                'files'  => array_map('basename', $paths),
+                'url'    => "/entrypoints/{$module}"
+            ];
+        }
+        Response::success('entrypoints', ['modules' => $modules]);
+    }
+
+    private function showEntrypoint(string $module): void {
+        $map = $this->entrypointFiles();
+        if (!preg_match('/^[a-z0-9_-]+$/', $module) || !isset($map[$module])) {
+            Response::error('Module non trouvé', null, 404);
+            return;
+        }
+
+        $files = [];
+        foreach ($map[$module] as $path) {
+            $content = json_decode(file_get_contents($path), true);
+            $files[basename($path)] = $content ?? [];
+        }
+        Response::success('entrypoints', ['module' => $module, 'files' => $files]);
+    }
+
     private function showWelcomeInfo(): void {
         $info = [
             'api' => [
@@ -165,6 +214,8 @@ class PublicRouteHandler extends BaseRouteHandler
                     'GET / - Informations générales sur l\'API',
                     'GET /help - Aide et liste complète des endpoints',
                     'GET /health - Statut de santé de l\'API',
+                    'GET /entrypoints - Liste des modules avec documentation JSON des endpoints',
+                    'GET /entrypoints/{module} - Contenu JSON des endpoints du module',
                     'GET /plans - Liste des plans d\'abonnement disponibles',
                     'POST /users/register - Inscription d\'un nouvel utilisateur',
                     'POST /auth/login - Connexion email + password → JWT (15 jours)',

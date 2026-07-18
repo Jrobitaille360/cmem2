@@ -284,6 +284,23 @@
           "response": "{ status, services: { database, file_storage, logging, plugins }, environment }"
         },
         {
+          "method": "GET",
+          "path": "/entrypoints",
+          "description": "Liste des modules dont la documentation d'endpoints (JSON) est disponible publiquement",
+          "auth_required": false,
+          "response": "{ modules: [ { module: string, files: [string], url: '/entrypoints/{module}' } ] }"
+        },
+        {
+          "method": "GET",
+          "path": "/entrypoints/{module}",
+          "description": "Contenu JSON des entrypoints du module (ex. core, stripe, ics, items, puzzle…)",
+          "auth_required": false,
+          "response": "{ module: string, files: { 'API_*_ENDPOINTS.json': { …contenu décodé… } } }",
+          "errors": {
+            "404": "Module non trouvé"
+          }
+        },
+        {
           "method": "POST",
           "path": "/users/register",
           "description": "Inscription d'un nouvel utilisateur",

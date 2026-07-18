@@ -7,6 +7,19 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-07-18 17:20]
+
+### Feat — `GET /entrypoints` et `GET /entrypoints/{module}` — documentation d'endpoints publique
+
+- **`GET /entrypoints`** (public, sans auth) — liste les modules dont un fichier `docs/<module>/API_*ENDPOINTS*.json` existe (`access`, `core`, `ics`, `items`, `playstore`, `pomo`, `puzzle`, `quiz`, `stripe`, `traque`, `webdevice`) avec noms de fichiers et URL de détail
+- **`GET /entrypoints/{module}`** (public, sans auth) — retourne le contenu JSON décodé des fichiers d'entrypoints du module ; module inconnu ou slug invalide → 404. `secret-admin` jamais exposé (aucun JSON d'entrypoints, whitelist par scan du disque)
+- `PublicRouteHandler` — nouvelles méthodes `entrypointFiles()`, `listEntrypoints()`, `showEntrypoint()` ; `/help` mentionne les deux routes
+- **`private/deploy.ps1`** — nouvelle étape de transfert : seuls les `API_*ENDPOINTS*.json` de `docs/<module>/` sont copiés vers `docs/` distant (staging temporaire — plans, SQL et guides restent hors serveur)
+- Tests : nouveau `private/tests/test_entrypoints.php` — 21/21 (liste, contenu, 404, traversal, casse, méthodes non supportées) ; régression `test_public.php` 34/34
+- Doc : `docs/core/API_ENDPOINTS.json` mis à jour (section `public`)
+
+---
+
 ## [Unreleased 2026-07-17 12:30]
 
 ### Fix — Checkout Stripe : `stripe_subscriptions` jamais créée après paiement réussi (directive `20260717_122030_cmem_web_vers_cmem2_API`)

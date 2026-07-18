@@ -416,6 +416,8 @@ Tags avec couleurs (nom ou `#RRGGBB`), associables à groupes et fichiers.
 | --- | --- | --- |
 | GET | `/` | Infos API |
 | GET | `/health` | Statut (DB, fichiers, plugins) |
+| GET | `/entrypoints` | Liste des modules avec documentation JSON des endpoints |
+| GET | `/entrypoints/{module}` | Contenu JSON des endpoints du module (404 si inconnu) |
 
 ---
 
