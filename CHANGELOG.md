@@ -7,6 +7,17 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-07-18 17:45]
+
+### Docs — `docs/core/GUIDE.md` réaligné sur le code (audit vs `API_ENDPOINTS.json`)
+
+- `PUT /users/{id}/plan-override` : rôle corrigé `ADMINISTRATEUR` → `SUPERADMINISTRATEUR` (resserré le 2026-07-16, GUIDE oublié)
+- Table des rôles : retrait de `MODERATEUR` (inexistant dans le code), ajout de `SUPERADMINISTRATEUR`, hiérarchie et matrice d'autorité (promotion/révocation)
+- Table Utilisateurs complétée : `GET /users` (+`include_deleted`), `PUT`/`DELETE /users/{id}`, `restore`, `{id}/sessions`, `session-status`, `password`, `{id}/avatar`, `{id}/password`, `choose-plan`, `app*`, `notification-preferences`
+- `API_ENDPOINTS.json` vérifié à jour (93 routes = handlers core) — aucun changement requis
+
+---
+
 ## [Unreleased 2026-07-18 17:20]
 
 ### Feat — `GET /entrypoints` et `GET /entrypoints/{module}` — documentation d'endpoints publique

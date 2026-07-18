@@ -222,8 +222,29 @@ Réponse `200` :
 | PUT | `/users/me` | JWT | Modifier profil |
 | DELETE | `/users/me` | JWT | Supprimer compte |
 | POST | `/users/avatar` | JWT | Upload avatar (multipart) |
+| PUT | `/users/password` | JWT | Changer son mot de passe (`old_password` + `new_password`) |
+| GET | `/users` | JWT (ADMIN+) | Liste des utilisateurs (`?email=`, `?include_deleted=1` pour inclure les comptes soft-deleted) |
 | GET | `/users/{id}` | JWT | Profil d'un utilisateur |
-| PUT | `/users/{id}/plan-override` | JWT (ADMINISTRATEUR) | Poser/retirer l'assignation manuelle du plan cmem (`cmem_plan_override`, ex. `'ami'`, ou `null` pour retirer) |
+| PUT | `/users/{id}` | JWT (ADMIN+) | Modifier un utilisateur ; accepte `role` selon la matrice d'autorité (voir Rôles) |
+| DELETE | `/users/{id}` | JWT (ADMIN+) | Supprimer (soft) selon la matrice d'autorité |
+| POST | `/users/{id}/restore` | JWT (ADMIN+) | Restaurer un compte soft-deleted |
+| POST | `/users/{id}/avatar` | JWT (ADMIN+) | Upload avatar d'un utilisateur |
+| PUT | `/users/{id}/password` | JWT (ADMIN+) | Changer le mot de passe d'un utilisateur |
+| GET | `/users/{id}/sessions` | JWT (ADMIN+ ou soi-même) | Sessions actives d'un utilisateur |
+| DELETE | `/users/{id}/sessions` | JWT (ADMIN+ ou soi-même) | Terminer toutes les sessions |
+| GET | `/users/{id}/session-status` | JWT (ADMIN+ ou soi-même) | Présence d'une session active |
+| PUT | `/users/{id}/plan-override` | JWT (SUPERADMINISTRATEUR) | Poser/retirer l'assignation manuelle du plan cmem (`cmem_plan_override`, ex. `'ami'`, ou `null` pour retirer) |
+| GET | `/users/choose-plan` | JWT | Plans disponibles pour l'utilisateur |
+| POST | `/users/choose-plan` | JWT | Choisir un plan |
+| POST | `/users/app` | JWT | Créer une configuration d'application (`app_id` + `json_data`) |
+| GET | `/users/app` | JWT | Lister ses configurations d'applications |
+| GET | `/users/app/{app_id}` | JWT | Lire une configuration |
+| PUT | `/users/app/{app_id}` | JWT | Modifier une configuration |
+| DELETE | `/users/app/{app_id}` | JWT | Supprimer une configuration |
+| GET | `/users/me/notification-preferences` | JWT | Lire ses préférences de notification |
+| PUT | `/users/me/notification-preferences` | JWT | Modifier ses préférences de notification |
+
+`ADMIN+` = `ADMINISTRATEUR` ou `SUPERADMINISTRATEUR`.
 
 ### POST /users/register
 
@@ -242,8 +263,16 @@ Un email de vérification est envoyé. La connexion est bloquée (403) tant que 
 | Rôle | Accès |
 | --- | --- |
 | `UTILISATEUR` | Accès standard |
-| `MODERATEUR` | Modération contenu |
-| `ADMINISTRATEUR` | Administration complète |
+| `ADMINISTRATEUR` | Administration : gestion utilisateurs et contenu |
+| `SUPERADMINISTRATEUR` | Autorité maximale ; jamais attribué via l'API (DB seulement) |
+
+Hiérarchie : `UTILISATEUR < ADMINISTRATEUR < SUPERADMINISTRATEUR`.
+
+Matrice d'autorité (`PUT /users/{id}` champ `role`, `DELETE /users/{id}`) :
+
+- `ADMINISTRATEUR` : peut seulement promouvoir `UTILISATEUR → ADMINISTRATEUR` ; ne touche jamais un pair `ADMINISTRATEUR`/`SUPERADMINISTRATEUR` ; révoque un `UTILISATEUR` seulement.
+- `SUPERADMINISTRATEUR` : toute transition `UTILISATEUR ↔ ADMINISTRATEUR` ; révoque `UTILISATEUR` ou `ADMINISTRATEUR`.
+- Personne ne peut attribuer ni révoquer `SUPERADMINISTRATEUR` via l'API.
 
 ---
 
