@@ -125,32 +125,43 @@
         {
           "method": "POST",
           "path": "/calendars/{id}/share",
-          "description": "Partager un calendrier avec un token public",
+          "description": "Partager un calendrier avec un utilisateur (user_id ou email) ou un groupe (group_id). Un seul des trois requis. Nécessite d'être propriétaire ou d'avoir un accès en écriture.",
           "params": {
             "id": "integer (required) - ID du calendrier"
           },
           "body": {
-            "email": "string (optional) - Email du destinataire",
-            "message": "string (optional) - Message personnalisé"
+            "user_id": "integer (optional) - ID de l'utilisateur cible",
+            "email": "string (optional) - Email de l'utilisateur cible",
+            "group_id": "integer (optional) - ID du groupe cible (tous les membres héritent de la permission)",
+            "permission": "string (optional) - 'read' (défaut) ou 'write'"
           },
-          "response": "Token de partage généré"
+          "response": "{ share: { id, calendar_id, shared_with_user_id, shared_with_email, shared_with_group_id, permission } }",
+          "errors": {
+            "400": "Aucun ou plusieurs de user_id/email/group_id fournis, ou groupe/utilisateur introuvable",
+            "403": "Permission insuffisante pour partager ce calendrier"
+          }
         },
         {
           "method": "GET",
           "path": "/calendars/{id}/share",
-          "description": "Récupérer les partages d'un calendrier",
+          "description": "Récupérer les partages d'un calendrier (utilisateur/email ou groupe)",
           "params": {
             "id": "integer (required) - ID du calendrier"
           },
           "body": {},
-          "response": "Liste des partages du calendrier"
+          "response": "{ shares: [{ id, calendar_id, shared_with_user_id, shared_with_email, shared_with_group_id, group_name, permission }], count }"
         },
         {
           "method": "DELETE",
           "path": "/calendars/{id}/share",
-          "description": "Supprimer le partage d'un calendrier",
+          "description": "Supprimer un partage de calendrier par user_id, email ou group_id",
           "params": {
             "id": "integer (required) - ID du calendrier"
+          },
+          "body": {
+            "user_id": "integer (optional)",
+            "email": "string (optional)",
+            "group_id": "integer (optional) - retrait réservé au propriétaire du calendrier"
           },
           "response": "Confirmation de suppression du partage"
         },

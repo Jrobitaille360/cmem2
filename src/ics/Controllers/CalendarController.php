@@ -13,6 +13,7 @@ use AuthGroups\Middleware\LoggingMiddleware;
 use AuthGroups\Services\LogService;
 use AuthGroups\Services\EmailService;
 use AuthGroups\Models\User;
+use AuthGroups\Models\Group;
 use PharIo\Manifest\Email;
 use Stripe\Services\EntitlementService;
 
@@ -350,14 +351,15 @@ class CalendarController
      */
     public function shareCalendar($calendarId, $userId): void
     {
-        LoggingMiddleware::logEntry();  
+        LoggingMiddleware::logEntry();
         $input = Response::getRequestParams();
         $validation = Validator::validate($input, [
             'user_id' => 'optional|integer',
             'email' => 'optional|email',
+            'group_id' => 'optional|integer',
             'permission' => 'optional|string|in:read,write'
         ]);
-        
+
         if(!$validation['valid']) {
             LogService::warning("Données de partage invalides", [
                 'errors' => $validation['errors']
@@ -367,16 +369,68 @@ class CalendarController
             return;
         }
 
-        // Vérifier qu'au moins user_id ou email est fourni
-        if (!isset($input['user_id']) && !isset($input['email'])) {
+        // Vérifier qu'au moins un et un seul de user_id / email / group_id est fourni
+        $targetsProvided = (int)isset($input['user_id']) + (int)isset($input['email']) + (int)isset($input['group_id']);
+        if ($targetsProvided === 0) {
             LoggingMiddleware::logExit(400);
-            Response::error('Vous devez fournir soit user_id soit email', null, 400);
+            Response::error('Vous devez fournir soit user_id, soit email, soit group_id', null, 400);
             return;
         }
-        
+        if ($targetsProvided > 1) {
+            LoggingMiddleware::logExit(400);
+            Response::error('Vous ne pouvez fournir qu\'un seul de user_id, email ou group_id', null, 400);
+            return;
+        }
+
         $cal = new Calendar();
         $calendar = $cal->getById($calendarId);
-        
+
+        // Partage avec un groupe
+        if (isset($input['group_id'])) {
+            if (!$calendar || !$cal->canUserWrite($calendarId, $userId)) {
+                LogService::warning("Tentative de partage d'un calendrier sans permission", [
+                    'calendar_id' => $calendarId,
+                    'user_id' => $userId
+                ]);
+                LoggingMiddleware::logExit(403);
+                Response::error('Permission insuffisante pour partager ce calendrier', null, 403);
+                return;
+            }
+
+            $groupModel = new Group();
+            $group = $groupModel->findById($input['group_id']);
+            if (!$group) {
+                LoggingMiddleware::logExit(400);
+                Response::error('Groupe spécifié introuvable', null, 400);
+                return;
+            }
+
+            $permission = $input['permission'] ?? 'read';
+
+            try {
+                $shareResult = $cal->shareWithGroup($calendarId, $input['group_id'], $permission);
+
+                LogService::info("Calendrier partagé avec groupe", [
+                    'calendar_id' => $calendarId,
+                    'shared_with_group_id' => $input['group_id'],
+                    'shared_by_user_id' => $userId,
+                    'permission' => $permission
+                ]);
+
+                LoggingMiddleware::logExit(200);
+                Response::success('Calendrier partagé avec succès', [
+                    'share' => $shareResult
+                ]);
+            } catch (\Exception $e) {
+                LogService::error("Erreur lors du partage du calendrier avec un groupe", [
+                    'exception' => $e->getMessage()
+                ]);
+                LoggingMiddleware::logExit(500);
+                Response::error('Erreur lors du partage du calendrier', null, 500);
+            }
+            return;
+        }
+
         // find user by userid or email
         $targetUser = null;
         if (isset($input['user_id'])) {
@@ -590,9 +644,10 @@ class CalendarController
         $input = Response::getRequestParams();
         $validation = Validator::validate($input, [
             'user_id' => 'optional|integer',
-            'email' => 'optional|email'
+            'email' => 'optional|email',
+            'group_id' => 'optional|integer'
         ]);
-        
+
         if(!$validation['valid']) {
             LogService::warning("Données de suppression de partage invalides", [
                 'errors' => $validation['errors']
@@ -602,25 +657,27 @@ class CalendarController
             return;
         }
 
-        // Vérifier qu'au moins user_id ou email est fourni
-        if (!isset($input['user_id']) && !isset($input['email'])) {
+        // Vérifier qu'au moins user_id, email ou group_id est fourni
+        if (!isset($input['user_id']) && !isset($input['email']) && !isset($input['group_id'])) {
             LoggingMiddleware::logExit(400);
-            Response::error('Vous devez fournir soit user_id soit email', null, 400);
+            Response::error('Vous devez fournir soit user_id, soit email, soit group_id', null, 400);
             return;
         }
 
         $targetUserId = $input['user_id'] ?? null;
         $targetEmail = $input['email'] ?? null;
-        
+        $targetGroupId = $input['group_id'] ?? null;
+
         $cal = new Calendar();
-        
+
         // Vérifier les permissions de suppression
-        if (!$cal->canUserRemoveShare($calendarId, $userId, $targetUserId, $targetEmail)) {
+        if (!$cal->canUserRemoveShare($calendarId, $userId, $targetUserId, $targetEmail, $targetGroupId)) {
             LogService::warning("Tentative de suppression de partage sans permission", [
                 'calendar_id' => $calendarId,
                 'current_user_id' => $userId,
                 'target_user_id' => $targetUserId,
-                'target_email' => $targetEmail
+                'target_email' => $targetEmail,
+                'target_group_id' => $targetGroupId
             ]);
             LoggingMiddleware::logExit(403);
             Response::error('Permission insuffisante pour supprimer ce partage', null, 403);
@@ -628,12 +685,13 @@ class CalendarController
         }
 
         // Vérifier que le partage existe
-        $existingShare = $cal->findCalendarShare($calendarId, $targetUserId, $targetEmail);
+        $existingShare = $cal->findCalendarShare($calendarId, $targetUserId, $targetEmail, $targetGroupId);
         if (!$existingShare) {
             LogService::warning("Tentative de suppression d'un partage inexistant", [
                 'calendar_id' => $calendarId,
                 'target_user_id' => $targetUserId,
-                'target_email' => $targetEmail
+                'target_email' => $targetEmail,
+                'target_group_id' => $targetGroupId
             ]);
             LoggingMiddleware::logExit(404);
             Response::error('Partage non trouvé', null, 404);
@@ -642,8 +700,8 @@ class CalendarController
 
         try {
             // Effectuer la suppression soft delete
-            $result = $cal->removeShare($calendarId, $targetUserId, $targetEmail);
-            
+            $result = $cal->removeShare($calendarId, $targetUserId, $targetEmail, $targetGroupId);
+
             if (!$result) {
                 throw new \Exception("Échec de la suppression du partage");
             }
@@ -653,7 +711,8 @@ class CalendarController
                 'calendar_id' => $calendarId,
                 'removed_by_user_id' => $userId,
                 'target_user_id' => $targetUserId,
-                'target_email' => $targetEmail
+                'target_email' => $targetEmail,
+                'target_group_id' => $targetGroupId
             ]);
 
             LoggingMiddleware::logExit(200);
@@ -662,6 +721,7 @@ class CalendarController
                 'calendar_id' => $calendarId,
                 'shared_with_user_id' => $existingShare['shared_with_user_id'],
                 'shared_with_email' => $existingShare['shared_with_email'],
+                'shared_with_group_id' => $existingShare['shared_with_group_id'] ?? null,
                 'deleted_at' => date('Y-m-d H:i:s')
             ]);
         } catch (\Exception $e) {

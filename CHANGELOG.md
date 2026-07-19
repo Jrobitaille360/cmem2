@@ -7,6 +7,21 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-07-18 20:40]
+
+### Ajout — partage de calendrier avec un groupe
+
+- Migration `calendar_shares.shared_with_group_id` (FK `groups(id) ON DELETE CASCADE`, nullable) — appliquée sur dev-cmem et prod (`docs/20260718_calendar_shares_group_id.sql`)
+- `POST /calendars/{id}/share` accepte `group_id` en plus de `user_id`/`email` (un seul des trois requis) — tous les membres du groupe héritent de la permission
+- `getUserPermissionForCalendar` et `getUserCalendars` élargis pour inclure les partages via appartenance à un groupe (lecture et écriture)
+- `GET /calendars/{id}/share` distingue partage utilisateur/email vs groupe (`shared_with_group_id` + `group_name`)
+- `DELETE /calendars/{id}/share` accepte `group_id` — retrait réservé au propriétaire du calendrier
+- Tests ajoutés dans `private/tests/test_calendars.php` (section 13bis) ; suite complète 1556/1556
+- Docs mises à jour : `docs/ics/API_ICS_ENDPOINTS.json`, `docs/ics/GUIDE.md`
+- Suite à la directive inter-projet `20260718_200825_cmem_web_vers_cmem2_API__partage-calendrier-groupe.md`
+
+---
+
 ## [Unreleased 2026-07-18 17:55]
 
 ### Docs — lecture d'avatar clarifiée (GUIDE + API_ENDPOINTS.json)

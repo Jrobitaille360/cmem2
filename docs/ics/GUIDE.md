@@ -76,9 +76,17 @@ GET  /calendars/12/ics                 → fichier .ics complet
 ### Partager un calendrier publiquement
 
 ```txt
-POST /calendars/12/share               → { token: "abc123..." }
-# Lien public :
-GET  /calendar/abc123....ics           → fichier .ics (sans auth)
+GET  /calendar/{share_token}.ics       → fichier .ics (sans auth, token généré à la création du calendrier)
+```
+
+### Partager un calendrier avec un utilisateur ou un groupe
+
+```txt
+POST /calendars/12/share               { user_id: 42, permission: "write" }
+POST /calendars/12/share               { email: "a@b.com", permission: "read" }
+POST /calendars/12/share               { group_id: 7, permission: "write" }  # tous les membres du groupe héritent de l'accès
+GET  /calendars/12/share               → { shares: [{ shared_with_group_id: 7, group_name: "Famille", permission: "write" }, ...] }
+DELETE /calendars/12/share             { group_id: 7 }                       # réservé au propriétaire du calendrier
 ```
 
 ### Import ICS — mise à jour
@@ -112,9 +120,9 @@ Auth   : Basic  (email + mot de passe) ou Bearer JWT
 | GET | `/calendars/{id}/ics` | Export ICS (authentifié) |
 | POST | `/calendars/{id}/ics/import` | Import ICS → upsert |
 | POST | `/calendars/import` | Créer depuis ICS (import initial) |
-| POST | `/calendars/{id}/share` | Générer token public |
-| GET | `/calendars/{id}/share` | Lister les partages |
-| DELETE | `/calendars/{id}/share` | Supprimer le partage |
+| POST | `/calendars/{id}/share` | Partager avec un utilisateur (`user_id`/`email`) ou un groupe (`group_id`) |
+| GET | `/calendars/{id}/share` | Lister les partages (utilisateur ou groupe) |
+| DELETE | `/calendars/{id}/share` | Supprimer un partage (`user_id`/`email`/`group_id`) |
 | GET | `/calendar/{token}.ics` | Téléchargement public |
 
 ### POST /calendars
