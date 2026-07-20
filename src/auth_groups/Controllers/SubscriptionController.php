@@ -37,7 +37,7 @@ class SubscriptionController
         if ($appId !== '') {
             $status = SubscriptionService::getStatus($userId, $appId);
 
-            if ($status['provider'] === 'google_play' && class_exists(\Puzzle\Services\GooglePlayService::class)) {
+            if ($status['provider'] === 'google_play' && $appId !== 'puzzle' && class_exists(\Puzzle\Services\GooglePlayService::class)) {
                 $active = (new Subscription())->findActive($userId, $appId);
                 if ($active && !empty($active['purchase_token'])) {
                     $status = $this->syncGooglePlayStatus($userId, $appId, $status, $active);
@@ -137,6 +137,12 @@ class SubscriptionController
         if (!in_array($provider, $allowed, true)) {
             LoggingMiddleware::logExit(400);
             Response::error('Provider invalide', ['provider' => 'Valeurs acceptées : ' . implode(', ', $allowed)], 400);
+            return;
+        }
+
+        if ($provider === 'google_play' && $input['app_id'] === 'puzzle') {
+            LoggingMiddleware::logExit(410);
+            Response::error('PROVIDER_DISABLED — puzzle ne supporte plus Google Play, utiliser Stripe', null, 410);
             return;
         }
 

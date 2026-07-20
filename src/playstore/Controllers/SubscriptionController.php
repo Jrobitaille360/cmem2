@@ -25,6 +25,12 @@ class SubscriptionController
             return;
         }
 
+        if ($appId === 'puzzle') {
+            LoggingMiddleware::logExit(410);
+            Response::error('PROVIDER_DISABLED — puzzle ne supporte plus Google Play, utiliser Stripe', null, 410);
+            return;
+        }
+
         try {
             $result = PlaystoreSubscriptionService::verify(
                 $device['device_uuid'],
@@ -54,6 +60,12 @@ class SubscriptionController
             return;
         }
 
+        if ($appId === 'puzzle') {
+            LoggingMiddleware::logExit(410);
+            Response::error('PROVIDER_DISABLED — puzzle ne supporte plus Google Play, utiliser Stripe', null, 410);
+            return;
+        }
+
         $result = PlaystoreSubscriptionService::getStatus($device['device_uuid'], $appId);
 
         LoggingMiddleware::logExit(200);
@@ -69,6 +81,12 @@ class SubscriptionController
         if (!$appId) {
             LoggingMiddleware::logExit(422);
             Response::error('app_id requis', null, 422);
+            return;
+        }
+
+        if ($appId === 'puzzle') {
+            LoggingMiddleware::logExit(410);
+            Response::error('PROVIDER_DISABLED — puzzle ne supporte plus Google Play, utiliser Stripe', null, 410);
             return;
         }
 

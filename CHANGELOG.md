@@ -9,6 +9,15 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+### Sécurité — désactivation Google Play/AdMob pour app_id=puzzle
+
+- `POST /v2/subscriptions/playstore/verify`, `GET /v2/subscriptions/playstore/status`, `DELETE /v2/subscriptions/playstore` → `410 PROVIDER_DISABLED` pour `app_id=puzzle` (Stripe désormais unique fournisseur)
+- `POST /subscription/verify` (legacy) refuse `provider=google_play` pour `app_id=puzzle` (410)
+- Sync Google Play désactivée dans `GET /subscription/status` pour `app_id=puzzle`
+- Aucun impact sur les autres apps (`cmem`, `kestyon`, `traque`) ni sur les endpoints Stripe
+- Suite complète 1555/1555
+- Suite à la directive inter-projet `20260719_195216_puzzle_vers_cmem2_API__fin-playstore-admob-stripe-seul.md`
+
 ---
 
 ## [2.9.0] — 2026-07-19
