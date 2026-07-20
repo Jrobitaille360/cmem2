@@ -860,7 +860,7 @@
       "auth_required": true,
       "auth_header": "Authorization: Bearer {jwt_token}",
       "notes": [
-        "Types MIME acceptés : image (jpeg/png/gif/webp/svg+xml), pdf, txt, doc/docx, xls/xlsx, mp3/wav/ogg, mp4/avi/mov, exe, msi, zip, 7z",
+        "Types MIME acceptés : image (jpeg/png/gif/webp/svg+xml), pdf, txt, doc/docx, xls/xlsx, mp3/wav/ogg, mp4/avi/mov, exe, msi, zip, 7z, gpx (application/gpx+xml, text/xml ou application/xml + extension .gpx)",
         "Tailles max : image 5 MB, document 10 MB, audio 20 MB, vidéo 50 MB, exécutable/archive (exe/msi/zip/7z) 200 MB"
       ],
       "routes": [
@@ -896,7 +896,7 @@
           }
         },
         { "method": "POST", "path": "/files",
-          "description": "Uploader un fichier — images, documents, audio, vidéo, et exécutables/archives Windows (exe, msi, zip, 7z)",
+          "description": "Uploader un fichier — images, documents (dont .gpx), audio, vidéo, et exécutables/archives Windows (exe, msi, zip, 7z)",
           "body": {
             "content_type": "multipart/form-data",
             "fields": {
@@ -907,7 +907,7 @@
             }
           },
           "notes": [
-            "Taille max standard : image 5 MB, document 10 MB, audio 20 MB, vidéo 50 MB",
+            "Taille max standard : image 5 MB, document 10 MB (dont gpx), audio 20 MB, vidéo 50 MB",
             "Taille max exécutables/archives (exe/msi/zip/7z) : 200 MB",
             "MIME types exécutables/archives : application/x-msdownload, application/octet-stream (exe/msi), application/zip, application/x-zip-compressed (zip), application/x-7z-compressed (7z)",
             "Si folder fourni et valide : le fichier est déposé dans uploads/<folder>/ et l'url retournée reflète ce chemin",

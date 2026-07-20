@@ -40,6 +40,10 @@ class FileController
         'application/x-zip-compressed',
         'application/x-7z-compressed',
         'application/octet-stream',
+        // Traces GPS
+        'application/gpx+xml',
+        'text/xml',
+        'application/xml',
     ];
 
     private array $maxFileSizes = [
@@ -165,7 +169,7 @@ class FileController
             $fileModel->file_path = $urlPrefix . $uniqueName;
             $fileModel->mime_type = $file['type'];
             $fileModel->file_size = $file['size'];
-            $fileModel->media_type   = $this->getFileCategory($file['type']);
+            $fileModel->media_type   = $fileExtension === 'gpx' ? 'document' : $this->getFileCategory($file['type']);
             $fileModel->uploaded_by  = $userId;
             $fileModel->accessibility = $accessibility;
             $fileModel->upload_ip    = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
@@ -695,7 +699,7 @@ class FileController
 
         // Vérifier l'extension
         $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-        $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'pdf', 'txt', 'doc', 'docx', 'xls', 'xlsx', 'mp3', 'wav', 'ogg', 'mp4', 'avi', 'mov', 'exe', 'msi', 'zip', '7z'];
+        $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'pdf', 'txt', 'doc', 'docx', 'xls', 'xlsx', 'mp3', 'wav', 'ogg', 'mp4', 'avi', 'mov', 'exe', 'msi', 'zip', '7z', 'gpx'];
 
         if (!in_array($extension, $allowedExtensions))
         {

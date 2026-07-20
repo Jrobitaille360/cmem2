@@ -9,6 +9,14 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+### Ajout — POST /files accepte les fichiers .gpx
+
+- Types MIME acceptés : `application/gpx+xml`, `text/xml`, `application/xml` + extension `.gpx`
+- `media_type` retourné : `document`
+- Taille max : alignée sur documents (10 MB)
+- `docs/core/API_ENDPOINTS.json` mis à jour ; tests ajoutés dans `private/tests/test_files.php` (section 17)
+- Suite à la directive inter-projet `20260720_210000_cmem_web_vers_cmem2_API__mime-gpx-upload.md`
+
 ### Docs — plan gestion de projet + iCalendar (JSON round-trip, Gantt, interop MSPDI/.gan)
 
 - `docs/PLAN_gestion_projet_icalendar.md` : plan pilote backend cmem2_API ↔ frontend cmem-web pour un module de gestion de projet (projets → tâches, hiérarchie `parentId`, dépendances `dependsOn[]` FS/SS/FF/SF, progression)
