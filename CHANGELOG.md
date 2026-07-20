@@ -9,6 +9,16 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+### Docs — plan gestion de projet + iCalendar (JSON round-trip, Gantt, interop MSPDI/.gan)
+
+- `docs/PLAN_gestion_projet_icalendar.md` : plan pilote backend cmem2_API ↔ frontend cmem-web pour un module de gestion de projet (projets → tâches, hiérarchie `parentId`, dépendances `dependsOn[]` FS/SS/FF/SF, progression)
+- Format d'échange principal = **JSON natif** (identité par `id` cmem2, round-trip sans mapping) ; `.ics` VEVENT = vue calendrier secondaire ; CSV optionnel
+- Schéma = extension des tables iCal existantes + table `task_dependencies` ; validation arbre/DAG
+- Détail des phases séparé backend (§12) et frontend (§13) ; ajout d'une **vue Gantt** (WEB-Phase 2b : barres, hiérarchie, dépendances, zoom, marqueur « aujourd'hui »)
+- Interop desktop MSPDI (`.xml`) + GanttProject (`.gan`) en round-trip (annexes E-H), **rebaissé au rang 🔮** — pas de client réel, risque round-trip (préservation `CmemId`) documenté avec repli « nouveau projet » (§14.5)
+- Bonifications cmem-web intégrées : dates journée entière **flottantes** (§9.5, anti-décalage de fuseau iCal) + correctif code Annexe B (`dateFlottante`/`jourSuivant`, arithmétique de date pure) ; plafonnement DoS import ; risques mineurs `task_dependencies` PK / `GraphValidator` O(n²) consignés
+- Aucun code applicatif modifié — document de planification uniquement
+
 ### Sécurité — désactivation Google Play/AdMob pour app_id=puzzle
 
 - `POST /v2/subscriptions/playstore/verify`, `GET /v2/subscriptions/playstore/status`, `DELETE /v2/subscriptions/playstore` → `410 PROVIDER_DISABLED` pour `app_id=puzzle` (Stripe désormais unique fournisseur)
