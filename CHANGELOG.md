@@ -7,7 +7,11 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-07-18 20:40]
+## [Unreleased]
+
+---
+
+## [2.9.0] — 2026-07-19
 
 ### Ajout — partage de calendrier avec un groupe
 
@@ -22,16 +26,12 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-07-18 17:55]
-
 ### Docs — lecture d'avatar clarifiée (GUIDE + API_ENDPOINTS.json)
 
 - Aucune route `GET` avatar n'existe : `POST /users/avatar` retourne `avatar_url` (`/uploads/avatars/<fichier>`) et le profil expose `profile_image` — fichier statique servi directement par Apache (`.htaccess` route vers `index.php` seulement si le fichier n'existe pas), sans JWT
 - Note ajoutée dans `docs/core/GUIDE.md` (section Utilisateurs) et `docs/core/API_ENDPOINTS.json` (route `POST /users/avatar`)
 
 ---
-
-## [Unreleased 2026-07-18 17:45]
 
 ### Docs — `docs/core/GUIDE.md` réaligné sur le code (audit vs `API_ENDPOINTS.json`)
 
@@ -41,8 +41,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - `API_ENDPOINTS.json` vérifié à jour (93 routes = handlers core) — aucun changement requis
 
 ---
-
-## [Unreleased 2026-07-18 17:20]
 
 ### Feat — `GET /entrypoints` et `GET /entrypoints/{module}` — documentation d'endpoints publique
 
@@ -55,8 +53,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-07-17 12:30]
-
 ### Fix — Checkout Stripe : `stripe_subscriptions` jamais créée après paiement réussi (directive `20260717_122030_cmem_web_vers_cmem2_API`)
 
 - **`StripeService::createCheckoutSession()`** (`src/stripe/Services/StripeService.php`) — la session Stripe créée n'avait de `metadata` (`user_id`, `app_id`) que sous `subscription_data.metadata` (copiée sur l'objet subscription), jamais au niveau racine de la session. `handleCheckoutCompleted()` lit `$session['metadata']['app_id']`, trouvait `null`, journalisait une erreur et retournait sans écrire en base — aucune exception levée, donc l'événement webhook restait marqué "processed" côté Stripe malgré l'échec silencieux
@@ -64,8 +60,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - Tests : `test_stripe_v2.php` 42/42 (pas de régression — le test ne couvrait pas la lecture de `metadata` côté webhook)
 
 ---
-
-## [Unreleased 2026-07-16 16:20]
 
 ### Feat — `GET /users?include_deleted=1` — retrouver les comptes soft-deleted (directive `20260716_150000_cmem_web_vers_cmem2_API`)
 
@@ -76,8 +70,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - Doc : `docs/core/API_ENDPOINTS.json` mis à jour
 
 ---
-
-## [Unreleased 2026-07-16 15:45]
 
 ### Feat — Rôle `SUPERADMINISTRATEUR`, matrice d'autorité admin/superadmin (directive `20260716_113000_cmem_web_vers_cmem2_API`)
 
@@ -91,8 +83,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-07-16 10:39]
-
 ### Feat — Endpoint admin assignation manuelle du plan Ami (`cmem_plan_override`) (phase 7b, directive `20260716_090000_cmem_web_vers_cmem2_API`)
 
 - **`PUT /users/{id}/plan-override`** (nouveau, `ADMINISTRATEUR` seul) — pose/retire `users.cmem_plan_override` (`'ami'` ou `null`), 422 sur valeur inconnue, 403 pour tout rôle non-admin, 404 si utilisateur introuvable. Réponse renvoie l'utilisateur à jour pour rafraîchir l'UI admin sans appel supplémentaire
@@ -102,16 +92,12 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-07-15 22:15]
-
 ### Fix — Webhook Stripe `app_id` manquant expose fallback silencieux vers `puzzle` (phase 7a, directive `20260715_140000_cmem_web_vers_cmem2_API`)
 
 - **`StripeService::handleCheckoutCompleted`/`handleSubscriptionUpdated`** — `metadata.app_id` absent défaultait silencieusement à `'puzzle'`, risquant de poser une ligne `stripe_subscriptions` avec le mauvais `app_id`. `app_id` étant obligatoire côté `BillingController::checkout()` depuis la phase 1, ce chemin ne devrait plus jamais se déclencher — rendu explicite (log `error`/`warning` + skip de l'upsert) plutôt que silencieux
 - Testé E2E sur dev-cmem2 : webhook `checkout.session.completed` avec `metadata.app_id=cmem` → ligne `stripe_subscriptions.app_id='cmem'` correcte ; même événement sans metadata → aucune ligne créée (avant : aurait posé `app_id='puzzle'`). `test_stripe_v2` 42/42 non-régression
 
 ---
-
-## [Unreleased 2026-07-15 22:12]
 
 ### Feat — CRON purge RGPD (hard delete comptes soft-deleted >30j) (phase 7a, directive `20260715_140000_cmem_web_vers_cmem2_API`)
 
@@ -121,8 +107,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - **Crontab serveur non modifié** — pas d'activation en prod sans confirmation explicite
 
 ---
-
-## [Unreleased 2026-07-15 21:25]
 
 ### Feat — Enforcement des caps cmem sur 6 ressources (phase 7a, directive `20260715_140000_cmem_web_vers_cmem2_API`)
 
@@ -135,8 +119,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-07-15 21:12]
-
 ### Feat — Plan effectif cmem exposé dans `GET /auth/me` (phase 7a, directive `20260715_140000_cmem_web_vers_cmem2_API`)
 
 - **`src/stripe/Services/EntitlementService.php`** — nouveau : résolution `stripe_subscriptions` actif (`app_id='cmem'`) > `users.cmem_plan_override` > `free`
@@ -146,16 +128,12 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-07-15 21:10]
-
 ### Fix — `DELETE /users/me` bloqué pour comptes OTP (phase 7a, directive `20260715_140000_cmem_web_vers_cmem2_API`)
 
 - **`UserManagerController::delete`** — l'auto-register OTP fixe `password_hash` à une valeur aléatoire jamais connue de l'utilisateur ; l'exigence `password` requis bloquait toute suppression de compte OTP. Retirée pour le chemin self-delete (`currentUserId === userId`) — JWT déjà validé par le middleware d'auth. `force_delete=false` inchangé (soft delete uniquement)
 - Suite `test_users.php` étendue (22.1) : suppression d'un compte auto-créé par OTP sans `password` dans le body → 200. 107/107 sur dev-cmem2
 
 ---
-
-## [Unreleased 2026-07-15 21:05]
 
 ### Feat — Stripe cmem (price_id CAD test) + config caps cmem (phase 7a, partiel) (directive `20260715_140000_cmem_web_vers_cmem2_API`)
 
@@ -168,8 +146,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-07-15 19:50]
-
 ### Fix — `UID`/`DTSTAMP` dupliqués dans export ICS VEVENT/VTODO/VJOURNAL (directive `20260715_194122_cmem_web_vers_cmem2_API`)
 
 - **`src/ics/Utils/IcsGenerator.php::buildVEvent/buildVTodo/buildVJournal`** — sabre/vobject pose déjà un `UID` (`sabre-vobject-...`) et un `DTSTAMP` par défaut à la création du composant (`VEvent::getDefaults()`/`VTodo::getDefaults()`/`VJournal::getDefaults()`) ; le générateur les ajoutait une deuxième fois via `->add()`, produisant deux propriétés `UID` et deux `DTSTAMP` par composant (invalide RFC 5545 §3.6.1-3, occurrence max 1) — parsers stricts (Google Calendar, Outlook) pouvaient rejeter l'import ou choisir arbitrairement le mauvais UID
@@ -178,8 +154,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - Suites ICS existantes ré-exécutées, toujours 100% vertes (`test_ics_freebusy_recurrence` 26/26, `test_ics_occurrences_expand` 33/33, `test_ics_occurrences_exceptions_by_date` 66/66, `test_ics_email_notifications`, `test_ics_tags` 37/37)
 
 ---
-
-## [Unreleased 2026-07-15 12:10]
 
 ### Feat — étiquettes (tags) scopées par calendrier, partagées, cascade (directive `20260715_090000_cmem_web_vers_cmem2_API`)
 
@@ -193,8 +167,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - **`private/tests/test_ics_tags.php`** — 37 tests (create/rename+cascade/delete+cascade, doublon, autorisation propriétaire/membre-écriture/membre-lecture/non-membre) — 37/37 en local (code local + DB dev-cmem2)
 
 ---
-
-## [Unreleased 2026-07-14 12:00]
 
 ### Feat — corbeille récupérable events/todos/journals (directive `20260714_120000_cmem_web_vers_cmem2_API`)
 
@@ -212,8 +184,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-07-13 17:00]
-
 ### Feat — `related_to` exposé sur VJOURNAL create/update (directive `20260713_161125_cmem_web_vers_cmem2_API`)
 
 - **`src/ics/Controllers/JournalController.php`** — `createJournal()` et `updateJournal()` acceptaient déjà `related_to` au niveau modèle/ICS mais ne le validaient/assignaient pas ; ajouté `'related_to' => 'optional|string|max:255'` aux règles et assignation explicite (hors boucle générique, comme `categories`/`dtstart`)
@@ -222,8 +192,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - **`private/tests/test_calendars.php`** — 5 tests ajoutés (16e.12b–e : création avec `related_to`, validation max 255, mise à jour, remise à `null`) ; suite complète 213/213 en local
 
 ---
-
-## [Unreleased 2026-07-13 08:50]
 
 ### Fix — queue notifications email jamais alimentée (directive `20260713_084317_cmem_web_vers_cmem2_API`)
 
@@ -234,8 +202,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - **`private/tests/test_ics_email_notifications.php`** — nouveau : 12 tests (queue alimentée avec `minutes_before`/status corrects sur événement `EMAIL`, non-régression `DISPLAY` seul → aucune ligne email) ; vérifié en direct sur dev-cmem2 ; ajouté à `run_all_tests.php` et `CLAUDE.md`
 
 ---
-
-## [Unreleased 2026-07-08 20:25]
 
 ### Fix — freebusy : récurrence non expansée + troncature borne `end` (directive `20260708_200813_cmem_web_vers_cmem2_API`)
 
@@ -250,8 +216,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-07-08 14:25]
-
 ### Exceptions d'occurrence par date — double clé `occurrence_date` (directive `20260708_105308_cmem_web_vers_cmem2_API`)
 
 - **`PUT` / `DELETE /calendars/{id}/events/{eventId}/occurrences`** — acceptent désormais `occurrence_date` (clé naturelle RECURRENCE-ID, RFC 5545 §3.8.4.4) comme alternative à `occurrence_id` : exactement une des deux clés requise (les deux ou aucune → `400` explicite) ; formats `YYYY-MM-DD` ou `YYYY-MM-DD HH:MM:SS` (désambiguïsation), interprétés dans le `TZID` de l'événement ; ligne matérialisée existante réutilisée (pas de doublon), sinon date validée contre la grille RRULE (même moteur TZID-aware que `/expand`) puis ligne d'exception **matérialisée à la demande** ; date hors grille → `404`, jamais de `500` ; chemin `occurrence_id` strictement inchangé (client Flutter) ; réponses des deux endpoints enrichies de `occurrence_date`
@@ -263,8 +227,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - Suite complète : 1365/1365 tests verts (aucune régression) ; déployé sur dev (prod attendue avant la fin de la phase 4 cmem_web)
 
 ---
-
-## [Unreleased 2026-07-08 07:46]
 
 ### Nouvel endpoint — expansion d'occurrences RRULE à la demande (directive `20260707_082007_cmem_web_vers_cmem2_API`)
 
@@ -278,8 +240,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-07-07 14:42]
-
 ### Fix — frontière `end_date` date-seule sur les occurrences (directive `20260707_082006_cmem_web_vers_cmem2_API`)
 
 - **`src/ics/Models/EventOccurrence.php`** — `end_date` date-seule (`YYYY-MM-DD`) était comparé par MySQL à `00:00:00`, écartant toute occurrence horaire du dernier jour de la fenêtre demandée ; nouveau helper `endOfDayIfDateOnly()` normalise en `YYYY-MM-DD 23:59:59`, appliqué en tête de `getByCalendarId`, `getByEventId`, `getByEventIds` ; `start_date` inchangé (déjà inclusif) ; bascule de génération à la volée `> 2099-12-31` préservée ; bornes déjà horodatées non affectées
@@ -287,8 +247,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - Suite complète : 1332/1332 tests verts (aucune régression)
 
 ---
-
-## [Unreleased 2026-07-07 08:45]
 
 ### CORS pour la SPA cmem-web + compte de test OTP à code fixe (dev) — directive `20260707_064207_cmem_web_vers_cmem2_API`
 
@@ -305,8 +263,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-07-06 14:30]
-
 ### Docs — alignement des GUIDE.md sur les JSON et le code + 3 nouveaux guides (audit complet)
 
 - **`docs/puzzle/GUIDE.md`** — réécriture v2.0.0 (était resté pré-v2.7.0) : chemins migrés vers `/v2/puzzle/*` ; routes fictives retirées (`POST /puzzle/auth/pseudonym`, `POST /puzzle/auth/verify-subscription`, `POST .../shared/{uid}/move`) ; documentation des vraies routes `pick`/`drop` (verrou exclusif, 409/423, `to_tray`), `POST /v2/puzzle/backup/claim` et `POST /puzzle/auth/link-device` (JWT) ; auth/pseudonyme/abonnement renvoient vers les modules playstore et access ; section « Routes dépréciées » ajoutée
@@ -322,8 +278,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-07-06 12:00]
-
 ### Docs — alignement des JSON d'endpoints sur le code réel (audit complet docs ↔ src)
 
 - **`docs/core/API_ENDPOINTS.json`** — version 2.2.4 → 2.8.0, date regénérée ; section `secret-admin` retirée (le handler exige que ces routes ne soient pas documentées publiquement) ; ajout `GET/PUT /users/me/notification-preferences` (fournies par le plugin ICS, 503 si absent)
@@ -337,8 +291,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-06-30 19:30]
-
 ### Ajout — `show_question_to_player` dans les quiz (directive kestyon)
 
 - **`docs/20260630_show_question_to_player.sql`** — migration : `ALTER TABLE quiz_quizzes ADD COLUMN show_question_to_player TINYINT(1) NOT NULL DEFAULT 1 AFTER show_leaderboard`
@@ -348,8 +300,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-06-29 20:45]
-
 ### Ajout — `GET /files/png-from-svg` : conversion SVG→PNG à la demande (directive kestyon)
 
 - **`src/auth_groups/Controllers/FileController.php`** — nouveau endpoint `svgToPng()` : détecte le convertisseur disponible (`rsvg-convert` > `inkscape` > `convert`) via `detectSvgConverter()`, exécute la commande via `runSvgConversion()` avec `proc_open` (tableau d'args, zéro interpolation shell) ; paramètres : `id` (requis), `width` (1–4096 px), `height` (1–4096 px), `dpi` (1–600, défaut 96), `bg` (hex sans `#`, regex validée), `scale` (0.01–10, défaut 1.0) ; réponse `image/png` avec `Cache-Control: public, max-age=86400` ; erreurs 400/404/422/500 en JSON ; contrôle d'accès identique à `download()` (grand-public sans JWT, public avec JWT, private propriétaire/admin)
@@ -357,8 +307,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - **`src/auth_groups/Routing/RouteHandlers/FileRouteHandler.php`** — middleware : `isOptionalAuth` étendu à `action === 'png-from-svg'` (JWT optionnel comme pour `GET /files/{id}`) ; route `GET /files/png-from-svg` ajoutée au match
 
 ---
-
-## [Unreleased 2026-06-27 10:00]
 
 ### Refactor — limites d'upload par type extraites vers `.env` / `environment.php`
 
@@ -368,8 +316,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - **Tous les fichiers `.env`** (`.env`, `.env.example`, `private/.env`, `private/utilitaires/.env*`) — `MAX_FILE_SIZE` retiré ; `MAX_IMAGE_SIZE`, `MAX_DOCUMENT_SIZE`, `MAX_AUDIO_SIZE`, `MAX_VIDEO_SIZE`, `MAX_EXECUTABLE_SIZE` ajoutés
 
 ---
-
-## [Unreleased 2026-06-26 12:00]
 
 ### Fix — `strip_tags(null)` dans `File.php` brisait le JSON de réponse (directive kestyon)
 
