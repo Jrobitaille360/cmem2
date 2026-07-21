@@ -149,6 +149,7 @@ class Calendar extends BaseModel
                 )
             WHERE (c.user_id = ? OR c.visibility = 'public' OR cs.id IS NOT NULL)
                 AND c.deleted_at IS NULL
+                AND c.id NOT IN (SELECT calendar_id FROM projects WHERE calendar_id IS NOT NULL)
             GROUP BY c.id
             ORDER BY c.user_id = ? DESC, c.created_at DESC
         ");

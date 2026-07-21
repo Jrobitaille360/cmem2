@@ -9,6 +9,14 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased 2026-07-21 10:20]
 
+### Fix — exclure calendriers/tâches de projet des endpoints génériques `/calendars`
+
+- `Calendar::getUserCalendars()` : exclut les calendriers cachés provisionnés par un projet (`projects.calendar_id`) — n'apparaissent plus dans `GET /calendars`
+- `CalendarTodo::getByCalendarId()` : exclut les tâches liées à un projet (`project_id IS NOT NULL`) — `GET /calendars/{id}/todos` ne renvoie plus les tâches de projet même en accès direct au calendrier caché
+- `GET /projets/projects/{id}/tasks` et `.../export.ics` inchangés (déjà scopés par `project_id`)
+- Tests : nouvelle section 6b dans `private/tests/test_projets.php` (66/66 verts)
+- Suite à la directive inter-projet `20260721_120000_cmem_web_vers_cmem2_API__exclure-calendriers-projet-de-todos.md`
+
 ### Ajout — plugin `projets` (gestion de projet + iCalendar, backend)
 
 - Nouveau plugin `src/projets/` (`Projets\`) : projets → tâches, hiérarchie (`parentId`), dépendances (`dependsOn[]` FS/SS/FF/SF), export/import JSON round-trip, export `.ics` VEVENT

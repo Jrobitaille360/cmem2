@@ -189,7 +189,7 @@ class CalendarTodo extends BaseModel
 
     public function getByCalendarId(int $calendarId, ?string $status = null): array
     {
-        $sql = "SELECT * FROM {$this->table} WHERE calendar_id = ? AND deleted_at IS NULL";
+        $sql = "SELECT * FROM {$this->table} WHERE calendar_id = ? AND deleted_at IS NULL AND project_id IS NULL";
         $params = [$calendarId];
 
         if ($status !== null) {
