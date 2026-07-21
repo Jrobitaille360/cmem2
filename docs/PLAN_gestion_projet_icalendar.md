@@ -176,6 +176,12 @@ GET    /plugins/projets/projects/{id}/export.ics     # calendrier VEVENT (export
 # GET  /plugins/projets/projects/{id}/calendar.ics?feed_token=...
 ```
 
+> **Écart d'implémentation (2026-07-21) :** le routeur cmem2_API dispatche sur le
+> premier segment d'URL comme nom de contrôleur (pas de préfixe `/plugins/`) — les
+> routes réelles sont `/projets/projects/...` et `/projets/tasks/{id}` (contrôleur
+> `projets`), pas `/plugins/projets/...` ci-dessus. Voir
+> `docs/projets/API_PROJETS_ENDPOINTS.json` pour le contrat exact servi.
+
 **Contrat d'une tâche :**
 `id, title, description, status, priority, percentComplete, dtstart, due, allDay,
 completedAt, createdAt, updatedAt, sequence, parentId, dependsOn[], assignee, url,
@@ -359,19 +365,24 @@ serveur ≠ UTC, export `.ics` + JSON) affiche `2026-08-01` partout, sans décal
 
 ## 11. Phases d'implantation
 
-- **Phase 0 — Schéma.** Figer le schéma §4 et le contrat JSON §6/§9. (Plus de spike
-  round-trip : l'identité JSON est native.)
-- **Phase 1 — Backend CRUD.** Extension des tables iCal + `task_dependencies` ;
-  endpoints §6 ; auth JWT ; **validation arbre/DAG**.
-- **Phase 2 — Affichage interne cmem-web (Cas A).** `ProjetsClient` + contrôleur ;
+- **Phase 0 — Schéma.** ✅ **Terminé 2026-07-21** (backend cmem2_API). Figer le schéma §4
+  et le contrat JSON §6/§9. (Plus de spike round-trip : l'identité JSON est native.)
+- **Phase 1 — Backend CRUD.** ✅ **Terminé 2026-07-21** (backend cmem2_API). Extension
+  des tables iCal + `task_dependencies` ; endpoints §6 ; auth JWT ; **validation arbre/DAG**.
+- **Phase 2 — Affichage interne cmem-web (Cas A).** ⏳ Non démarré — autre projet
+  (cmem-web) ; à traiter via directive inter-projet. `ProjetsClient` + contrôleur ;
   listes + calendrier.
-- **Phase 3 — Export/Import JSON (round-trip).** `export.json` + `import.json` :
+- **Phase 3 — Export/Import JSON (round-trip).** ✅ **Terminé 2026-07-21** (backend
+  cmem2_API). `export.json` + `import.json` (dry-run) + `import.json/confirm` (écriture) :
   sérialisation du contrat, validation, fusion upsert + diff, résolution des ids
   temporaires. **Acceptation :** export → édition → ré-import met à jour sans doublon ;
-  nouvelles tâches insérées ; orphelins signalés ; cycles rejetés.
-- **Phase 4 — Export `.ics` VEVENT.** Annexe B. **Acceptation :** validateur iCal
-  0 erreur ; import Thunderbird/Google OK.
-- **Phase 5 — Export CSV (optionnel).** Côté cmem-web. Annexe A.
+  nouvelles tâches insérées ; orphelins signalés ; cycles rejetés. — validé par
+  `private/tests/test_projets.php` (59/59).
+- **Phase 4 — Export `.ics` VEVENT.** ✅ **Terminé 2026-07-21** (backend cmem2_API).
+  Annexe B. **Acceptation :** validateur iCal 0 erreur ; import Thunderbird/Google OK
+  — structure VEVENT/CRLF/pliage/UID validée par tests ; import client réel (Thunderbird/
+  Google) restant à confirmer manuellement.
+- **Phase 5 — Export CSV (optionnel).** ⏳ Non démarré — autre projet (cmem-web).
 - **Phase 6 — ⏸ Cas B (abonnement externe).** `feed_token` + `calendar.ics`.
 - **Phase 7 — 🔮 Round-trip interop desktop Gantt (rebaissé, voir note).** MSPDI (`.xml`) et
   GanttProject (`.gan`), **export + import** par-dessus le modèle JSON (§14). Sous-phases :
@@ -393,7 +404,11 @@ Plugin `src/projets/` sur l'archi à plugins existante (namespace `Projets\`,
 enregistrement via `PluginManager`). Structure standard du repo :
 `Controllers/ · Models/ · Services/ · Routing/`.
 
-### API-Phase 0 — Schéma & migration SQL
+### API-Phase 0 — Schéma & migration SQL — ✅ Terminé 2026-07-21
+
+> Migration `docs/20260721_projets_taches.sql` appliquée sur dev-cmem2 et prod. Plugin
+> `src/projets/` (`Projets\`) actif, découvert automatiquement (pas de clé `.env PLUGINS` —
+> `PluginManager` scanne `src/*/plugin.json`).
 
 - **Actions :**
   - Écrire la migration `docs/YYYYMMDD_projets_taches.sql` : colonnes ajoutées à la
@@ -408,7 +423,12 @@ enregistrement via `PluginManager`). Structure standard du repo :
 - **Terminé quand :** migration s'applique sans erreur ; schéma relu et figé ; plugin
   chargé au boot sans casser les tests existants (`run_all_tests.php` vert).
 
-### API-Phase 1 — CRUD projets & tâches
+### API-Phase 1 — CRUD projets & tâches — ✅ Terminé 2026-07-21
+
+> `ProjectController` + `TaskController`, `Project` + `Task` (Models). `calendar_id`
+> résolu par calendrier caché auto-provisionné 1:1 par projet (au lieu de rendre la
+> colonne nullable — ne touche pas au module `ics`). `GraphValidator` branché en
+> transaction sur POST/PATCH tâche (rollback + 422 si cycle).
 
 - **Actions :**
   - `ProjectController` + `TaskController` ; `ProjectModel` + `TaskModel` (PDO préparé).
@@ -429,7 +449,13 @@ enregistrement via `PluginManager`). Structure standard du repo :
 
 - Rien côté API. Les endpoints CRUD de la Phase 1 suffisent à l'affichage interne.
 
-### API-Phase 3 — Export/Import JSON (round-trip)
+### API-Phase 3 — Export/Import JSON (round-trip) — ✅ Terminé 2026-07-21
+
+> `JsonRoundTrip::export()/planifier()`. Écart au contrat §6 : import scindé en deux
+> routes plutôt qu'un flag `confirm` dans le body — `POST import.json` = diff seul
+> (rien écrit), `POST import.json/confirm` = applique (même payload), plus explicite
+> pour un dry-run réseau. Transaction PDO + résolution `tmp-*` + `GraphValidator` avant
+> commit, rollback complet si cycle.
 
 - **Actions :**
   - `JsonRoundTrip` (Annexe C) : `export()` et `planifier()`.
@@ -449,7 +475,11 @@ enregistrement via `PluginManager`). Structure standard du repo :
 - **Terminé quand :** export → édition → ré-import met à jour sans doublon ; nouvelles
   tâches insérées et reliées ; orphelins signalés ; cycles rejetés ; tests verts.
 
-### API-Phase 4 — Export `.ics` VEVENT
+### API-Phase 4 — Export `.ics` VEVENT — ✅ Terminé 2026-07-21
+
+> `VEventSerializer` (namespace `Projets\Ical\`). Import réel Thunderbird/Google encore
+> à confirmer manuellement — la suite `test_projets.php` valide CRLF, pliage, `UID`
+> stable, tâche sans date exclue, structure VCALENDAR/VEVENT.
 
 - **Actions :** `VEventSerializer` (Annexe B) ; `GET /export.ics` ;
   `Content-Type: text/calendar; charset=utf-8`, `attachment`, JWT.

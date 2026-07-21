@@ -39,6 +39,7 @@ php private/tests/test_playstore.php
 php private/tests/test_pomo.php
 php private/tests/test_pseudo.php
 php private/tests/test_public.php
+php private/tests/test_projets.php
 php private/tests/test_puzzle_admin.php
 php private/tests/test_puzzle_backup.php
 php private/tests/test_puzzle_share.php
@@ -96,6 +97,7 @@ src/<module>/
 | `src/ics/` | `ICS\` | CalDAV/ICS calendar sync (RFC 5545) |
 | `src/quiz/` | `Quiz\` | Real-time quiz sessions with participant tokens |
 | `src/items/` | `Items\` | Generic item manager — private / public / shared |
+| `src/projets/` | `Projets\` | Project management — tasks, hierarchy, dependencies, JSON round-trip, .ics export |
 | `src/pomo/` | `Pomo\` | Engagement waitlist and support forms |
 | `src/puzzle/` | `Puzzle\` | Collaborative puzzle with pick/drop mechanics |
 | `src/access/` | `Access\` | Subscription access control (Stripe + Playstore cross-check) |

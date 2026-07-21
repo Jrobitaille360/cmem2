@@ -7,7 +7,17 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased]
+## [Unreleased 2026-07-21 10:20]
+
+### Ajout — plugin `projets` (gestion de projet + iCalendar, backend)
+
+- Nouveau plugin `src/projets/` (`Projets\`) : projets → tâches, hiérarchie (`parentId`), dépendances (`dependsOn[]` FS/SS/FF/SF), export/import JSON round-trip, export `.ics` VEVENT
+- Schéma : table `projects` (calendrier caché 1:1 provisionné automatiquement) + extension `calendar_todos` (`project_id`, `parent_id`, `all_day`, `assignee`, `remind_minutes_before`) + table `task_dependencies` — migration pendante `docs/20260721_projets_taches.sql`
+- Endpoints JWT : CRUD `/projets/projects`, CRUD `/projets/tasks/{id}`, `GET .../export.json`, `POST .../import.json` (diff dry-run) + `POST .../import.json/confirm` (écriture transactionnelle avec résolution des ids temporaires `tmp-*`), `GET .../export.ics`
+- `GraphValidator` : rejet des cycles hiérarchie (arbre) et dépendances (DAG) avant tout commit, y compris à l'import round-trip
+- Tâches orphelines (absentes du fichier importé) jamais supprimées, seulement signalées dans le diff
+- Suite `private/tests/test_projets.php` : 59/59 tests verts (CRUD, cycles, round-trip JSON, export .ics)
+- Suite à `docs/PLAN_gestion_projet_icalendar.md` — Phases API 0/1/3/4 uniquement (frontend cmem-web, Cas B et interop MSPDI/.gan hors scope, autre projet / stand-by / rebaissé)
 
 ### Ajout — POST /files accepte les fichiers .gpx
 

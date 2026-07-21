@@ -1,0 +1,174 @@
+{
+  "plugin": {
+    "name": "Projets",
+    "version": "1.0.0",
+    "description": "Gestion de projet — tâches, hiérarchie (parentId), dépendances (dependsOn[]), round-trip JSON, export .ics VEVENT",
+    "generated": "2026-07-21",
+    "base_path": "/projets",
+    "authentication": {
+      "type": "JWT_BEARER",
+      "header": "Authorization: Bearer {jwt_token}"
+    },
+    "notes": "Toutes les routes exigent un JWT valide et sont scopées au propriétaire du projet (user_id)."
+  },
+  "endpoints": {
+    "projects": {
+      "description": "CRUD projets",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/projets/projects",
+          "description": "Liste les projets du user courant",
+          "auth_required": true,
+          "response": { "projects": "array — [{ id, name, createdAt, updatedAt }]" },
+          "errors": { "401": "JWT absent ou invalide" }
+        },
+        {
+          "method": "POST",
+          "path": "/projets/projects",
+          "description": "Créer un projet (provisionne un calendrier caché 1:1)",
+          "auth_required": true,
+          "body": { "name": "string — requis" },
+          "response": { "project": "object" },
+          "errors": { "401": "JWT absent", "422": "name requis" }
+        },
+        {
+          "method": "GET",
+          "path": "/projets/projects/{id}",
+          "description": "Lire un projet",
+          "auth_required": true,
+          "response": { "project": "object" },
+          "errors": { "401": "JWT absent", "403": "Non propriétaire", "404": "Projet introuvable" }
+        },
+        {
+          "method": "PATCH",
+          "path": "/projets/projects/{id}",
+          "description": "Renommer un projet",
+          "auth_required": true,
+          "body": { "name": "string — requis" },
+          "response": { "project": "object" },
+          "errors": { "401": "JWT absent", "403": "Non propriétaire", "404": "Projet introuvable", "422": "name requis" }
+        },
+        {
+          "method": "DELETE",
+          "path": "/projets/projects/{id}",
+          "description": "Supprimer un projet (physique — cascade sur tâches, dépendances et calendrier caché)",
+          "auth_required": true,
+          "response": "204 No Content",
+          "errors": { "401": "JWT absent", "403": "Non propriétaire", "404": "Projet introuvable" }
+        }
+      ]
+    },
+    "tasks": {
+      "description": "CRUD tâches — hiérarchie parentId, dépendances dependsOn[] (FS/SS/FF/SF), validation arbre/DAG à chaque écriture",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/projets/projects/{id}/tasks",
+          "description": "Liste les tâches du projet, contrat de tâche complet",
+          "auth_required": true,
+          "response": { "tasks": "array", "count": "integer" },
+          "errors": { "401": "JWT absent", "403": "Non propriétaire", "404": "Projet introuvable" }
+        },
+        {
+          "method": "POST",
+          "path": "/projets/projects/{id}/tasks",
+          "description": "Créer une tâche. Rejette (422) si parentId/dependsOn[].taskId inexistant, hors-projet, ou introduit un cycle.",
+          "auth_required": true,
+          "body": {
+            "title": "string — requis",
+            "description": "string — optionnel",
+            "dtstart": "datetime UTC — optionnel",
+            "due": "datetime UTC ou date (allDay) — optionnel",
+            "allDay": "bool — défaut false",
+            "status": "NEEDS-ACTION|IN-PROCESS|COMPLETED|CANCELLED — défaut NEEDS-ACTION",
+            "priority": "integer 0-9 — défaut 0",
+            "percentComplete": "integer 0-100 — défaut 0",
+            "parentId": "integer — optionnel, même projet",
+            "dependsOn": "array de { taskId, type: FS|SS|FF|SF, lagDays } — optionnel, même projet",
+            "assignee": "string — optionnel",
+            "url": "string — optionnel",
+            "categories": "array de strings — optionnel",
+            "rappelMinutesAvant": "integer — optionnel"
+          },
+          "response": { "task": "object — contrat de tâche complet" },
+          "errors": {
+            "401": "JWT absent", "403": "Non propriétaire", "404": "Projet introuvable",
+            "422": "title manquant, référence invalide, ou cycle arbre/DAG"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/projets/tasks/{id}",
+          "description": "Lire une tâche",
+          "auth_required": true,
+          "response": { "task": "object" },
+          "errors": { "401": "JWT absent", "403": "Non propriétaire", "404": "Tâche introuvable" }
+        },
+        {
+          "method": "PATCH",
+          "path": "/projets/tasks/{id}",
+          "description": "Mettre à jour une tâche (champs partiels du contrat). Rejette (422) si cycle introduit.",
+          "auth_required": true,
+          "response": { "task": "object" },
+          "errors": {
+            "401": "JWT absent", "403": "Non propriétaire", "404": "Tâche introuvable",
+            "422": "title vide, référence invalide, ou cycle arbre/DAG"
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/projets/tasks/{id}",
+          "description": "Soft-delete d'une tâche",
+          "auth_required": true,
+          "response": "204 No Content",
+          "errors": { "401": "JWT absent", "403": "Non propriétaire", "404": "Tâche introuvable" }
+        }
+      ]
+    },
+    "round_trip_json": {
+      "description": "Export/Import JSON round-trip (identité par id cmem2, aucun mapping)",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/projets/projects/{id}/export.json",
+          "description": "Exporte le projet + toutes ses tâches (contrat §6 + schemaVersion)",
+          "auth_required": true,
+          "response": { "project": "object", "tasks": "array", "exportedAt": "ISO8601 UTC", "schemaVersion": "integer" },
+          "errors": { "401": "JWT absent", "403": "Non propriétaire", "404": "Projet introuvable" }
+        },
+        {
+          "method": "POST",
+          "path": "/projets/projects/{id}/import.json",
+          "description": "Dry-run : calcule et renvoie le diff SANS écrire en base",
+          "auth_required": true,
+          "body": "objet export.json (project, tasks[], schemaVersion)",
+          "response": { "aCreer": "array", "aMettreAJour": "array", "orphelins": "array — tâches cmem2 absentes du fichier, jamais supprimées" },
+          "errors": { "401": "JWT absent", "403": "Non propriétaire", "404": "Projet introuvable", "422": "schemaVersion incompatible ou payload invalide" }
+        },
+        {
+          "method": "POST",
+          "path": "/projets/projects/{id}/import.json/confirm",
+          "description": "Applique la fusion upsert (même payload que le dry-run) dans une transaction : INSERT des tâches tmp-*, résolution des ids temporaires en 2e passe, validation arbre/DAG avant commit. Rollback complet si cycle détecté.",
+          "auth_required": true,
+          "body": "objet export.json (project, tasks[], schemaVersion)",
+          "response": { "aCreer": "integer", "aMettreAJour": "integer", "orphelins": "integer" },
+          "errors": { "401": "JWT absent", "403": "Non propriétaire", "404": "Projet introuvable", "422": "schemaVersion incompatible, payload invalide, ou cycle introduit (rien écrit)" }
+        }
+      ]
+    },
+    "export_ics": {
+      "description": "Export .ics secondaire (VEVENT) — vue calendrier universelle, export seul",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/projets/projects/{id}/export.ics",
+          "description": "Exporte le projet en VCALENDAR/VEVENT. Tâche sans dtstart ni due exclue. Dates allDay flottantes (VALUE=DATE, sans conversion de fuseau).",
+          "auth_required": true,
+          "response": "text/calendar; charset=utf-8 — fichier .ics",
+          "errors": { "401": "JWT absent", "403": "Non propriétaire", "404": "Projet introuvable" }
+        }
+      ]
+    }
+  }
+}

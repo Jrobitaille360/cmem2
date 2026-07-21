@@ -5,7 +5,7 @@
 ![Status](https://img.shields.io/badge/status-production%20ready-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 
-API REST modulaire pour la plateforme **Memories v2**. Elle regroupe les modules : authentification/groupes (core), calendriers ICS/CalDAV, Pomodoro, Quiz interactif, gestionnaire générique Items, puzzle collaboratif, jeu Traque, contrôle d'accès aux abonnements (Access), paiements Stripe, vérification Playstore et gestion des tokens push web (WebDevice).
+API REST modulaire pour la plateforme **Memories v2**. Elle regroupe les modules : authentification/groupes (core), calendriers ICS/CalDAV, Pomodoro, Quiz interactif, gestionnaire générique Items, gestion de projet (Projets), puzzle collaboratif, jeu Traque, contrôle d'accès aux abonnements (Access), paiements Stripe, vérification Playstore et gestion des tokens push web (WebDevice).
 
 Authentification **JWT** HS256 (Bearer, 15 jours). Deux méthodes de connexion : **email + mot de passe** ou **email + code OTP**.
 
@@ -33,6 +33,7 @@ cmem2 API fournit :
 - **Pomo** : Plugin Pomodoro — engagement waitlist/sondage, support, sync cloud
 - **Quiz** : Quiz interactifs en temps réel (style Kahoot) — sessions, scoring dégressif, leaderboard
 - **Items** : Gestionnaire générique d'items (private/public/share), catégories JSON, partages utilisateurs
+- **Projets** : Gestion de projet — tâches, hiérarchie, dépendances (FS/SS/FF/SF), round-trip JSON, export `.ics`
 - **Puzzle** : Puzzle collaboratif — pick/drop de pièces, sessions partagées
 - **Traque** : Jeu type combat/exploration — monstres, biomes OSM, achievements
 - **Access** : Contrôle d'accès aux abonnements — croisement Stripe / Playstore
@@ -156,6 +157,12 @@ cmem2_API/
 │   │   ├── Validators/        # QuizValidator
 │   │   └── Routing/
 │   ├── items/                 # Gestionnaire générique d'items
+│   ├── projets/                # Gestion de projet — tâches, hiérarchie, dépendances
+│   │   ├── Controllers/
+│   │   ├── Models/
+│   │   ├── Services/           # GraphValidator, JsonRoundTrip
+│   │   ├── Ical/                # VEventSerializer (export .ics)
+│   │   └── Routing/
 │   ├── puzzle/                # Puzzle collaboratif
 │   ├── traque/                # Jeu combat/exploration
 │   ├── access/                # Contrôle d'accès abonnements
@@ -181,6 +188,7 @@ Namespaces PSR-4 :
 - `Pomo\` → `src/pomo/`
 - `Quiz\` → `src/quiz/`
 - `Items\` → `src/items/`
+- `Projets\` → `src/projets/`
 - `Puzzle\` → `src/puzzle/`
 - `Traque\` → `src/traque/`
 - `Access\` → `src/access/`
@@ -367,6 +375,7 @@ Voir [docs/items/GUIDE.md](docs/items/GUIDE.md) pour la référence complète.
 | Pomo | [docs/pomo/API_POMO_ENDPOINTS_v1_0_0.json](docs/pomo/API_POMO_ENDPOINTS_v1_0_0.json) | [docs/pomo/GUIDE.md](docs/pomo/GUIDE.md) |
 | Quiz | [docs/quiz/API_QUIZ_ENDPOINTS_v1_0_0.json](docs/quiz/API_QUIZ_ENDPOINTS_v1_0_0.json) | [docs/quiz/GUIDE.md](docs/quiz/GUIDE.md) |
 | Items | [docs/items/API_ITEMS_ENDPOINTS.json](docs/items/API_ITEMS_ENDPOINTS.json) | [docs/items/GUIDE.md](docs/items/GUIDE.md) |
+| Projets | [docs/projets/API_PROJETS_ENDPOINTS.json](docs/projets/API_PROJETS_ENDPOINTS.json) | — |
 | Puzzle | [docs/puzzle/API_PUZZLE_ENDPOINTS.json](docs/puzzle/API_PUZZLE_ENDPOINTS.json) | [docs/puzzle/GUIDE.md](docs/puzzle/GUIDE.md) |
 | Traque | [docs/traque/API_TRAQUE_ENDPOINTS.json](docs/traque/API_TRAQUE_ENDPOINTS.json) | [docs/traque/GUIDE.md](docs/traque/GUIDE.md) |
 | Access | [docs/access/API_ACCESS_ENDPOINTS.json](docs/access/API_ACCESS_ENDPOINTS.json) | [docs/access/GUIDE.md](docs/access/GUIDE.md) |
@@ -418,6 +427,7 @@ Chaque module a son propre fichier `private/tests/test_<module>.php` (voir la li
 - [x] Plugin Traque — combat/exploration, biomes OSM, achievements
 - [x] Access/Stripe/Playstore — abonnements croisés Stripe + Playstore
 - [x] Module ICS — tâches (VTODO), journaux (VJOURNAL), étiquettes par calendrier, corbeille récupérable
+- [x] Plugin Projets — CRUD + hiérarchie/dépendances (arbre/DAG), round-trip JSON, export `.ics` (backend ; frontend cmem-web hors dépôt)
 - [ ] Plugin Quiz Ph2 — Variables dynamiques
 - [ ] Plugin Quiz Ph3 — Moteur math (mossadal/math-executor)
 - [ ] Plugin Quiz Ph4 — WebSocket Node.js (temps réel)

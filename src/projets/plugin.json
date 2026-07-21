@@ -1,0 +1,24 @@
+{
+    "name": "Projets",
+    "version": "1.0.0",
+    "description": "Gestion de projet (tâches, hiérarchie, dépendances) — round-trip JSON + export .ics VEVENT",
+    "author": "CMEM Team",
+    "namespace": "Projets",
+    "main_class": "Projets\\ProjetsPlugin",
+    "min_cmem_version": "2.9.0",
+    "status": "active",
+    "dependencies": {
+        "cmem2_core": ">=2.9.0"
+    },
+    "routes": {
+        "prefix": "/projets",
+        "auth_routes": [
+            "/projets/projects",
+            "/projets/tasks"
+        ]
+    },
+    "database": {
+        "migrations": [],
+        "migrations_path": "docs/projets/migrations/"
+    }
+}
