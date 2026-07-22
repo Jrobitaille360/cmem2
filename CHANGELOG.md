@@ -7,7 +7,19 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-07-21 10:20]
+## [Unreleased 2026-07-21 21:10]
+
+### Dépréciation — chemin d'occurrences matérialisées du module calendrier (ICS)
+
+- **BREAKING** — `GET /calendars/{id}/events/occurrences` et `GET /calendars/{id}/events/{eventId}/occurrences` (chemin matérialisé) retirés → répondent `410 Gone`, pointant vers `.../occurrences/expand`
+- `GET /calendars/{id}/events?expand_recurrence=true` : ne développe plus les récurrences en occurrences (renvoie les événements parents) ; l'expansion passe exclusivement par `GET .../occurrences/expand`
+- Matérialisation arrêtée : plus d'écriture bulk dans `event_occurrences` à la création/mise à jour d'un événement récurrent ; `OccurrenceMaintenanceService::performMaintenance()` est un no-op (CRON `maintenance_occurrences.php` déprécié — retirer l'entrée crontab serveur)
+- Limite de matérialisation `2099-12-31` levée : l'expansion à la volée (`RecurrenceService::expandInRangeTzAware`) honore n'importe quelle plage, y compris > 2099 (`countConstraintFailures=false` + `virtualLimit` généreux)
+- **RDATE** désormais expansé à la volée (colonne `event.rdate`) au lieu d'être matérialisé — recalculable, donc purgeable sans perte
+- Conservés inchangés : `GET .../occurrences/expand` (calendrier + par événement) et les endpoints d'exception `PUT`/`DELETE .../occurrences` (EXDATE / RECURRENCE-ID par clé date, materialize-on-demand) ; les lignes d'exception (`is_cancelled=1`, `is_modified=1`, `modified_*`) restent la source de vérité
+- Tests (private) : `test_ics_occurrences_expand` 39/39, `test_calendars` 248/248, `test_ics_occurrences_exceptions_by_date` 66/66, `test_ics_occurrences_end_date_bound` 12/12, `test_ics_freebusy_recurrence` 26/26, `test_ics_tags` 37/37, `test_ics_email_notifications` 16/16
+- Purge des lignes recalculables de `event_occurrences` = étape production distincte (backup + confirmation) — voir `docs/PLAN_depreciation_occurrences_materialisees.md`
+- Suite à la directive inter-projet `20260721_202158_cmem_web_vers_cmem2_API__depreciation-ancien-chemin-occurrences.md`
 
 ### Fix — exclure calendriers/tâches de projet des endpoints génériques `/calendars`
 

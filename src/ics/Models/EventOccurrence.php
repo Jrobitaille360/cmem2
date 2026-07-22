@@ -676,7 +676,8 @@ class EventOccurrence extends BaseModel
      */
     private static function expandEventInRange(array $event, string $start, string $end): array
     {
-        if (empty($event['recurrence_rule'])) {
+        // Événement sans RRULE ni RDATE : occurrence unique s'il chevauche la plage.
+        if (empty($event['recurrence_rule']) && empty($event['rdate'])) {
             if ($event['end_datetime'] >= $start && $event['start_datetime'] <= $end) {
                 $occurrence = $event;
                 unset($occurrence['id']);

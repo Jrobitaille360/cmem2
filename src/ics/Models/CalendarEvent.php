@@ -146,11 +146,11 @@ class CalendarEvent extends BaseModel
                 'organizer_name'  => $this->organizerName  ?? null,
             ];
             
-            // Générer les occurrences si c'est un événement récurrent
-            if (!empty($this->recurrenceRule)) {
-                \ICS\Services\RecurrenceService::generateAllOccurrences($result);
-            }
-            
+            // Matérialisation des occurrences dépréciée — l'expansion des récurrences
+            // se fait à la volée (/occurrences/expand). On n'écrit plus de lignes bulk
+            // dans event_occurrences à la création. Les exceptions (EXDATE / RECURRENCE-ID)
+            // restent gérées ailleurs (voir gestion des exdates/upsert).
+
             return $result;
             
         } catch (\Exception $e) {
@@ -215,10 +215,11 @@ class CalendarEvent extends BaseModel
     }  
 
     /**
-     * Récupère tous les événements d'un calendrier
-     * si $expandRecurrence est true, les événements récurrents sont développés en occurrences.
-     * si $expandMultiJour est true, les événements multi-jours sont développés en occurrences journalières.
-     * Utilise la table event_occurrences pour les événements récurrents (performant)
+     * Récupère tous les événements d'un calendrier.
+     * $expandMultiJour : développe les événements multi-jours en occurrences journalières.
+     * $expandRecurrence : DÉPRÉCIÉ — n'expanse plus les récurrences (option B). Le listing
+     *   renvoie les événements parents ; l'expansion des occurrences récurrentes passe
+     *   désormais par GET /calendars/{id}/events/occurrences/expand (à la volée, sans table).
      */
     public function getByCalendarId($calendarId, $startDatePeriod = null, $endDatePeriode = null, $expandRecurrence = true, $lastUpdateAfter = null, $expandMultiJour = true, $limit = 100): array
     {
@@ -255,69 +256,14 @@ class CalendarEvent extends BaseModel
             $expandedEvents = $events;
         }
 
-        if( !$expandRecurrence || $expandRecurrence !== "true" ) {
-            return $expandedEvents;
-        } 
-
-        // Séparer les événements récurrents et non-récurrents
-        $recurringEvents = array_filter($expandedEvents, function($event) {
-            return !empty($event['recurrence_rule']);
-        });
-        
-   
-        $nonRecurringEvents = array_filter($expandedEvents,  function($event) {
-            return empty($event['recurrence_rule']);
-        });
-
-        $allEvents = $nonRecurringEvents;
-        // ICI 
-        // Utiliser les occurrences pré-calculées pour les événements récurrents
-        if ($expandRecurrence && !empty($recurringEvents)) {
-            $occurrences = \ICS\Models\EventOccurrence::getByCalendarId($calendarId, $startDatePeriod, $endDatePeriode);
-            
-            // Fusionner les occurrences avec les données des événements parents
-            $eventById = [];
-            foreach ($recurringEvents as $event) {
-                $eventById[$event['id']] = $event;
-            }
-            
-            foreach ($occurrences as $occurrence) {
-                if (isset($eventById[$occurrence['event_id']])) {
-                    $parentEvent = $eventById[$occurrence['event_id']];
-                    
-                    // Créer l'événement expandé avec les données de l'occurrence
-                    $expandedEvent = $parentEvent;
-                    
-                    // Utiliser les dates modifiées si disponibles, sinon les dates de l'occurrence
-                    $expandedEvent['start_datetime'] = $occurrence['modified_start_datetime'] ?? $occurrence['start_datetime'];
-                    $expandedEvent['end_datetime'] = $occurrence['modified_end_datetime'] ?? $occurrence['end_datetime'];
-                    
-                    // Appliquer les modifications si présentes
-                    if ($occurrence['is_modified']) {
-                        if ($occurrence['modified_title']) {
-                            $expandedEvent['title'] = $occurrence['modified_title'];
-                        }
-                        if ($occurrence['modified_description']) {
-                            $expandedEvent['description'] = $occurrence['modified_description'];
-                        }
-                        if ($occurrence['modified_location']) {
-                            $expandedEvent['location'] = $occurrence['modified_location'];
-                        }
-                    }
-                    
-                    // Ajouter les métadonnées d'occurrence
-                    $expandedEvent['occurrence_id'] = $occurrence['id'];
-                    $expandedEvent['occurrence_date'] = $occurrence['occurrence_date'];
-                    $expandedEvent['recurrence_index'] = $occurrence['recurrence_index'];
-                    $expandedEvent['is_recurring'] = true;
-                    $expandedEvent['parent_event_id'] = $occurrence['event_id'];
-                    $expandedEvent['is_occurrence_modified'] = (bool)$occurrence['is_modified'];
-                    $expandedEvent['is_occurrence_cancelled'] = (bool)$occurrence['is_cancelled'];
-                    
-                    $allEvents[] = $expandedEvent;
-                }
-            }
-        }
+        // Expansion des récurrences DÉPRÉCIÉE (option B) : ce listing ne développe plus
+        // les événements récurrents en occurrences via la table event_occurrences.
+        // Il renvoie les événements parents tels quels ; l'expansion en occurrences
+        // (RRULE/RDATE, exceptions appliquées) se fait exclusivement via
+        // GET /calendars/{id}/events/occurrences/expand?start&end.
+        // Le paramètre $expandRecurrence est conservé pour compatibilité de signature
+        // mais n'a plus d'effet d'expansion.
+        $allEvents = $expandedEvents;
 
         // Filtrer par période si spécifié
         if ($startDatePeriod || $endDatePeriode) {
@@ -504,12 +450,9 @@ class CalendarEvent extends BaseModel
                 'event_id' => $this->id
             ]);
             
-            // Régénérer les occurrences si l'événement est récurrent et que des champs affectant les occurrences ont été modifiés
-            $event = $this->getEventById($this->id);
-            if ($event && (!empty($event['recurrence_rule']) || isset($this->recurrenceRule) || isset($this->startDatetime) || isset($this->endDatetime))) {
-                \ICS\Services\RecurrenceService::generateAllOccurrences($event);
-            }
-            
+            // Matérialisation des occurrences dépréciée — plus de régénération bulk
+            // dans event_occurrences à la mise à jour. Expansion à la volée (/occurrences/expand).
+
             return $result;
             
         } catch (\Exception $e) {
@@ -767,10 +710,8 @@ class CalendarEvent extends BaseModel
                     );
                 }
 
-                // Phase 4.2 — RDATE : générer les occurrences additionnelles
-                if (!empty($eventData['rdate']) && !empty($result['id'])) {
-                    \ICS\Services\RecurrenceService::generateRdateOccurrences($result);
-                }
+                // Phase 4.2 — RDATE : expansion à la volée (colonne event.rdate lue par
+                // RecurrenceService::expandInRangeTzAware). Plus d'écriture matérialisée.
 
                 $importedCount++;
             } catch (\Exception $e) {
@@ -881,9 +822,7 @@ class CalendarEvent extends BaseModel
                     if (!empty($eventData['exdates']) && !empty($result['id'])) {
                         \ICS\Services\RecurrenceService::cancelOccurrencesByDatetimes($result, $eventData['exdates']);
                     }
-                    if (!empty($eventData['rdate']) && !empty($result['id'])) {
-                        \ICS\Services\RecurrenceService::generateRdateOccurrences($result);
-                    }
+                    // RDATE : expansion à la volée (event.rdate). Plus d'écriture matérialisée.
                     $created++;
                 }
             } catch (\Exception $e) {

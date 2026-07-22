@@ -23,6 +23,27 @@ class OccurrenceMaintenanceService
      */
     public static function performMaintenance(bool $forceAll = false): array
     {
+        // DÉPRÉCIÉ — la matérialisation des occurrences est abandonnée.
+        // L'expansion des récurrences se fait désormais exclusivement à la volée
+        // (RecurrenceService::expandInRangeTzAware, endpoint /occurrences/expand).
+        // Cette méthode ne régénère plus aucune ligne dans event_occurrences ;
+        // elle est conservée en no-op pour ne pas casser le CRON serveur et
+        // MaintenanceService le temps de retirer l'entrée crontab.
+        LogService::info("performMaintenance() ignoré — matérialisation des occurrences dépréciée (expansion à la volée)");
+
+        return [
+            'regenerated_events' => 0,
+            'skipped_events' => 0,
+            'errors' => [],
+            'mode' => 'deprecated_noop',
+        ];
+    }
+
+    /**
+     * Ancienne implémentation (conservée pour référence, non appelée).
+     */
+    private static function performMaintenanceLegacy(bool $forceAll = false): array
+    {
         $stats = [
             'regenerated_events' => 0,
             'skipped_events' => 0,
@@ -33,7 +54,7 @@ class OccurrenceMaintenanceService
         try {
             // Récupérer la date de la dernière maintenance
             $lastMaintenance = self::getLastMaintenanceDate();
-            
+
             if ($forceAll || !$lastMaintenance) {
                 // Régénération complète
                 $stats['last_maintenance'] = $lastMaintenance ?? 'never';
@@ -43,26 +64,26 @@ class OccurrenceMaintenanceService
                 $stats['last_maintenance'] = $lastMaintenance;
                 $regenerateStats = RecurrenceService::regenerateModifiedOccurrences($lastMaintenance);
             }
-            
+
             if (isset($regenerateStats['success'])) {
                 $stats['regenerated_events'] = $regenerateStats['success'];
             }
-            
+
             if (isset($regenerateStats['skipped'])) {
                 $stats['skipped_events'] = $regenerateStats['skipped'];
             }
-            
+
             if (isset($regenerateStats['error'])) {
                 $stats['errors'][] = $regenerateStats['error'];
             }
-            
+
             // Enregistrer la date de cette maintenance
             self::setLastMaintenanceDate();
-            
+
             LogService::info("Maintenance des occurrences terminée", $stats);
-            
+
             return $stats;
-            
+
         } catch (\Exception $e) {
             $stats['errors'][] = $e->getMessage();
             LogService::error("Erreur lors de la maintenance des occurrences", [

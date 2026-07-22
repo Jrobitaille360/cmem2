@@ -72,7 +72,7 @@ class CalendarRouteHandler extends BaseRouteHandler
             ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && isset($segments[3]) && ctype_digit($segments[3]) && isset($segments[4]) && $segments[4] === 'occurrences' && isset($segments[5]) && $segments[5] === 'expand' && $method === 'GET') =>
                 $this->controller->getEventOccurrenceExpand((int)$segments[3], (int)$action, $user['user_id']),
 
-            // GET /calendars/{id}/events/{eventId}/occurrences - Obtenir les occurrences d'un événement récurrent spécifique
+            // GET /calendars/{id}/events/{eventId}/occurrences - DÉPRÉCIÉ (410) → utiliser .../occurrences/expand
             ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && isset($segments[3]) && ctype_digit($segments[3]) && isset($segments[4]) && $segments[4] === 'occurrences' && !isset($segments[5]) && $method === 'GET') =>
                 $this->controller->getEventOccurrences((int)$segments[3], (int)$action, $user['user_id']),
 
@@ -88,7 +88,7 @@ class CalendarRouteHandler extends BaseRouteHandler
             ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && isset($segments[3]) && $segments[3] === 'occurrences' && isset($segments[4]) && $segments[4] === 'expand' && $method === 'GET') =>
                 $this->controller->getEventsOccurrencesExpand((int)$action, $user['user_id']),
 
-            // GET /calendars/{id}/events/occurrences - Obtenir toutes les occurrences du calendrier entre deux dates
+            // GET /calendars/{id}/events/occurrences - DÉPRÉCIÉ (410) → utiliser .../occurrences/expand
             ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'events' && isset($segments[3]) && $segments[3] === 'occurrences' && !isset($segments[4]) && $method === 'GET') =>
                 $this->controller->getEventsOccurrences((int)$action, $user['user_id']),
 

@@ -1761,57 +1761,16 @@ class CalendarController
      */
     public function getEventOccurrences($eventId, $calendarId, $userId): void
     {
+        // DÉPRÉCIÉ (410 Gone) — le chemin d'occurrences matérialisées a été retiré.
+        // Utilisez GET /calendars/{id}/events/{eventId}/occurrences/expand?start=&end=.
         LoggingMiddleware::logEntry();
-        
-        $cal = new Calendar();
-        
-        // Vérifier l'accès en lecture au calendrier (utiliser canUserWrite car il n'y a pas de canUserRead)
-        if (!$cal->canUserWrite($calendarId, $userId)) {
-            LoggingMiddleware::logExit(403);
-            Response::error('Permission insuffisante pour accéder à ce calendrier', null, 403);
-            return;
-        }
-        
-        $event = new CalendarEvent();
-        $existingEvent = $event->findById($eventId);
-        
-        // Vérifier que l'événement existe et appartient au calendrier
-        if (!$existingEvent || $existingEvent['calendar_id'] != $calendarId) {
-            LogService::warning("Événement non trouvé ou non associé au calendrier", [
-                'event_id' => $eventId,
-                'calendar_id' => $calendarId
-            ]);
-            LoggingMiddleware::logExit(404);
-            Response::error('Événement non trouvé', null, 404);
-            return;
-        } 
-        
-        // Récupérer les paramètres de période
-        $startDate = $_GET['start_date'] ?? null;
-        $endDate = $_GET['end_date'] ?? null;
-        
-        try {
-            // Utiliser les occurrences pré-calculées de la table event_occurrences
-            $occurrences = \ICS\Models\EventOccurrence::getByEventId($eventId, $startDate, $endDate);
-            
-            LogService::info("Occurrences d'événement récupérées depuis table pré-calculée", [
-                'event_id' => $eventId,
-                'calendar_id' => $calendarId,
-                'count' => count($occurrences)
-            ]);
-            
-            LoggingMiddleware::logExit(200);
-            Response::success('Occurrences récupérées avec succès', [
-                'occurrences' => $occurrences,
-                'count' => count($occurrences)
-            ]);
-        } catch (\Exception $e) {
-            LogService::error("Erreur lors de la récupération des occurrences", [
-                'exception' => $e->getMessage()
-            ]);
-            LoggingMiddleware::logExit(500);
-            Response::error('Erreur lors de la récupération des occurrences', null, 500);
-        }
+        LoggingMiddleware::logExit(410);
+        Response::error(
+            'Endpoint retiré. Utilisez GET /calendars/' . $calendarId . '/events/' . $eventId .
+            '/occurrences/expand?start=&end=',
+            null,
+            410
+        );
     }
 
     /**
@@ -2244,58 +2203,17 @@ class CalendarController
     */
     public function getEventsOccurrences($calendarId, $userId): void
     {
+        // DÉPRÉCIÉ (410 Gone) — le chemin d'occurrences matérialisées a été retiré.
+        // L'expansion des occurrences (RRULE/RDATE, exceptions appliquées) se fait
+        // désormais à la volée via GET /calendars/{id}/events/occurrences/expand?start=&end=.
         LoggingMiddleware::logEntry();
-        
-        $cal = new Calendar();
-        
-        // Vérifier l'accès en lecture au calendrier (utiliser canUserWrite car il n'y a pas de canUserRead)
-        if (!$cal->canUserWrite($calendarId, $userId)) {
-            LoggingMiddleware::logExit(403);
-            Response::error('Permission insuffisante pour accéder à ce calendrier', null, 403);
-            return;
-        }
-
-        $input = Response::getRequestParams();
-        $validation = Validator::validate($input, [
-            'start_date' => 'optionnal|date_or_datetime',
-            'end_date' => 'optionnal|date_or_datetime',
-            'expand_multi_jour' => 'optionnal|boolean',
-        ]);
-
-        if (!$validation['valid']) {
-            LogService::warning("Paramètres de récupération des occurrences invalides", [
-                'errors' => $validation['errors']
-            ]);
-            LoggingMiddleware::logExit(400);
-            Response::error('Données invalides', $validation['errors'], 400);
-            return;
-        }
-        // Récupérer les paramètres de période
-        $startDate = $input['start_date'] ?? null;
-        $endDate = $input['end_date'] ?? null;
-        $expand_multi_jour = $input['expand_multi_jour'] ?? true;
-        
-        try {
-            // Utiliser les occurrences pré-calculées de la table event_occurrences
-            $occurrences = \ICS\Models\EventOccurrence::getByCalendarId($calendarId, $startDate, $endDate, $expand_multi_jour);
-            
-            LogService::info("Occurrences du calendrier récupérées depuis table pré-calculée", [
-                'calendar_id' => $calendarId,
-                'count' => count($occurrences)
-            ]);
-            
-            LoggingMiddleware::logExit(200);
-            Response::success('Occurrences récupérées avec succès', [
-                'occurrences' => $occurrences,
-                'count' => count($occurrences)
-            ]);
-        } catch (\Exception $e) {
-            LogService::error("Erreur lors de la récupération des occurrences", [
-                'exception' => $e->getMessage()
-            ]);
-            LoggingMiddleware::logExit(500);
-            Response::error('Erreur lors de la récupération des occurrences', null, 500);
-        }
+        LoggingMiddleware::logExit(410);
+        Response::error(
+            'Endpoint retiré. Utilisez GET /calendars/' . $calendarId .
+            '/events/occurrences/expand?start=&end=',
+            null,
+            410
+        );
     }
 
     /**

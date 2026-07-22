@@ -320,7 +320,10 @@ class RecurrenceService
      */
     public static function expandInRangeTzAware(array $event, string $start, string $end): array
     {
-        if (empty($event['recurrence_rule'])) {
+        $hasRrule = !empty($event['recurrence_rule']);
+        $hasRdate = !empty($event['rdate']);
+
+        if (!$hasRrule && !$hasRdate) {
             return [];
         }
 
@@ -331,33 +334,68 @@ class RecurrenceService
         $endDateTime = new \DateTime($event['end_datetime'], $tz);
         $duration = $startDateTime->diff($endDateTime);
 
-        $rule = new Rule('RRULE:' . $event['recurrence_rule'], $startDateTime, null, $timezone);
-
-        $constraint = new BetweenConstraint(
-            new \DateTime($start, $tz),
-            new \DateTime($end, $tz),
-            true
-        );
-
-        $transformer = new ArrayTransformer();
-        $recurrences = $transformer->transform($rule, $constraint);
+        $rangeStart = new \DateTime($start, $tz);
+        $rangeEnd = new \DateTime($end, $tz);
 
         $expanded = [];
         $index = 0;
-        foreach ($recurrences as $recurrence) {
-            $occurrenceStart = $recurrence->getStart();
-            $occurrenceEnd = \DateTime::createFromInterface($occurrenceStart)->add($duration);
 
-            $occurrence = $event;
-            unset($occurrence['id']);
-            $expanded[] = array_merge($occurrence, [
-                'event_id'         => $event['id'],
-                'start_datetime'   => $occurrenceStart->format('Y-m-d H:i:s'),
-                'end_datetime'     => $occurrenceEnd->format('Y-m-d H:i:s'),
-                'occurrence_date'  => $occurrenceStart->format('Y-m-d'),
-                'recurrence_index' => $index,
-            ]);
-            $index++;
+        // Occurrences RRULE
+        if ($hasRrule) {
+            $rule = new Rule('RRULE:' . $event['recurrence_rule'], $startDateTime, null, $timezone);
+
+            $constraint = new BetweenConstraint($rangeStart, $rangeEnd, true);
+
+            // Filet de sécurité pour une règle sans fin sur une très large plage.
+            $config = new \Recurr\Transformer\ArrayTransformerConfig();
+            $config->setVirtualLimit(200000);
+            $transformer = new ArrayTransformer($config);
+
+            // countConstraintFailures = false : les occurrences hors plage (avant $start)
+            // ne comptent PAS contre le virtualLimit ; la transformation s'arrête via
+            // BetweenConstraint::stopsTransformer() une fois $end dépassé. Indispensable
+            // pour les règles sans fin projetées loin dans le futur (ex. plage en 2100) —
+            // remplace l'ancienne limite de matérialisation 2099.
+            $recurrences = $transformer->transform($rule, $constraint, false);
+
+            foreach ($recurrences as $recurrence) {
+                $occurrenceStart = $recurrence->getStart();
+                $occurrenceEnd = \DateTime::createFromInterface($occurrenceStart)->add($duration);
+
+                $occurrence = $event;
+                unset($occurrence['id']);
+                $expanded[] = array_merge($occurrence, [
+                    'event_id'         => $event['id'],
+                    'start_datetime'   => $occurrenceStart->format('Y-m-d H:i:s'),
+                    'end_datetime'     => $occurrenceEnd->format('Y-m-d H:i:s'),
+                    'occurrence_date'  => $occurrenceStart->format('Y-m-d'),
+                    'recurrence_index' => $index,
+                ]);
+                $index++;
+            }
+        }
+
+        // Occurrences RDATE (RFC 5545 §3.8.5.2) — à la volée depuis event.rdate (CSV).
+        // Remplace l'ancienne matérialisation (generateRdateOccurrences). recurrence_index = -1.
+        if ($hasRdate) {
+            $rdateParts = array_filter(array_map('trim', explode(',', $event['rdate'])));
+            foreach ($rdateParts as $rdateDatetime) {
+                $occurrenceStart = new \DateTime($rdateDatetime, $tz);
+                if ($occurrenceStart < $rangeStart || $occurrenceStart > $rangeEnd) {
+                    continue;
+                }
+                $occurrenceEnd = (clone $occurrenceStart)->add($duration);
+
+                $occurrence = $event;
+                unset($occurrence['id']);
+                $expanded[] = array_merge($occurrence, [
+                    'event_id'         => $event['id'],
+                    'start_datetime'   => $occurrenceStart->format('Y-m-d H:i:s'),
+                    'end_datetime'     => $occurrenceEnd->format('Y-m-d H:i:s'),
+                    'occurrence_date'  => $occurrenceStart->format('Y-m-d'),
+                    'recurrence_index' => -1,
+                ]);
+            }
         }
 
         return $expanded;

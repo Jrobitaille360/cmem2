@@ -65,15 +65,14 @@ try {
         exit(0);
     }
     
-    // Maintenance complète (par défaut) ou incrémentale
+    // DÉPRÉCIÉ — la matérialisation des occurrences est abandonnée (expansion à la volée
+    // via /occurrences/expand). performMaintenance() est un no-op ; retirer l'entrée
+    // crontab qui appelle ce script. --stats / --check restent disponibles pour inspection.
+    echo "⚠ DÉPRÉCIÉ : matérialisation des occurrences abandonnée. Aucune régénération.\n";
+    echo "  L'expansion se fait à la volée (GET /calendars/{id}/events/occurrences/expand).\n";
+    echo "  → Retirer l'entrée crontab appelant ce script.\n";
+
     $forceAll = isset($options['force']);
-    
-    if ($forceAll) {
-        echo "Mode: Régénération COMPLÈTE (--force)\n";
-    } else {
-        echo "Mode: Régénération INCRÉMENTALE (événements modifiés uniquement)\n";
-    }
-    
     $stats = OccurrenceMaintenanceService::performMaintenance($forceAll);
     
     echo "✓ " . $stats['regenerated_events'] . " événement(s) récurrent(s) traité(s)\n";
