@@ -62,7 +62,17 @@ SELECT COUNT(*) AS ex_apres FROM event_occurrences WHERE is_cancelled=1 OR is_mo
 > désormais **no-op via le code**. Déployer le code coupe donc la re-matérialisation ; le cron
 > `maintenance.php` reste en place pour ses autres tâches.
 
-- [ ] **Déployer le code (2-3-5)** — invariant : coupe la re-matérialisation (no-op) **avant** la purge.
-- [ ] Backup `event_occurrences` (mysqldump).
-- [ ] Exécuter la purge, vérifier comptage exceptions identique avant/après.
+### cmem-dev (validation — FAIT 2026-07-21)
+
+- [x] Code déployé (2-3-5) — re-matérialisation no-op.
+- [x] Backup `event_occurrences` (mysqldump).
+- [x] Purge exécutée : `DELETE ... WHERE is_cancelled=0 AND is_modified=0` → 2038 recalculables supprimées.
+- [x] Vérif garde-fou : recalculables restantes = 0, exceptions préservées = 1926.
+
+### Production (au prochain déploiement / ancrage de version — À FAIRE)
+
+- [ ] Déployer le code (2-3-5) sur prod — coupe la re-matérialisation **avant** la purge.
+- [ ] Backup `event_occurrences` (mysqldump) sur prod.
+- [ ] Purge prod : `DELETE FROM event_occurrences WHERE is_cancelled=0 AND is_modified=0`.
+- [ ] Vérif : recalculables = 0, exceptions inchangées.
 - [ ] Vérifier `/expand` au-delà de 2099.
