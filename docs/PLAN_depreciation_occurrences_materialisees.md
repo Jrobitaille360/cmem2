@@ -36,11 +36,11 @@ Dead code après changements (aucun appelant) : `EventOccurrence::getByCalendarI
 
 ## Ordre d'exécution (invariant directive)
 
-1. **[FAIT]** Confirmer zéro trafic legacy (logs prod — confirmé par l'utilisateur).
-2. Désactiver CRON / matérialisation à l'écriture (code, non-destructif).
-3. Arrêter matérialisation + lever cap 2099 + RDATE à la volée + option B (code, non-destructif).
-5. Retirer endpoints legacy → `410` (code, non-destructif).
-4. **[STOP]** Purge `event_occurrences` non-modifiées — **backup + confirmation avant `DELETE`**. À exécuter **après** que le code (2-3-5) est déployé et le CRON serveur coupé.
+1. (Étape 1) **[FAIT]** Confirmer zéro trafic legacy (logs prod — confirmé par l'utilisateur).
+2. (Étape 2) Désactiver matérialisation à l'écriture + no-op maintenance (code, non-destructif).
+3. (Étape 3) Arrêter matérialisation + lever cap 2099 + RDATE à la volée + option B (code, non-destructif).
+4. (Étape 5) Retirer endpoints legacy → `410` (code, non-destructif).
+5. (Étape 4) **[STOP]** Purge `event_occurrences` non-modifiées — **backup + confirmation avant `DELETE`**. À exécuter **après** déploiement du code (la re-matérialisation devient no-op).
 
 ## Étape 4 — purge (à confirmer séparément)
 
@@ -56,8 +56,13 @@ SELECT COUNT(*) AS ex_apres FROM event_occurrences WHERE is_cancelled=1 OR is_mo
 
 ## Checklist production
 
-- [ ] Retirer l'entrée crontab serveur appelant `maintenance_occurrences.php` (**avant** la purge).
-- [ ] Déployer le code (2-3-5).
-- [ ] Backup `event_occurrences`.
+> **Aucune modif crontab nécessaire** (voir `docs/cron.md`) : `maintenance_occurrences.php`
+> n'est pas planifié. La régénération d'occurrences passait par le cron `src/cron/maintenance.php`
+> (3h00) → `ICS\MaintenanceService::regenerateOccurrences()` → `OccurrenceMaintenanceService::performMaintenance()`,
+> désormais **no-op via le code**. Déployer le code coupe donc la re-matérialisation ; le cron
+> `maintenance.php` reste en place pour ses autres tâches.
+
+- [ ] **Déployer le code (2-3-5)** — invariant : coupe la re-matérialisation (no-op) **avant** la purge.
+- [ ] Backup `event_occurrences` (mysqldump).
 - [ ] Exécuter la purge, vérifier comptage exceptions identique avant/après.
 - [ ] Vérifier `/expand` au-delà de 2099.
