@@ -13,6 +13,7 @@ use AuthGroups\Routing\RouteHandlers\{
     SecretAdminRouteHandler,
     PlanRouteHandler,
     SubscriptionRouteHandler,
+    LinkRouteHandler,
     V2RouteHandler
 };
 use AuthGroups\Services\{AuthService, LogService};
@@ -46,6 +47,7 @@ class Router
             'secret-admin' => fn() => new SecretAdminRouteHandler(),
             'plans'        => fn() => new PlanRouteHandler($auth),
             'subscription' => fn() => new SubscriptionRouteHandler($auth),
+            'links'        => fn() => new LinkRouteHandler($auth),
             'v2'           => fn() => new V2RouteHandler($auth),
         ];
 

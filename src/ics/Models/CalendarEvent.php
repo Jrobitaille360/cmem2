@@ -176,6 +176,20 @@ class CalendarEvent extends BaseModel
     }
 
     /**
+     * Surcharge du soft delete (trait SoftDeleteTrait) pour purger, en cascade, les liens
+     * croisés référençant cet événement (directive B2). La suppression prime : la purge
+     * (statique, try/catch) n'interrompt jamais l'opération.
+     */
+    public function softDelete()
+    {
+        $result = parent::softDelete();
+        if ($this->id) {
+            \AuthGroups\Models\Link::purge('event', (int) $this->id);
+        }
+        return $result;
+    }
+
+    /**
      * Récupère les événements soft-deleted d'un calendrier (corbeille), triés deleted_at DESC.
      * Limité à la fenêtre de rétention (RESTORE_RETENTION_DAYS) : au-delà, l'élément
      * n'est plus proposé à la restauration côté client même si la purge physique

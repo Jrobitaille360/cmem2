@@ -210,7 +210,10 @@ class CalendarTodo extends BaseModel
             UPDATE {$this->table} SET deleted_at = NOW(), updated_at = NOW()
             WHERE id = ? AND deleted_at IS NULL
         ");
-        return $stmt->execute([$id]);
+        $result = $stmt->execute([$id]);
+        // Cascade : purge des liens croisés référençant cette tâche (directive B2).
+        \AuthGroups\Models\Link::purgeTodo($id);
+        return $result;
     }
 
     /**

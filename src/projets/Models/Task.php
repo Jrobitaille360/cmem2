@@ -236,7 +236,10 @@ class Task extends BaseModel
             'UPDATE calendar_todos SET deleted_at = NOW() WHERE id = ? AND deleted_at IS NULL'
         );
         $stmt->execute([$id]);
-        return $stmt->rowCount() > 0;
+        $ok = $stmt->rowCount() > 0;
+        // Cascade : purge des liens croisés référençant cette tâche de projet (directive B2).
+        \AuthGroups\Models\Link::purgeTodo($id);
+        return $ok;
     }
 
     // ---------------------------------------------------------------

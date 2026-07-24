@@ -1,0 +1,87 @@
+{
+  "module": {
+    "name": "Links",
+    "version": "1.0.0",
+    "description": "Liens croisés polymorphes entre entités (event | task | journal | project | project_task). Directive cmem_web B2.",
+    "generated": "2026-07-22",
+    "base_path": "/links",
+    "authentication": {
+      "type": "JWT_BEARER",
+      "header": "Authorization: Bearer {jwt_token}"
+    },
+    "notes": "Portée owner-strict : toutes les extrémités doivent appartenir au user courant (user_id). Multi-tenant via app_id (défaut serveur 'puzzle', 'cmemweb' pour cmem_web). Lien logiquement bidirectionnel : une seule ligne src→dst ; le sens inverse est le même lien (dédup à la création). GET renvoie les liens entrants + sortants."
+  },
+  "entity_types": ["event", "task", "journal", "project", "project_task"],
+  "entity_mapping": {
+    "event": "calendar_events",
+    "task": "calendar_todos (project_id NULL)",
+    "journal": "calendar_journals",
+    "project": "projects",
+    "project_task": "calendar_todos (project_id NOT NULL)"
+  },
+  "endpoints": {
+    "links": {
+      "description": "CRUD des liens croisés",
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/links",
+          "description": "Créer un lien. Idempotent : si le lien existe déjà (exact ou sens inverse), renvoie le lien existant avec code 200.",
+          "auth_required": true,
+          "body": {
+            "app_id": "string — optionnel, défaut 'puzzle' ('cmemweb' pour cmem_web)",
+            "src_type": "enum(event|task|journal|project|project_task) — requis",
+            "src_id": "int — requis",
+            "dst_type": "enum(event|task|journal|project|project_task) — requis",
+            "dst_id": "int — requis"
+          },
+          "response": {
+            "id": "int",
+            "app_id": "string",
+            "src_type": "string", "src_id": "int",
+            "dst_type": "string", "dst_id": "int",
+            "created_at": "datetime"
+          },
+          "status_codes": { "201": "Lien créé", "200": "Lien déjà existant (idempotent)" },
+          "errors": {
+            "401": "JWT absent ou invalide",
+            "404": "Entité source ou cible introuvable / non visible par le user",
+            "422": "Type invalide, id manquant, ou auto-lien (src == dst)"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/links?type={type}&id={id}&app_id={app_id}",
+          "description": "Liste les liens entrants + sortants d'une entité, enrichis du titre de la cible.",
+          "auth_required": true,
+          "query": {
+            "type": "enum(event|task|journal|project|project_task) — requis",
+            "id": "int — requis",
+            "app_id": "string — optionnel, défaut 'puzzle'"
+          },
+          "response": {
+            "data": "array — [{ id, direction, other_type, other_id, other_title, created_at }]",
+            "direction": "enum(outgoing|incoming) — outgoing quand l'entité est src, incoming quand elle est dst"
+          },
+          "errors": {
+            "401": "JWT absent",
+            "404": "Entité introuvable ou non visible",
+            "422": "type invalide ou id manquant"
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/links/{id}",
+          "description": "Supprimer un lien. Scoping propriétaire.",
+          "auth_required": true,
+          "errors": {
+            "401": "JWT absent",
+            "403": "Le lien appartient à un autre user",
+            "404": "Lien introuvable"
+          }
+        }
+      ]
+    }
+  },
+  "cascade_purge": "À la suppression (soft ou hard) d'une entité (event/task/journal/project/project_task), tous les liens la référençant (en src OU dst) sont purgés automatiquement — aucun lien orphelin. La suppression d'un projet purge aussi les liens de ses project_tasks (cascade FK)."
+}

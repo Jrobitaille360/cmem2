@@ -184,7 +184,10 @@ class CalendarJournal extends BaseModel
             UPDATE {$this->table} SET deleted_at = NOW(), updated_at = NOW()
             WHERE id = ? AND deleted_at IS NULL
         ");
-        return $stmt->execute([$id]);
+        $result = $stmt->execute([$id]);
+        // Cascade : purge des liens croisés référençant ce journal (directive B2).
+        \AuthGroups\Models\Link::purge('journal', $id);
+        return $result;
     }
 
     /**

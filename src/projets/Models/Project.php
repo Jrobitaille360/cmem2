@@ -90,6 +90,16 @@ class Project extends BaseModel
     {
         $project = $this->findProjectById($id);
         if (!$project) { return false; }
+
+        // Cascade liens (directive B2) : la suppression du projet FK-cascade ses tâches
+        // (calendar_todos.project_id) en DB, hors PHP — purger leurs liens ici, avant le DELETE.
+        $taskStmt = $this->getDb()->prepare('SELECT id FROM calendar_todos WHERE project_id = ?');
+        $taskStmt->execute([$id]);
+        foreach ($taskStmt->fetchAll(PDO::FETCH_COLUMN) as $taskId) {
+            \AuthGroups\Models\Link::purgeTodo((int) $taskId);
+        }
+        \AuthGroups\Models\Link::purge('project', $id);
+
         $stmt = $this->getDb()->prepare('DELETE FROM projects WHERE id = ?');
         $stmt->execute([$id]);
         return $stmt->rowCount() > 0;
