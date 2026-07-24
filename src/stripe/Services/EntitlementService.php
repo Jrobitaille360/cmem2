@@ -8,11 +8,15 @@ use Stripe\Models\StripeSubscription;
 
 /**
  * Résolution du plan effectif cmem — phase 7a.
- * Ordre de priorité : stripe_subscriptions actif (app_id='cmem') > users.cmem_plan_override > 'free'.
+ * Ordre de priorité : stripe_subscriptions actif (tenant cmem) > users.cmem_plan_override > 'free'.
+ * Tenant cmem = app_id 'cmemweb' (primaire) + 'cmem' (alias legacy, voir docs/stripe/TENANT_CMEMWEB.md).
  */
 class EntitlementService
 {
     private const ACTIVE_STATUSES = ['trialing', 'active', 'past_due'];
+
+    /** app_id de la famille tenant cmem — 'cmemweb' primaire, 'cmem' conservé en alias. */
+    private const CMEM_APP_IDS = ['cmemweb', 'cmem'];
 
     /**
      * Caps cmem effectifs pour un user (utilisé par les points d'enforcement).
@@ -47,7 +51,7 @@ class EntitlementService
 
     public static function getEffectivePlanForCmem(int $userId, ?string $planOverride): array
     {
-        $sub = (new StripeSubscription())->findByUserAndApp($userId, 'cmem');
+        $sub = (new StripeSubscription())->findByUserAndApps($userId, self::CMEM_APP_IDS);
 
         if ($sub && in_array($sub['status'], self::ACTIVE_STATUSES, true)) {
             $code = $sub['plan'];

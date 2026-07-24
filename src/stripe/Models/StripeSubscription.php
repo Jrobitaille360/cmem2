@@ -78,6 +78,26 @@ class StripeSubscription extends BaseModel
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
+    /**
+     * Trouve l'abonnement d'un user pour une famille d'app_id (ex. tenant cmem : ['cmemweb','cmem']).
+     * Priorité à un statut actif, puis au plus récent. Usage : résolution du plan cmem effectif.
+     */
+    public function findByUserAndApps(int $userId, array $appIds): ?array
+    {
+        if ($appIds === []) {
+            return null;
+        }
+        $placeholders = implode(',', array_fill(0, count($appIds), '?'));
+        $stmt = $this->getDb()->prepare(
+            "SELECT * FROM stripe_subscriptions
+             WHERE user_id = ? AND app_id IN ({$placeholders})
+             ORDER BY FIELD(status, 'active', 'trialing', 'past_due') = 0, updated_at DESC
+             LIMIT 1"
+        );
+        $stmt->execute(array_merge([$userId], array_values($appIds)));
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
     public function updateByUserAndApp(int $userId, string $appId, array $fields): void
     {
         $allowed = ['status', 'is_trial', 'trial_end', 'expires_at', 'plan', 'cancel_at_period_end'];
