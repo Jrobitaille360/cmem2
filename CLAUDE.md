@@ -21,6 +21,7 @@ php private/tests/test_auth_otp.php
 php private/tests/test_calendars.php
 php private/tests/test_contacts.php
 php private/tests/test_contacts_messages.php
+php private/tests/test_contacts_interactions.php
 php private/tests/test_cors_e2e_account.php
 php private/tests/test_entrypoints.php
 php private/tests/test_files.php

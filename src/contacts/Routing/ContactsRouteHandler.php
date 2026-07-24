@@ -16,6 +16,11 @@ use Contacts\Controllers\ContactController;
  *   GET    /contacts/{id}.vcf    → export vCard 4.0
  *   PUT    /contacts/{id}        → mise à jour partielle
  *   DELETE /contacts/{id}        → soft-delete
+ *   GET    /contacts/{id}/messages          → historique courriels
+ *   POST   /contacts/{id}/messages          → envoi courriel
+ *   GET    /contacts/{id}/interactions      → historique CRM unifié (filtres ?type= ?limit= ?offset=)
+ *   POST   /contacts/{id}/interactions      → saisie manuelle (appel/note/rdv/sms)
+ *   DELETE /contacts/{id}/interactions/{iid} → soft-delete d'une interaction
  *
  * Toutes les routes exigent un JWT valide.
  */
@@ -92,6 +97,32 @@ class ContactsRouteHandler extends BaseRouteHandler
             };
             return;
         }
+
+        // -------------------------------------------------
+        // /contacts/{id}/interactions[/{interactionId}]  — CRM (Phase G-C)
+        // -------------------------------------------------
+        if ($s2 === 'interactions') {
+            $s3 = $segs[3] ?? '';
+            if ($s3 === '') {
+                match ($method) {
+                    'GET'  => (new ContactController())->listInteractions($user, $contactId),
+                    'POST' => (new ContactController())->createInteraction($user, $contactId),
+                    default => Response::error('Méthode non autorisée', null, 405),
+                };
+                return;
+            }
+            if (!is_numeric($s3)) {
+                Response::error('Endpoint non trouvé', null, 404);
+                return;
+            }
+            if ($method === 'DELETE') {
+                (new ContactController())->deleteInteraction($user, $contactId, (int) $s3);
+                return;
+            }
+            Response::error('Méthode non autorisée', null, 405);
+            return;
+        }
+
         if ($s2 !== '') {
             Response::error('Endpoint non trouvé', null, 404);
             return;

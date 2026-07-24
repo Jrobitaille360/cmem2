@@ -41,6 +41,11 @@ Les colonnes et les clés JSON restent en français : elles forment le contrat a
 | DELETE | `/contacts/{id}` | Soft-delete |
 | GET | `/contacts/{id}.vcf` | Export vCard 4.0 (`text/vcard`) |
 | POST | `/contacts/import` | Import vCard ou CSV |
+| POST | `/contacts/{id}/messages` | Envoi courriel + journalisation |
+| GET | `/contacts/{id}/messages` | Historique des courriels |
+| GET | `/contacts/{id}/interactions` | Historique CRM unifié (email + saisies) |
+| POST | `/contacts/{id}/interactions` | Saisie manuelle (appel/note/rdv/sms) |
+| DELETE | `/contacts/{id}/interactions/{interactionId}` | Soft-delete d'une interaction |
 
 Toutes les routes exigent un JWT valide.
 
@@ -193,6 +198,39 @@ propriétaire vers sa propre fiche : pas de consentement commercial ni de lien d
 requis. La colonne `contacts.optout_courriel` (défaut `0`) est **réservée** et non bloquante en
 v1 ; elle devra bloquer l'envoi si l'usage devient commercial (envoi de masse).
 
+## CRM — historique d'interactions (Phase G-C)
+
+Directive cmem_web `20260724_143353`. Réutilise la table `interaction` (pas de nouvelle table)
+pour offrir un **historique 360°** par contact et l'**enregistrement manuel** d'interactions.
+
+### `GET /contacts/{id}/interactions`
+
+Historique **unifié** de toutes les interactions de la fiche — les courriels journalisés par
+`/messages` (Phase G-B) y apparaissent aussi. Plus récentes d'abord. Owner-strict. Filtres
+`?type=`, `?limit=`, `?offset=`. Les interactions soft-supprimées sont exclues.
+
+Contrat unifié par entrée : `{ id, contact_id, type, direction, date, resume, statut,
+piece_jointe_file_id }`. Pour un courriel, `date` = date d'envoi (`envoye_le`) et `resume` =
+`sujet` — le mapping est fait à l'hydratation, sans dupliquer les données.
+
+### `POST /contacts/{id}/interactions`
+
+Saisie manuelle : `type` ∈ `appel|note|rdv|sms` (le `type='email'` est **refusé** — passe par
+`/messages`), `direction` défaut `sortant`, `date` défaut = maintenant, `resume` requis,
+`piece_jointe_file_id` optionnel. `422` si `resume` vide, `type` invalide/`email`, ou `date`
+mal formée. `statut` reste `null` pour les saisies manuelles.
+
+### `DELETE /contacts/{id}/interactions/{interactionId}`
+
+Soft-delete (`interaction.supprime_le`). L'interaction disparaît ensuite du `GET`. Owner-strict :
+`404` si l'interaction n'existe pas, est déjà supprimée, ou n'appartient pas à la fiche.
+
+### Cascade
+
+Le soft-delete d'un **contact** masque ses interactions : le `GET` passe par la vérification de
+propriété de la fiche (`404` si la fiche est supprimée), rendant ses interactions inaccessibles
+sans purge physique.
+
 ## Partage (réservé P1)
 
 La table `contact_shares` et la colonne `partage_scope` existent mais ne sont **pas exploitées**
@@ -204,6 +242,7 @@ l'ajout du partage.
 ```bash
 php private/tests/test_contacts.php
 php private/tests/test_contacts_messages.php
+php private/tests/test_contacts_interactions.php
 ```
 
 `test_contacts.php` couvre : sécurité, CRUD et scoping, filtres et pagination, export vCard,

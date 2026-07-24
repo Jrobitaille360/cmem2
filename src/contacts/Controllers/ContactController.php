@@ -336,6 +336,130 @@ class ContactController
         ]);
     }
 
+    // ---------------------------------------------------------------
+    // GET /contacts/{id}/interactions  — historique unifié (CRM, Phase G-C)
+    // ---------------------------------------------------------------
+    public function listInteractions(array $user, int $id): void
+    {
+        LoggingMiddleware::logEntry();
+
+        $contact = $this->ownedOrFail($user, $id);
+        if (!$contact) { return; }
+
+        $p    = Response::getRequestParams();
+        $rows = (new Interaction())->findByContact(
+            $this->appId($p),
+            (int) $user['user_id'],
+            $id,
+            ['type' => $p['type'] ?? null, 'limit' => $p['limit'] ?? null, 'offset' => $p['offset'] ?? null]
+        );
+
+        Response::success('Interactions récupérées', [
+            'interactions' => array_map([$this, 'toInteractionContract'], $rows),
+        ]);
+    }
+
+    // ---------------------------------------------------------------
+    // POST /contacts/{id}/interactions  — saisie manuelle (CRM, Phase G-C)
+    // ---------------------------------------------------------------
+    public function createInteraction(array $user, int $id): void
+    {
+        LoggingMiddleware::logEntry();
+
+        $contact = $this->ownedOrFail($user, $id);
+        if (!$contact) { return; }
+
+        $p      = Response::getRequestParams();
+        $type   = strtolower(trim((string) ($p['type'] ?? '')));
+        $resume = trim((string) ($p['resume'] ?? ''));
+
+        // type='email' est réservé à /messages ; les autres types hors liste sont refusés.
+        if ($type === 'email') {
+            LoggingMiddleware::logExit(422);
+            Response::error("type='email' réservé à /messages", null, 422);
+            return;
+        }
+        if (!in_array($type, Interaction::MANUAL_TYPES, true)) {
+            LoggingMiddleware::logExit(422);
+            Response::error("type doit valoir appel, note, rdv ou sms", null, 422);
+            return;
+        }
+        if ($resume === '') {
+            LoggingMiddleware::logExit(422);
+            Response::error('resume requis', null, 422);
+            return;
+        }
+
+        $direction = in_array($p['direction'] ?? null, ['entrant', 'sortant'], true)
+            ? $p['direction'] : 'sortant';
+
+        // date optionnelle : format Y-m-d H:i:s, sinon maintenant.
+        $date = trim((string) ($p['date'] ?? ''));
+        if ($date !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2})?)?$/', $date)) {
+            LoggingMiddleware::logExit(422);
+            Response::error('date invalide (attendu Y-m-d H:i:s)', null, 422);
+            return;
+        }
+
+        $fileId = array_key_exists('piece_jointe_file_id', $p) && $p['piece_jointe_file_id'] !== null
+            ? (int) $p['piece_jointe_file_id'] : null;
+
+        $interaction = (new Interaction())->logManual([
+            'app_id'               => $this->appId($p),
+            'user_id'              => (int) $user['user_id'],
+            'contact_id'           => $id,
+            'type'                 => $type,
+            'direction'            => $direction,
+            'resume'               => $resume,
+            'date'                 => $date !== '' ? str_replace('T', ' ', $date) : null,
+            'piece_jointe_file_id' => $fileId,
+        ]);
+
+        Response::success('Interaction créée', ['interaction' => $this->toInteractionContract($interaction)], 201);
+    }
+
+    // ---------------------------------------------------------------
+    // DELETE /contacts/{id}/interactions/{interactionId}  — soft-delete
+    // ---------------------------------------------------------------
+    public function deleteInteraction(array $user, int $id, int $interactionId): void
+    {
+        LoggingMiddleware::logEntry();
+
+        $contact = $this->ownedOrFail($user, $id);
+        if (!$contact) { return; }
+
+        $p  = Response::getRequestParams();
+        $ok = (new Interaction())->softDeleteInteraction(
+            $this->appId($p),
+            (int) $user['user_id'],
+            $id,
+            $interactionId
+        );
+
+        if (!$ok) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Interaction non trouvée', null, 404);
+            return;
+        }
+
+        Response::success('Interaction supprimée', ['id' => $interactionId]);
+    }
+
+    /** Contrat de sortie unifié d'une interaction (CRM). */
+    private function toInteractionContract(array $i): array
+    {
+        return [
+            'id'                   => (int) $i['id'],
+            'contact_id'           => (int) $i['contact_id'],
+            'type'                 => $i['type'],
+            'direction'            => $i['direction'],
+            'date'                 => $i['date'],
+            'resume'               => $i['resume'],
+            'statut'               => $i['statut'],
+            'piece_jointe_file_id' => $i['piece_jointe_file_id'],
+        ];
+    }
+
     /** Contrat de sortie d'une interaction (message). */
     private function toMessageContract(array $i): array
     {

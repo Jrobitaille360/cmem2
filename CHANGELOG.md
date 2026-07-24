@@ -7,7 +7,19 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased]
+## [Unreleased 2026-07-24 15:26]
+
+### Ajout — CRM : historique d'interactions par contact (pilier Contacts, Phase G-C)
+
+- Nouvel endpoint `GET /contacts/{id}/interactions` : historique **unifié** de toutes les interactions de la fiche (courriels de `/messages` inclus), plus récentes d'abord, owner-strict, filtres `?type=&limit=&offset=` ; interactions soft-supprimées exclues
+- Nouvel endpoint `POST /contacts/{id}/interactions` : **saisie manuelle** (`type` ∈ `appel|note|rdv|sms`, `direction` défaut `sortant`, `date` défaut = maintenant, `resume` requis, `piece_jointe_file_id` optionnel) ; `type='email'` **refusé** (réservé à `/messages`) ; `422` si `resume` vide, `type` invalide, ou `date` mal formée
+- Nouvel endpoint `DELETE /contacts/{id}/interactions/{interactionId}` : soft-delete owner-strict (`interaction.supprime_le`) ; l'interaction disparaît ensuite du `GET`
+- **Réutilise** la table `interaction` (pas de nouvelle table) : contrat de sortie unifié `{ id, contact_id, type, direction, date, resume, statut, piece_jointe_file_id }` ; pour un courriel, `date`←`envoye_le` et `resume`←`sujet` (mapping à l'hydratation)
+- Cascade : le soft-delete d'un contact masque ses interactions via la vérification de propriété de la fiche (`404`)
+- Migration pendante `docs/20260724_interactions_crm.sql` : `interaction.type` += `rdv`, `statut` nullable, colonnes `resume`/`date_interaction`/`piece_jointe_file_id`/`maj_le`/`supprime_le`, FK `piece_jointe_file_id` → `files`
+- Doc : `docs/contacts/API_CONTACTS_ENDPOINTS.json` (groupe `interactions`) et `docs/contacts/GUIDE.md` (section CRM)
+- Suite `private/tests/test_contacts_interactions.php` : 46/46 tests verts (sécurité, validation, historique unifié, filtre type, soft-delete, cascade)
+- Suite à la directive inter-projet `20260724_143353_cmem_web_vers_cmem2_API__crm-interactions.md`
 
 ### Ajout — envoi de courriel depuis une fiche contact (pilier Contacts, Phase G-B)
 
