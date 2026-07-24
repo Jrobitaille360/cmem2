@@ -7,7 +7,9 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-07-23 18:45]
+## [Unreleased]
+
+## [2.10.0] — 2026-07-24
 
 ### Ajout — plugin `contacts` (pilier Contacts, socle backend)
 
@@ -42,8 +44,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - `StripeSubscription::findByUserAndApps()` remplace `findByUserAndApp()` pour la résolution du plan — priorité au statut actif, puis au plus récent
 - Nouvelles variables d'environnement `STRIPE_PRICE_CMEMWEB_MONTHLY` / `STRIPE_PRICE_CMEMWEB_YEARLY` (mêmes price IDs que CMEM)
 - Doc : `docs/stripe/TENANT_CMEMWEB.md`
-
-## [Unreleased 2026-07-21 21:10]
 
 ### Dépréciation — chemin d'occurrences matérialisées du module calendrier (ICS)
 
