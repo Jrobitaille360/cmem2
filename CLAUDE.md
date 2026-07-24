@@ -19,6 +19,7 @@ Run a single module:
 php private/tests/test_access.php
 php private/tests/test_auth_otp.php
 php private/tests/test_calendars.php
+php private/tests/test_contacts.php
 php private/tests/test_cors_e2e_account.php
 php private/tests/test_entrypoints.php
 php private/tests/test_files.php
@@ -33,6 +34,7 @@ php private/tests/test_items.php
 php private/tests/test_kestyon_tags.php
 php private/tests/test_kestyon_upload.php
 php private/tests/test_link_device_e2e.php
+php private/tests/test_links.php
 php private/tests/test_maintenance.php
 php private/tests/test_plans.php
 php private/tests/test_playstore.php
@@ -93,10 +95,11 @@ src/<module>/
 
 | Module | Namespace | Purpose |
 | - | - | - |
-| `src/auth_groups/` | `AuthGroups\` | Core: users, JWT auth, groups, files, tags, webhooks |
+| `src/auth_groups/` | `AuthGroups\` | Core: users, JWT auth, groups, files, tags, webhooks, cross-entity links (`/links`) |
 | `src/ics/` | `ICS\` | CalDAV/ICS calendar sync (RFC 5545) |
 | `src/quiz/` | `Quiz\` | Real-time quiz sessions with participant tokens |
 | `src/items/` | `Items\` | Generic item manager — private / public / shared |
+| `src/contacts/` | `Contacts\` | Contacts pillar — CRUD `/contacts`, vCard 4.0 import/export, `max_contacts` cap |
 | `src/projets/` | `Projets\` | Project management — tasks, hierarchy, dependencies, JSON round-trip, .ics export |
 | `src/pomo/` | `Pomo\` | Engagement waitlist and support forms |
 | `src/puzzle/` | `Puzzle\` | Collaborative puzzle with pick/drop mechanics |

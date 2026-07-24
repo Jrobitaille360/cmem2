@@ -7,6 +7,42 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-07-23 18:45]
+
+### Ajout — plugin `contacts` (pilier Contacts, socle backend)
+
+- Nouveau plugin `src/contacts/` (`Contacts\`) : fiches personnes/organisations appartenant à un propriétaire (`user_id`) — un contact n'est pas un compte de l'app
+- Endpoints JWT : `GET/POST /contacts`, `GET/PUT/PATCH/DELETE /contacts/{id}` (suppression = soft-delete `supprime_le`, purge par le cron RGPD existant)
+- Filtres de liste : `?q=` (prenom/nom/organisation/courriels), `?categorie=`, `?favori=`, pagination `?limit=&offset=` avec `total`
+- vCard 4.0 (RFC 6350) sérialisée côté serveur : export `GET /contacts/{id}.vcf` (`text/vcard`), import `POST /contacts/import` en vCard **ou** CSV (body `content` ou multipart `file`) → rapport `{ crees, maj, ignores, erreurs[] }`, upsert par courriel puis par prenom+nom, entrée invalide sans abort
+- Nouveau cap de plan `max_contacts` (free 50, monthly/yearly/ami 2000), appliqué serveur à la création et à l'import, exposé dans `GET /auth/me` → `plan.features`; dépassement → `403` + payload `QUOTA_EXCEEDED`
+- Schéma : tables `contacts` et `contact_shares` (réservée au partage P1, aucune route ne l'exploite) — migration pendante `docs/20260723_contacts.sql`
+- Multi-tenant `app_id` (défaut serveur `'puzzle'`, `'cmemweb'` pour cmem_web) : à transmettre en création **et** en lecture de liste, comme pour `/links`
+- Doc de contrat : `docs/contacts/API_CONTACTS_ENDPOINTS.json` et `docs/contacts/GUIDE.md`
+- Suite `private/tests/test_contacts.php` : 98/98 tests verts (sécurité, CRUD + scoping 403/404, filtres, pagination, vCard, import, cap)
+- Renommages assumés vs directive : `contacts_max` → `max_contacts`, quota `429` → `403 QUOTA_EXCEEDED`, tables `contact`/`contact_partage` → `contacts`/`contact_shares` (conventions du dépôt) ; colonnes et clés JSON conservées en français
+- Suite à la directive inter-projet `20260723_084409_cmem_web_vers_cmem2_API__contacts-table-crud.md`
+
+### Ajout — liens croisés polymorphes `/links`
+
+- Nouvelle table `links` + endpoints `POST /links`, `GET /links?type=&id=`, `DELETE /links/{id}` dans le module core `auth_groups` (toujours chargé)
+- Entités liables : `event`, `task`, `journal`, `project`, `project_task` — `task` vs `project_task` distingués par `calendar_todos.project_id` (NULL vs NOT NULL)
+- Lien logiquement bidirectionnel : une seule ligne `src → dst` ; `GET` renvoie les liens entrants **et** sortants avec `direction` et `other_title` (évite N requêtes de résolution côté client)
+- Dédup à la création : doublon exact **et** sens inverse renvoient le lien existant en `200` (idempotent), direction d'origine conservée
+- Portée owner-strict : une extrémité non visible par l'usager courant renvoie `404` — aucune divulgation d'entité d'autrui
+- Cascade de purge branchée dans `CalendarEvent::softDelete`, `CalendarTodo::softDeleteById`, `CalendarJournal::softDeleteById`, `Projets\Task::softDeleteTask`, `Projets\Project::deleteProject` — zéro lien orphelin
+- Migration pendante `docs/20260722_links.sql` ; doc `docs/links/GUIDE.md` + `docs/links/API_LINKS_ENDPOINTS.json`
+- Suite `private/tests/test_links.php` : 66/66 tests verts
+- Limite connue : restaurer une entité soft-deleted ne restaure pas ses liens (purgés à la suppression)
+- Suite à la directive inter-projet `20260722_141845_cmem_web_vers_cmem2_API__links-inter-entites.md`
+
+### Changement — tenant Stripe `cmemweb`
+
+- Le tenant cmem couvre désormais les `app_id` `'cmemweb'` (primaire) et `'cmem'` (alias legacy) : `EntitlementService::CMEM_APP_IDS`
+- `StripeSubscription::findByUserAndApps()` remplace `findByUserAndApp()` pour la résolution du plan — priorité au statut actif, puis au plus récent
+- Nouvelles variables d'environnement `STRIPE_PRICE_CMEMWEB_MONTHLY` / `STRIPE_PRICE_CMEMWEB_YEARLY` (mêmes price IDs que CMEM)
+- Doc : `docs/stripe/TENANT_CMEMWEB.md`
+
 ## [Unreleased 2026-07-21 21:10]
 
 ### Dépréciation — chemin d'occurrences matérialisées du module calendrier (ICS)

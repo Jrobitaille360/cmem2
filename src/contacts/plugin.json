@@ -1,0 +1,23 @@
+{
+    "name": "Contacts",
+    "version": "1.0.0",
+    "description": "Pilier Contacts — fiches personnes/organisations, vCard 4.0 import/export, cap max_contacts",
+    "author": "CMEM Team",
+    "namespace": "Contacts",
+    "main_class": "Contacts\\ContactsPlugin",
+    "min_cmem_version": "2.9.0",
+    "status": "active",
+    "dependencies": {
+        "cmem2_core": ">=2.9.0"
+    },
+    "routes": {
+        "prefix": "/contacts",
+        "auth_routes": [
+            "/contacts"
+        ]
+    },
+    "database": {
+        "migrations": [],
+        "migrations_path": "docs/contacts/migrations/"
+    }
+}

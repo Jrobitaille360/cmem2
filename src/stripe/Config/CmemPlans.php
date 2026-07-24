@@ -19,6 +19,7 @@ class CmemPlans
             'max_storage_mb'     => 100,
             'max_groups'         => 1,
             'max_group_members'  => 5,
+            'max_contacts'      => 50,
         ],
         'monthly' => [
             'max_calendars'      => 25,
@@ -28,6 +29,7 @@ class CmemPlans
             'max_storage_mb'     => 2000,
             'max_groups'         => 10,
             'max_group_members'  => 50,
+            'max_contacts'      => 2000,
         ],
         'yearly' => [
             'max_calendars'      => 25,
@@ -37,6 +39,7 @@ class CmemPlans
             'max_storage_mb'     => 2000,
             'max_groups'         => 10,
             'max_group_members'  => 50,
+            'max_contacts'      => 2000,
         ],
         'ami' => [
             'max_calendars'      => 25,
@@ -46,6 +49,7 @@ class CmemPlans
             'max_storage_mb'     => 2000,
             'max_groups'         => 10,
             'max_group_members'  => 50,
+            'max_contacts'      => 2000,
         ],
     ];
 

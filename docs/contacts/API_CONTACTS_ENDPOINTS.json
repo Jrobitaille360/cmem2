@@ -1,0 +1,200 @@
+{
+  "module": {
+    "name": "Contacts",
+    "version": "1.0.0",
+    "description": "Pilier Contacts — fiches personnes/organisations, vCard 4.0 import/export, cap max_contacts. Directive cmem_web 20260723_084409.",
+    "generated": "2026-07-23",
+    "base_path": "/contacts",
+    "authentication": {
+      "type": "JWT_BEARER",
+      "header": "Authorization: Bearer {jwt_token}"
+    },
+    "notes": "Portée owner-strict : user_id est le PROPRIÉTAIRE de la fiche, pas un compte lié — un contact n'est pas forcément un utilisateur de l'app. Multi-tenant via app_id (défaut serveur 'puzzle', 'cmemweb' pour cmem_web) : app_id doit être transmis en création ET en lecture de liste, sinon la liste renvoie le tenant par défaut. Suppression = soft-delete (supprime_le), purge par le cron RGPD existant. Les colonnes/clés JSON sont en français ; les noms de tables suivent la convention du dépôt (contacts, contact_shares)."
+  },
+  "renommages_directive": {
+    "contacts_max": "max_contacts — aligné sur max_calendars / max_journals / max_tasks",
+    "429": "403 + payload QUOTA_EXCEEDED — aligné sur EntitlementService::checkQuota",
+    "table contact": "contacts — tables du dépôt au pluriel",
+    "table contact_partage": "contact_shares — noms de tables en anglais"
+  },
+  "champs_repetables": {
+    "courriels": "[{ type: 'perso'|'pro'|'autre', valeur: string }]",
+    "telephones": "[{ type: 'mobile'|'fixe'|'fax'|'autre', indicatif?: string, valeur: string }]",
+    "adresses": "[{ type?: string, ligne1: string, ligne2?: string, ville?: string, region?: string, code_postal?: string, pays?: string }]",
+    "sites": "[{ label?: string, url: string }]",
+    "reseaux": "[{ type: string, handle: string }]",
+    "categories": "string[] — étiquettes libres, aucune entité dédiée"
+  },
+  "endpoints": {
+    "contacts": {
+      "description": "CRUD des fiches contact",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/contacts?app_id={app_id}&q={q}&categorie={categorie}&favori={0|1}&limit={limit}&offset={offset}",
+          "description": "Liste les fiches actives du propriétaire, triées par nom puis prénom. Les fiches soft-supprimées sont exclues.",
+          "auth_required": true,
+          "query": {
+            "app_id": "string — optionnel, défaut 'puzzle' ('cmemweb' pour cmem_web)",
+            "q": "string — optionnel, recherche sur prenom, nom, organisation et courriels",
+            "categorie": "string — optionnel, fiche dont categories[] contient cette valeur",
+            "favori": "0|1 — optionnel",
+            "limit": "int — optionnel, 1..500 ; absent = pas de pagination",
+            "offset": "int — optionnel, défaut 0"
+          },
+          "response": {
+            "contacts": "Contact[]",
+            "total": "int — nombre total avant pagination"
+          },
+          "status_codes": { "200": "Liste récupérée" },
+          "errors": { "401": "JWT absent ou invalide" }
+        },
+        {
+          "method": "POST",
+          "path": "/contacts",
+          "description": "Crée une fiche. Applique le cap de plan max_contacts.",
+          "auth_required": true,
+          "body": {
+            "app_id": "string — optionnel, défaut 'puzzle'",
+            "prenom": "string — requis si nom et organisation absents",
+            "nom": "string — requis si prenom et organisation absents",
+            "organisation": "string|null — une fiche « organisation seule » est valide",
+            "fonction": "string|null",
+            "courriels": "array — voir champs_repetables, défaut []",
+            "telephones": "array — défaut []",
+            "adresses": "array — défaut []",
+            "sites": "array — défaut []",
+            "reseaux": "array — défaut []",
+            "categories": "string[] — défaut []",
+            "notes": "string|null — markdown",
+            "anniversaire": "date YYYY-MM-DD|null",
+            "photo_file_id": "int|null — référence au module files",
+            "favori": "bool — défaut false",
+            "partage_scope": "enum(prive|groupe|utilisateurs) — défaut 'prive', réservé P1 (inactif)"
+          },
+          "response": { "contact": "Contact" },
+          "status_codes": { "201": "Contact créé" },
+          "errors": {
+            "401": "JWT absent ou invalide",
+            "403": "QUOTA_EXCEEDED — cap max_contacts atteint (payload { code, resource, limit, current })",
+            "422": "prenom, nom et organisation tous absents"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/contacts/{id}",
+          "description": "Fiche complète.",
+          "auth_required": true,
+          "response": { "contact": "Contact" },
+          "status_codes": { "200": "Contact récupéré" },
+          "errors": {
+            "401": "JWT absent ou invalide",
+            "403": "La fiche appartient à un autre propriétaire",
+            "404": "Fiche inexistante ou soft-supprimée"
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/contacts/{id}",
+          "description": "Mise à jour partielle : seuls les champs transmis sont écrits. PATCH est accepté et se comporte à l'identique.",
+          "auth_required": true,
+          "body": "Mêmes champs que POST, tous optionnels",
+          "response": { "contact": "Contact" },
+          "status_codes": { "200": "Contact mis à jour" },
+          "errors": {
+            "401": "JWT absent ou invalide",
+            "403": "La fiche appartient à un autre propriétaire",
+            "404": "Fiche inexistante ou soft-supprimée",
+            "422": "La mise à jour viderait à la fois prenom, nom et organisation"
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/contacts/{id}",
+          "description": "Soft-delete : renseigne supprime_le. La ligne reste en base jusqu'à la purge RGPD.",
+          "auth_required": true,
+          "response": { "id": "int" },
+          "status_codes": { "200": "Contact supprimé" },
+          "errors": {
+            "401": "JWT absent ou invalide",
+            "403": "La fiche appartient à un autre propriétaire",
+            "404": "Fiche inexistante ou déjà supprimée"
+          }
+        }
+      ]
+    },
+    "vcard": {
+      "description": "Export et import vCard 4.0 (RFC 6350) — sérialisation serveur",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/contacts/{id}.vcf",
+          "description": "Export vCard 4.0 de la fiche. Réponse brute (pas d'enveloppe JSON).",
+          "auth_required": true,
+          "response_content_type": "text/vcard; charset=utf-8",
+          "proprietes": ["BEGIN:VCARD", "VERSION:4.0", "N", "FN", "ORG", "TITLE", "EMAIL;TYPE=", "TEL;TYPE=", "ADR", "URL", "X-SOCIALPROFILE", "BDAY", "CATEGORIES", "NOTE", "REV", "UID", "END:VCARD"],
+          "status_codes": { "200": "vCard renvoyée" },
+          "errors": {
+            "401": "JWT absent ou invalide",
+            "403": "La fiche appartient à un autre propriétaire",
+            "404": "Fiche inexistante ou soft-supprimée"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/contacts/import",
+          "description": "Import vCard ou CSV. Upsert : rapprochement par courriel, sinon par prenom+nom. Le cap max_contacts est respecté — le surplus est compté dans 'ignores' sans erreur. Une entrée invalide n'interrompt pas l'import.",
+          "auth_required": true,
+          "body": {
+            "app_id": "string — optionnel, défaut 'puzzle'",
+            "format": "enum(vcard|csv) — optionnel, déduit du contenu ou de l'extension du fichier",
+            "content": "string — contenu brut vCard ou CSV (alternative au multipart)"
+          },
+          "multipart": {
+            "file": "fichier .vcf/.vcard/.csv — alternative à 'content'"
+          },
+          "csv_colonnes_reconnues": ["prenom", "nom", "organisation", "fonction", "courriel", "telephone", "categories", "adresse", "ville", "code_postal", "pays", "notes", "anniversaire", "site"],
+          "csv_notes": "En-tête obligatoire. Séparateur détecté parmi ',', ';' et tabulation. Colonnes inconnues ignorées. Alias acceptés (email, phone, company, first_name…).",
+          "response": {
+            "crees": "int — fiches créées",
+            "maj": "int — fiches existantes mises à jour (upsert)",
+            "ignores": "int — entrées non importées faute de quota",
+            "erreurs": "array — [{ ligne|carte, raison }]"
+          },
+          "status_codes": { "200": "Import terminé" },
+          "errors": {
+            "401": "JWT absent ou invalide",
+            "422": "content/fichier absent, ou format hors (vcard|csv)"
+          }
+        }
+      ]
+    }
+  },
+  "plan_caps": {
+    "cle": "max_contacts",
+    "expose_dans": "GET /auth/me → data.user.plan.features.max_contacts",
+    "valeurs": { "free": 50, "monthly": 2000, "yearly": 2000, "ami": 2000 },
+    "depassement": "403 avec payload { code: 'QUOTA_EXCEEDED', resource: 'max_contacts', limit, current }"
+  },
+  "modele_contact": {
+    "id": "int",
+    "app_id": "string",
+    "prenom": "string",
+    "nom": "string",
+    "organisation": "string|null",
+    "fonction": "string|null",
+    "courriels": "array",
+    "telephones": "array",
+    "adresses": "array",
+    "sites": "array",
+    "reseaux": "array",
+    "notes": "string|null",
+    "categories": "string[]",
+    "anniversaire": "date|null",
+    "photo_file_id": "int|null",
+    "favori": "bool",
+    "partage_scope": "enum(prive|groupe|utilisateurs)",
+    "cree_le": "datetime",
+    "maj_le": "datetime"
+  }
+}
