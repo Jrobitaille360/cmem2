@@ -7,7 +7,37 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-07-24 15:26]
+## [Unreleased 2026-07-24 17:20]
+
+### Ajout — GED : liens croisés étendus aux fichiers et contacts (Phase G-E)
+
+- `/links` accepte quatre nouveaux types d'entité : **`file`** (`files`), **`contact`** (`contacts`), **`interaction`** et **`opportunite`** — un document rattaché est un lien `{ src_type:'file', src_id, dst_type:<entité>, dst_id }`, sans nouvelle mécanique de liaison
+- Le contrat `/links` s'applique tel quel aux nouveaux types : dédup idempotente bidirectionnelle, owner-strict (`404` sur une extrémité d'autrui), `403`/`404` inchangés
+- `GET /links?type=file|contact&id=` renvoie `other_title` sans requête supplémentaire : nom du fichier (`files.original_name`), « prénom nom » du contact (à défaut `organisation`), `resume` d'une interaction (à défaut `sujet`), `titre` d'une opportunité
+- Résolution des extrémités par colonnes propriétaire/suppression déclarées par type (`uploaded_by`, `supprime_le`) — les piliers en colonnes françaises sont pris en charge
+- Cascade de purge : la suppression d'un **fichier** ou d'un **contact** purge les liens le référençant ; la suppression d'un contact purge aussi ceux de ses interactions et opportunités — zéro orphelin
+- Migration pendante `docs/20260724_links_ged.sql` : `links.src_type`/`dst_type` += `file`, `contact`, `interaction`, `opportunite`
+- Doc : `docs/links/API_LINKS_ENDPOINTS.json` (v1.1.0) et `docs/links/GUIDE.md` (table des types, points d'ancrage de purge)
+- Suite `private/tests/test_links_ged.php` : 54/54 tests verts (types acceptés, owner-strict, `other_title`, purges)
+- Suite à la directive inter-projet `20260724_154619_cmem_web_vers_cmem2_API__ged-liens-fichiers.md`
+
+### Ajout — CRM : pipeline d'opportunités (pilier Contacts, Phase G-D)
+
+- Nouvelle table `opportunite` : opportunités commerciales rattachées à un contact (owner-strict, multi-tenant `app_id`, devise par défaut **CAD**, soft-delete `supprime_le`)
+- Nouvel endpoint `GET /contacts/{id}/opportunites` : opportunités actives d'une fiche, plus récentes d'abord
+- Nouvel endpoint `POST /contacts/{id}/opportunites` : `{ titre, etape?, montant?, devise?, date_cloture_prevue?, notes? }` ; défauts `etape='prospect'` et `devise='CAD'` ; `422` si `titre` vide, `etape` hors `prospect|qualifie|proposition|gagne|perdu`, `montant` non numérique, `devise` non ISO 4217 ou date hors format `Y-m-d`
+- Nouvel endpoint `GET /opportunites?etape=&limit=&offset=` : **board Kanban global** du propriétaire, toutes fiches confondues, réponse `{ opportunites, total }` ; les opportunités des contacts supprimés sont exclues
+- Nouveaux endpoints `PUT`/`PATCH /opportunites/{opId}` (mise à jour partielle, notamment le changement d'étape au glisser-déposer) et `DELETE /opportunites/{opId}` (soft-delete + purge des liens croisés)
+- Cascade : le soft-delete d'un contact masque ses opportunités
+- Migration pendante `docs/20260724_opportunite.sql` (table `opportunite`, FK `contact_id` → `contacts` ON DELETE CASCADE)
+- Doc : `docs/contacts/API_CONTACTS_ENDPOINTS.json` (groupe `opportunites`, modèle `Opportunite`) et `docs/contacts/GUIDE.md` (sections pipeline et GED)
+- Suite `private/tests/test_contacts_opportunites.php` : 65/65 tests verts (sécurité, validation, board et filtre, Kanban, soft-delete, cascade)
+- Suite à la directive inter-projet `20260724_154618_cmem_web_vers_cmem2_API__crm-pipeline.md`
+
+### Correction — suite de tests : login des comptes partagés par OTP
+
+- Les 22 fichiers de tests qui se connectaient au compte partagé `support@…` par mot de passe basculent sur le nouvel helper `loginUserOtp()` (code OTP fixe sur dev, cache JWT inter-processus par courriel) — le mot de passe n'était plus exploitable et entraînait 205 échecs en cascade (`401`)
+- Suite complète : **1892/1892** tests verts
 
 ### Ajout — CRM : historique d'interactions par contact (pilier Contacts, Phase G-C)
 

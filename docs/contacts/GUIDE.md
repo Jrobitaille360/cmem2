@@ -231,6 +231,68 @@ Le soft-delete d'un **contact** masque ses interactions : le `GET` passe par la 
 propriété de la fiche (`404` si la fiche est supprimée), rendant ses interactions inaccessibles
 sans purge physique.
 
+## CRM — pipeline d'opportunités (Phase G-D)
+
+Directive cmem_web `20260724_154618`. Table `opportunite` : opportunités commerciales rattachées
+à un contact, affichées en **Kanban** côté client. Owner-strict, multi-tenant `app_id`,
+devise par défaut `CAD`, soft-delete (`supprime_le`).
+
+### `GET /contacts/{id}/opportunites`
+
+Opportunités actives de la fiche, plus récentes d'abord. `403` fiche d'autrui, `404` fiche
+absente ou supprimée.
+
+### `POST /contacts/{id}/opportunites`
+
+Corps : `{ titre, etape?, montant?, devise?, date_cloture_prevue?, notes? }`.
+Défauts : `etape='prospect'`, `devise='CAD'`. `422` si `titre` vide, `etape` hors
+`prospect|qualifie|proposition|gagne|perdu`, `montant` non numérique, `devise` non ISO 4217
+(3 lettres) ou `date_cloture_prevue` hors format `Y-m-d`.
+
+### `GET /opportunites?etape=`
+
+**Board Kanban global** : toutes les opportunités du propriétaire, toutes fiches confondues.
+Filtre `?etape=` optionnel (`422` si étape inconnue), pagination `?limit=` / `?offset=`,
+réponse `{ opportunites, total }`. Les opportunités des contacts supprimés sont exclues.
+
+### `PUT /opportunites/{opId}`
+
+Mise à jour **partielle** — seuls les champs transmis sont écrits ; sert au changement d'étape
+par glisser-déposer (`{ "etape": "proposition" }`). `PATCH` est accepté à l'identique.
+`403` opportunité d'autrui, `404` inexistante ou supprimée.
+
+### `DELETE /opportunites/{opId}`
+
+Soft-delete. L'opportunité disparaît du board et de la fiche ; ses liens croisés (`/links`)
+sont purgés.
+
+### Cascade
+
+Le soft-delete d'un **contact** masque ses opportunités (`Contact::softDeleteContact` appelle
+`Opportunite::softDeleteByContact`) et purge les liens croisés du contact, de ses interactions
+et de ses opportunités. Le board global exclut de toute façon les opportunités dont le contact
+est supprimé.
+
+## GED — documents rattachés (Phase G-E)
+
+Directive cmem_web `20260724_154619`. **Aucune nouvelle mécanique** : les documents rattachés
+sont des liens `/links` (voir `docs/links/GUIDE.md`) dont l'enum de types accepte désormais
+`file`, `contact`, `interaction` et `opportunite`.
+
+Rattacher un fichier à une fiche :
+
+```json
+POST /links
+{ "app_id": "cmemweb", "src_type": "file", "src_id": 42, "dst_type": "contact", "dst_id": 10 }
+```
+
+Bibliothèque documentaire d'une fiche : `GET /links?type=contact&id=10&app_id=cmemweb` —
+`other_title` vaut le nom du fichier (`files.original_name`). Inversement,
+`GET /links?type=file&id=42` liste toutes les entités auxquelles le document est rattaché ;
+`other_title` d'un contact vaut « prénom nom » (ou l'organisation si les deux sont vides).
+
+La suppression d'un fichier ou d'un contact **purge** les liens correspondants — aucun orphelin.
+
 ## Partage (réservé P1)
 
 La table `contact_shares` et la colonne `partage_scope` existent mais ne sont **pas exploitées**
@@ -243,6 +305,8 @@ l'ajout du partage.
 php private/tests/test_contacts.php
 php private/tests/test_contacts_messages.php
 php private/tests/test_contacts_interactions.php
+php private/tests/test_contacts_opportunites.php
+php private/tests/test_links_ged.php
 ```
 
 `test_contacts.php` couvre : sécurité, CRUD et scoping, filtres et pagination, export vCard,

@@ -13,7 +13,8 @@
     "routes": {
         "prefix": "/contacts",
         "auth_routes": [
-            "/contacts"
+            "/contacts",
+            "/opportunites"
         ]
     },
     "database": {

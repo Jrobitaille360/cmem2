@@ -116,7 +116,13 @@ class Interaction extends BaseModel
               WHERE id = ? AND app_id = ? AND user_id = ? AND contact_id = ? AND supprime_le IS NULL"
         );
         $stmt->execute([$interactionId, $appId, $userId, $contactId]);
-        return $stmt->rowCount() > 0;
+
+        if ($stmt->rowCount() > 0) {
+            // GED (Phase G-E) : pas de lien orphelin vers une interaction supprimée.
+            \AuthGroups\Models\Link::purge('interaction', $interactionId);
+            return true;
+        }
+        return false;
     }
 
     /** Nommé findInteractionById : BaseModel::findById a une signature incompatible. */

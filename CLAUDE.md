@@ -22,6 +22,7 @@ php private/tests/test_calendars.php
 php private/tests/test_contacts.php
 php private/tests/test_contacts_messages.php
 php private/tests/test_contacts_interactions.php
+php private/tests/test_contacts_opportunites.php
 php private/tests/test_cors_e2e_account.php
 php private/tests/test_entrypoints.php
 php private/tests/test_files.php
@@ -37,6 +38,7 @@ php private/tests/test_kestyon_tags.php
 php private/tests/test_kestyon_upload.php
 php private/tests/test_link_device_e2e.php
 php private/tests/test_links.php
+php private/tests/test_links_ged.php
 php private/tests/test_maintenance.php
 php private/tests/test_plans.php
 php private/tests/test_playstore.php
@@ -101,7 +103,7 @@ src/<module>/
 | `src/ics/` | `ICS\` | CalDAV/ICS calendar sync (RFC 5545) |
 | `src/quiz/` | `Quiz\` | Real-time quiz sessions with participant tokens |
 | `src/items/` | `Items\` | Generic item manager — private / public / shared |
-| `src/contacts/` | `Contacts\` | Contacts pillar — CRUD `/contacts`, vCard 4.0 import/export, `max_contacts` cap |
+| `src/contacts/` | `Contacts\` | Contacts pillar — CRUD `/contacts`, vCard 4.0 import/export, `max_contacts` cap, CRM interactions and `/opportunites` pipeline |
 | `src/projets/` | `Projets\` | Project management — tasks, hierarchy, dependencies, JSON round-trip, .ics export |
 | `src/pomo/` | `Pomo\` | Engagement waitlist and support forms |
 | `src/puzzle/` | `Puzzle\` | Collaborative puzzle with pick/drop mechanics |
