@@ -80,6 +80,23 @@ class ContactsRouteHandler extends BaseRouteHandler
         }
         $contactId = (int) $s1;
 
+        // -------------------------------------------------
+        // /contacts/{id}/messages  — envoi courriel + historique
+        // -------------------------------------------------
+        $s2 = $segs[2] ?? '';
+        if ($s2 === 'messages') {
+            match ($method) {
+                'POST' => (new ContactController())->sendMessage($user, $contactId),
+                'GET'  => (new ContactController())->listMessages($user, $contactId),
+                default => Response::error('Méthode non autorisée', null, 405),
+            };
+            return;
+        }
+        if ($s2 !== '') {
+            Response::error('Endpoint non trouvé', null, 404);
+            return;
+        }
+
         match ($method) {
             'GET'    => (new ContactController())->show($user, $contactId),
             'PUT'    => (new ContactController())->update($user, $contactId),

@@ -9,6 +9,20 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+### Ajout — envoi de courriel depuis une fiche contact (pilier Contacts, Phase G-B)
+
+- Nouvel endpoint `POST /contacts/{id}/messages` (canal `email`) : envoie un courriel au contact via l'infra mail serveur (SPF/DKIM), **au nom de l'usager courant** (`From` = serveur, `Reply-To` = courriel de l'usager) et journalise l'envoi — owner-strict (`403`/`404`)
+- Résolution du destinataire : si `destinataire` absent, courriel principal du contact (type `pro` prioritaire, sinon 1er de `courriels[]`) ; `422` si aucun courriel et aucun `destinataire` ; `422` si `destinataire` fourni mais invalide, si `canal` ≠ `email`, ou si `sujet`/`corps` vide
+- Historique `GET /contacts/{id}/messages` (canal email, owner-strict, `?limit=&offset=`)
+- Journalisation dans une nouvelle table **générique** `interaction` (`type='email'`, `direction='sortant'`, `statut='envoye'|'echec'`) anticipant la directive `crm-interactions` (Phase C — historique unifié) pour éviter un doublon
+- Rate-limit anti-abus (`429`) via `RateLimitService` (endpoint `contact-message`, clé courriel usager + IP)
+- CASL/RGPD : v1 = courriel transactionnel/personnel manuel ; colonne `contacts.optout_courriel` **réservée** (non bloquante), prévue pour un futur usage commercial
+- `EmailService::sendEmail()` accepte un `Reply-To` optionnel (rétro-compatible)
+- Migration pendante `docs/20260724_interactions.sql` (table `interaction` + colonne `contacts.optout_courriel`)
+- Doc : `docs/contacts/API_CONTACTS_ENDPOINTS.json` (groupe `messages`) et `docs/contacts/GUIDE.md` (section Communication)
+- Suite `private/tests/test_contacts_messages.php` : 43/43 tests verts (sécurité, validation, résolution destinataire, journalisation, historique, rate-limit)
+- Suite à la directive inter-projet `20260724_090048_cmem_web_vers_cmem2_API__contacts-email-envoi.md`
+
 ## [2.10.0] — 2026-07-24
 
 ### Ajout — plugin `contacts` (pilier Contacts, socle backend)

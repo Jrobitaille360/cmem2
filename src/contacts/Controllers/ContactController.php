@@ -3,8 +3,11 @@
 namespace Contacts\Controllers;
 
 use AuthGroups\Middleware\LoggingMiddleware;
+use AuthGroups\Services\RateLimitService;
 use AuthGroups\Utils\Response;
 use Contacts\Models\Contact;
+use Contacts\Models\Interaction;
+use Contacts\Services\ContactMessageService;
 use Contacts\Services\CsvParser;
 use Contacts\Services\VCardParser;
 use Contacts\Services\VCardSerializer;
@@ -20,6 +23,8 @@ class ContactController
 {
     private const DEFAULT_APP_ID = 'puzzle';
     private const QUOTA_KEY      = 'max_contacts';
+    /** Clé d'endpoint pour le rate-limit anti-abus des envois de courriel. */
+    private const RL_ENDPOINT    = 'contact-message';
 
     private Contact $model;
 
@@ -240,6 +245,109 @@ class ContactController
 
         $this->model->softDeleteContact($id);
         Response::success('Contact supprimé', ['id' => $id]);
+    }
+
+    // ---------------------------------------------------------------
+    // POST /contacts/{id}/messages  — envoi courriel + journalisation
+    // ---------------------------------------------------------------
+    public function sendMessage(array $user, int $id): void
+    {
+        LoggingMiddleware::logEntry();
+
+        $contact = $this->ownedOrFail($user, $id);
+        if (!$contact) { return; }
+
+        $p     = Response::getRequestParams();
+        $canal = strtolower(trim((string) ($p['canal'] ?? '')));
+        $sujet = trim((string) ($p['sujet'] ?? ''));
+        $corps = (string) ($p['corps'] ?? '');
+
+        // Seul le canal email est supporté en v1.
+        if ($canal !== 'email') {
+            LoggingMiddleware::logExit(422);
+            Response::error("canal doit valoir 'email'", null, 422);
+            return;
+        }
+        if ($sujet === '' || trim($corps) === '') {
+            LoggingMiddleware::logExit(422);
+            Response::error('sujet et corps requis', null, 422);
+            return;
+        }
+
+        // Résolution du destinataire : fourni (validé) sinon courriel principal de la fiche.
+        $destinataire = trim((string) ($p['destinataire'] ?? ''));
+        if ($destinataire !== '') {
+            if (!filter_var($destinataire, FILTER_VALIDATE_EMAIL)) {
+                LoggingMiddleware::logExit(422);
+                Response::error('destinataire invalide', null, 422);
+                return;
+            }
+        } else {
+            $destinataire = ContactMessageService::resolvePrimaryEmail($contact['courriels'] ?? []);
+            if ($destinataire === null) {
+                LoggingMiddleware::logExit(422);
+                Response::error('Le contact n\'a aucun courriel ; fournir un destinataire', null, 422);
+                return;
+            }
+        }
+
+        // Rate-limit anti-abus : clé = courriel de l'usager courant.
+        $userEmail = (string) ($user['email'] ?? '');
+        if (!RateLimitService::check($userEmail, self::RL_ENDPOINT)) {
+            LoggingMiddleware::logExit(429);
+            Response::error('Trop d\'envois. Réessayez plus tard.', null, 429);
+            return;
+        }
+        RateLimitService::record($userEmail, self::RL_ENDPOINT);
+
+        $interaction = (new ContactMessageService())->sendEmail(
+            $contact,
+            $this->appId($p),
+            (int) $user['user_id'],
+            $userEmail,
+            $destinataire,
+            $sujet,
+            $corps
+        );
+
+        Response::success('Message envoyé', ['message' => $this->toMessageContract($interaction)], 201);
+    }
+
+    // ---------------------------------------------------------------
+    // GET /contacts/{id}/messages  — historique des messages
+    // ---------------------------------------------------------------
+    public function listMessages(array $user, int $id): void
+    {
+        LoggingMiddleware::logEntry();
+
+        $contact = $this->ownedOrFail($user, $id);
+        if (!$contact) { return; }
+
+        $p    = Response::getRequestParams();
+        $rows = (new Interaction())->findByContact(
+            $this->appId($p),
+            (int) $user['user_id'],
+            $id,
+            ['type' => 'email', 'limit' => $p['limit'] ?? null, 'offset' => $p['offset'] ?? null]
+        );
+
+        Response::success('Messages récupérés', [
+            'messages' => array_map([$this, 'toMessageContract'], $rows),
+        ]);
+    }
+
+    /** Contrat de sortie d'une interaction (message). */
+    private function toMessageContract(array $i): array
+    {
+        return [
+            'id'           => (int) $i['id'],
+            'contact_id'   => (int) $i['contact_id'],
+            'canal'        => $i['canal'],
+            'destinataire' => $i['destinataire'],
+            'sujet'        => $i['sujet'],
+            'statut'       => $i['statut'],
+            'envoye_le'    => $i['envoye_le'],
+        ];
     }
 
     // ---------------------------------------------------------------

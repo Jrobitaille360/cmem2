@@ -134,6 +134,65 @@ Exposé dans `GET /auth/me` → `data.user.plan.features.max_contacts`. Dépasse
   "errors": { "code": "QUOTA_EXCEEDED", "resource": "max_contacts", "limit": 50, "current": 50 } }
 ```
 
+## Communication — envoi de courriel
+
+Directive cmem_web `20260724_090048` (Phase G-B). Envoyer un courriel depuis une fiche contact
+via l'infra mail serveur (SPF/DKIM), plutôt qu'un simple `mailto:` dépendant du client mail.
+
+### `POST /contacts/{id}/messages`
+
+Envoie un courriel au contact **au nom de l'usager courant** et journalise l'envoi.
+
+- `From` = adresse serveur ; `Reply-To` = courriel de l'usager courant (les réponses lui reviennent).
+- Owner-strict : `403` si la fiche appartient à un autre usager, `404` si absente.
+- Corps envoyé en **texte brut**.
+
+Body :
+
+```json
+{ "app_id": "cmemweb", "canal": "email",
+  "destinataire": "marie@exemple.ca", "sujet": "Suivi devis", "corps": "Bonjour Marie, ..." }
+```
+
+- `canal` doit valoir `email` (seul canal supporté en v1) — sinon `422`.
+- `sujet` et `corps` requis non vides — sinon `422`.
+- `destinataire` optionnel : si absent, on résout le **courriel principal** du contact — le premier
+  courriel de type `pro`, sinon le premier de `courriels[]`. Si le contact n'a aucun courriel et
+  qu'aucun `destinataire` n'est fourni → `422`. Un `destinataire` fourni mais non valide → `422`.
+
+Réponse `201` :
+
+```json
+{ "success": true, "data": { "message": {
+  "id": 5, "contact_id": 10, "canal": "email",
+  "destinataire": "marie@exemple.ca", "sujet": "Suivi devis",
+  "statut": "envoye", "envoye_le": "2026-07-24 09:10:00" } } }
+```
+
+### `GET /contacts/{id}/messages`
+
+Historique des courriels envoyés depuis la fiche (canal email), owner-strict, plus récents d'abord.
+Accepte `?limit=` et `?offset=`.
+
+### Journalisation — table `interaction`
+
+Chaque envoi est journalisé dans `interaction` (`type='email'`, `direction='sortant'`,
+`statut='envoye'|'echec'`). La table est **générique** : elle anticipe la directive
+`crm-interactions` (Phase C — historique unifié appels/sms/notes) pour éviter un doublon.
+
+### Rate-limit anti-abus
+
+Réutilise `RateLimitService` (table `login_attempts`, endpoint `contact-message`), clé =
+courriel de l'usager courant + IP. Dépassement → `429`. Seuil : `RATE_LIMIT_AUTH_MAX_ATTEMPTS`
+envois par `RATE_LIMIT_AUTH_WINDOW_MINUTES` minutes.
+
+### Position CASL / RGPD
+
+La v1 ne couvre que du courriel **transactionnel / personnel**, initié manuellement par le
+propriétaire vers sa propre fiche : pas de consentement commercial ni de lien de désabonnement
+requis. La colonne `contacts.optout_courriel` (défaut `0`) est **réservée** et non bloquante en
+v1 ; elle devra bloquer l'envoi si l'usage devient commercial (envoi de masse).
+
 ## Partage (réservé P1)
 
 La table `contact_shares` et la colonne `partage_scope` existent mais ne sont **pas exploitées**
@@ -144,7 +203,11 @@ l'ajout du partage.
 
 ```bash
 php private/tests/test_contacts.php
+php private/tests/test_contacts_messages.php
 ```
 
-Couvre : sécurité, CRUD et scoping, filtres et pagination, export vCard, import vCard/CSV,
-cap `max_contacts`.
+`test_contacts.php` couvre : sécurité, CRUD et scoping, filtres et pagination, export vCard,
+import vCard/CSV, cap `max_contacts`.
+
+`test_contacts_messages.php` couvre : sécurité, validation, résolution du destinataire,
+envoi + journalisation `interaction`, historique, rate-limit anti-abus.

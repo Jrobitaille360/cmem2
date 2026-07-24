@@ -123,6 +123,58 @@
         }
       ]
     },
+    "messages": {
+      "description": "Communication — envoi de courriel depuis une fiche contact via l'infra mail serveur (SPF/DKIM). Directive cmem_web 20260724_090048 (Phase G-B). Journalisé dans la table interaction (générique, anticipe crm-interactions Phase C).",
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/contacts/{id}/messages",
+          "description": "Envoie un courriel au contact au nom de l'usager courant (From = serveur, Reply-To = courriel de l'usager) et journalise l'envoi. Owner-strict.",
+          "auth_required": true,
+          "body": {
+            "app_id": "string — défaut 'puzzle' ; 'cmemweb' pour le client web",
+            "canal": "string — doit valoir 'email' (seul canal supporté v1)",
+            "destinataire": "string|null — optionnel ; si absent, courriel principal du contact (type 'pro' prioritaire, sinon 1er de courriels[])",
+            "sujet": "string — requis, non vide",
+            "corps": "string — requis, non vide ; envoyé en texte brut"
+          },
+          "response": {
+            "message": {
+              "id": "int",
+              "contact_id": "int",
+              "canal": "string ('email')",
+              "destinataire": "string",
+              "sujet": "string",
+              "statut": "enum(envoye|echec)",
+              "envoye_le": "datetime"
+            }
+          },
+          "status_codes": { "201": "Message envoyé et journalisé" },
+          "errors": {
+            "401": "JWT absent ou invalide",
+            "403": "La fiche appartient à un autre propriétaire",
+            "404": "Fiche inexistante ou supprimée",
+            "422": "canal ≠ email, sujet/corps vide, destinataire invalide, ou contact sans courriel et sans destinataire",
+            "429": "Rate-limit anti-abus dépassé (par courriel usager + IP)"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/contacts/{id}/messages?app_id={app_id}&limit={limit}&offset={offset}",
+          "description": "Historique des courriels envoyés depuis la fiche (canal email). Owner-strict. Plus récents d'abord.",
+          "auth_required": true,
+          "response": {
+            "messages": "array — [{ id, contact_id, canal, destinataire, sujet, statut, envoye_le }]"
+          },
+          "status_codes": { "200": "Messages récupérés" },
+          "errors": {
+            "401": "JWT absent ou invalide",
+            "403": "La fiche appartient à un autre propriétaire",
+            "404": "Fiche inexistante ou supprimée"
+          }
+        }
+      ]
+    },
     "vcard": {
       "description": "Export et import vCard 4.0 (RFC 6350) — sérialisation serveur",
       "routes": [
