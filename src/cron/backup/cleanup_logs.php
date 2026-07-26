@@ -31,9 +31,12 @@ date_default_timezone_set($_ENV['APP_TIMEZONE'] ?? 'America/Montreal');
 $date      = date('Y-m-d H:i:s');
 $startTime = microtime(true);
 
+$logDirEnv = $_ENV['LOG_DIR'] ?? 'logs/';
+$logDirIsAbsolute = preg_match('#^(/|[A-Za-z]:[\\\\/])#', $logDirEnv) === 1;
+
 $logDir = isset($argv[1]) && $argv[1] !== ''
     ? rtrim($argv[1], '/')
-    : rtrim($rootDir . '/' . ltrim($_ENV['LOG_DIR'] ?? 'logs/', '/'), '/');
+    : rtrim($logDirIsAbsolute ? $logDirEnv : $rootDir . '/' . $logDirEnv, '/\\');
 
 if (!is_dir($logDir)) {
     echo "[{$date}] cleanup_logs ERREUR | Répertoire introuvable : {$logDir}\n";

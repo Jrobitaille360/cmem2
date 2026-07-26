@@ -258,14 +258,19 @@ class LogService
     private function writeToFile(string $filePath, string $content): void
     {
         // Utiliser un verrou pour éviter les corruptions en cas d'accès concurrent
-        $handle = fopen($filePath, 'a');
-        if ($handle) {
-            if (flock($handle, LOCK_EX)) {
-                fwrite($handle, $content);
-                flock($handle, LOCK_UN);
-            }
-            fclose($handle);
+        $handle = @fopen($filePath, 'a');
+        if ($handle === false) {
+            // Ne jamais échouer silencieusement : sans ceci, une erreur de chemin
+            // ou de permission fait disparaître les logs sans aucun signal.
+            error_log("LogService: écriture impossible dans {$filePath}");
+            return;
         }
+
+        if (flock($handle, LOCK_EX)) {
+            fwrite($handle, $content);
+            flock($handle, LOCK_UN);
+        }
+        fclose($handle);
     }
     
     /**

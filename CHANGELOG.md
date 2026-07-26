@@ -7,7 +7,16 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-07-24 17:20]
+## [Unreleased 2026-07-26 14:15]
+
+### Correctif — LOG_DIR absolu ignoré : logs applicatifs écrits hors du dossier attendu
+
+- `LOG_DIR` accepte désormais un **chemin absolu** (POSIX ou Windows) autant qu'un chemin relatif à la racine du projet — auparavant la valeur était toujours concaténée à la racine, transformant `/home/<user>/logs/` en `<racine-projet>/home/<user>/logs/`
+- Conséquence en production depuis le 22 juin 2026 : `LogService` créait silencieusement ce dossier imbriqué (`mkdir` récursif) et y écrivait tous les `app-YYYY-MM-DD.log`, laissant le dossier `logs/` attendu figé — aucune erreur remontée
+- `src/cron/backup/cleanup_logs.php` corrigé de la même façon : la purge visait elle aussi le mauvais dossier
+- `LogService::writeToFile()` n'échoue plus en silence : un `fopen` refusé (chemin invalide, permissions, quota) est signalé via `error_log()`
+- `.env.prod` : `LOG_DIR` repassé en relatif (`logs/`) ; déployé sur prod et dev, historique du 22 juin au 26 juillet rapatrié dans `logs/` et dossier imbriqué supprimé
+- `README.md` : tableau des variables par cible corrigé (`LOG_DIR=logs/` partout) + note sur le support relatif/absolu
 
 ### Ajout — GED : liens croisés étendus aux fichiers et contacts (Phase G-E)
 

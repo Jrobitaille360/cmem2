@@ -106,10 +106,13 @@ Ces variables changent selon la cible de déploiement (marquées `↓ à ajuster
 | `BASE_PATH` | `/api` | `/` | `/` |
 | `ALLOWED_ORIGINS` | origines localhost | domaine dev | domaine prod |
 | `LOG_LEVEL` | `debug` | `debug` | `info` |
-| `LOG_DIR` | `logs/` | `/home/xxx/logs/` | `/home/xxx/logs/` |
+| `LOG_DIR` | `logs/` | `logs/` | `logs/` |
 | `BACKUP_DIR` | chemin local | `/home/xxx/backups/` | `/home/xxx/backups/` |
 | `STRIPE_SECRET_KEY` | `sk_test_…` | `sk_test_…` | `sk_live_…` |
 | `PUZZLE_DEBUG_PREMIUM` | `false` | `false` | `false` |
+
+`LOG_DIR` accepte un chemin relatif à la racine du projet (`logs/`) ou un chemin absolu
+(`/home/xxx/logs/`, `C:\logs`). `BACKUP_DIR` attend un chemin absolu.
 
 ### Variables sensibles
 

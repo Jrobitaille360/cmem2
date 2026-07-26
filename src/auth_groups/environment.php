@@ -139,7 +139,11 @@ if (!file_exists(TMP_ASSETS_DIR)) {
 // Configuration des logs
 define('LOG_ENABLED', filter_var($_ENV['LOG_ENABLED'] ?? true, FILTER_VALIDATE_BOOLEAN));
 define('LOG_LEVEL', $_ENV['LOG_LEVEL'] ?? 'debug');
-define('LOG_DIR', __DIR__ . '/../../' . ($_ENV['LOG_DIR'] ?? 'logs/'));
+// LOG_DIR accepte un chemin relatif à la racine du projet ou un chemin absolu
+$logDirEnv = $_ENV['LOG_DIR'] ?? 'logs/';
+$logDirIsAbsolute = preg_match('#^(/|[A-Za-z]:[\\\\/])#', $logDirEnv) === 1;
+define('LOG_DIR', rtrim($logDirIsAbsolute ? $logDirEnv : __DIR__ . '/../../' . $logDirEnv, '/\\') . '/');
+unset($logDirEnv, $logDirIsAbsolute);
 define('LOG_MAX_FILE_SIZE', (int)($_ENV['LOG_MAX_FILE_SIZE'] ?? 10485760)); // 10MB par défaut
 define('LOG_ARCHIVE_AFTER_DAYS', (int)($_ENV['LOG_ARCHIVE_AFTER_DAYS'] ?? 7));
 define('LOG_DELETE_AFTER_WEEKS', (int)($_ENV['LOG_DELETE_AFTER_WEEKS'] ?? 12));
