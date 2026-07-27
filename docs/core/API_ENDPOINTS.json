@@ -450,17 +450,18 @@
         {
           "method": "GET",
           "path": "/users/me",
-          "description": "Obtenir son propre profil",
+          "description": "Obtenir son propre profil. Inclut timezone (identifiant IANA ou null si jamais renseigné).",
           "response": "{ user: User object }"
         },
         {
           "method": "PUT",
           "path": "/users/me",
-          "description": "Modifier son propre profil",
+          "description": "Modifier son propre profil. Un champ absent du corps reste inchangé.",
           "body": {
             "name": "string (optional)",
             "email": "string (optional)",
-            "bio": "string (optional)"
+            "bio": "string (optional)",
+            "timezone": "string|null (optional) - identifiant IANA (ex. Europe/Paris) ; null remet l'usager sur le repli (fuseau du premier calendrier, sinon America/Montreal). Utilisé par le cron push pour les échéances et la plage « ne pas déranger ». Valeur non reconnue → 422"
           },
           "response": "User object mis à jour"
         },

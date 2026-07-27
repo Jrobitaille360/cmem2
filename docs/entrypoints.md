@@ -16,6 +16,7 @@ Chaque module expose sa documentation d'API au format JSON. Ces fichiers décriv
 | [access/API_ACCESS_ENDPOINTS.json](access/API_ACCESS_ENDPOINTS.json) | 1 | `GET /v2/access/status` — statut d'accès consolidé (croisement Stripe + Play Store) par app_id. |
 | [traque/API_TRAQUE_ENDPOINTS.json](traque/API_TRAQUE_ENDPOINTS.json) | 17 | Jeu Traque : monstres géolocalisés (OSM), combat, personnage (création, repos, level-up), bestiaire, leaderboard. |
 | [pomo/API_POMO_ENDPOINTS_v1_0_0.json](pomo/API_POMO_ENDPOINTS_v1_0_0.json) | 1 | Plugin Pomodoro — phase 1A seulement : `POST /pomo/engagement` (waitlist/sondage public). Phases 1B/2/3 planifiées. |
+| [push/API_PUSH_ENDPOINTS.json](push/API_PUSH_ENDPOINTS.json) | 5 | Notifications push web (VAPID) : clé publique, subscriptions par appareil, préférences par compte (4 kinds dont `contact_followup`). |
 
 ## Guides narratifs par module
 
@@ -36,6 +37,7 @@ Chaque guide complète le JSON avec les flux d'intégration, exemples et codes d
 | [access/GUIDE.md](access/GUIDE.md) | `GET /v2/access/status` — matrice d'accès premium par plateforme. |
 | [traque/GUIDE.md](traque/GUIDE.md) | Personnage, monstres géolocalisés, combat, repos, bestiaire, leaderboard. |
 | [pomo/GUIDE.md](pomo/GUIDE.md) | Engagement public (Ph1A actif) ; support/sync/Stripe = contrat prévisionnel (404). |
+| [push/GUIDE.md](push/GUIDE.md) | Flux d'abonnement Web Push, préférences par compte, sélection des échéances, idempotence, purge sur 410, cron. |
 
 ## Conventions
 

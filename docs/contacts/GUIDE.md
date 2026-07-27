@@ -293,6 +293,46 @@ Bibliothèque documentaire d'une fiche : `GET /links?type=contact&id=10&app_id=c
 
 La suppression d'un fichier ou d'un contact **purge** les liens correspondants — aucun orphelin.
 
+## Relance de contact (Phase G-F)
+
+Directive `20260726_161400`, modèle **A1** retenu par cmem_web : la relance est portée par la
+**fiche**, pas par l'interaction. Une seule relance en cours par contact.
+
+| Champ | Type | Rôle |
+| - | - | - |
+| `date_relance` | `date\|null` | Date de la prochaine relance à faire |
+| `motif_relance` | `string\|null` | Motif libre, tronqué à 255 caractères |
+| `relance_faite_le` | `datetime\|null` | Horodatage du traitement ; `null` = relance en cours |
+
+Une fiche est **à relancer** quand `date_relance IS NOT NULL AND relance_faite_le IS NULL`.
+
+### Écriture
+
+Les trois champs s'écrivent par `POST /contacts` et `PUT /contacts/{id}` :
+
+```json
+PUT /contacts/10
+{ "app_id": "cmemweb", "date_relance": "2026-08-03", "motif_relance": "Rappeler après le devis" }
+```
+
+- `relance_faite_le: true` horodate côté serveur ; `null` annule la marque ; une chaîne
+  `AAAA-MM-JJ HH:MM:SS` est acceptée telle quelle.
+- Poser une `date_relance` **différente** de l'existante remet `relance_faite_le` à `null` —
+  une nouvelle échéance rouvre le suivi. Fournir `relance_faite_le` dans la même requête
+  désactive cette remise à zéro.
+- `date_relance: null` efface la relance et la marque.
+- Une date mal formée (`2026-13-40`, `demain`) renvoie `422` sans rien écrire.
+
+L'API **ne pose jamais** de relance automatiquement, notamment pas à la création d'une
+interaction : un « rappeler dans 7 jours » est un préréglage côté client.
+
+### Notification push
+
+Le cron `contact_followup` balaie **deux** sources : les relances de fiche et les échéances
+`opportunite.date_cloture_prevue`. Pas de 5e `kind` — le payload `data` porte
+`entity: "contact" | "opportunite"` pour savoir quelle vue ouvrir. Le corps reste générique :
+ni le nom du contact ni le motif n'y figurent. Détails : `docs/push/GUIDE.md`.
+
 ## Partage (réservé P1)
 
 La table `contact_shares` et la colonne `partage_scope` existent mais ne sont **pas exploitées**

@@ -23,7 +23,8 @@ class Contact extends BaseModel
 
     /** Champs scalaires acceptés en création/mise à jour. */
     public const SCALAR_FIELDS = ['prenom', 'nom', 'organisation', 'fonction', 'notes',
-                                  'anniversaire', 'photo_file_id', 'favori', 'partage_scope'];
+                                  'anniversaire', 'photo_file_id', 'favori', 'partage_scope',
+                                  'date_relance', 'motif_relance', 'relance_faite_le'];
 
     /** Requis par BaseModel — création via createContact(). */
     public function create()

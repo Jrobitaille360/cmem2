@@ -76,6 +76,11 @@ class ContactController
             'photo_file_id' => $c['photo_file_id'],
             'favori'        => (bool) $c['favori'],
             'partage_scope' => $c['partage_scope'],
+            // Relance de contact — modèle A1 (directive 20260726_161400 volet A).
+            // Une fiche est « à relancer » si date_relance != null et relance_faite_le == null.
+            'date_relance'     => $c['date_relance']     ?? null,
+            'motif_relance'    => $c['motif_relance']    ?? null,
+            'relance_faite_le' => $c['relance_faite_le'] ?? null,
             'cree_le'       => $c['cree_le'],
             'maj_le'        => $c['maj_le'],
         ];
@@ -122,6 +127,21 @@ class ContactController
             $fields['partage_scope'] = $p['partage_scope'];
         }
 
+        // --- Relance de contact (modèle A1) ---
+        if (array_key_exists('date_relance', $p)) {
+            $v = $p['date_relance'] === null ? '' : trim((string) $p['date_relance']);
+            $fields['date_relance'] = $v === '' ? null : $v;   // format déjà validé
+        }
+
+        if (array_key_exists('motif_relance', $p)) {
+            $v = $p['motif_relance'] === null ? '' : trim((string) $p['motif_relance']);
+            $fields['motif_relance'] = $v === '' ? null : mb_substr($v, 0, 255);
+        }
+
+        if (array_key_exists('relance_faite_le', $p)) {
+            $fields['relance_faite_le'] = self::normalizeFaiteLe($p['relance_faite_le']);
+        }
+
         foreach (Contact::JSON_FIELDS as $f) {
             if (array_key_exists($f, $p) && is_array($p[$f])) {
                 $fields[$f] = array_values($p[$f]);
@@ -131,6 +151,71 @@ class ContactController
         }
 
         return $fields;
+    }
+
+    /**
+     * Valide les champs de relance d'un payload.
+     * Retourne le message d'erreur à renvoyer en 422, ou null si tout est acceptable.
+     */
+    private function validateRelance(array $p): ?string
+    {
+        if (array_key_exists('date_relance', $p) && $p['date_relance'] !== null) {
+            $v = trim((string) $p['date_relance']);
+            if ($v !== '' && !self::isValidDate($v)) {
+                return 'date_relance invalide (attendu AAAA-MM-JJ)';
+            }
+        }
+
+        if (array_key_exists('relance_faite_le', $p)
+            && $p['relance_faite_le'] !== null
+            && !is_bool($p['relance_faite_le'])) {
+            $v = trim((string) $p['relance_faite_le']);
+            if ($v !== '' && !self::isValidDateTime($v)) {
+                return 'relance_faite_le invalide (attendu booléen ou AAAA-MM-JJ HH:MM:SS)';
+            }
+        }
+
+        return null;
+    }
+
+    /** Date calendaire réelle au format AAAA-MM-JJ (2026-13-40 est refusé). */
+    private static function isValidDate(string $v): bool
+    {
+        if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $v, $m)) {
+            return false;
+        }
+        return checkdate((int) $m[2], (int) $m[3], (int) $m[1]);
+    }
+
+    private static function isValidDateTime(string $v): bool
+    {
+        if (self::isValidDate($v)) {
+            return true;
+        }
+        $d = \DateTime::createFromFormat('Y-m-d H:i:s', $v);
+        return $d !== false && $d->format('Y-m-d H:i:s') === $v;
+    }
+
+    /**
+     * Normalise `relance_faite_le` : `true` horodate côté serveur, `false`/`null`/vide efface,
+     * une chaîne datetime est conservée telle quelle (déjà validée).
+     */
+    private static function normalizeFaiteLe($raw): ?string
+    {
+        if ($raw === null || $raw === false || $raw === '') {
+            return null;
+        }
+        if ($raw === true) {
+            return date('Y-m-d H:i:s');
+        }
+        $v = trim((string) $raw);
+        if ($v === '' || strtolower($v) === 'false' || $v === '0') {
+            return null;
+        }
+        if (strtolower($v) === 'true' || $v === '1') {
+            return date('Y-m-d H:i:s');
+        }
+        return self::isValidDate($v) ? $v . ' 00:00:00' : $v;
     }
 
     /** Vérifie le cap max_contacts. Retourne true si la réponse d'erreur a été envoyée. */
@@ -190,6 +275,13 @@ class ContactController
         LoggingMiddleware::logEntry();
         $p      = Response::getRequestParams();
         $userId = (int) $user['user_id'];
+
+        if ($err = $this->validateRelance($p)) {
+            LoggingMiddleware::logExit(422);
+            Response::error($err, null, 422);
+            return;
+        }
+
         $fields = $this->extractFields($p, true);
 
         if ($fields['prenom'] === '' && $fields['nom'] === '' && empty($fields['organisation'])) {
@@ -215,8 +307,23 @@ class ContactController
         $contact = $this->ownedOrFail($user, $id);
         if (!$contact) { return; }
 
-        $p      = Response::getRequestParams();
+        $p = Response::getRequestParams();
+
+        if ($err = $this->validateRelance($p)) {
+            LoggingMiddleware::logExit(422);
+            Response::error($err, null, 422);
+            return;
+        }
+
         $fields = $this->extractFields($p, false);
+
+        // Changer la date de relance rouvre le suivi : la marque « faite » est levée, sauf si
+        // le client fournit lui-même relance_faite_le dans la même requête.
+        if (array_key_exists('date_relance', $fields)
+            && !array_key_exists('relance_faite_le', $fields)
+            && (string) $fields['date_relance'] !== (string) ($contact['date_relance'] ?? '')) {
+            $fields['relance_faite_le'] = null;
+        }
 
         // Une maj ne peut pas vider à la fois prenom, nom et organisation.
         $prenom = array_key_exists('prenom', $fields) ? $fields['prenom'] : $contact['prenom'];

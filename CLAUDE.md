@@ -46,6 +46,7 @@ php private/tests/test_pomo.php
 php private/tests/test_pseudo.php
 php private/tests/test_public.php
 php private/tests/test_projets.php
+php private/tests/test_push.php
 php private/tests/test_puzzle_admin.php
 php private/tests/test_puzzle_backup.php
 php private/tests/test_puzzle_share.php
@@ -61,6 +62,7 @@ php private/tests/test_tags.php
 php private/tests/test_traque.php
 php private/tests/test_traque_rest.php
 php private/tests/test_users.php
+php private/tests/test_user_timezone.php
 ```
 
 Run all tests:
@@ -112,6 +114,7 @@ src/<module>/
 | `src/playstore/` | `Playstore\` | Google Play Store subscription verification |
 | `src/traque/` | `Traque\` | Game plugin: combat, monsters, OSM biomes, achievements |
 | `src/webdevice/` | `WebDevice\` | Web push device token management |
+| `src/push/` | `Push\` | Web Push (VAPID) — `/push/*`, subscriptions per device, prefs per account, send cron |
 | `src/notifications/` | *(scripts)* | Email notification scripts (no routing) |
 | `src/cron/` | *(scripts)* | Backup cron scripts (no routing) |
 | `src/Core/` | `Core\` | `PluginInterface`, `PluginManager`, `AbstractPlugin` |

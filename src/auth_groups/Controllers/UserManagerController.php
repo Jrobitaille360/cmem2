@@ -391,6 +391,18 @@ class UserManagerController {
                 return false;
             }
 
+            // timezone : identifiant IANA (ex. Europe/Paris) ou null pour revenir au repli
+            // (fuseau du premier calendrier, sinon America/Montreal). Champ absent = inchangé.
+            if (array_key_exists('timezone', $input) && $input['timezone'] !== null) {
+                if (!is_string($input['timezone'])
+                    || !in_array($input['timezone'], timezone_identifiers_list(), true)) {
+                    LoggingMiddleware::logExit(422);
+                    Response::error('Données de validation invalides',
+                        ['timezone' => ['identifiant de fuseau IANA non reconnu']], 422);
+                    return false;
+                }
+            }
+
             // Vérifier l'authentification
             if ( !RoleHelper::isAtLeast($currentUserRole, 'ADMINISTRATEUR') && $userId !== $currentUserId) {
                 LogService::warning("Tentative de modification de profil par un non-admin", [
@@ -454,6 +466,9 @@ class UserManagerController {
             $user->phone = $input['phone'] ?? $userData['phone'];
             $user->date_of_birth = $input['date_of_birth'] ?? $userData['date_of_birth'];
             $user->location = $input['location'] ?? $userData['location'];
+            $user->timezone = array_key_exists('timezone', $input)
+                ? $input['timezone']                 // null explicite = retour au repli
+                : ($userData['timezone'] ?? null);   // champ absent = valeur conservée
             $user->email_verified = $userData['email_verified'];
             if ($user->update()) {
                 LogService::info("Profil utilisateur mis à jour", [

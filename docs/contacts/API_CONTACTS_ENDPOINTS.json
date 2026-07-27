@@ -70,7 +70,10 @@
             "anniversaire": "date YYYY-MM-DD|null",
             "photo_file_id": "int|null — référence au module files",
             "favori": "bool — défaut false",
-            "partage_scope": "enum(prive|groupe|utilisateurs) — défaut 'prive', réservé P1 (inactif)"
+            "partage_scope": "enum(prive|groupe|utilisateurs) — défaut 'prive', réservé P1 (inactif)",
+            "date_relance": "date YYYY-MM-DD|null — prochaine relance à faire sur la fiche",
+            "motif_relance": "string|null — tronqué à 255 caractères, jamais inclus dans le push",
+            "relance_faite_le": "bool|datetime|null — true horodate côté serveur, null annule la marque"
           },
           "response": { "contact": "Contact" },
           "status_codes": { "201": "Contact créé" },
@@ -99,13 +102,14 @@
           "description": "Mise à jour partielle : seuls les champs transmis sont écrits. PATCH est accepté et se comporte à l'identique.",
           "auth_required": true,
           "body": "Mêmes champs que POST, tous optionnels",
+          "regle_relance": "Poser une date_relance différente de l'existante remet relance_faite_le à null, sauf si relance_faite_le est fourni dans la même requête.",
           "response": { "contact": "Contact" },
           "status_codes": { "200": "Contact mis à jour" },
           "errors": {
             "401": "JWT absent ou invalide",
             "403": "La fiche appartient à un autre propriétaire",
             "404": "Fiche inexistante ou soft-supprimée",
-            "422": "La mise à jour viderait à la fois prenom, nom et organisation"
+            "422": "La mise à jour viderait à la fois prenom, nom et organisation ; ou date_relance / relance_faite_le mal formées"
           }
         },
         {
@@ -421,6 +425,9 @@
     "photo_file_id": "int|null",
     "favori": "bool",
     "partage_scope": "enum(prive|groupe|utilisateurs)",
+    "date_relance": "date|null",
+    "motif_relance": "string|null",
+    "relance_faite_le": "datetime|null — une fiche est « à relancer » si date_relance != null et relance_faite_le == null",
     "cree_le": "datetime",
     "maj_le": "datetime"
   },

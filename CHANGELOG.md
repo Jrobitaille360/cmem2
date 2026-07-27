@@ -7,7 +7,53 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-07-26 14:15]
+## [Unreleased 2026-07-26 22:15]
+
+### Ajout — Relance de contact : 2e source de `contact_followup` (Phase G-F)
+
+- Trois colonnes sur `contacts` : `date_relance` (DATE), `motif_relance` (VARCHAR(255)), `relance_faite_le` (DATETIME) — modèle **A1** tranché par cmem_web : la relance est portée par la fiche, pas par l'interaction ; une seule relance en cours par contact
+- `POST /contacts` et `PUT /contacts/{id}` acceptent les trois champs ; `GET /contacts` et `GET /contacts/{id}` les exposent. Une fiche est « à relancer » quand `date_relance IS NOT NULL AND relance_faite_le IS NULL`
+- `relance_faite_le: true` horodate côté serveur, `null` annule la marque — l'historique est conservé, la relance n'est jamais effacée par l'API
+- Poser une `date_relance` différente de l'existante remet `relance_faite_le` à `null` (une nouvelle échéance rouvre le suivi), sauf si le client fournit `relance_faite_le` dans la même requête
+- Date mal formée (`2026-13-40`, `demain`) → `422` sans écriture ; validation par `checkdate()`, pas par simple motif
+- **Aucune pose automatique** : l'API n'écrit jamais de relance à la création d'une interaction — un « rappeler dans 7 jours » reste un préréglage client
+- Cron push : `contact_followup` balaie désormais **deux** sources (relances de fiche + échéances d'opportunité) sans 5e `kind`, donc sans migration d'`ENUM` sur `notification_prefs` / `push_notification_log` ; le payload `data` porte `entity` (`contact` | `opportunite`) pour router le clic
+- `occurrence_key` des relances préfixée `relance:` : la clé d'idempotence est unique sur `(owner_id, kind, entity_id, occurrence_key)` — sans préfixe, un contact et une opportunité de même id échéant le même jour se seraient annulés mutuellement
+- Corps de notification inchangé et générique : ni le nom du contact ni le motif n'y figurent
+- Ligne `DUE` du cron enrichie d'`entity_type=<contact|opportunite|->`
+- Migration pendante `docs/20260726_contacts_relance.sql` ; plan de travail `docs/PLAN_relance-contact.md`
+- Doc : `docs/contacts/GUIDE.md` (section « Relance de contact »), `docs/contacts/API_CONTACTS_ENDPOINTS.json`, `docs/push/GUIDE.md`
+- Suites `private/tests/test_contacts.php` (137/137) et `private/tests/test_push.php` (98/98) vertes
+- Répond au volet A de la directive inter-projet `20260726_161400_cmem2_API_vers_cmem_web__relance-contact-et-timezone-usager.md`
+
+## [Unreleased 2026-07-26 16:45]
+
+### Ajout — Fuseau horaire de l'usager (`users.timezone`)
+
+- Nouvelle colonne `users.timezone` (VARCHAR(50), **nullable**) : identifiant IANA posé par le client. `NULL` = jamais renseigné, le repli reste actif — choix délibéré contre un `NOT NULL DEFAULT` qui aurait basculé en heure de Montréal les comptes disposant déjà d'un calendrier dans un autre fuseau
+- `GET /users/me` (et `GET /users/{id}`) exposent `timezone` ; `PUT /users/me` l'accepte en écriture — identifiant hors base IANA du serveur → `422`, champ absent du corps → valeur conservée, `null` explicite → retour au repli
+- `DueScanner::userTimezone()` applique désormais l'ordre `users.timezone` → fuseau du premier calendrier → `America/Montreal` ; un identifiant inconnu du serveur est ignoré au profit du repli suivant plutôt que passé à `DateTimeZone`
+- Corrige le cas d'un usager hors Québec sans calendrier : sa plage « ne pas déranger » et ses échéances sans heure étaient évaluées en heure de Montréal (un réglage `22:00 → 07:00` produisait un silence de 04:00 à 13:00 à Paris, et des notifications en pleine nuit)
+- Migration pendante `docs/20260726_users_timezone.sql` ; plan de travail `docs/PLAN_timezone-usager.md`
+- Doc : `docs/core/GUIDE.md` (section « Fuseau horaire du compte »), `docs/core/API_ENDPOINTS.json`, `docs/push/GUIDE.md`
+- Suite `private/tests/test_user_timezone.php` : 38/38 tests verts (priorité du fuseau du compte sur celui du calendrier, prouvée par la plage silencieuse évaluée à Paris et non à Montréal)
+
+## [Unreleased 2026-07-26 16:10]
+
+### Ajout — Notifications push web (VAPID) : subscriptions, préférences et cron d'envoi
+
+- Nouveau module `src/push/` (plugin `Push`) exposant cinq routes authentifiées par JWT : `GET /push/vapid-public-key`, `POST`/`DELETE /push/subscribe`, `GET`/`PUT /push/preferences`
+- `POST /push/subscribe` crée (`201`) ou met à jour (`200`) la subscription de l'appareil — unicité `(owner_id, endpoint)`, aucun doublon sur ré-abonnement ; `DELETE` renvoie `204`, `404` si l'endpoint est inconnu ou appartient à un tiers
+- **Préférences par compte** (réponse au point laissé à trancher par la directive) : `notification_prefs` unique sur `(owner_id, app_id, kind)`, quatre `kind` dès la première migration — `event`, `task_due`, `recurring`, `contact_followup` ; `lead_minutes` limité à 5/15/60/1440, plage « ne pas déranger » par paire `quiet_from`/`quiet_to`, push **opt-in** (`enabled = false` par défaut)
+- Cron `src/push/send_push_notifications.php` (toutes les 5 minutes, options `--dry-run`, `--verbose`, `--batch=`, `--user=`, `--now=`) : sélection des échéances d'événements, occurrences récurrentes, tâches et suivis d'opportunités dans la fenêtre `]maintenant − grâce ; maintenant + lead_minutes]`
+- Idempotence stricte : réservation de l'échéance dans `push_notification_log` avant envoi — une échéance = une ligne = un envoi logique, quel que soit le nombre d'appareils
+- Purge automatique des subscriptions rejetées en `404`/`410` par le service de push — seule maintenance du module
+- Confidentialité : corps de notification générique (`PUSH_GENERIC_TITLE` + libellé par `kind`) ; le payload ne transporte que `data.type` et `data.id` pour router le clic, jamais le titre d'une entité
+- Fuseaux respectés sans `NOW()` SQL : datetimes convertis en UTC depuis le fuseau de l'entité ; échéances sans heure fixées à 00:00 dans le fuseau de l'usager (premier calendrier, à défaut `America/Montreal`)
+- Dépendance `minishlink/web-push ^9` ; nouvelles variables `.env` : `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `PUSH_GENERIC_TITLE`, `PUSH_TTL_SECONDS` — génération par `php src/push/generate_vapid.php`
+- Migration pendante `docs/20260726_web_push.sql` : `push_subscriptions`, `notification_prefs`, `push_notification_log`
+- Doc : `docs/push/API_PUSH_ENDPOINTS.json`, `docs/push/GUIDE.md`, index `docs/entrypoints.md`
+- Suite `private/tests/test_push.php` : 77/77 tests verts (le cron y est lancé par SSH sur dev — OpenSSL de XAMPP ne peut pas chiffrer en `aes128gcm`)
 
 ### Correctif — LOG_DIR absolu ignoré : logs applicatifs écrits hors du dossier attendu
 
