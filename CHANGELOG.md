@@ -7,7 +7,9 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-07-26 22:15]
+## [Unreleased]
+
+## [2.11.0] — 2026-07-26
 
 ### Ajout — Relance de contact : 2e source de `contact_followup` (Phase G-F)
 
@@ -26,8 +28,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - Suites `private/tests/test_contacts.php` (137/137) et `private/tests/test_push.php` (98/98) vertes
 - Répond au volet A de la directive inter-projet `20260726_161400_cmem2_API_vers_cmem_web__relance-contact-et-timezone-usager.md`
 
-## [Unreleased 2026-07-26 16:45]
-
 ### Ajout — Fuseau horaire de l'usager (`users.timezone`)
 
 - Nouvelle colonne `users.timezone` (VARCHAR(50), **nullable**) : identifiant IANA posé par le client. `NULL` = jamais renseigné, le repli reste actif — choix délibéré contre un `NOT NULL DEFAULT` qui aurait basculé en heure de Montréal les comptes disposant déjà d'un calendrier dans un autre fuseau
@@ -37,8 +37,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - Migration pendante `docs/20260726_users_timezone.sql` ; plan de travail `docs/PLAN_timezone-usager.md`
 - Doc : `docs/core/GUIDE.md` (section « Fuseau horaire du compte »), `docs/core/API_ENDPOINTS.json`, `docs/push/GUIDE.md`
 - Suite `private/tests/test_user_timezone.php` : 38/38 tests verts (priorité du fuseau du compte sur celui du calendrier, prouvée par la plage silencieuse évaluée à Paris et non à Montréal)
-
-## [Unreleased 2026-07-26 16:10]
 
 ### Ajout — Notifications push web (VAPID) : subscriptions, préférences et cron d'envoi
 

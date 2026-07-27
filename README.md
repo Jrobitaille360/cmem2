@@ -1,11 +1,11 @@
 ﻿# cmem2 API
 
-![Version](https://img.shields.io/badge/version-2.10.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.11.0-blue.svg)
 ![PHP](https://img.shields.io/badge/PHP-8.0+-purple.svg)
 ![Status](https://img.shields.io/badge/status-production%20ready-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 
-API REST modulaire pour la plateforme **Memories v2**. Elle regroupe les modules : authentification/groupes (core), calendriers ICS/CalDAV, Pomodoro, Quiz interactif, gestionnaire générique Items, pilier Contacts (CRM), gestion de projet (Projets), puzzle collaboratif, jeu Traque, contrôle d'accès aux abonnements (Access), paiements Stripe, vérification Playstore et gestion des tokens push web (WebDevice).
+API REST modulaire pour la plateforme **Memories v2**. Elle regroupe les modules : authentification/groupes (core), calendriers ICS/CalDAV, Pomodoro, Quiz interactif, gestionnaire générique Items, pilier Contacts (CRM), gestion de projet (Projets), puzzle collaboratif, jeu Traque, contrôle d'accès aux abonnements (Access), paiements Stripe, vérification Playstore, notifications push web VAPID (Push) et gestion des tokens push web (WebDevice).
 
 Authentification **JWT** HS256 (Bearer, 15 jours). Deux méthodes de connexion : **email + mot de passe** ou **email + code OTP**.
 
@@ -445,4 +445,4 @@ MIT — voir [LICENSE](LICENSE). Dépendances tierces : [THIRD_PARTY_LICENSES.md
 
 ---
 
-**Version** : 2.10.0 · **Mis à jour** : 2026-07-24 · **Auteur** : [Jrobitaille360](https://github.com/Jrobitaille360)
+**Version** : 2.11.0 · **Mis à jour** : 2026-07-26 · **Auteur** : [Jrobitaille360](https://github.com/Jrobitaille360)
