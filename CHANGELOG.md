@@ -9,6 +9,21 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+### Ajout — Registre de modules activables : `GET /modules`, `PATCH /modules/{key}`
+
+- Nouvelle table `tenant_modules` (`docs/20260727_tenant_modules.sql`) : `app_id`, `owner_id`/`group_id`, `module_key`, `enabled`, `quota_used`, `quota_reset_at` — unicité sur `(owner_id, module_key)` et `(group_id, module_key)`, CHECK `owner_id` XOR `group_id`
+- Énumération `module_key` figée dès la v1 : `projet | contacts | crm | ged | ia | caldav | booking | push_avance`
+- Trois états séparés : **disponible** (décidé par le plan Stripe, `src/stripe/Config/CmemModules.php`), **activé** (choix de l'usager, `tenant_modules.enabled`), **quota** (serveur, `quota_used`/`quota_reset_at`). Un module peut être disponible mais éteint — aucun appel, aucun coût
+- `GET /modules` renvoie les 8 modules avec `available` / `enabled` / `quota`, plus le code du plan effectif. N'écrit aucune ligne : l'absence de ligne vaut état par défaut
+- `PATCH /modules/{key}` allume ou éteint un module (UPSERT, jamais de doublon). `403` `MODULE_NOT_AVAILABLE` si le plan n'y donne pas droit, `422` `UNKNOWN_MODULE_KEY` sur clé inconnue, `422` `VALIDATION_ERROR` si `enabled` absent ou non booléen
+- Rétro-fit sans perte d'accès : `projet`, `contacts`, `crm` et `ged` restent disponibles sur **tous** les plans (Gratuit inclus) et sont allumés par défaut — pas de clause grand-père, pas de backfill de données. Le plan `ami` ouvre les 8 modules
+- `ia` : non disponible sur Gratuit, éteint par défaut sur les plans payants, quota de 30 appels/mois décompté côté serveur (`TenantModule::incrementQuota`) pour la future directive `ai-proxy`
+- Quota de stockage `ged` reporté (`quota: null`) ; `group_id` présent en base mais non servi en v1 (prépare le plan équipe)
+- Désactiver un module coupe l'accès, jamais le contenu : réactiver rend les données telles quelles
+- Doc : `docs/modules/GUIDE.md`, `docs/modules/API_MODULES_ENDPOINTS.json`, `docs/entrypoints.md`
+- Tests : `private/tests/test_modules.php` (54 tests) ; suite complète 2139/2139
+- Répond à la directive inter-projet `20260727_144926_cmem_web_vers_cmem2_API__modules-gating.md`
+
 ### Ajout — Corbeille des fichiers : `GET /files/user/{user_id}?deleted=`
 
 - Nouveau paramètre `deleted` sur `GET /files/user/{user_id}` : `exclude` (défaut, comportement historique), `include` (actifs + supprimés), `only` (corbeille). Valeur hors liste → `422`

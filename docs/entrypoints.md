@@ -17,6 +17,7 @@ Chaque module expose sa documentation d'API au format JSON. Ces fichiers décriv
 | [traque/API_TRAQUE_ENDPOINTS.json](traque/API_TRAQUE_ENDPOINTS.json) | 17 | Jeu Traque : monstres géolocalisés (OSM), combat, personnage (création, repos, level-up), bestiaire, leaderboard. |
 | [pomo/API_POMO_ENDPOINTS_v1_0_0.json](pomo/API_POMO_ENDPOINTS_v1_0_0.json) | 1 | Plugin Pomodoro — phase 1A seulement : `POST /pomo/engagement` (waitlist/sondage public). Phases 1B/2/3 planifiées. |
 | [push/API_PUSH_ENDPOINTS.json](push/API_PUSH_ENDPOINTS.json) | 5 | Notifications push web (VAPID) : clé publique, subscriptions par appareil, préférences par compte (4 kinds dont `contact_followup`). |
+| [modules/API_MODULES_ENDPOINTS.json](modules/API_MODULES_ENDPOINTS.json) | 2 | Registre de modules activables : gating par plan (`available`), interrupteur usager (`enabled`), quota serveur. |
 
 ## Guides narratifs par module
 
@@ -38,6 +39,7 @@ Chaque guide complète le JSON avec les flux d'intégration, exemples et codes d
 | [traque/GUIDE.md](traque/GUIDE.md) | Personnage, monstres géolocalisés, combat, repos, bestiaire, leaderboard. |
 | [pomo/GUIDE.md](pomo/GUIDE.md) | Engagement public (Ph1A actif) ; support/sync/Stripe = contrat prévisionnel (404). |
 | [push/GUIDE.md](push/GUIDE.md) | Flux d'abonnement Web Push, préférences par compte, sélection des échéances, idempotence, purge sur 410, cron. |
+| [modules/GUIDE.md](modules/GUIDE.md) | Trois états (disponible / activé / quota), mapping plan→modules, rétro-fit des pans livrés, codes d'erreur du gating. |
 
 ## Conventions
 
