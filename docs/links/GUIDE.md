@@ -3,7 +3,8 @@
 <!-- markdownlint-disable MD013 -->
 
 Liens bidirectionnels polymorphes entre les entités CMEM : **event, task, journal, project,
-project_task**. Directive `cmem_web` B2 (`20260722_141845`).
+project_task** et, depuis la Phase G-E (GED), **file, contact, interaction, opportunite**.
+Directives `cmem_web` B2 (`20260722_141845`) et GED (`20260724_154619`).
 
 ## Modèle
 
@@ -14,6 +15,10 @@ project_task**. Directive `cmem_web` B2 (`20260722_141845`).
 | `journal` | `calendar_journals` | `summary` | — |
 | `project` | `projects` | `name` | — |
 | `project_task` | `calendar_todos` | `title` | `project_id IS NOT NULL` |
+| `file` | `files` | `original_name` | propriétaire = `uploaded_by` |
+| `contact` | `contacts` | « prénom nom », à défaut `organisation` | suppression = `supprime_le` |
+| `interaction` | `interaction` | `resume`, à défaut `sujet` | suppression = `supprime_le` |
+| `opportunite` | `opportunite` | `titre` | suppression = `supprime_le` |
 
 Table `links` : `id, app_id, owner_id, src_type, src_id, dst_type, dst_id, created_at`.
 Unicité logique : `(app_id, owner_id, src_type, src_id, dst_type, dst_id)`.
@@ -41,6 +46,11 @@ sont purgés — zéro orphelin. Points d'ancrage :
 - `CalendarJournal::softDeleteById()` → purge `journal`
 - `Projets\Project::deleteProject()` → purge `project` + les liens de ses `project_task` (avant le
   DELETE, car la suppression FK-cascade les tâches hors PHP)
+- `File::deleteById()` / `File::delete()` → purge `file`
+- `Contacts\Contact::softDeleteContact()` → purge `contact` + les liens de ses `interaction` et
+  `opportunite` (ids collectés avant le masquage)
+- `Contacts\Interaction::softDeleteInteraction()` → purge `interaction`
+- `Contacts\Opportunite::softDeleteOpportunite()` / `softDeleteByContact()` → purge `opportunite`
 
 La purge est appelée via `AuthGroups\Models\Link::purge()` / `purgeTodo()` (statiques, try/catch : la
 suppression de l'entité prime, jamais interrompue même si la table `links` est absente).
@@ -60,3 +70,7 @@ Voir `API_LINKS_ENDPOINTS.json`. Résumé :
 
 `php private/tests/test_links.php` — 55 assertions (sécurité, validation, dédup bidirectionnelle,
 GET entrants/sortants, DELETE scopé, cascade de purge event/journal/project/project_task).
+
+`php private/tests/test_links_ged.php` — types GED (sécurité owner-strict sur `file`/`contact`,
+liens vers `interaction`/`opportunite`, `other_title`, purge à la suppression d'un fichier ou
+d'un contact).

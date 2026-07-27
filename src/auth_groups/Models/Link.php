@@ -7,23 +7,47 @@ use PDO;
 /**
  * Model Link — table `links`
  *
- * Liens croisés polymorphes entre entités (event|task|journal|project|project_task).
- * Directive cmem_web B2 (20260722_141845). Voir docs/links/GUIDE.md.
+ * Liens croisés polymorphes entre entités
+ * (event|task|journal|project|project_task|file|contact|interaction|opportunite).
+ * Directive cmem_web B2 (20260722_141845), étendue à la GED par 20260724_154619 (Phase G-E).
+ * Voir docs/links/GUIDE.md.
  *
- * Portée : owner-strict. Un lien n'est permis qu'entre entités dont user_id == owner_id.
+ * Portée : owner-strict. Un lien n'est permis qu'entre entités dont le propriétaire == owner_id.
  * Un seul enregistrement (src → dst) par paire logique ; le sens inverse est le même lien.
  */
 class Link extends BaseModel
 {
     protected $table = 'links';
 
-    /** Types liables → table, colonne titre, filtre project_id éventuel. */
+    /**
+     * Types liables → table, expression du titre, colonne propriétaire, colonne de suppression,
+     * filtre project_id éventuel.
+     *
+     * Les piliers récents (contacts) utilisent des colonnes françaises : `supprime_le` au lieu de
+     * `deleted_at`, d'où les clés `owner` et `deleted` explicites.
+     */
     private const ENTITY_MAP = [
-        'event'        => ['table' => 'calendar_events',   'title' => 'title',   'project' => null],
-        'task'         => ['table' => 'calendar_todos',    'title' => 'title',   'project' => 'null'],
-        'journal'      => ['table' => 'calendar_journals', 'title' => 'summary', 'project' => null],
-        'project'      => ['table' => 'projects',          'title' => 'name',    'project' => null],
-        'project_task' => ['table' => 'calendar_todos',    'title' => 'title',   'project' => 'notnull'],
+        'event'        => ['table' => 'calendar_events',   'title' => 'title',
+                           'owner' => 'user_id',     'deleted' => 'deleted_at',  'project' => null],
+        'task'         => ['table' => 'calendar_todos',    'title' => 'title',
+                           'owner' => 'user_id',     'deleted' => 'deleted_at',  'project' => 'null'],
+        'journal'      => ['table' => 'calendar_journals', 'title' => 'summary',
+                           'owner' => 'user_id',     'deleted' => 'deleted_at',  'project' => null],
+        'project'      => ['table' => 'projects',          'title' => 'name',
+                           'owner' => 'user_id',     'deleted' => 'deleted_at',  'project' => null],
+        'project_task' => ['table' => 'calendar_todos',    'title' => 'title',
+                           'owner' => 'user_id',     'deleted' => 'deleted_at',  'project' => 'notnull'],
+        // --- GED (Phase G-E) ---
+        'file'         => ['table' => 'files',             'title' => 'original_name',
+                           'owner' => 'uploaded_by', 'deleted' => 'deleted_at',  'project' => null],
+        'contact'      => ['table' => 'contacts',
+                           'title' => "COALESCE(NULLIF(TRIM(CONCAT(prenom, ' ', nom)), ''), organisation)",
+                           'owner' => 'user_id',     'deleted' => 'supprime_le', 'project' => null],
+        'interaction'  => ['table' => 'interaction',
+                           'title' => "COALESCE(NULLIF(resume, ''), sujet)",
+                           'owner' => 'user_id',     'deleted' => 'supprime_le', 'project' => null],
+        'opportunite'  => ['table' => 'opportunite',       'title' => 'titre',
+                           'owner' => 'user_id',     'deleted' => 'supprime_le', 'project' => null],
     ];
 
     public static function validTypes(): array
@@ -46,16 +70,21 @@ class Link extends BaseModel
             return null;
         }
         $meta  = self::ENTITY_MAP[$type];
-        $where = "id = ? AND user_id = ? AND deleted_at IS NULL";
+        $where = "id = ? AND {$meta['owner']} = ? AND {$meta['deleted']} IS NULL";
         if ($meta['project'] === 'null') {
             $where .= " AND project_id IS NULL";
         } elseif ($meta['project'] === 'notnull') {
             $where .= " AND project_id IS NOT NULL";
         }
-        $stmt = $this->getDb()->prepare(
-            "SELECT id, {$meta['title']} AS title FROM {$meta['table']} WHERE {$where} LIMIT 1"
-        );
-        $stmt->execute([$id, $ownerId]);
+        try {
+            $stmt = $this->getDb()->prepare(
+                "SELECT id, {$meta['title']} AS title FROM {$meta['table']} WHERE {$where} LIMIT 1"
+            );
+            $stmt->execute([$id, $ownerId]);
+        } catch (\PDOException $e) {
+            // Table absente (migration non encore appliquée) : l'entité est simplement non résolue.
+            return null;
+        }
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row ?: null;
     }

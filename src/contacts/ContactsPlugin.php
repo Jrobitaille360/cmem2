@@ -5,6 +5,7 @@ namespace Contacts;
 use Core\AbstractPlugin;
 use Core\PluginManager;
 use Contacts\Routing\ContactsRouteHandler;
+use Contacts\Routing\OpportunitesRouteHandler;
 
 class ContactsPlugin extends AbstractPlugin
 {
@@ -18,6 +19,9 @@ class ContactsPlugin extends AbstractPlugin
         return [
             'contacts' => function ($authService) {
                 return new ContactsRouteHandler($authService);
+            },
+            'opportunites' => function ($authService) {
+                return new OpportunitesRouteHandler($authService);
             }
         ];
     }

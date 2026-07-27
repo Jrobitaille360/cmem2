@@ -1,9 +1,9 @@
 {
   "module": {
     "name": "Links",
-    "version": "1.0.0",
-    "description": "Liens croisés polymorphes entre entités (event | task | journal | project | project_task). Directive cmem_web B2.",
-    "generated": "2026-07-22",
+    "version": "1.1.0",
+    "description": "Liens croisés polymorphes entre entités (event | task | journal | project | project_task | file | contact | interaction | opportunite). Directive cmem_web B2, étendue à la GED (20260724_154619, Phase G-E).",
+    "generated": "2026-07-24",
     "base_path": "/links",
     "authentication": {
       "type": "JWT_BEARER",
@@ -11,13 +11,17 @@
     },
     "notes": "Portée owner-strict : toutes les extrémités doivent appartenir au user courant (user_id). Multi-tenant via app_id (défaut serveur 'puzzle', 'cmemweb' pour cmem_web). Lien logiquement bidirectionnel : une seule ligne src→dst ; le sens inverse est le même lien (dédup à la création). GET renvoie les liens entrants + sortants."
   },
-  "entity_types": ["event", "task", "journal", "project", "project_task"],
+  "entity_types": ["event", "task", "journal", "project", "project_task", "file", "contact", "interaction", "opportunite"],
   "entity_mapping": {
     "event": "calendar_events",
     "task": "calendar_todos (project_id NULL)",
     "journal": "calendar_journals",
     "project": "projects",
-    "project_task": "calendar_todos (project_id NOT NULL)"
+    "project_task": "calendar_todos (project_id NOT NULL)",
+    "file": "files (propriétaire uploaded_by) — other_title = files.original_name",
+    "contact": "contacts (supprime_le) — other_title = « prénom nom », à défaut organisation",
+    "interaction": "interaction (supprime_le) — other_title = resume, à défaut sujet",
+    "opportunite": "opportunite (supprime_le) — other_title = titre"
   },
   "endpoints": {
     "links": {
@@ -30,9 +34,9 @@
           "auth_required": true,
           "body": {
             "app_id": "string — optionnel, défaut 'puzzle' ('cmemweb' pour cmem_web)",
-            "src_type": "enum(event|task|journal|project|project_task) — requis",
+            "src_type": "enum(event|task|journal|project|project_task|file|contact|interaction|opportunite) — requis",
             "src_id": "int — requis",
-            "dst_type": "enum(event|task|journal|project|project_task) — requis",
+            "dst_type": "enum(event|task|journal|project|project_task|file|contact|interaction|opportunite) — requis",
             "dst_id": "int — requis"
           },
           "response": {
@@ -55,7 +59,7 @@
           "description": "Liste les liens entrants + sortants d'une entité, enrichis du titre de la cible.",
           "auth_required": true,
           "query": {
-            "type": "enum(event|task|journal|project|project_task) — requis",
+            "type": "enum(event|task|journal|project|project_task|file|contact|interaction|opportunite) — requis",
             "id": "int — requis",
             "app_id": "string — optionnel, défaut 'puzzle'"
           },
@@ -83,5 +87,5 @@
       ]
     }
   },
-  "cascade_purge": "À la suppression (soft ou hard) d'une entité (event/task/journal/project/project_task), tous les liens la référençant (en src OU dst) sont purgés automatiquement — aucun lien orphelin. La suppression d'un projet purge aussi les liens de ses project_tasks (cascade FK)."
+  "cascade_purge": "À la suppression (soft ou hard) d'une entité, tous les liens la référençant (en src OU dst) sont purgés automatiquement — aucun lien orphelin. Vaut pour event/task/journal/project/project_task et, depuis la Phase G-E, pour file/contact/interaction/opportunite. La suppression d'un projet purge aussi les liens de ses project_tasks ; la suppression d'un contact purge ses liens ainsi que ceux de ses interactions et opportunités."
 }

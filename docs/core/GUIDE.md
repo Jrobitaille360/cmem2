@@ -219,7 +219,7 @@ Réponse `200` :
 | POST | `/users/request-password-reset` | Non | Demander réinitialisation |
 | POST | `/users/reset-password` | Non | Nouveau mot de passe |
 | GET | `/users/me` | JWT | Profil courant |
-| PUT | `/users/me` | JWT | Modifier profil |
+| PUT | `/users/me` | JWT | Modifier profil ; accepte `timezone` (identifiant IANA, `null` = repli) |
 | DELETE | `/users/me` | JWT | Supprimer compte |
 | POST | `/users/avatar` | JWT | Upload avatar (multipart) |
 | PUT | `/users/password` | JWT | Changer son mot de passe (`old_password` + `new_password`) |
@@ -265,6 +265,22 @@ Il n'existe pas de route `GET /users/avatar`. L'upload (`POST /users/avatar`) re
 `GET /users/{id}`) expose `profile_image`. Ce chemin est un **fichier statique** servi
 directement par le serveur web, sans JWT — le client le charge tel quel
 (`{base_url}/uploads/avatars/...`).
+
+### Fuseau horaire du compte (`timezone`)
+
+`GET /users/me` expose `timezone` : un identifiant IANA (`Europe/Paris`) ou `null` tant que
+le client ne l'a jamais posé. `PUT /users/me` l'accepte en écriture ; une valeur absente de
+la base IANA du serveur est refusée en `422`, et `null` remet l'usager sur le repli.
+
+Le client est la seule source fiable de cette valeur
+(`Intl.DateTimeFormat().resolvedOptions().timeZone`) : il lui revient de la poser à
+l'inscription, et de la corriger si elle change.
+
+Le champ sert au cron des notifications push, qui s'exécute hors requête HTTP et ne peut
+donc pas déduire l'heure locale de l'usager au moment de l'envoi : échéances sans heure
+fixées à 00:00 locales, et plage « ne pas déranger » (`quiet_from` / `quiet_to` de
+`/push/preferences`) évaluée dans ce fuseau. Ordre de priorité :
+`users.timezone` → fuseau du premier calendrier → `America/Montreal`.
 
 ### Rôles utilisateur
 

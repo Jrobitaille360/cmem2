@@ -255,14 +255,33 @@ class File extends BaseModel
             return false;
         }
 
-        $query = "UPDATE {$this->table} 
+        $query = "UPDATE {$this->table}
                  SET deleted_at = NOW()
                  WHERE id = :id AND deleted_at IS NULL";
 
         $stmt = $this->getDb()->prepare($query);
         $stmt->bindParam(':id', $fileId, PDO::PARAM_INT);
 
-        return $stmt->execute();
+        $result = $stmt->execute();
+
+        // GED (Phase G-E) : un fichier supprimé ne doit laisser aucun lien orphelin.
+        Link::purge('file', (int) $fileId);
+
+        return $result;
+    }
+
+    /**
+     * Suppression (soft ou hard) via SoftDeleteTrait, avec purge des liens croisés (Phase G-E).
+     */
+    public function delete($force = false)
+    {
+        $result = parent::delete($force);
+
+        if ($this->id) {
+            Link::purge('file', (int) $this->id);
+        }
+
+        return $result;
     }
 
 }

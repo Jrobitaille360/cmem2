@@ -104,7 +104,7 @@ class EmailService {
     /**
      * Envoyer un email avec SMTP ou mode développement
      */
-    public function sendEmail($to, $subject, $body, $isHtml = true) {
+    public function sendEmail($to, $subject, $body, $isHtml = true, $replyTo = null) {
         try {
             // Validation de l'email
             if (!$this->isValidEmail($to)) {
@@ -127,10 +127,10 @@ class EmailService {
             
             if ($this->useSMTP === 'true') {
                 // Utiliser PHPMailer avec SMTP
-                return $this->sendViaSMTP($to, $subject, $body, $isHtml);
+                return $this->sendViaSMTP($to, $subject, $body, $isHtml, $replyTo);
             } else {
                 // Fallback vers la fonction mail() native
-                return $this->sendViaMailFunction($to, $subject, $body, $isHtml);
+                return $this->sendViaMailFunction($to, $subject, $body, $isHtml, $replyTo);
             }
             
         } catch (Exception $e) {
@@ -148,7 +148,7 @@ class EmailService {
     /**
      * Envoyer via SMTP avec PHPMailer
      */
-    private function sendViaSMTP($to, $subject, $body, $isHtml = true) {
+    private function sendViaSMTP($to, $subject, $body, $isHtml = true, $replyTo = null) {
         try {
             $mail = new PHPMailer(true);
             
@@ -177,6 +177,11 @@ class EmailService {
             // Expéditeur et destinataire
             $mail->setFrom($this->fromEmail, $this->fromName);
             $mail->addAddress($to);
+
+            // Reply-To optionnel (ex. « au nom de » l'usager courant)
+            if (!empty($replyTo) && $this->isValidEmail($replyTo)) {
+                $mail->addReplyTo($replyTo);
+            }
             
             // Contenu
             $mail->isHTML($isHtml);
@@ -216,10 +221,13 @@ class EmailService {
     /**
      * Envoyer via la fonction mail() native (fallback)
      */
-    private function sendViaMailFunction($to, $subject, $body, $isHtml = true) {
+    private function sendViaMailFunction($to, $subject, $body, $isHtml = true, $replyTo = null) {
         try {
             // Configuration des headers
             $headers = $this->buildHeaders($isHtml);
+            if (!empty($replyTo) && $this->isValidEmail($replyTo)) {
+                $headers[] = 'Reply-To: ' . $replyTo;
+            }
             
             // Envoyer l'email
             $result = mail($to, $subject, $body, implode("\r\n", $headers));

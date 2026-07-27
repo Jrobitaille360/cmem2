@@ -23,7 +23,8 @@ class Contact extends BaseModel
 
     /** Champs scalaires acceptés en création/mise à jour. */
     public const SCALAR_FIELDS = ['prenom', 'nom', 'organisation', 'fonction', 'notes',
-                                  'anniversaire', 'photo_file_id', 'favori', 'partage_scope'];
+                                  'anniversaire', 'photo_file_id', 'favori', 'partage_scope',
+                                  'date_relance', 'motif_relance', 'relance_faite_le'];
 
     /** Requis par BaseModel — création via createContact(). */
     public function create()
@@ -209,12 +210,46 @@ class Contact extends BaseModel
     /**
      * Soft-delete — la ligne reste en base, purgée plus tard par le cron RGPD.
      * Nommé softDeleteContact : BaseModel::softDelete a une signature incompatible (deleted_at).
+     *
+     * Cascade (Phases G-D / G-E) : masque les opportunités de la fiche et purge les liens
+     * croisés du contact ainsi que ceux de ses interactions et opportunités.
      */
     public function softDeleteContact(int $id): bool
     {
+        // Ids collectés AVANT le masquage : après, les requêtes « actives » ne les voient plus.
+        $interactionIds = $this->activeInteractionIds($id);
+        $opportuniteIds = (new Opportunite())->activeIdsForContact($id);
+
         $stmt = $this->getDb()->prepare(
             "UPDATE contacts SET supprime_le = NOW() WHERE id = ? AND supprime_le IS NULL"
         );
-        return $stmt->execute([$id]);
+        $ok = $stmt->execute([$id]);
+
+        (new Opportunite())->softDeleteByContact($id);
+
+        \AuthGroups\Models\Link::purge('contact', $id);
+        foreach ($interactionIds as $iid) {
+            \AuthGroups\Models\Link::purge('interaction', $iid);
+        }
+        foreach ($opportuniteIds as $oid) {
+            \AuthGroups\Models\Link::purge('opportunite', $oid);
+        }
+
+        return $ok;
+    }
+
+    /** Ids des interactions actives d'une fiche — sert à la purge des liens croisés. */
+    private function activeInteractionIds(int $contactId): array
+    {
+        try {
+            $stmt = $this->getDb()->prepare(
+                "SELECT id FROM interaction WHERE contact_id = ? AND supprime_le IS NULL"
+            );
+            $stmt->execute([$contactId]);
+            return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN) ?: []);
+        } catch (\Throwable $e) {
+            // Table absente (migration non appliquée) : la suppression du contact prime.
+            return [];
+        }
     }
 }

@@ -20,6 +20,9 @@ php private/tests/test_access.php
 php private/tests/test_auth_otp.php
 php private/tests/test_calendars.php
 php private/tests/test_contacts.php
+php private/tests/test_contacts_messages.php
+php private/tests/test_contacts_interactions.php
+php private/tests/test_contacts_opportunites.php
 php private/tests/test_cors_e2e_account.php
 php private/tests/test_entrypoints.php
 php private/tests/test_files.php
@@ -35,6 +38,7 @@ php private/tests/test_kestyon_tags.php
 php private/tests/test_kestyon_upload.php
 php private/tests/test_link_device_e2e.php
 php private/tests/test_links.php
+php private/tests/test_links_ged.php
 php private/tests/test_maintenance.php
 php private/tests/test_plans.php
 php private/tests/test_playstore.php
@@ -42,6 +46,7 @@ php private/tests/test_pomo.php
 php private/tests/test_pseudo.php
 php private/tests/test_public.php
 php private/tests/test_projets.php
+php private/tests/test_push.php
 php private/tests/test_puzzle_admin.php
 php private/tests/test_puzzle_backup.php
 php private/tests/test_puzzle_share.php
@@ -57,6 +62,7 @@ php private/tests/test_tags.php
 php private/tests/test_traque.php
 php private/tests/test_traque_rest.php
 php private/tests/test_users.php
+php private/tests/test_user_timezone.php
 ```
 
 Run all tests:
@@ -99,7 +105,7 @@ src/<module>/
 | `src/ics/` | `ICS\` | CalDAV/ICS calendar sync (RFC 5545) |
 | `src/quiz/` | `Quiz\` | Real-time quiz sessions with participant tokens |
 | `src/items/` | `Items\` | Generic item manager — private / public / shared |
-| `src/contacts/` | `Contacts\` | Contacts pillar — CRUD `/contacts`, vCard 4.0 import/export, `max_contacts` cap |
+| `src/contacts/` | `Contacts\` | Contacts pillar — CRUD `/contacts`, vCard 4.0 import/export, `max_contacts` cap, CRM interactions and `/opportunites` pipeline |
 | `src/projets/` | `Projets\` | Project management — tasks, hierarchy, dependencies, JSON round-trip, .ics export |
 | `src/pomo/` | `Pomo\` | Engagement waitlist and support forms |
 | `src/puzzle/` | `Puzzle\` | Collaborative puzzle with pick/drop mechanics |
@@ -108,6 +114,7 @@ src/<module>/
 | `src/playstore/` | `Playstore\` | Google Play Store subscription verification |
 | `src/traque/` | `Traque\` | Game plugin: combat, monsters, OSM biomes, achievements |
 | `src/webdevice/` | `WebDevice\` | Web push device token management |
+| `src/push/` | `Push\` | Web Push (VAPID) — `/push/*`, subscriptions per device, prefs per account, send cron |
 | `src/notifications/` | *(scripts)* | Email notification scripts (no routing) |
 | `src/cron/` | *(scripts)* | Backup cron scripts (no routing) |
 | `src/Core/` | `Core\` | `PluginInterface`, `PluginManager`, `AbstractPlugin` |

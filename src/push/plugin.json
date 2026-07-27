@@ -1,0 +1,23 @@
+{
+    "name": "Push",
+    "version": "1.0.0",
+    "description": "Notifications push web — VAPID, subscriptions par appareil, préférences par compte, cron d'envoi",
+    "author": "CMEM Team",
+    "namespace": "Push",
+    "main_class": "Push\\PushPlugin",
+    "min_cmem_version": "2.10.0",
+    "status": "active",
+    "dependencies": {
+        "cmem2_core": ">=2.10.0"
+    },
+    "routes": {
+        "prefix": "/push",
+        "auth_routes": [
+            "/push"
+        ]
+    },
+    "database": {
+        "migrations": [],
+        "migrations_path": "docs/push/migrations/"
+    }
+}

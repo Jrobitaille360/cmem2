@@ -5,6 +5,7 @@ namespace Contacts\Routing;
 use AuthGroups\Routing\BaseRouteHandler;
 use AuthGroups\Utils\Response;
 use Contacts\Controllers\ContactController;
+use Contacts\Controllers\OpportuniteController;
 
 /**
  * ContactsRouteHandler — routes /contacts/*
@@ -16,6 +17,13 @@ use Contacts\Controllers\ContactController;
  *   GET    /contacts/{id}.vcf    → export vCard 4.0
  *   PUT    /contacts/{id}        → mise à jour partielle
  *   DELETE /contacts/{id}        → soft-delete
+ *   GET    /contacts/{id}/messages          → historique courriels
+ *   POST   /contacts/{id}/messages          → envoi courriel
+ *   GET    /contacts/{id}/interactions      → historique CRM unifié (filtres ?type= ?limit= ?offset=)
+ *   POST   /contacts/{id}/interactions      → saisie manuelle (appel/note/rdv/sms)
+ *   DELETE /contacts/{id}/interactions/{iid} → soft-delete d'une interaction
+ *   GET    /contacts/{id}/opportunites      → opportunités CRM de la fiche
+ *   POST   /contacts/{id}/opportunites      → création d'une opportunité
  *
  * Toutes les routes exigent un JWT valide.
  */
@@ -79,6 +87,65 @@ class ContactsRouteHandler extends BaseRouteHandler
             return;
         }
         $contactId = (int) $s1;
+
+        // -------------------------------------------------
+        // /contacts/{id}/messages  — envoi courriel + historique
+        // -------------------------------------------------
+        $s2 = $segs[2] ?? '';
+        if ($s2 === 'messages') {
+            match ($method) {
+                'POST' => (new ContactController())->sendMessage($user, $contactId),
+                'GET'  => (new ContactController())->listMessages($user, $contactId),
+                default => Response::error('Méthode non autorisée', null, 405),
+            };
+            return;
+        }
+
+        // -------------------------------------------------
+        // /contacts/{id}/interactions[/{interactionId}]  — CRM (Phase G-C)
+        // -------------------------------------------------
+        if ($s2 === 'interactions') {
+            $s3 = $segs[3] ?? '';
+            if ($s3 === '') {
+                match ($method) {
+                    'GET'  => (new ContactController())->listInteractions($user, $contactId),
+                    'POST' => (new ContactController())->createInteraction($user, $contactId),
+                    default => Response::error('Méthode non autorisée', null, 405),
+                };
+                return;
+            }
+            if (!is_numeric($s3)) {
+                Response::error('Endpoint non trouvé', null, 404);
+                return;
+            }
+            if ($method === 'DELETE') {
+                (new ContactController())->deleteInteraction($user, $contactId, (int) $s3);
+                return;
+            }
+            Response::error('Méthode non autorisée', null, 405);
+            return;
+        }
+
+        // -------------------------------------------------
+        // /contacts/{id}/opportunites  — CRM pipeline (Phase G-D)
+        // -------------------------------------------------
+        if ($s2 === 'opportunites') {
+            if (($segs[3] ?? '') !== '') {
+                Response::error('Endpoint non trouvé', null, 404);
+                return;
+            }
+            match ($method) {
+                'GET'  => (new OpportuniteController())->listForContact($user, $contactId),
+                'POST' => (new OpportuniteController())->create($user, $contactId),
+                default => Response::error('Méthode non autorisée', null, 405),
+            };
+            return;
+        }
+
+        if ($s2 !== '') {
+            Response::error('Endpoint non trouvé', null, 404);
+            return;
+        }
 
         match ($method) {
             'GET'    => (new ContactController())->show($user, $contactId),

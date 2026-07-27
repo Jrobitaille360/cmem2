@@ -70,7 +70,10 @@
             "anniversaire": "date YYYY-MM-DD|null",
             "photo_file_id": "int|null — référence au module files",
             "favori": "bool — défaut false",
-            "partage_scope": "enum(prive|groupe|utilisateurs) — défaut 'prive', réservé P1 (inactif)"
+            "partage_scope": "enum(prive|groupe|utilisateurs) — défaut 'prive', réservé P1 (inactif)",
+            "date_relance": "date YYYY-MM-DD|null — prochaine relance à faire sur la fiche",
+            "motif_relance": "string|null — tronqué à 255 caractères, jamais inclus dans le push",
+            "relance_faite_le": "bool|datetime|null — true horodate côté serveur, null annule la marque"
           },
           "response": { "contact": "Contact" },
           "status_codes": { "201": "Contact créé" },
@@ -99,13 +102,14 @@
           "description": "Mise à jour partielle : seuls les champs transmis sont écrits. PATCH est accepté et se comporte à l'identique.",
           "auth_required": true,
           "body": "Mêmes champs que POST, tous optionnels",
+          "regle_relance": "Poser une date_relance différente de l'existante remet relance_faite_le à null, sauf si relance_faite_le est fourni dans la même requête.",
           "response": { "contact": "Contact" },
           "status_codes": { "200": "Contact mis à jour" },
           "errors": {
             "401": "JWT absent ou invalide",
             "403": "La fiche appartient à un autre propriétaire",
             "404": "Fiche inexistante ou soft-supprimée",
-            "422": "La mise à jour viderait à la fois prenom, nom et organisation"
+            "422": "La mise à jour viderait à la fois prenom, nom et organisation ; ou date_relance / relance_faite_le mal formées"
           }
         },
         {
@@ -119,6 +123,233 @@
             "401": "JWT absent ou invalide",
             "403": "La fiche appartient à un autre propriétaire",
             "404": "Fiche inexistante ou déjà supprimée"
+          }
+        }
+      ]
+    },
+    "messages": {
+      "description": "Communication — envoi de courriel depuis une fiche contact via l'infra mail serveur (SPF/DKIM). Directive cmem_web 20260724_090048 (Phase G-B). Journalisé dans la table interaction (générique, anticipe crm-interactions Phase C).",
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/contacts/{id}/messages",
+          "description": "Envoie un courriel au contact au nom de l'usager courant (From = serveur, Reply-To = courriel de l'usager) et journalise l'envoi. Owner-strict.",
+          "auth_required": true,
+          "body": {
+            "app_id": "string — défaut 'puzzle' ; 'cmemweb' pour le client web",
+            "canal": "string — doit valoir 'email' (seul canal supporté v1)",
+            "destinataire": "string|null — optionnel ; si absent, courriel principal du contact (type 'pro' prioritaire, sinon 1er de courriels[])",
+            "sujet": "string — requis, non vide",
+            "corps": "string — requis, non vide ; envoyé en texte brut"
+          },
+          "response": {
+            "message": {
+              "id": "int",
+              "contact_id": "int",
+              "canal": "string ('email')",
+              "destinataire": "string",
+              "sujet": "string",
+              "statut": "enum(envoye|echec)",
+              "envoye_le": "datetime"
+            }
+          },
+          "status_codes": { "201": "Message envoyé et journalisé" },
+          "errors": {
+            "401": "JWT absent ou invalide",
+            "403": "La fiche appartient à un autre propriétaire",
+            "404": "Fiche inexistante ou supprimée",
+            "422": "canal ≠ email, sujet/corps vide, destinataire invalide, ou contact sans courriel et sans destinataire",
+            "429": "Rate-limit anti-abus dépassé (par courriel usager + IP)"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/contacts/{id}/messages?app_id={app_id}&limit={limit}&offset={offset}",
+          "description": "Historique des courriels envoyés depuis la fiche (canal email). Owner-strict. Plus récents d'abord.",
+          "auth_required": true,
+          "response": {
+            "messages": "array — [{ id, contact_id, canal, destinataire, sujet, statut, envoye_le }]"
+          },
+          "status_codes": { "200": "Messages récupérés" },
+          "errors": {
+            "401": "JWT absent ou invalide",
+            "403": "La fiche appartient à un autre propriétaire",
+            "404": "Fiche inexistante ou supprimée"
+          }
+        }
+      ]
+    },
+    "interactions": {
+      "description": "CRM — historique 360° des interactions d'une fiche contact et saisie manuelle (appel/note/rdv/sms). Directive cmem_web 20260724_143353 (Phase G-C). Réutilise la table interaction : les courriels envoyés via /messages (Phase G-B) apparaissent dans le GET. Owner-strict.",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/contacts/{id}/interactions?app_id={app_id}&type={type}&limit={limit}&offset={offset}",
+          "description": "Historique unifié de toutes les interactions de la fiche (email inclus), plus récentes d'abord. Filtre 'type' optionnel. Les interactions soft-supprimées sont exclues. Owner-strict.",
+          "auth_required": true,
+          "query": {
+            "app_id": "string — défaut 'puzzle' ; 'cmemweb' pour le client web",
+            "type": "enum(email|appel|note|rdv|sms|rencontre|autre) — optionnel, filtre",
+            "limit": "int — optionnel, défaut 100, max 500",
+            "offset": "int — optionnel, défaut 0"
+          },
+          "response": {
+            "interactions": "array — [{ id, contact_id, type, direction, date, resume, statut, piece_jointe_file_id }] ; pour les courriels, 'date' = date d'envoi et 'resume' = sujet"
+          },
+          "status_codes": { "200": "Interactions récupérées" },
+          "errors": {
+            "401": "JWT absent ou invalide",
+            "403": "La fiche appartient à un autre propriétaire",
+            "404": "Fiche inexistante ou supprimée"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/contacts/{id}/interactions",
+          "description": "Enregistre manuellement une interaction (appel/note/rdv/sms). type='email' refusé ici (passe par /messages). Owner-strict.",
+          "auth_required": true,
+          "body": {
+            "app_id": "string — défaut 'puzzle' ; 'cmemweb' pour le client web",
+            "type": "enum(appel|note|rdv|sms) — requis ; 'email' refusé (422)",
+            "direction": "enum(entrant|sortant) — optionnel, défaut 'sortant'",
+            "date": "datetime|null — optionnel, format 'Y-m-d H:i:s' ; défaut = maintenant",
+            "resume": "string — requis, non vide (markdown toléré)",
+            "piece_jointe_file_id": "int|null — optionnel, référence module files"
+          },
+          "response": {
+            "interaction": {
+              "id": "int",
+              "contact_id": "int",
+              "type": "enum(appel|note|rdv|sms)",
+              "direction": "enum(entrant|sortant)",
+              "date": "datetime",
+              "resume": "string",
+              "statut": "null (saisie manuelle)",
+              "piece_jointe_file_id": "int|null"
+            }
+          },
+          "status_codes": { "201": "Interaction créée" },
+          "errors": {
+            "401": "JWT absent ou invalide",
+            "403": "La fiche appartient à un autre propriétaire",
+            "404": "Fiche inexistante ou supprimée",
+            "422": "resume vide, type invalide, type='email' (réservé /messages), ou date mal formée"
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/contacts/{id}/interactions/{interactionId}?app_id={app_id}",
+          "description": "Soft-delete d'une interaction. Elle disparaît ensuite du GET. Owner-strict.",
+          "auth_required": true,
+          "response": { "id": "int — id de l'interaction supprimée" },
+          "status_codes": { "200": "Interaction supprimée" },
+          "errors": {
+            "401": "JWT absent ou invalide",
+            "403": "La fiche appartient à un autre propriétaire",
+            "404": "Fiche ou interaction inexistante, déjà supprimée, ou n'appartenant pas à la fiche"
+          }
+        }
+      ]
+    },
+    "opportunites": {
+      "description": "CRM pipeline — opportunités commerciales rattachées à un contact, affichées en Kanban par étape. Directive cmem_web 20260724_154618 (Phase G-D). Owner-strict, devise par défaut CAD, soft-delete. La suppression d'un contact masque ses opportunités.",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/contacts/{id}/opportunites?app_id={app_id}",
+          "description": "Opportunités actives d'une fiche, plus récentes d'abord. Owner-strict.",
+          "auth_required": true,
+          "query": {
+            "app_id": "string — défaut 'puzzle' ; 'cmemweb' pour le client web"
+          },
+          "response": {
+            "opportunites": "Opportunite[]"
+          },
+          "status_codes": { "200": "Opportunités récupérées" },
+          "errors": {
+            "401": "JWT absent ou invalide",
+            "403": "La fiche appartient à un autre propriétaire",
+            "404": "Fiche inexistante ou supprimée"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/contacts/{id}/opportunites",
+          "description": "Crée une opportunité rattachée à la fiche. Owner-strict.",
+          "auth_required": true,
+          "body": {
+            "app_id": "string — défaut 'puzzle' ; 'cmemweb' pour le client web",
+            "titre": "string — requis, non vide",
+            "etape": "enum(prospect|qualifie|proposition|gagne|perdu) — optionnel, défaut 'prospect'",
+            "montant": "number|null — optionnel, 2 décimales",
+            "devise": "string — optionnel, code ISO 4217, défaut 'CAD'",
+            "date_cloture_prevue": "date|null — optionnel, format 'Y-m-d'",
+            "notes": "string|null — optionnel, markdown toléré"
+          },
+          "response": { "opportunite": "Opportunite" },
+          "status_codes": { "201": "Opportunité créée" },
+          "errors": {
+            "401": "JWT absent ou invalide",
+            "403": "La fiche appartient à un autre propriétaire",
+            "404": "Fiche inexistante ou supprimée",
+            "422": "titre vide, etape invalide, montant non numérique, devise non ISO 4217 ou date mal formée"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/opportunites?app_id={app_id}&etape={etape}&limit={limit}&offset={offset}",
+          "description": "Board Kanban global : toutes les opportunités actives du propriétaire, toutes fiches confondues, plus récentes d'abord. Les opportunités des contacts supprimés sont exclues.",
+          "auth_required": true,
+          "query": {
+            "app_id": "string — défaut 'puzzle' ; 'cmemweb' pour le client web",
+            "etape": "enum(prospect|qualifie|proposition|gagne|perdu) — optionnel, filtre",
+            "limit": "int — optionnel, 1..500 ; absent = pas de pagination",
+            "offset": "int — optionnel, défaut 0"
+          },
+          "response": {
+            "opportunites": "Opportunite[]",
+            "total": "int — nombre total avant pagination"
+          },
+          "status_codes": { "200": "Opportunités récupérées" },
+          "errors": {
+            "401": "JWT absent ou invalide",
+            "422": "etape invalide"
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/opportunites/{opId}",
+          "description": "Mise à jour partielle : seuls les champs transmis sont écrits. Sert notamment au changement d'étape par glisser-déposer Kanban. PATCH est accepté à l'identique.",
+          "auth_required": true,
+          "body": {
+            "app_id": "string — défaut 'puzzle' ; 'cmemweb' pour le client web",
+            "titre": "string — optionnel, non vide si transmis",
+            "etape": "enum(prospect|qualifie|proposition|gagne|perdu) — optionnel",
+            "montant": "number|null — optionnel",
+            "devise": "string — optionnel, code ISO 4217",
+            "date_cloture_prevue": "date|null — optionnel, format 'Y-m-d'",
+            "notes": "string|null — optionnel"
+          },
+          "response": { "opportunite": "Opportunite" },
+          "status_codes": { "200": "Opportunité mise à jour" },
+          "errors": {
+            "401": "JWT absent ou invalide",
+            "403": "L'opportunité appartient à un autre propriétaire",
+            "404": "Opportunité inexistante ou supprimée",
+            "422": "titre vide, etape invalide, montant non numérique, devise non ISO 4217 ou date mal formée"
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/opportunites/{opId}?app_id={app_id}",
+          "description": "Soft-delete d'une opportunité. Elle disparaît ensuite du board et de la fiche. Ses liens croisés (/links) sont purgés.",
+          "auth_required": true,
+          "response": { "id": "int — id de l'opportunité supprimée" },
+          "status_codes": { "200": "Opportunité supprimée" },
+          "errors": {
+            "401": "JWT absent ou invalide",
+            "403": "L'opportunité appartient à un autre propriétaire",
+            "404": "Opportunité inexistante ou déjà supprimée"
           }
         }
       ]
@@ -194,7 +425,23 @@
     "photo_file_id": "int|null",
     "favori": "bool",
     "partage_scope": "enum(prive|groupe|utilisateurs)",
+    "date_relance": "date|null",
+    "motif_relance": "string|null",
+    "relance_faite_le": "datetime|null — une fiche est « à relancer » si date_relance != null et relance_faite_le == null",
     "cree_le": "datetime",
     "maj_le": "datetime"
+  },
+  "modele_opportunite": {
+    "id": "int",
+    "app_id": "string",
+    "contact_id": "int",
+    "titre": "string",
+    "etape": "enum(prospect|qualifie|proposition|gagne|perdu)",
+    "montant": "number|null",
+    "devise": "string — défaut 'CAD'",
+    "date_cloture_prevue": "date|null",
+    "notes": "string|null",
+    "cree_le": "datetime",
+    "maj_le": "datetime|null"
   }
 }

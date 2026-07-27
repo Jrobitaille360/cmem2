@@ -22,6 +22,8 @@ class User extends BaseModel {
     public $phone;
     public $date_of_birth;
     public $location;
+    /** Identifiant IANA (ex. Europe/Paris) — NULL = repli sur le fuseau du premier calendrier */
+    public $timezone;
     public $email_verified;
     public $last_login;
     public $created_at;
@@ -113,6 +115,7 @@ class User extends BaseModel {
                  phone = :phone,
                  date_of_birth = :date_of_birth,
                  location = :location,
+                 timezone = :timezone,
                  email_verified = :email_verified,
                  updated_at = CURRENT_TIMESTAMP
                  WHERE id = :id AND deleted_at IS NULL";
@@ -128,8 +131,9 @@ class User extends BaseModel {
         $stmt->bindParam(':phone', $this->phone);
         $stmt->bindParam(':date_of_birth', $this->date_of_birth);
         $stmt->bindParam(':location', $this->location);
+        $stmt->bindParam(':timezone', $this->timezone);
         $stmt->bindParam(':email_verified', $this->email_verified);
-        
+
         return $stmt->execute();
     }
 

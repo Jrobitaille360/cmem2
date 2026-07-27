@@ -1,0 +1,147 @@
+{
+  "module": {
+    "name": "Push",
+    "version": "1.0.0",
+    "description": "Notifications push web (Web Push RFC 8030 + VAPID RFC 8292) — subscriptions par appareil, préférences par compte, cron d'envoi. Directive cmem_web 20260726_140426.",
+    "generated": "2026-07-26",
+    "base_path": "/push",
+    "authentication": {
+      "type": "JWT_BEARER",
+      "header": "Authorization: Bearer {jwt_token}"
+    },
+    "notes": "Les 5 routes exigent un JWT. Portée owner-strict : un usager ne voit et ne supprime que ses propres subscriptions ; un endpoint appartenant à un tiers renvoie 404 (aucune fuite d'existence). Multi-tenant via app_id (défaut serveur 'puzzle', 'cmemweb' pour cmem_web). Les préférences sont rattachées au COMPTE, jamais à un appareil."
+  },
+  "decisions": {
+    "portee_preferences": "PAR COMPTE. notification_prefs est unique sur (owner_id, app_id, kind). Un compte = un jeu de 4 préférences ; tous ses appareils reçoivent le même envoi. Seule portée compatible avec l'exigence « une échéance = un envoi logique » de la directive.",
+    "kinds": "event | task_due | recurring | contact_followup — l'énumération est complète dès la première migration.",
+    "lead_minutes": "Valeurs acceptées : 5, 15, 60, 1440. Toute autre valeur → 422.",
+    "confidentialite": "Le corps de la notification est générique (PUSH_GENERIC_TITLE + libellé par kind). Aucun titre d'événement, de tâche ou d'opportunité n'y figure ; seuls data.type et data.id permettent d'ouvrir la bonne fiche.",
+    "fuseau_usager": "La table users n'a pas de colonne timezone : le fuseau retenu est celui du premier calendrier de l'usager, sinon America/Montreal."
+  },
+  "endpoints": {
+    "vapid": {
+      "description": "Clé publique du serveur, à passer comme applicationServerKey à pushManager.subscribe()",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/push/vapid-public-key",
+          "description": "Retourne la clé publique VAPID du serveur. Stable ; sa rotation invalide toutes les subscriptions existantes.",
+          "auth_required": true,
+          "response": {
+            "publicKey": "string — base64url, 87 caractères, commence par 'B'"
+          },
+          "status_codes": { "200": "Clé retournée" },
+          "errors": {
+            "401": "JWT absent ou invalide",
+            "503": "VAPID_PUBLIC_KEY absente du .env serveur"
+          }
+        }
+      ]
+    },
+    "subscriptions": {
+      "description": "Enregistrement et retrait d'un appareil",
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/push/subscribe",
+          "description": "Crée la subscription (201) ou met à jour celle du même endpoint (200). Aucune ligne dupliquée sur ré-abonnement : unicité (owner_id, endpoint).",
+          "auth_required": true,
+          "body": {
+            "app_id": "string — requis ('cmemweb' pour cmem_web)",
+            "endpoint": "string — requis, URL https du service de push (max 2048)",
+            "keys": {
+              "p256dh": "string — requis, clé publique du client",
+              "auth": "string — requis, secret d'authentification du client"
+            },
+            "device_label": "string — optionnel, max 190 (ex. « Pixel 8 — Chrome »)"
+          },
+          "response": {
+            "subscription": {
+              "id": "int",
+              "app_id": "string",
+              "endpoint": "string",
+              "device_label": "string|null",
+              "created_at": "datetime",
+              "last_seen_at": "datetime|null"
+            }
+          },
+          "status_codes": {
+            "201": "Subscription créée",
+            "200": "Subscription existante mise à jour (mêmes owner_id + endpoint)"
+          },
+          "errors": {
+            "401": "JWT absent ou invalide",
+            "422": "app_id, endpoint (https), keys.p256dh ou keys.auth manquants/invalides"
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/push/subscribe",
+          "description": "Désabonne l'appareil. Corps JSON obligatoire (endpoint).",
+          "auth_required": true,
+          "body": {
+            "app_id": "string — optionnel",
+            "endpoint": "string — requis"
+          },
+          "response": null,
+          "status_codes": { "204": "Supprimée — corps vide" },
+          "errors": {
+            "401": "JWT absent ou invalide",
+            "404": "Aucune subscription de cet usager pour cet endpoint",
+            "422": "endpoint manquant"
+          }
+        }
+      ]
+    },
+    "preferences": {
+      "description": "Préférences de notification du compte (4 kinds)",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/push/preferences?app_id={app_id}",
+          "description": "Retourne les 4 kinds. Les kinds jamais réglés sont renvoyés avec leurs défauts (lead_minutes=15, enabled=false — opt-in).",
+          "auth_required": true,
+          "query": { "app_id": "string — optionnel, défaut 'puzzle'" },
+          "response": {
+            "scope": "string — toujours 'account'",
+            "preferences": "[{ kind, lead_minutes, quiet_from, quiet_to, enabled }]"
+          },
+          "status_codes": { "200": "Préférences retournées" },
+          "errors": { "401": "JWT absent ou invalide" }
+        },
+        {
+          "method": "PUT",
+          "path": "/push/preferences",
+          "description": "Met à jour les préférences fournies (upsert par kind). PATCH est accepté comme alias. Les kinds absents du corps restent inchangés.",
+          "auth_required": true,
+          "body": {
+            "app_id": "string — optionnel, défaut 'puzzle'",
+            "preferences": "[{ kind: 'event'|'task_due'|'recurring'|'contact_followup', lead_minutes: 5|15|60|1440, enabled: bool, quiet_from?: 'HH:MM', quiet_to?: 'HH:MM' }]"
+          },
+          "response": {
+            "scope": "string — toujours 'account'",
+            "preferences": "[{ kind, lead_minutes, quiet_from, quiet_to, enabled }] — les 4 kinds après mise à jour"
+          },
+          "status_codes": { "200": "Préférences persistées" },
+          "errors": {
+            "401": "JWT absent ou invalide",
+            "422": "kind inconnu, lead_minutes hors {5,15,60,1440}, format horaire ≠ HH:MM, ou quiet_from/quiet_to fourni seul"
+          }
+        }
+      ]
+    }
+  },
+  "payload_push": {
+    "description": "Corps chiffré transporté jusqu'au service worker (aes128gcm)",
+    "exemple": {
+      "title": "Rappel",
+      "body": "Vous avez un événement dans 15 minutes.",
+      "data": {
+        "type": "event",
+        "id": 1234,
+        "occurrence": "2026-07-27T09:00:00+00:00"
+      }
+    },
+    "regle": "data.type vaut le kind ('event', 'task_due', 'recurring', 'contact_followup') et data.id l'identifiant de l'entité. Aucun titre d'entité n'est transmis."
+  }
+}

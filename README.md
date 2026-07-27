@@ -1,11 +1,11 @@
 ﻿# cmem2 API
 
-![Version](https://img.shields.io/badge/version-2.10.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.11.0-blue.svg)
 ![PHP](https://img.shields.io/badge/PHP-8.0+-purple.svg)
 ![Status](https://img.shields.io/badge/status-production%20ready-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 
-API REST modulaire pour la plateforme **Memories v2**. Elle regroupe les modules : authentification/groupes (core), calendriers ICS/CalDAV, Pomodoro, Quiz interactif, gestionnaire générique Items, gestion de projet (Projets), puzzle collaboratif, jeu Traque, contrôle d'accès aux abonnements (Access), paiements Stripe, vérification Playstore et gestion des tokens push web (WebDevice).
+API REST modulaire pour la plateforme **Memories v2**. Elle regroupe les modules : authentification/groupes (core), calendriers ICS/CalDAV, Pomodoro, Quiz interactif, gestionnaire générique Items, pilier Contacts (CRM), gestion de projet (Projets), puzzle collaboratif, jeu Traque, contrôle d'accès aux abonnements (Access), paiements Stripe, vérification Playstore, notifications push web VAPID (Push) et gestion des tokens push web (WebDevice).
 
 Authentification **JWT** HS256 (Bearer, 15 jours). Deux méthodes de connexion : **email + mot de passe** ou **email + code OTP**.
 
@@ -33,6 +33,7 @@ cmem2 API fournit :
 - **Pomo** : Plugin Pomodoro — engagement waitlist/sondage, support, sync cloud
 - **Quiz** : Quiz interactifs en temps réel (style Kahoot) — sessions, scoring dégressif, leaderboard
 - **Items** : Gestionnaire générique d'items (private/public/share), catégories JSON, partages utilisateurs
+- **Contacts** : Pilier Contacts (CRM) — fiches personnes/organisations owner-strict, vCard 4.0, cap `max_contacts`, envoi de courriel, historique d'interactions (appels/notes/rdv/sms)
 - **Projets** : Gestion de projet — tâches, hiérarchie, dépendances (FS/SS/FF/SF), round-trip JSON, export `.ics`
 - **Puzzle** : Puzzle collaboratif — pick/drop de pièces, sessions partagées
 - **Traque** : Jeu type combat/exploration — monstres, biomes OSM, achievements
@@ -105,10 +106,13 @@ Ces variables changent selon la cible de déploiement (marquées `↓ à ajuster
 | `BASE_PATH` | `/api` | `/` | `/` |
 | `ALLOWED_ORIGINS` | origines localhost | domaine dev | domaine prod |
 | `LOG_LEVEL` | `debug` | `debug` | `info` |
-| `LOG_DIR` | `logs/` | `/home/xxx/logs/` | `/home/xxx/logs/` |
+| `LOG_DIR` | `logs/` | `logs/` | `logs/` |
 | `BACKUP_DIR` | chemin local | `/home/xxx/backups/` | `/home/xxx/backups/` |
 | `STRIPE_SECRET_KEY` | `sk_test_…` | `sk_test_…` | `sk_live_…` |
 | `PUZZLE_DEBUG_PREMIUM` | `false` | `false` | `false` |
+
+`LOG_DIR` accepte un chemin relatif à la racine du projet (`logs/`) ou un chemin absolu
+(`/home/xxx/logs/`, `C:\logs`). `BACKUP_DIR` attend un chemin absolu.
 
 ### Variables sensibles
 
@@ -441,4 +445,4 @@ MIT — voir [LICENSE](LICENSE). Dépendances tierces : [THIRD_PARTY_LICENSES.md
 
 ---
 
-**Version** : 2.10.0 · **Mis à jour** : 2026-07-24 · **Auteur** : [Jrobitaille360](https://github.com/Jrobitaille360)
+**Version** : 2.11.0 · **Mis à jour** : 2026-07-26 · **Auteur** : [Jrobitaille360](https://github.com/Jrobitaille360)
