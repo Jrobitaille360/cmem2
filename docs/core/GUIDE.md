@@ -337,7 +337,18 @@ Matrice d'autorité (`PUT /users/{id}` champ `role`, `DELETE /users/{id}`) :
 | PATCH | `/files/{id}/accessibility` | JWT propriétaire/admin | Changer l'accessibilité |
 | DELETE | `/files/{id}` | JWT | Soft delete (`force_delete: true` pour suppression physique) |
 | POST | `/files/{id}/restore` | JWT | Restaurer un fichier soft-deleted |
-| GET | `/files/user/{user_id}` | JWT | Lister les fichiers d'un utilisateur (paginé) |
+| GET | `/files/user/{user_id}` | JWT | Lister les fichiers d'un utilisateur (paginé, `?deleted=exclude\|include\|only`) |
+
+### Corbeille : `GET /files/user/{user_id}?deleted=`
+
+| Valeur | Effet |
+| - | - |
+| `exclude` | Défaut — fichiers actifs seulement (comportement historique) |
+| `include` | Actifs + soft-deleted |
+| `only` | Soft-deleted seulement (vue corbeille) |
+
+Chaque ligne expose `deleted_at` (`null` si le fichier est actif). Une valeur hors liste retourne `422`.
+`pagination` et `statistics` suivent le même filtre. Restauration via `POST /files/{id}/restore`.
 
 ### Types MIME acceptés
 

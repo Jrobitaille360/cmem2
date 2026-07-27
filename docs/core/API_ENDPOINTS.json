@@ -1107,7 +1107,8 @@
           },
           "query": {
             "page": "integer (optional, default 1)",
-            "limit": "integer (optional, default 20, max 100)"
+            "limit": "integer (optional, default 20, max 100)",
+            "deleted": "string (optional, default 'exclude') — 'exclude' | 'include' | 'only' ; valeur invalide → 422"
           },
           "response": {
             "data": {
@@ -1123,6 +1124,7 @@
                   "download_count": "integer",
                   "upload_date": "string (datetime)",
                   "updated_at": "string (datetime)",
+                  "deleted_at": "string (datetime)|null",
                   "url": "string"
                 }
               ],

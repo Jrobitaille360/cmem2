@@ -9,6 +9,17 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+### Ajout — Corbeille des fichiers : `GET /files/user/{user_id}?deleted=`
+
+- Nouveau paramètre `deleted` sur `GET /files/user/{user_id}` : `exclude` (défaut, comportement historique), `include` (actifs + supprimés), `only` (corbeille). Valeur hors liste → `422`
+- Chaque ligne de la liste expose désormais `deleted_at` (`null` si le fichier est actif) et `accessibility` (jusqu'ici documenté mais absent de la réponse)
+- `pagination` et `statistics` suivent le même filtre que la liste
+- Sans le paramètre, la réponse reste strictement celle d'avant (hors champs ajoutés) — la vue `/documents` de cmem_web n'est pas impactée
+- Un fichier soft-deleted redevient récupérable depuis l'UI : lister en `deleted=only` puis `POST /files/{id}/restore`
+- Doc : `docs/core/GUIDE.md` (section « Corbeille »), `docs/core/API_ENDPOINTS.json`
+- Tests : `private/tests/test_files.php` section 6b ; suite complète 2085/2085
+- Répond à la directive inter-projet `20260727_130000_cmem_web_vers_cmem2_API__files-lister-supprimes.md`
+
 ## [2.11.0] — 2026-07-26
 
 ### Ajout — Relance de contact : 2e source de `contact_followup` (Phase G-F)
