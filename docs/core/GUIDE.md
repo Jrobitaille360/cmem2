@@ -58,7 +58,7 @@ En passant `device_id` (UUID stable côté client) lors du login ou de la vérif
 
 ### Anti-brute-force
 
-5 tentatives maximum par email+IP toutes les 10 minutes sur `/auth/login` et `/auth/send-code`. HTTP 429 au dépassement.
+5 tentatives maximum par email+IP toutes les 10 minutes sur `/auth/login`, `/auth/send-code`, `/users/request-password-reset` et `/users/reset-password`. HTTP 429 au dépassement.
 
 ### CORS
 
@@ -99,9 +99,19 @@ POST /auth/refresh (device_id + device_token) → { token, device_token }
 ### 4. Réinitialisation mot de passe
 
 ```txt
-POST /users/request-password-reset   → lien envoyé par email
+POST /users/request-password-reset   → code à 6 chiffres envoyé par courriel (valide 60 min)
 POST /users/reset-password           → mot de passe mis à jour
 ```
+
+Le code n'apparaît **jamais** dans la réponse HTTP : il part uniquement par courriel. La réponse est identique que le courriel existe ou non (anti-énumération de comptes).
+
+- `request-password-reset` : 5 demandes par 10 minutes par couple (email + IP) → `429` au-delà.
+- `reset-password` : body `{ token, new_password, password_policy?, email? }`.
+  - `password_policy` — `any` (défaut, min 6 caractères) ou `strong` (min 8 caractères) ; le client choisit.
+  - `email` (facultatif) — permet de compter les tentatives sur le code de cet usager : au-delà de 5 essais, le code est supprimé et l'API répond `429`.
+  - Le code est à usage unique : il est supprimé dès que le mot de passe est changé.
+
+Sur `dev-cmem2` uniquement, `PASSWORD_RESET_TEST_CODE=654321` force un code fixe, sans envoi de courriel et sans rate limit. La variable est ignorée si `APP_ENV=production`.
 
 ---
 

@@ -40,6 +40,7 @@ php private/tests/test_link_device_e2e.php
 php private/tests/test_links.php
 php private/tests/test_links_ged.php
 php private/tests/test_maintenance.php
+php private/tests/test_password_reset.php
 php private/tests/test_plans.php
 php private/tests/test_playstore.php
 php private/tests/test_pomo.php

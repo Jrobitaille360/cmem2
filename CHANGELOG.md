@@ -9,6 +9,21 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+### Sécurité — Réinitialisation de mot de passe par code : code retiré de la réponse, 6 chiffres, limites de tentatives
+
+- **`POST /users/request-password-reset` ne renvoie plus le code** dans le body (`data.token` supprimé). Auparavant, connaître une adresse courriel suffisait à obtenir le code sans accès à la boîte mail — prise de compte triviale. Le code part désormais uniquement par courriel
+- Réponse générique unique, identique que le courriel existe ou non : « Si ce courriel existe, un code de réinitialisation a été envoyé. » (anti-énumération de comptes)
+- Code ramené de **8 à 6 chiffres** (premier chiffre 1-9), aligné sur l'OTP de `/auth/send-code` ; gabarit courriel `EmailService::buildPasswordResetTemplate()` mis à jour. Un seul code actif par usager : les codes précédents sont supprimés à chaque demande, avec régénération en cas de collision sur la contrainte `UNIQUE`
+- Validité du code portée par `PASSWORD_RESET_EXPIRY_MINUTES` (60 min par défaut, comportement historique conservé)
+- Rate limit **5 demandes / 10 min par couple (email + IP)** sur `request-password-reset` → `429` `RATE_LIMIT_EXCEEDED` (même politique que `/auth/send-code`)
+- Rate limit **5 tentatives / 10 min** sur `reset-password` (par IP, et par email si le champ facultatif `email` est fourni) → `429`. Compteur par code : nouvelles colonnes `attempts` / `max_attempts` sur `password_resets` (`docs/20260728_password_resets_attempts.sql`) ; au-delà de `max_attempts`, le code est supprimé et l'API répond `429` `TOO_MANY_ATTEMPTS`
+- Le code est consommé à l'usage : suppression définitive de la ligne après changement du mot de passe (plus de soft delete)
+- **Nouveau champ `password_policy`** sur `POST /users/reset-password` : `any` (défaut, min 6 caractères) ou `strong` (min 8 caractères) — le client choisit la politique. Valeur hors liste → `400`
+- Code fixe de développement `PASSWORD_RESET_TEST_CODE` : aucun courriel envoyé, code fixe, exempt du rate limit. Actif seulement si `APP_ENV !== 'production'` ; en production la variable est ignorée et journalisée en `warning`. Documenté dans `.env.example`, configuré sur `dev-cmem2` (`654321`)
+- Doc : `docs/core/API_ENDPOINTS.json` (les deux routes, erreurs `429`, retrait du champ `token`), `docs/core/GUIDE.md`
+- Tests : `private/tests/test_password_reset.php` (28 tests) ; suite complète 2167/2167
+- Répond à la directive inter-projet `20260728_142154_jdb_vers_cmem2_API__reset-password-code-6-chiffres-securite.md`
+
 ### Ajout — Registre de modules activables : `GET /modules`, `PATCH /modules/{key}`
 
 - Nouvelle table `tenant_modules` (`docs/20260727_tenant_modules.sql`) : `app_id`, `owner_id`/`group_id`, `module_key`, `enabled`, `quota_used`, `quota_reset_at` — unicité sur `(owner_id, module_key)` et `(group_id, module_key)`, CHECK `owner_id` XOR `group_id`

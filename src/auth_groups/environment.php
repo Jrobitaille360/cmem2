@@ -270,6 +270,16 @@ define('OTP_TEST_ACCOUNT_EMAIL', strtolower(trim($_ENV['OTP_TEST_ACCOUNT_EMAIL']
 define('OTP_TEST_ACCOUNT_CODE', trim($_ENV['OTP_TEST_ACCOUNT_CODE'] ?? ''));
 
 // ============================================
+// RESET DE MOT DE PASSE (code par courriel)
+// ============================================
+define('PASSWORD_RESET_EXPIRY_MINUTES', (int)($_ENV['PASSWORD_RESET_EXPIRY_MINUTES'] ?? 60));
+define('PASSWORD_RESET_MAX_ATTEMPTS', (int)($_ENV['PASSWORD_RESET_MAX_ATTEMPTS'] ?? ($_ENV['OTP_MAX_ATTEMPTS'] ?? 5)));
+// Code de reset fixe (dev seulement) — ignoré si APP_ENV === 'production'
+define('PASSWORD_RESET_TEST_CODE', APP_ENV === 'production' ? '' : trim($_ENV['PASSWORD_RESET_TEST_CODE'] ?? ''));
+// Trace la présence de la variable en production (configuration à corriger)
+define('PASSWORD_RESET_TEST_CODE_IGNORED', APP_ENV === 'production' && trim($_ENV['PASSWORD_RESET_TEST_CODE'] ?? '') !== '');
+
+// ============================================
 // DEVICE TOKENS - Appareils de confiance
 // ============================================
 define('DEVICE_TOKEN_EXPIRY_DAYS', (int)($_ENV['DEVICE_TOKEN_EXPIRY_DAYS'] ?? 365));

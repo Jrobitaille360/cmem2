@@ -347,23 +347,36 @@
         {
           "method": "POST",
           "path": "/users/request-password-reset",
-          "description": "Demander un lien de réinitialisation de mot de passe",
+          "description": "Demander un code de réinitialisation de mot de passe (6 chiffres, envoyé par courriel, valide 60 minutes). Le code n'est JAMAIS renvoyé dans la réponse.",
           "auth_required": false,
           "body": {
             "email": "string (required)"
           },
-          "response": "Message de confirmation (générique pour protéger l'énumération)"
+          "response": "Message générique identique que le courriel existe ou non : « Si ce courriel existe, un code de réinitialisation a été envoyé. » — aucun champ token dans data",
+          "rate_limit": "5 demandes par 10 minutes par couple (email + IP)",
+          "errors": {
+            "400": "Email manquant ou de format invalide",
+            "429": "Trop de demandes de réinitialisation (RATE_LIMIT_EXCEEDED)"
+          }
         },
         {
           "method": "POST",
           "path": "/users/reset-password",
-          "description": "Réinitialiser le mot de passe avec le token reçu par email",
+          "description": "Réinitialiser le mot de passe avec le code à 6 chiffres reçu par courriel. Le code est à usage unique et supprimé après emploi.",
           "auth_required": false,
           "body": {
-            "token": "string (required)",
-            "new_password": "string (required, min 8 caractères)"
+            "token": "string (required) — code à 6 chiffres reçu par courriel",
+            "new_password": "string (required) — longueur minimale selon password_policy",
+            "password_policy": "string (optional) — 'any' (défaut, min 6 caractères) | 'strong' (min 8 caractères) ; le client choisit la politique",
+            "email": "string (optional) — permet de compter les tentatives sur le code de cet usager et d'invalider le code après 5 essais"
           },
-          "response": "Message de confirmation"
+          "response": "Message de confirmation — aucun champ token dans data",
+          "rate_limit": "5 tentatives par 10 minutes (par IP, et par email s'il est fourni) ; max 5 tentatives par code, au-delà le code est supprimé",
+          "errors": {
+            "400": "Token ou new_password manquant, mot de passe trop court pour la politique choisie, ou password_policy invalide",
+            "404": "Code non trouvé ou expiré",
+            "429": "Trop de tentatives — demandez un nouveau code (TOO_MANY_ATTEMPTS / RATE_LIMIT_EXCEEDED)"
+          }
         },
         {
           "method": "GET",
