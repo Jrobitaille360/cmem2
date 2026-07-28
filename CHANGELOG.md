@@ -18,11 +18,11 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - Rate limit **5 demandes / 10 min par couple (email + IP)** sur `request-password-reset` → `429` `RATE_LIMIT_EXCEEDED` (même politique que `/auth/send-code`)
 - Rate limit **5 tentatives / 10 min** sur `reset-password` (par IP, et par email si le champ facultatif `email` est fourni) → `429`. Compteur par code : nouvelles colonnes `attempts` / `max_attempts` sur `password_resets` (`docs/20260728_password_resets_attempts.sql`) ; au-delà de `max_attempts`, le code est supprimé et l'API répond `429` `TOO_MANY_ATTEMPTS`
 - Le code est consommé à l'usage : suppression définitive de la ligne après changement du mot de passe (plus de soft delete)
-- **Nouveau champ `password_policy`** sur `POST /users/reset-password` : `any` (défaut, min 6 caractères) ou `strong` (min 8 caractères) — le client choisit la politique. Valeur hors liste → `400`
+- **Nouveau champ `password_policy`** sur `POST /users/reset-password` : **défaut `strong` (min 8 caractères)** — l'omission du champ ne vaut pas dérogation, le plancher est imposé par le serveur. `any` (min 6 caractères) reste accepté comme dérogation **explicite et dépréciée** pour les clients legacy : chaque usage est journalisé en `warning` (`endpoint`, `user_id`, `user_agent`) afin d'identifier les clients à migrer avant retrait de l'option. Valeur hors liste → `400`
 - Code fixe de développement `PASSWORD_RESET_TEST_CODE` : aucun courriel envoyé, code fixe, exempt du rate limit. Actif seulement si `APP_ENV !== 'production'` ; en production la variable est ignorée et journalisée en `warning`. Documenté dans `.env.example`, configuré sur `dev-cmem2` (`654321`)
 - Doc : `docs/core/API_ENDPOINTS.json` (les deux routes, erreurs `429`, retrait du champ `token`), `docs/core/GUIDE.md`
 - Tests : `private/tests/test_password_reset.php` (28 tests) ; suite complète 2167/2167
-- Répond à la directive inter-projet `20260728_142154_jdb_vers_cmem2_API__reset-password-code-6-chiffres-securite.md`
+- Répond aux directives inter-projet `20260728_142154_jdb_vers_cmem2_API__reset-password-code-6-chiffres-securite.md` et `20260728_181216_jdb_vers_cmem2_API__password-policy-defaut-strong.md`
 
 ### Ajout — Registre de modules activables : `GET /modules`, `PATCH /modules/{key}`
 

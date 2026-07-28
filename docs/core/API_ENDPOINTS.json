@@ -367,7 +367,7 @@
           "body": {
             "token": "string (required) — code à 6 chiffres reçu par courriel",
             "new_password": "string (required) — longueur minimale selon password_policy",
-            "password_policy": "string (optional) — 'any' (défaut, min 6 caractères) | 'strong' (min 8 caractères) ; le client choisit la politique",
+            "password_policy": "string (optional) — défaut 'strong' (min 8 caractères) : l'omission du champ n'est PAS une dérogation. 'any' (min 6 caractères) est une dérogation explicite DÉPRÉCIÉE, réservée aux clients legacy et journalisée en warning ; elle sera retirée",
             "email": "string (optional) — permet de compter les tentatives sur le code de cet usager et d'invalider le code après 5 essais"
           },
           "response": "Message de confirmation — aucun champ token dans data",

@@ -107,7 +107,7 @@ Le code n'apparaît **jamais** dans la réponse HTTP : il part uniquement par co
 
 - `request-password-reset` : 5 demandes par 10 minutes par couple (email + IP) → `429` au-delà.
 - `reset-password` : body `{ token, new_password, password_policy?, email? }`.
-  - `password_policy` — `any` (défaut, min 6 caractères) ou `strong` (min 8 caractères) ; le client choisit.
+  - `password_policy` — **défaut `strong` (min 8 caractères)** : omettre le champ ne dispense pas du plancher. `any` (min 6 caractères) est une dérogation **explicite et dépréciée**, réservée aux clients legacy ; chaque usage est journalisé en `warning` (`endpoint`, `user_id`, `user_agent`) et l'option sera retirée.
   - `email` (facultatif) — permet de compter les tentatives sur le code de cet usager : au-delà de 5 essais, le code est supprimé et l'API répond `429`.
   - Le code est à usage unique : il est supprimé dès que le mot de passe est changé.
 
