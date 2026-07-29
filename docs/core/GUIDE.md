@@ -60,6 +60,21 @@ En passant `device_id` (UUID stable côté client) lors du login ou de la vérif
 
 5 tentatives maximum par email+IP toutes les 10 minutes sur `/auth/login`, `/auth/send-code`, `/users/request-password-reset` et `/users/reset-password`. HTTP 429 au dépassement.
 
+### Politique de mot de passe
+
+Une seule politique, appliquée à **tous** les points d'entrée acceptant un mot de passe
+(`POST /users/register`, `POST /users/reset-password`, `PUT /users/{id}/password`). Un mot de passe doit contenir :
+
+- au minimum **8 caractères** ;
+- au moins une lettre **minuscule** ;
+- au moins une lettre **majuscule** ;
+- au moins un **chiffre** ;
+- au moins un **caractère spécial** (tout caractère non alphanumérique).
+
+Les exigences non satisfaites sont renvoyées en `400`, sous forme de tableau de messages prêts à afficher (`errors.password` ou `errors.new_password`). Source unique : `Validator::passwordErrors()`.
+
+> **BREAKING (2026-07-28)** — tous les `password_hash` existants ont été invalidés sur dev et en production. Aucun mot de passe antérieur n'authentifie plus : chaque usager doit passer par « mot de passe oublié » (code par courriel) ou par connexion OTP. Script : `private/utilitaires/invalidate_passwords.php`.
+
 ### CORS
 
 L'API répond aux préflights `OPTIONS` sans authentification (`204`, `Access-Control-Max-Age: 86400`). Si l'en-tête `Origin` figure dans la liste blanche du serveur (`ALLOWED_ORIGINS`), il est renvoyé tel quel dans `Access-Control-Allow-Origin` (+ `Vary: Origin`) ; sinon la réponse porte `Access-Control-Allow-Origin: *`. `Access-Control-Allow-Headers` inclut `Authorization` et `Content-Type` ; `Access-Control-Allow-Methods` inclut `GET, POST, PUT, PATCH, DELETE, OPTIONS`.
@@ -107,7 +122,7 @@ Le code n'apparaît **jamais** dans la réponse HTTP : il part uniquement par co
 
 - `request-password-reset` : 5 demandes par 10 minutes par couple (email + IP) → `429` au-delà.
 - `reset-password` : body `{ token, new_password, password_policy?, email? }`.
-  - `password_policy` — **défaut `strong` (min 8 caractères)** : omettre le champ ne dispense pas du plancher. `any` (min 6 caractères) est une dérogation **explicite et dépréciée**, réservée aux clients legacy ; chaque usage est journalisé en `warning` (`endpoint`, `user_id`, `user_agent`) et l'option sera retirée.
+  - `password_policy` — **sans effet**, il n'existe plus qu'une seule politique (voir « Politique de mot de passe » ci-dessous). Seule la valeur `strong` est tolérée par compatibilité ; `any` et toute autre valeur renvoient `400`.
   - `email` (facultatif) — permet de compter les tentatives sur le code de cet usager : au-delà de 5 essais, le code est supprimé et l'API répond `429`.
   - Le code est à usage unique : il est supprimé dès que le mot de passe est changé.
 

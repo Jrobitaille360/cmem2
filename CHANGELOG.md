@@ -9,6 +9,15 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+### BREAKING — Politique de mot de passe unique et invalidation de tous les mots de passe existants
+
+- **Règle unique** (`Validator::passwordErrors()`, nouvelle règle de validation `password`) : minimum **8 caractères**, au moins une **minuscule**, une **majuscule**, un **chiffre** et un **caractère spécial**. Les exigences non satisfaites sont renvoyées en `400` sous forme de tableau de messages prêts à afficher
+- Appliquée à **tous** les points d'entrée acceptant un mot de passe : `POST /users/register` (était `min:6`), `POST /users/reset-password`, `PUT /users/{id}/password` (était `min:6`) — l'incohérence du changement authentifié est corrigée
+- **`password_policy` n'a plus d'effet** : une seule politique existe. Seule la valeur `strong` reste tolérée par compatibilité (JdB l'envoie en dur) ; `any` et toute autre valeur renvoient `400`. La journalisation de dépréciation est retirée, sans objet
+- **Tous les `password_hash` ont été invalidés** sur dev-cmem2 (307 comptes) et en production (4 comptes) le 2026-07-28 : chaque hash est remplacé par celui d'un secret aléatoire de 32 octets jamais conservé. Aucun mot de passe antérieur n'authentifie plus — chaque usager doit passer par « mot de passe oublié » (code par courriel) ou par connexion OTP, qui n'est pas affectée. Les hash d'origine sont sauvegardés hors dépôt côté serveur (`~/backup_password_hashes_20260728_{env}.json`, mode 600). Script : `private/utilitaires/invalidate_passwords.php` (option `--dry-run`)
+- Tests : mots de passe des jeux d'essai rendus conformes ; nouveau helper `injectPassword()` dans `private/tests/test_new_base.php` pour reposer un mot de passe connu sur les comptes fixes (dev/local seulement). Suite complète 2177/2177
+- Clients notifiés par les directives `20260728_203000_cmem2_API_vers_{jdb,cmem_web,kestyon}__politique-mot-de-passe-unique-et-invalidation.md`
+
 ### Sécurité — Réinitialisation de mot de passe par code : code retiré de la réponse, 6 chiffres, limites de tentatives
 
 - **`POST /users/request-password-reset` ne renvoie plus le code** dans le body (`data.token` supprimé). Auparavant, connaître une adresse courriel suffisait à obtenir le code sans accès à la boîte mail — prise de compte triviale. Le code part désormais uniquement par courriel

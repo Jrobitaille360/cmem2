@@ -308,7 +308,7 @@
           "body": {
             "name": "string (required)",
             "email": "string (required, format email)",
-            "password": "string (required, min 8 caractères)"
+            "password": "string (required) — politique unique : min 8 caractères, au moins une minuscule, une majuscule, un chiffre et un caractère spécial"
           },
           "response": {
             "user": {
@@ -366,14 +366,14 @@
           "auth_required": false,
           "body": {
             "token": "string (required) — code à 6 chiffres reçu par courriel",
-            "new_password": "string (required) — longueur minimale selon password_policy",
-            "password_policy": "string (optional) — défaut 'strong' (min 8 caractères) : l'omission du champ n'est PAS une dérogation. 'any' (min 6 caractères) est une dérogation explicite DÉPRÉCIÉE, réservée aux clients legacy et journalisée en warning ; elle sera retirée",
+            "new_password": "string (required) — politique unique : min 8 caractères, au moins une minuscule, une majuscule, un chiffre et un caractère spécial",
+            "password_policy": "string (optional) — SANS EFFET : il n'existe plus qu'une seule politique. Seule la valeur 'strong' est tolérée par compatibilité ; 'any' et toute autre valeur renvoient 400",
             "email": "string (optional) — permet de compter les tentatives sur le code de cet usager et d'invalider le code après 5 essais"
           },
           "response": "Message de confirmation — aucun champ token dans data",
           "rate_limit": "5 tentatives par 10 minutes (par IP, et par email s'il est fourni) ; max 5 tentatives par code, au-delà le code est supprimé",
           "errors": {
-            "400": "Token ou new_password manquant, mot de passe trop court pour la politique choisie, ou password_policy invalide",
+            "400": "Token ou new_password manquant, mot de passe non conforme à la politique (les exigences non satisfaites sont listées dans errors.new_password), ou password_policy autre que 'strong'",
             "404": "Code non trouvé ou expiré",
             "429": "Trop de tentatives — demandez un nouveau code (TOO_MANY_ATTEMPTS / RATE_LIMIT_EXCEEDED)"
           }
@@ -611,7 +611,7 @@
           "description": "Changer son mot de passe",
           "body": {
             "old_password": "string (required)",
-            "new_password": "string (required, min 8 caractères)"
+            "new_password": "string (required) — politique unique : min 8 caractères, au moins une minuscule, une majuscule, un chiffre et un caractère spécial"
           },
           "response": "Message de confirmation"
         },

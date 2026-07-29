@@ -25,17 +25,15 @@ class UserPasswordController {
     /** Longueur du code de réinitialisation envoyé par courriel. */
     const RESET_CODE_LENGTH = 6;
 
-    /** Politiques de mot de passe acceptées : longueur minimale par politique. */
-    const PASSWORD_POLICIES = [
-        'any'    => 6,
-        'strong' => 8,
-    ];
-
     /**
-     * Politique appliquée quand le client n'envoie pas `password_policy`.
-     * Le plancher est imposé par le serveur : l'omission ne vaut pas dérogation.
+     * Politique de mot de passe unique — il n'en existe plus qu'une.
+     * Les règles vivent dans `Validator::passwordErrors()` : min 8 caractères,
+     * une minuscule, une majuscule, un chiffre, un caractère spécial.
+     *
+     * `password_policy` n'a plus d'effet : seule la valeur 'strong' reste tolérée
+     * pour ne pas casser les clients existants ; toute autre valeur est rejetée.
      */
-    const DEFAULT_PASSWORD_POLICY = 'strong';
+    const ACCEPTED_PASSWORD_POLICY = 'strong';
 
     /**
      * Demander un code de réinitialisation de mot de passe.
@@ -170,10 +168,9 @@ class UserPasswordController {
      * Changer le mot de passe (via code reçu par courriel).
      *
      * Body : { token, new_password, password_policy?, email? }
-     *   - password_policy : omis ⇒ 'strong' (min 8). Le serveur impose le plancher ;
-     *                       il n'est pas dérogé par omission.
-     *                       'any' (min 6) = dérogation explicite, DÉPRÉCIÉE (clients legacy),
-     *                       journalisée en warning pour identifier les clients à migrer.
+     *   - password_policy : sans effet. Une seule politique existe (Validator::passwordErrors()).
+     *                       Seule la valeur 'strong' est tolérée (compatibilité des clients) ;
+     *                       toute autre valeur, dont 'any', est rejetée en 400.
      *   - email           : facultatif ; permet de compter les tentatives sur le code de l'usager
      */
     public function changePasswordToken() {
@@ -181,33 +178,31 @@ class UserPasswordController {
             LoggingMiddleware::logEntry();
             $input = Response::getRequestParams();
 
-            // Politique de mot de passe : `strong` par défaut, `any` sur dérogation explicite
-            $policyGiven = isset($input['password_policy']) && trim((string) $input['password_policy']) !== '';
-            $policy      = $policyGiven
-                ? strtolower(trim((string) $input['password_policy']))
-                : self::DEFAULT_PASSWORD_POLICY;
-
-            if (!isset(self::PASSWORD_POLICIES[$policy])) {
-                LoggingMiddleware::logExit(400);
-                Response::error('Données de validation invalides', [
-                    'password_policy' => 'Valeurs acceptées : ' . implode(', ', array_keys(self::PASSWORD_POLICIES)),
-                ], 400);
-                return false;
+            // `password_policy` n'a plus d'effet : seul 'strong' reste toléré (compatibilité clients)
+            if (isset($input['password_policy']) && trim((string) $input['password_policy']) !== '') {
+                $policy = strtolower(trim((string) $input['password_policy']));
+                if ($policy !== self::ACCEPTED_PASSWORD_POLICY) {
+                    LogService::warning('password_policy refusé — politique unique en vigueur', [
+                        'endpoint'   => '/users/reset-password',
+                        'policy'     => $policy,
+                        'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
+                    ]);
+                    LoggingMiddleware::logExit(400);
+                    Response::error('Données de validation invalides', [
+                        'password_policy' => "Politique supprimée : tous les mots de passe suivent désormais la même règle. Seule la valeur '" . self::ACCEPTED_PASSWORD_POLICY . "' est tolérée, et elle est sans effet.",
+                    ], 400);
+                    return false;
+                }
             }
-            $minLength    = self::PASSWORD_POLICIES[$policy];
-            $legacyPolicy = $policyGiven && $policy === 'any';
 
             $validation = Validator::validate(
                 $input,
                 [
-                    'new_password' => 'required|string|min:' . $minLength,
+                    'new_password' => 'required|string|password',
                     'token' => 'required|string'
                 ]
             );
             if (!$validation['valid']) {
-                if ($legacyPolicy) {
-                    $this->logDeprecatedPolicy(null);
-                }
                 LoggingMiddleware::logExit(400);
                 Response::error('Données de validation invalides', $validation['errors'], 400);
                 return false;
@@ -262,11 +257,6 @@ class UserPasswordController {
 
             $userId = $row['user_id'];
 
-            // Traçage des clients encore sur la dérogation `any` (à migrer puis retirer l'option)
-            if ($legacyPolicy) {
-                $this->logDeprecatedPolicy((int) $userId);
-            }
-
             $userData = $userModel->findById($userId);
             if (!$userData) {
                 LoggingMiddleware::logExit(404);
@@ -279,7 +269,7 @@ class UserPasswordController {
                 // Le code est consommé : suppression définitive
                 $pdo->prepare("DELETE FROM password_resets WHERE id = :id")->execute(['id' => $row['id']]);
                 RateLimitService::clear($rateKey, 'pwd-reset');
-                LogService::info('Mot de passe réinitialisé par code', ['user_id' => $userId, 'policy' => $policy]);
+                LogService::info('Mot de passe réinitialisé par code', ['user_id' => $userId]);
                 LoggingMiddleware::logExit(200);
                 Response::success('Mot de passe changé avec succès');
                 return true;
@@ -296,19 +286,6 @@ class UserPasswordController {
             Response::error('Erreur lors du changement de mot de passe', null, 500);
             return false;
         }
-    }
-
-    /**
-     * Journalise l'usage de la dérogation `password_policy: "any"` (dépréciée),
-     * afin d'identifier les clients à migrer avant retrait de l'option.
-     */
-    private function logDeprecatedPolicy(?int $userId): void
-    {
-        LogService::warning('password_policy=any (déprécié) — client à migrer vers le plancher strong', [
-            'endpoint'   => '/users/reset-password',
-            'user_id'    => $userId,
-            'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
-        ]);
     }
 
     /**
@@ -367,7 +344,7 @@ class UserPasswordController {
                 $validation = Validator::validate(
                 $input,
                 [
-                    'new_password' => 'required|string|min:6',
+                    'new_password' => 'required|string|password',
                 ]
                 );
             } else {
@@ -375,7 +352,7 @@ class UserPasswordController {
                     $input,
                     [
                         'current_password' => 'required|string',
-                        'new_password' => 'required|string|min:6',
+                        'new_password' => 'required|string|password',
                     ]
                 );
             }           

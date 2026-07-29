@@ -33,7 +33,7 @@ class UserManagerController {
             $validation = Validator::validate($input, [
                 'name' => 'required|string|min:2|max:255',
                 'email' => 'required|email|max:255',
-                'password' => 'required|string|min:6',  // Changé de min:8 à min:6
+                'password' => 'required|string|password',  // Politique unique : Validator::passwordErrors()
                 'bio' => 'string',
                 'phone' => 'string',
                 'date_of_birth' => 'date',
