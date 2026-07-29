@@ -9,6 +9,12 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+### Correction — Déploiement : `APP_COMMIT` collé à la variable précédente
+
+- `private/deploy.ps1` — l'injection de traçabilité ajoutait `APP_COMMIT` avec `echo >> .env` sans garantir de saut de ligne final. Sur un `.env` qui n'en avait pas, la clé se collait à la dernière variable (`PUSH_TTL_SECONDS=86400APP_COMMIT=abc123`) : `APP_COMMIT` n'était pas lu et la variable précédente était corrompue. Constaté en production. Un saut de ligne est désormais garanti avant tout ajout
+- Gabarit `private/utilitaires/.env.prod` : saut de ligne final ajouté (cause racine)
+- Déploiements refaits avec `-LocalComposerInstall` (composer absent des serveurs cPanel) : `vendor/` bâti localement puis transféré, `APP_COMMIT` / `APP_DEPLOYED_AT` correctement injectés sur dev et prod
+
 ### BREAKING — Politique de mot de passe unique et invalidation de tous les mots de passe existants
 
 - **Règle unique** (`Validator::passwordErrors()`, nouvelle règle de validation `password`) : minimum **8 caractères**, au moins une **minuscule**, une **majuscule**, un **chiffre** et un **caractère spécial**. Les exigences non satisfaites sont renvoyées en `400` sous forme de tableau de messages prêts à afficher
