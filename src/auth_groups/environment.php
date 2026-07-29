@@ -280,6 +280,16 @@ define('PASSWORD_RESET_TEST_CODE', APP_ENV === 'production' ? '' : trim($_ENV['P
 define('PASSWORD_RESET_TEST_CODE_IGNORED', APP_ENV === 'production' && trim($_ENV['PASSWORD_RESET_TEST_CODE'] ?? '') !== '');
 
 // ============================================
+// VÉRIFICATION DE COURRIEL (token par courriel)
+// ============================================
+define('EMAIL_VERIFICATION_EXPIRY_HOURS', (int)($_ENV['EMAIL_VERIFICATION_EXPIRY_HOURS'] ?? 24));
+define('EMAIL_VERIFICATION_MAX_ATTEMPTS', (int)($_ENV['EMAIL_VERIFICATION_MAX_ATTEMPTS'] ?? ($_ENV['OTP_MAX_ATTEMPTS'] ?? 5)));
+// Token de vérification fixe (dev seulement) — ignoré si APP_ENV === 'production'
+define('EMAIL_VERIFICATION_TEST_CODE', APP_ENV === 'production' ? '' : trim($_ENV['EMAIL_VERIFICATION_TEST_CODE'] ?? ''));
+// Trace la présence de la variable en production (configuration à corriger)
+define('EMAIL_VERIFICATION_TEST_CODE_IGNORED', APP_ENV === 'production' && trim($_ENV['EMAIL_VERIFICATION_TEST_CODE'] ?? '') !== '');
+
+// ============================================
 // DEVICE TOKENS - Appareils de confiance
 // ============================================
 define('DEVICE_TOKEN_EXPIRY_DAYS', (int)($_ENV['DEVICE_TOKEN_EXPIRY_DAYS'] ?? 365));

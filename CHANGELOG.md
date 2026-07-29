@@ -7,7 +7,22 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased]
+## [Unreleased 2026-07-29 07:45]
+
+### Sécurité — Vérification de courriel : token retiré des réponses, limites de tentatives
+
+- **Le token de vérification n'apparaît plus dans aucune réponse HTTP.** `POST /users/register` et `POST /users/resend-verification-email` le renvoyaient en développement : déclencher l'envoi pour une adresse tierce suffisait à obtenir le token et à valider un compte sans accès à la boîte mail. Le token ne sort désormais que par courriel
+- Réponse générique unique sur `resend-verification-email`, identique que le compte existe, n'existe pas ou soit déjà vérifié : « Si cette adresse est associée à un compte non vérifié, un email de vérification sera envoyé. » Les champs `email` et `token_expires_at` sont retirés du body (anti-énumération)
+- Longueur du token **maintenue à 8 chiffres** (premier chiffre 1-9), confirmée à jdb : `VERIFY_CODE_LENGTH` reste à 8 côté client, aucune coordination requise. Génération par `random_int()` au lieu de `mt_rand()`
+- Un seul token actif par usager : les tokens précédents sont supprimés à chaque émission, avec régénération en cas de collision sur la contrainte `UNIQUE`. Validité portée par `EMAIL_VERIFICATION_EXPIRY_HOURS` (24 h par défaut, comportement historique conservé)
+- Rate limit **5 tentatives / 10 min** sur `verify-email` (par IP, et par email si le champ facultatif `email` est fourni) → `429` `RATE_LIMIT_EXCEEDED`. Compteur par token : nouvelles colonnes `attempts` / `max_attempts` sur `email_verifications` (`docs/20260729_email_verifications_attempts.sql`) ; au-delà de `max_attempts` (5), le token est supprimé et l'API répond `429` `TOO_MANY_ATTEMPTS`
+- Rate limit **5 demandes / 10 min par couple (email + IP)** sur `resend-verification-email` → `429` (bombing de courriels)
+- Message d'erreur générique sur token refusé : « Token invalide ou expiré » (`404`), sans distinction entre token inconnu, expiré et usager introuvable
+- Token fixe de développement `EMAIL_VERIFICATION_TEST_CODE` : aucun courriel envoyé, token fixe, exempt du rate limit. Actif seulement si `APP_ENV !== 'production'` ; en production la variable est ignorée et journalisée en `warning`. Volontairement **non configuré** sur `dev-cmem2` (un token fixe partagé casserait les inscriptions parallèles — contrainte `UNIQUE`)
+- Doc : `docs/core/API_ENDPOINTS.json` (les trois routes, erreurs `429`, retrait du champ `verification_token`), `docs/core/GUIDE.md`, `.env.example`
+- Tests : `private/tests/test_email_verification.php` (28 tests) ; nouveaux helpers `getVerificationTokenFromDB()` / `getVerificationTokenFromRegister()` dans `test_new_base.php` — les 16 fichiers de test qui lisaient `data.verification_token` lisent maintenant le token en base. Suite complète 2173/2173
+- Migration `docs/20260729_email_verifications_attempts.sql` appliquée sur **dev-cmem2** et en **production** ; code déployé sur les deux cibles avec `-LocalComposerInstall`
+- Répond à la directive inter-projet `20260728_211346_jdb_vers_cmem2_API__verification-courriel-token-securite.md` ; suites client à ajuster via la directive retour `20260729_073000_cmem2_API_vers_jdb__verification-courriel-securisee.md`
 
 ### Correction — Déploiement : `APP_COMMIT` collé à la variable précédente
 

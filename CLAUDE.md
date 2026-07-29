@@ -24,12 +24,15 @@ php private/tests/test_contacts_messages.php
 php private/tests/test_contacts_interactions.php
 php private/tests/test_contacts_opportunites.php
 php private/tests/test_cors_e2e_account.php
+php private/tests/test_email_verification.php
 php private/tests/test_entrypoints.php
 php private/tests/test_files.php
 php private/tests/test_files_accessibility.php
 php private/tests/test_groups.php
 php private/tests/test_ics_email_notifications.php
 php private/tests/test_ics_freebusy_recurrence.php
+php private/tests/test_ics_generator_uid_dtstamp.php
+php private/tests/test_ics_occurrences_end_date_bound.php
 php private/tests/test_ics_occurrences_exceptions_by_date.php
 php private/tests/test_ics_occurrences_expand.php
 php private/tests/test_ics_tags.php
@@ -40,6 +43,7 @@ php private/tests/test_link_device_e2e.php
 php private/tests/test_links.php
 php private/tests/test_links_ged.php
 php private/tests/test_maintenance.php
+php private/tests/test_modules.php
 php private/tests/test_password_reset.php
 php private/tests/test_plans.php
 php private/tests/test_playstore.php

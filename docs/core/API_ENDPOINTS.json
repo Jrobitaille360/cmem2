@@ -322,27 +322,39 @@
             },
             "auth_method": "jwt"
           },
-          "notes": "Un email de vérification est envoyé. Connexion impossible avant vérification."
+          "notes": "Un email de vérification est envoyé. Connexion impossible avant vérification. Le token de vérification n'est JAMAIS renvoyé dans la réponse."
         },
         {
           "method": "POST",
           "path": "/users/verify-email",
-          "description": "Vérifier l'adresse email avec le token reçu par email",
+          "description": "Vérifier l'adresse email avec le token à 8 chiffres reçu par courriel (valide 24 heures)",
           "auth_required": false,
           "body": {
-            "token": "string (required)"
+            "token": "string (required) — 8 chiffres",
+            "email": "string (optional) — permet de compter les tentatives sur le token de l'usager"
           },
-          "response": "Message de confirmation"
+          "response": "Message de confirmation",
+          "rate_limit": "5 tentatives par 10 minutes par couple (email + IP) ; 5 tentatives par token, au-delà le token est invalidé",
+          "errors": {
+            "400": "Token manquant, ou email déjà vérifié",
+            "404": "Token invalide ou expiré (message générique — ne révèle pas l'existence du compte)",
+            "429": "Trop de tentatives (RATE_LIMIT_EXCEEDED ou TOO_MANY_ATTEMPTS) — le token est invalidé, en redemander un"
+          }
         },
         {
           "method": "POST",
           "path": "/users/resend-verification-email",
-          "description": "Renvoyer l'email de vérification",
+          "description": "Renvoyer l'email de vérification. Le token n'est JAMAIS renvoyé dans la réponse.",
           "auth_required": false,
           "body": {
             "email": "string (required)"
           },
-          "response": "Message de confirmation (générique pour protéger l'énumération — retourne toujours 200)"
+          "response": "Message générique identique que le compte existe ou non : « Si cette adresse est associée à un compte non vérifié, un email de vérification sera envoyé. » — aucun champ token dans data",
+          "rate_limit": "5 demandes par 10 minutes par couple (email + IP)",
+          "errors": {
+            "400": "Email manquant ou de format invalide",
+            "429": "Trop de demandes de vérification (RATE_LIMIT_EXCEEDED)"
+          }
         },
         {
           "method": "POST",

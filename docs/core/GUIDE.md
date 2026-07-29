@@ -90,10 +90,16 @@ Sur `dev-cmem2` uniquement, un compte de test à code OTP fixe est disponible po
 ### 1. Inscription → connexion
 
 ```txt
-POST /users/register         → email de vérification envoyé
+POST /users/register         → token à 8 chiffres envoyé par courriel (valide 24 h)
 POST /users/verify-email     → compte activé
 POST /auth/login             → { token, user }
 ```
+
+Le token de vérification n'est **jamais** renvoyé dans une réponse HTTP : il ne sort que par
+courriel. `POST /users/verify-email` accepte un champ facultatif `email` qui permet de compter
+les tentatives sur le token de l'usager : au-delà de 5 essais (ou 5 tentatives en 10 minutes
+par couple email + IP), le token est invalidé et l'API répond `429` — il faut en redemander un
+via `POST /users/resend-verification-email`, elle-même limitée à 5 demandes par 10 minutes.
 
 ### 2. Connexion par code (OTP)
 
