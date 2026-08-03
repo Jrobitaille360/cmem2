@@ -7,7 +7,9 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-08-02 22:30]
+## [Unreleased]
+
+## [2.12.0] — 2026-08-02
 
 ### Sécurité — JWT accepté après suppression de compte
 
@@ -30,8 +32,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - Doc : `docs/core/API_ENDPOINTS.json`, `docs/core/GUIDE.md` (section « Suppression de compte et restauration » avec le tableau effacé / conservé), `docs/cron.md`, `docs/entrypoints.md`
 - Tests : `private/tests/test_account_deletion.php` (44 tests). Suite complète 2245/2245
 - Répond à la directive inter-projet `20260729_220000_cmem_web_vers_cmem2_API__suppression-compte-purge-30-jours.md`
-
-## [Unreleased 2026-07-29 07:45]
 
 ### Sécurité — Vérification de courriel : token retiré des réponses, limites de tentatives
 
