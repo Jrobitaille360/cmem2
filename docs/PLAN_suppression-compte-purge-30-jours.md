@@ -167,7 +167,9 @@ de rotation vérifié côté API : à valider en phase 5 avant recopie dans la p
      `subscribed_at`, `archived_at`. **Aucun** `user_id`, courriel ni nom.
      `stripe_subscriptions` ne stocke ni montant ni devise — ils vivent chez Stripe, et les
      identifiants Stripe conservés sont les clés de rapprochement comptable.
-   - `ADD INDEX idx_files_uploaded_by ON files (uploaded_by)` si absent — la purge lit par usager.
+   - Aucun index à ajouter sur `files(uploaded_by)` : `idx_file_uploaded_by` couvre déjà cette
+     lecture. Une première version de la migration en créait un second (`idx_files_uploaded_by`),
+     retiré de dev et de production le 2026-08-02 — vérifier les index existants avant d'en ajouter.
 2. Ne pas toucher `docs/v-2-11-0/build_DB-v-2.11.0.sql` (version fixée). Intégration au prochain
    `build_DB` lors de l'ancrage de version.
 

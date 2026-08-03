@@ -7,9 +7,15 @@
 -- Contenu :
 --   1. Table billing_archive — registres de facturation conservés ANONYMISÉS
 --      avant la purge physique du compte (obligation fiscale, §3 de la directive).
---   2. Index sur files.uploaded_by — la purge lit les fichiers par usager.
 --
 -- Idempotente : réexécutable sans erreur.
+--
+-- Historique : une première version de cette migration créait un index
+-- `idx_files_uploaded_by` sur `files(uploaded_by)` pour la lecture des fichiers
+-- par usager. Cet index faisait double emploi avec `idx_file_uploaded_by`
+-- (singulier), déjà présent sur la même colonne. Le doublon a été retiré sur dev
+-- et en production le 2026-08-02 (`DROP INDEX idx_files_uploaded_by ON files`) et
+-- la création est retirée d'ici : aucun index n'est à ajouter.
 -- ============================================================
 
 -- ------------------------------------------------------------
@@ -45,30 +51,13 @@ CREATE TABLE IF NOT EXISTS `billing_archive` (
   COMMENT='Registres de facturation anonymisés, conservés après purge de compte (obligation fiscale)';
 
 -- ------------------------------------------------------------
--- 2. Index files.uploaded_by
+-- Note — index sur files.uploaded_by
 --
 -- files.uploaded_by n'a volontairement AUCUNE contrainte FK : des lignes
--- orphelines antérieures existent, une FK échouerait à la création.
--- La purge traite ces lignes par code (fichier disque puis ligne en base),
--- d'où le besoin d'un index de lecture par usager.
+-- orphelines antérieures existent, une FK échouerait à la création. La purge
+-- traite ces lignes par code (fichier disque puis ligne en base), et lit donc
+-- les fichiers par usager.
 --
--- CREATE INDEX n'accepte pas IF NOT EXISTS sur MySQL/MariaDB : on passe par
--- information_schema pour garder la migration réexécutable.
+-- Cette lecture est déjà couverte par `idx_file_uploaded_by`, présent de longue
+-- date sur `files(uploaded_by)`. Aucun index n'est à créer.
 -- ------------------------------------------------------------
-SET @idx_exists := (
-    SELECT COUNT(*)
-    FROM information_schema.STATISTICS
-    WHERE TABLE_SCHEMA = DATABASE()
-      AND TABLE_NAME   = 'files'
-      AND INDEX_NAME   = 'idx_files_uploaded_by'
-);
-
-SET @sql := IF(
-    @idx_exists = 0,
-    'CREATE INDEX `idx_files_uploaded_by` ON `files` (`uploaded_by`)',
-    'DO 0'
-);
-
-PREPARE stmt FROM @sql;
-EXECUTE stmt;
-DEALLOCATE PREPARE stmt;
