@@ -459,6 +459,8 @@ Le traitement est idempotent et journalise un décompte par usager purgé.
 | GET | `/files/{id}` | JWT | Télécharger le contenu binaire |
 | GET | `/files/png-from-svg` | JWT* | Convertir un SVG en PNG à la demande (`?id=`) |
 | GET | `/files/{id}/info` | JWT | Métadonnées d'un fichier |
+| GET | `/files/{id}/tags` | JWT | Étiquettes associées au fichier |
+| PATCH | `/files/{id}` | JWT propriétaire/admin | Renommer (`original_name`) / modifier `description` |
 | PATCH | `/files/{id}/accessibility` | JWT propriétaire/admin | Changer l'accessibilité |
 | DELETE | `/files/{id}` | JWT | Soft delete (`force_delete: true` pour suppression physique) |
 | POST | `/files/{id}/restore` | JWT | Restaurer un fichier soft-deleted |
@@ -475,17 +477,67 @@ Le traitement est idempotent et journalise un décompte par usager purgé.
 Chaque ligne expose `deleted_at` (`null` si le fichier est actif). Une valeur hors liste retourne `422`.
 `pagination` et `statistics` suivent le même filtre. Restauration via `POST /files/{id}/restore`.
 
-### Types MIME acceptés
+### Types acceptés
 
 | Catégorie | Extensions | Taille max |
 | --- | --- | --- |
-| Image | jpeg, png, gif, webp, svg | 5 MB |
-| Document | pdf, txt, doc, docx, xls, xlsx | 10 MB |
+| Image | jpg, jpeg, png, gif, webp, svg, heic, heif, avif, tiff, tif | 10 MB |
+| Document | pdf, txt, csv, md, rtf, doc, docx, xls, xlsx, pptx, odt, ods, odp, gpx | 10 MB |
 | Audio | mp3, wav, ogg | 20 MB |
 | Vidéo | mp4, avi, mov | 50 MB |
 | Exécutable / Archive | **exe, msi, zip, 7z** | **200 MB** |
 
-Validation côté serveur : type MIME + taille. Retourne `400` si le type est refusé ou la taille dépassée.
+Plafond dur toutes catégories : **100 MB** (`FILES_MAX_UPLOAD_MB`), aligné sur `upload_max_filesize` / `post_max_size`.
+
+La validation croise l'**extension** et la **signature réelle** du fichier (`mime_content_type`) :
+les deux doivent correspondre. Renommer un `.zip` en `.png` ne le fait pas passer, et un MIME
+générique (`application/zip`, `text/plain`, `application/octet-stream`) n'est accepté que pour les
+extensions dont c'est la signature attendue — `.ods`/`.pptx` pour zip, `.csv`/`.md` pour texte,
+`.exe`/`.msi`/`.zip`/`.7z` pour octet-stream.
+
+Le `mime_type` enregistré est celui de la signature, **pas** le `Content-Type` déclaré par le client ;
+`media_type` en découle.
+
+Refus (`400`) avec code applicatif :
+
+| Motif | `errors.code` | Données jointes |
+| - | - | - |
+| Type non autorisé | `FILE_TYPE_REFUSED` | `detected_type`, `extension` |
+| Taille dépassée | `FILE_TOO_LARGE` | `max_size_bytes`, `file_size_bytes` |
+
+### Sécurité — SVG
+
+`GET /files/{id}` sert les images bitmap `inline` avec un cache immuable, mais un `image/svg+xml`
+est **toujours** servi `Content-Disposition: attachment` + `X-Content-Type-Options: nosniff` : un SVG
+est du XML exécutable, et l'afficher inline exécuterait son script sur l'origine de l'API.
+Pour l'affichage, utiliser `GET /files/png-from-svg`.
+
+### PATCH /files/{id}
+
+Renomme le fichier (libellé affiché et nom proposé au téléchargement) sans toucher au stockage :
+`file_name` et `file_path` restent inchangés.
+
+```http
+PATCH /files/42
+Authorization: Bearer {jwt_token}
+Content-Type: application/json
+
+{ "original_name": "Devis 2026 révisé.pdf", "description": "Version signée" }
+```
+
+Les deux champs sont optionnels, mais au moins un doit être fourni (sinon `400`).
+`original_name` doit être non vide, de 255 caractères au plus, et ne contenir ni `/`, ni `\`, ni `..`
+— sinon `400` avec `errors.code = FILE_NAME_INVALID`. Propriétaire ou administrateur uniquement.
+
+### Étiquettes d'un fichier
+
+Association / dissociation par `PUT /tags/{tag_id}/{file_id}` avec `table_associate: files`.
+
+Lecture :
+
+- `GET /files/{id}/tags` → `{ "file_id": 42, "tags": [{ "id": 7, "name": "Contrats", "color": "#33aa55" }] }`
+- chaque ligne de `GET /files/user/{user_id}` porte un champ `tags` (une seule requête pour toute la
+  page — pas de fan-out côté client)
 
 ### Paramètre `accessibility` (POST /files)
 

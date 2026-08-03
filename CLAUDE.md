@@ -29,6 +29,7 @@ php private/tests/test_email_verification.php
 php private/tests/test_entrypoints.php
 php private/tests/test_files.php
 php private/tests/test_files_accessibility.php
+php private/tests/test_files_types.php
 php private/tests/test_groups.php
 php private/tests/test_ics_email_notifications.php
 php private/tests/test_ics_freebusy_recurrence.php

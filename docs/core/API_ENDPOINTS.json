@@ -987,11 +987,16 @@
             }
           },
           "notes": [
-            "Taille max standard : image 5 MB, document 10 MB (dont gpx), audio 20 MB, vidéo 50 MB",
+            "Extensions acceptées : jpg, jpeg, png, gif, webp, svg, heic, heif, avif, tiff, tif, pdf, txt, csv, md, rtf, doc, docx, xls, xlsx, pptx, odt, ods, odp, mp3, wav, ogg, mp4, avi, mov, exe, msi, zip, 7z, gpx",
+            "La paire (extension, signature réelle du fichier) est validée ensemble : renommer un fichier pour tromper la validation ne suffit pas. Le MIME stocké est celui de la signature, pas le Content-Type déclaré par le client",
+            "Taille max standard : image 10 MB, document 10 MB (dont gpx), audio 20 MB, vidéo 50 MB",
             "Taille max exécutables/archives (exe/msi/zip/7z) : 200 MB",
-            "MIME types exécutables/archives : application/x-msdownload, application/octet-stream (exe/msi), application/zip, application/x-zip-compressed (zip), application/x-7z-compressed (7z)",
+            "Plafond dur toutes catégories : 100 MB (FILES_MAX_UPLOAD_MB), aligné sur upload_max_filesize / post_max_size",
+            "MIME types exécutables/archives : application/x-msdownload, application/x-dosexec, application/octet-stream (exe/msi), application/zip, application/x-zip-compressed (zip), application/x-7z-compressed (7z)",
             "Si folder fourni et valide : le fichier est déposé dans uploads/<folder>/ et l'url retournée reflète ce chemin",
-            "Retourne 400 si folder contient des caractères non autorisés (/, \\, .., espaces, majuscules, etc.)"
+            "Retourne 400 si folder contient des caractères non autorisés (/, \\, .., espaces, majuscules, etc.)",
+            "Refus de type : 400 avec errors.code = FILE_TYPE_REFUSED, errors.detected_type, errors.extension",
+            "Refus de taille : 400 avec errors.code = FILE_TOO_LARGE, errors.max_size_bytes, errors.file_size_bytes"
           ],
           "response": {
             "data": {
@@ -1028,7 +1033,10 @@
           "notes": [
             "accessibility=grand-public : aucun JWT requis — accès libre",
             "accessibility=public : JWT requis, tout utilisateur authentifié",
-            "accessibility=private : JWT requis, propriétaire ou administrateur uniquement"
+            "accessibility=private : JWT requis, propriétaire ou administrateur uniquement",
+            "Images bitmap : Content-Disposition: inline + cache immuable 1 an",
+            "SVG (image/svg+xml) : toujours Content-Disposition: attachment + X-Content-Type-Options: nosniff — jamais rendu inline (XML exécutable). Utiliser GET /files/png-from-svg pour un affichage sûr",
+            "Autres types : Content-Disposition: attachment, no-cache"
           ],
           "response": "Fichier binaire avec headers Content-Type / Content-Disposition",
           "http_codes": {
@@ -1096,6 +1104,69 @@
                 "updated_at": "string (datetime)",
                 "deleted_at": "string|null"
               }
+            }
+          },
+          "http_codes": {
+            "200": "succès",
+            "401": "non authentifié",
+            "403": "fichier private — accès refusé",
+            "404": "introuvable"
+          }
+        },
+        {
+          "method": "PATCH",
+          "path": "/files/{id}",
+          "description": "Renommer un fichier / modifier sa description (le stockage n'est pas touché)",
+          "params": {
+            "id": "integer (required)"
+          },
+          "body": {
+            "original_name": "string (optional) — nom affiché ; non vide, 255 car. max, sans / \\ ni ..",
+            "description": "string|null (optional)"
+          },
+          "notes": [
+            "Au moins un des deux champs doit être fourni, sinon 400",
+            "file_name et file_path (nom de stockage) restent inchangés",
+            "original_name invalide : 400 avec errors.code = FILE_NAME_INVALID"
+          ],
+          "response": {
+            "data": {
+              "file": {
+                "id": "integer",
+                "original_name": "string",
+                "description": "string|null",
+                "file_name": "string (nom stocké, inchangé)",
+                "url": "string (chemin relatif, inchangé)"
+              }
+            }
+          },
+          "permissions": "propriétaire ou administrateur",
+          "http_codes": {
+            "200": "succès",
+            "400": "aucun champ fourni ou original_name invalide",
+            "401": "non authentifié",
+            "403": "accès refusé",
+            "404": "introuvable"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/files/{id}/tags",
+          "description": "Lister les étiquettes associées à un fichier",
+          "params": {
+            "id": "integer (required)"
+          },
+          "notes": [
+            "Mêmes règles d'accessibilité que le téléchargement",
+            "Les étiquettes sont aussi retournées dans chaque ligne de GET /files/user/{user_id} (champ tags)",
+            "Association / dissociation : PUT /tags/{tag_id}/{file_id} avec table_associate = files"
+          ],
+          "response": {
+            "data": {
+              "file_id": "integer",
+              "tags": [
+                { "id": "integer", "name": "string", "color": "string|null" }
+              ]
             }
           },
           "http_codes": {
@@ -1204,7 +1275,10 @@
                   "upload_date": "string (datetime)",
                   "updated_at": "string (datetime)",
                   "deleted_at": "string (datetime)|null",
-                  "url": "string"
+                  "url": "string",
+                  "tags": [
+                    { "id": "integer", "name": "string", "color": "string|null" }
+                  ]
                 }
               ],
               "pagination": {
