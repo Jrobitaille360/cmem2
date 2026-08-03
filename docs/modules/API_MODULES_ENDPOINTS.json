@@ -1,0 +1,77 @@
+{
+  "module": {
+    "name": "Modules",
+    "version": "1.0.0",
+    "description": "Registre de modules activables — gating par plan Stripe + interrupteur usager + quota serveur. Directive cmem_web 20260727_144926.",
+    "generated": "2026-07-27",
+    "base_path": "/modules",
+    "authentication": {
+      "type": "JWT_BEARER",
+      "header": "Authorization: Bearer {jwt_token}"
+    },
+    "notes": "Les 2 routes exigent un JWT. L'autorité est serveur : le plan décide de « disponible », l'usager de « activé », le serveur du quota. Un PATCH émis sur un module non disponible est refusé quel que soit l'état du client. Multi-tenant via app_id (défaut serveur 'puzzle', 'cmemweb' pour cmem_web)."
+  },
+  "decisions": {
+    "trois_etats": "disponible (plan Stripe, mapping serveur) / activé (choix usager, tenant_modules.enabled) / quota (serveur, quota_used + quota_reset_at). Jamais fusionnés : un module peut être disponible mais éteint — aucun appel, aucun coût.",
+    "module_key": "Enum figée dès la v1 : projet | contacts | crm | ged | ia | caldav | booking | push_avance. Alignée sur l'ENUM SQL de tenant_modules.",
+    "retrofit": "Acté avec cmem_web le 2026-07-27 : les 4 pans déjà en production (projet, contacts, crm, ged) restent disponibles sur TOUS les plans, y compris Gratuit. Pas de clause grand-père, pas de date de bascule, aucun backfill de données. Le plan « ami » donne accès aux 8 modules.",
+    "defaut_sans_ligne": "L'absence de ligne dans tenant_modules n'est pas une erreur : elle signifie l'état par défaut. projet/contacts/crm/ged → enabled=true ; ia/caldav/booking/push_avance → enabled=false. GET /modules ne crée aucune ligne ; seul PATCH écrit.",
+    "portee": "owner_id uniquement en v1. La colonne group_id existe en base (unicité + CHECK XOR) pour préparer le plan équipe, mais n'est pas servie par l'API.",
+    "quota_ged": "Reporté. Le cap max_storage_mb de CmemPlans n'est pas enforcé ; ged renvoie quota=null. L'indicateur de stockage du front reste purement indicatif.",
+    "quota_ia": "30 appels/mois sur monthly, yearly et ami ; 0 sur free (module non disponible). Décompte serveur uniquement (TenantModule::incrementQuota), appelé par les endpoints consommateurs — directive ai-proxy à venir. Au dépassement, l'endpoint consommateur répond 429.",
+    "desactivation": "Éteindre un module coupe l'accès, jamais le contenu. Aucune donnée n'est supprimée ; réactiver rend les données telles quelles."
+  },
+  "endpoints": {
+    "registre": {
+      "description": "Lecture et bascule des modules de l'usager du JWT",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/modules",
+          "description": "État des 8 modules pour l'usager du JWT. Ne crée aucune ligne en base : les modules sans ligne sont servis à leur valeur par défaut.",
+          "auth_required": true,
+          "query": {
+            "app_id": "string — optionnel ('cmemweb' pour cmem_web ; défaut serveur 'puzzle')"
+          },
+          "response": {
+            "plan": "string — plan cmem effectif : free | monthly | yearly | ami",
+            "modules": [
+              {
+                "key": "string — une des 8 clés de module_key",
+                "available": "bool — le plan donne-t-il droit au module",
+                "enabled": "bool — le module est-il allumé (toujours false si available=false)",
+                "quota": "object|null — {used:int, limit:int, reset_at:datetime} sur les modules à coût variable (ia), null sinon"
+              }
+            ]
+          },
+          "status_codes": { "200": "Liste retournée" },
+          "errors": { "401": "JWT absent ou invalide" }
+        },
+        {
+          "method": "PATCH",
+          "path": "/modules/{key}",
+          "description": "Allume ou éteint un module. UPSERT sur (owner_id, module_key) : deux appels successifs ne créent jamais deux lignes. PUT accepté comme alias.",
+          "auth_required": true,
+          "body": {
+            "app_id": "string — optionnel ('cmemweb' pour cmem_web)",
+            "enabled": "bool — requis, booléen strict (une chaîne ou un entier → 422)"
+          },
+          "response": {
+            "module": {
+              "key": "string",
+              "available": "bool",
+              "enabled": "bool",
+              "quota": "object|null"
+            }
+          },
+          "status_codes": { "200": "Module mis à jour" },
+          "errors": {
+            "401": "JWT absent ou invalide",
+            "403": "errors.code = MODULE_NOT_AVAILABLE — le plan ne donne pas droit au module. À distinguer d'un 403 d'authentification : le front affiche une invite à l'upgrade, pas une déconnexion. La réponse porte aussi errors.module et errors.plan.",
+            "422": "errors.code = UNKNOWN_MODULE_KEY (clé hors énumération) ou VALIDATION_ERROR (champ enabled absent ou non booléen)"
+          }
+        }
+      ]
+    }
+  }
+}

@@ -11,6 +11,7 @@ Version 2.2.4 · Base URL : `/`
 - [Flux typiques](#flux-typiques)
 - [Endpoints — Auth](#endpoints--auth)
 - [Endpoints — Utilisateurs](#endpoints--utilisateurs)
+- [Suppression de compte et restauration](#suppression-de-compte-et-restauration)
 - [Endpoints — Groupes](#endpoints--groupes)
 - [Endpoints — Fichiers](#endpoints--fichiers)
 - [Endpoints — Tags](#endpoints--tags)
@@ -58,7 +59,22 @@ En passant `device_id` (UUID stable côté client) lors du login ou de la vérif
 
 ### Anti-brute-force
 
-5 tentatives maximum par email+IP toutes les 10 minutes sur `/auth/login` et `/auth/send-code`. HTTP 429 au dépassement.
+5 tentatives maximum par email+IP toutes les 10 minutes sur `/auth/login`, `/auth/send-code`, `/users/request-password-reset` et `/users/reset-password`. HTTP 429 au dépassement.
+
+### Politique de mot de passe
+
+Une seule politique, appliquée à **tous** les points d'entrée acceptant un mot de passe
+(`POST /users/register`, `POST /users/reset-password`, `PUT /users/{id}/password`). Un mot de passe doit contenir :
+
+- au minimum **8 caractères** ;
+- au moins une lettre **minuscule** ;
+- au moins une lettre **majuscule** ;
+- au moins un **chiffre** ;
+- au moins un **caractère spécial** (tout caractère non alphanumérique).
+
+Les exigences non satisfaites sont renvoyées en `400`, sous forme de tableau de messages prêts à afficher (`errors.password` ou `errors.new_password`). Source unique : `Validator::passwordErrors()`.
+
+> **BREAKING (2026-07-28)** — tous les `password_hash` existants ont été invalidés sur dev et en production. Aucun mot de passe antérieur n'authentifie plus : chaque usager doit passer par « mot de passe oublié » (code par courriel) ou par connexion OTP. Script : `private/utilitaires/invalidate_passwords.php`.
 
 ### CORS
 
@@ -75,10 +91,16 @@ Sur `dev-cmem2` uniquement, un compte de test à code OTP fixe est disponible po
 ### 1. Inscription → connexion
 
 ```txt
-POST /users/register         → email de vérification envoyé
+POST /users/register         → token à 8 chiffres envoyé par courriel (valide 24 h)
 POST /users/verify-email     → compte activé
 POST /auth/login             → { token, user }
 ```
+
+Le token de vérification n'est **jamais** renvoyé dans une réponse HTTP : il ne sort que par
+courriel. `POST /users/verify-email` accepte un champ facultatif `email` qui permet de compter
+les tentatives sur le token de l'usager : au-delà de 5 essais (ou 5 tentatives en 10 minutes
+par couple email + IP), le token est invalidé et l'API répond `429` — il faut en redemander un
+via `POST /users/resend-verification-email`, elle-même limitée à 5 demandes par 10 minutes.
 
 ### 2. Connexion par code (OTP)
 
@@ -99,9 +121,19 @@ POST /auth/refresh (device_id + device_token) → { token, device_token }
 ### 4. Réinitialisation mot de passe
 
 ```txt
-POST /users/request-password-reset   → lien envoyé par email
+POST /users/request-password-reset   → code à 6 chiffres envoyé par courriel (valide 60 min)
 POST /users/reset-password           → mot de passe mis à jour
 ```
+
+Le code n'apparaît **jamais** dans la réponse HTTP : il part uniquement par courriel. La réponse est identique que le courriel existe ou non (anti-énumération de comptes).
+
+- `request-password-reset` : 5 demandes par 10 minutes par couple (email + IP) → `429` au-delà.
+- `reset-password` : body `{ token, new_password, password_policy?, email? }`.
+  - `password_policy` — **sans effet**, il n'existe plus qu'une seule politique (voir « Politique de mot de passe » ci-dessous). Seule la valeur `strong` est tolérée par compatibilité ; `any` et toute autre valeur renvoient `400`.
+  - `email` (facultatif) — permet de compter les tentatives sur le code de cet usager : au-delà de 5 essais, le code est supprimé et l'API répond `429`.
+  - Le code est à usage unique : il est supprimé dès que le mot de passe est changé.
+
+Sur `dev-cmem2` uniquement, `PASSWORD_RESET_TEST_CODE=654321` force un code fixe, sans envoi de courriel et sans rate limit. La variable est ignorée si `APP_ENV=production`.
 
 ---
 
@@ -162,6 +194,21 @@ Réponse générique `200` (même si email inconnu) :
 **Auto-register Option A** : si l'email est inconnu du système, un compte est créé silencieusement (`email_verified=1`, mot de passe aléatoire inutilisable) et un code OTP est envoyé. L'utilisateur peut se connecter sans avoir inscrit de mot de passe.
 
 `403` retourné uniquement si le compte **existe** mais que l'email n'est pas vérifié.
+
+`409` retourné si le compte est **en attente de purge** (supprimé, délai de grâce en cours) — aucun code n'est envoyé :
+
+```json
+{
+  "success": false,
+  "message": "Compte en attente de suppression définitive",
+  "errors": {
+    "error_code": "ACCOUNT_PENDING_DELETION",
+    "purge_scheduled_at": "2026-08-28T02:14:07Z"
+  }
+}
+```
+
+Voir [Suppression de compte](#suppression-de-compte-et-restauration) pour la restauration.
 
 ### POST /auth/refresh
 
@@ -300,6 +347,84 @@ Matrice d'autorité (`PUT /users/{id}` champ `role`, `DELETE /users/{id}`) :
 
 ---
 
+## Suppression de compte et restauration
+
+Conformité Loi 25 (Québec). L'accès est coupé immédiatement, les données sont effacées
+définitivement après un **délai de grâce de 30 jours** (`ACCOUNT_PURGE_GRACE_DAYS`).
+
+### Parcours
+
+1. `DELETE /users/me` — le serveur annule d'abord tout abonnement Stripe encore actif, puis pose
+   `deleted_at`. Réponse :
+
+   ```json
+   { "deleted": true, "purge_scheduled_at": "2026-08-28T02:14:07Z" }
+   ```
+
+   `purge_scheduled_at` est informatif : son absence ne remet pas en cause le succès.
+
+2. Pendant le délai de grâce : toute connexion est refusée, un JWT déjà émis cesse d'être accepté,
+   et `POST /auth/send-code` répond `409 ACCOUNT_PENDING_DELETION` avec la date de purge.
+
+3. Restauration, deux voies :
+   - `POST /auth/restore-account` `{ email }` → code envoyé, réponse générique ;
+     puis `POST /auth/restore-account/verify` `{ email, code }` → compte restauré + JWT ;
+   - `POST /auth/login` avec le mot de passe du compte — une connexion réussie restaure le compte.
+   - Voie admin : `POST /users/{id}/restore` (`ADMINISTRATEUR` et plus).
+
+4. Après 30 jours, le cron de maintenance efface physiquement le compte. L'adresse redevient
+   disponible pour une inscription neuve, sans aucun reliquat.
+
+### Si l'annulation Stripe échoue
+
+`DELETE /users/me` renvoie `409` et **ne supprime pas** le compte :
+
+```json
+{
+  "success": false,
+  "errors": {
+    "error_code": "STRIPE_CANCEL_FAILED",
+    "app_id": "cmemweb"
+  }
+}
+```
+
+Aucun compte supprimé ne reste facturé. Réessayer plus tard, ou annuler l'abonnement d'abord via
+`DELETE /v2/subscriptions/stripe`.
+
+### Ce qui est effacé, ce qui est conservé
+
+| Donnée | Sort |
+| - | - |
+| Calendriers, événements, occurrences, journaux, tâches | Effacé |
+| Projets et dépendances de tâches | Effacé |
+| Contacts, interactions CRM, opportunités | Effacé |
+| Fichiers téléversés (base **et** disque) | Effacé |
+| Liens `/links`, étiquettes | Effacé |
+| Compte, profil, préférences, sessions, jetons d'appareil | Effacé |
+| Abonnements Web Push et préférences de notification | Effacé |
+| Données de jeu traque | Effacé |
+| Adhésion aux groupes partagés | Effacée — le groupe des autres membres survit |
+| Groupe dont l'usager est le seul membre | Effacé |
+| Propriété d'un groupe partagé | Transférée au membre le plus ancien |
+| Partie de casse-tête partagée | Conservée chez le partenaire, sans trace de l'usager parti |
+| Registres de facturation Stripe | Conservés **anonymisés** (`billing_archive`) — obligation fiscale, aucun identifiant d'usager |
+
+### Cron
+
+La purge tourne dans `src/cron/maintenance.php` (tâche `auth_groups`). Elle peut être déclenchée
+seule :
+
+```bash
+php src/cron/purge_accounts.php --dry-run   # compte sans rien supprimer
+php src/cron/purge_accounts.php             # exécution réelle
+php src/cron/purge_accounts.php --json      # rapport machine
+```
+
+Le traitement est idempotent et journalise un décompte par usager purgé.
+
+---
+
 ## Endpoints — Groupes
 
 | Méthode | Endpoint | Auth | Description |
@@ -337,7 +462,18 @@ Matrice d'autorité (`PUT /users/{id}` champ `role`, `DELETE /users/{id}`) :
 | PATCH | `/files/{id}/accessibility` | JWT propriétaire/admin | Changer l'accessibilité |
 | DELETE | `/files/{id}` | JWT | Soft delete (`force_delete: true` pour suppression physique) |
 | POST | `/files/{id}/restore` | JWT | Restaurer un fichier soft-deleted |
-| GET | `/files/user/{user_id}` | JWT | Lister les fichiers d'un utilisateur (paginé) |
+| GET | `/files/user/{user_id}` | JWT | Lister les fichiers d'un utilisateur (paginé, `?deleted=exclude\|include\|only`) |
+
+### Corbeille : `GET /files/user/{user_id}?deleted=`
+
+| Valeur | Effet |
+| - | - |
+| `exclude` | Défaut — fichiers actifs seulement (comportement historique) |
+| `include` | Actifs + soft-deleted |
+| `only` | Soft-deleted seulement (vue corbeille) |
+
+Chaque ligne expose `deleted_at` (`null` si le fichier est actif). Une valeur hors liste retourne `422`.
+`pagination` et `statistics` suivent le même filtre. Restauration via `POST /files/{id}/restore`.
 
 ### Types MIME acceptés
 

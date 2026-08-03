@@ -9,6 +9,101 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+## [2.12.0] — 2026-08-02
+
+### Sécurité — JWT accepté après suppression de compte
+
+- **Un JWT émis avant `DELETE /users/me` restait valide jusqu'à 15 jours sur les routes `/auth/*`.** `JwtAuthMiddleware::authenticate()` validait signature et expiration sans jamais consulter la base ; les routes `/auth/*` l'appellent directement (`withAuth`) au lieu de passer par `AuthService`, qui vérifiait déjà `deleted_at`. Exposition : `GET /auth/me` (profil complet d'un compte supprimé), `GET|DELETE /auth/devices`, `GET|DELETE /auth/sessions`, `POST /auth/logout`. Après purge physique, le jeton aurait continué d'authentifier un `user_id` inexistant
+- Le middleware vérifie désormais que le compte existe et n'est pas supprimé → `401` `ACCOUNT_UNAVAILABLE`. Rôle, courriel et nom sont lus en base plutôt que dans le payload : une révocation de rôle prend effet immédiatement
+
+### Suppression de compte — purge physique après 30 jours (Loi 25)
+
+- **Purge complète des comptes supprimés au-delà du délai de grâce.** `AccountPurgeService` traite ce que la cascade FK ne peut pas faire : fichiers retirés du **disque et de la base** (`files.uploaded_by` n'a aucune contrainte FK), tables sans FK vidées (`otp_codes`, `login_attempts`, `device_tokens`, `jwt_blacklist`, `pomo_engagements`), transaction par compte, mode dry-run, idempotence, décompte journalisé par usager
+- **Groupes partagés préservés** : la FK `groups.owner_id ON DELETE CASCADE` détruisait le groupe de tous ses membres. La propriété est désormais transférée au membre le plus ancien ; un groupe sans autre membre est supprimé
+- **Parties de casse-tête préservées** : `puzzle_shared.creator_id` / `partner_id` sont `NOT NULL` en cascade — la partie disparaissait aussi pour le partenaire. Elle lui est maintenant réattribuée, sans trace de l'usager parti
+- **Registres de facturation conservés anonymisés** : nouvelle table `billing_archive` (montants chez Stripe, identifiants de rapprochement, **aucun** `user_id`, courriel ni nom) alimentée avant la purge — obligation fiscale. Migration `docs/20260802_suppression_compte_purge.sql` (création de `billing_archive` seulement ; l'index `idx_files_uploaded_by` initialement prévu faisait double emploi avec `idx_file_uploaded_by` et a été retiré de dev et de production)
+- `DELETE /users/me` renvoie `purge_scheduled_at` (date d'effacement physique, ISO 8601 UTC)
+- **Filet Stripe sur `DELETE /users/me`** : un abonnement encore actif est annulé par le serveur avant la suppression ; si l'appel Stripe échoue, la suppression est **refusée** (`409` `STRIPE_CANCEL_FAILED`). Aucun compte supprimé ne peut rester facturé, même si le client saute l'étape d'annulation
+- **`POST /auth/send-code` sur un compte en délai de grâce** : `409` `ACCOUNT_PENDING_DELETION` avec `purge_scheduled_at`, au lieu d'un `500` — l'auto-inscription heurtait le `UNIQUE KEY` sur `users.email`
+- **Restauration pendant le délai de grâce** : nouvelles routes `POST /auth/restore-account` (envoi du code, réponse générique) et `POST /auth/restore-account/verify` (restauration + JWT). Une connexion réussie par mot de passe restaure également le compte. Voie admin `POST /users/{id}/restore` inchangée
+- **Le courriel redevient disponible après la purge** : la ligne `users` étant physiquement supprimée, une inscription neuve avec la même adresse fonctionne sans reliquat
+- Nouveau `ACCOUNT_PURGE_GRACE_DAYS` (30 jours par défaut) dans `.env.example` et `environment.php`
+- Nouveau script `src/cron/purge_accounts.php` (`--dry-run`, `--user=ID`, `--json`) — la purge tourne déjà dans `maintenance.php`, aucune entrée crontab supplémentaire
+- Doc : `docs/core/API_ENDPOINTS.json`, `docs/core/GUIDE.md` (section « Suppression de compte et restauration » avec le tableau effacé / conservé), `docs/cron.md`, `docs/entrypoints.md`
+- Tests : `private/tests/test_account_deletion.php` (44 tests). Suite complète 2245/2245
+- Répond à la directive inter-projet `20260729_220000_cmem_web_vers_cmem2_API__suppression-compte-purge-30-jours.md`
+
+### Sécurité — Vérification de courriel : token retiré des réponses, limites de tentatives
+
+- **Le token de vérification n'apparaît plus dans aucune réponse HTTP.** `POST /users/register` et `POST /users/resend-verification-email` le renvoyaient en développement : déclencher l'envoi pour une adresse tierce suffisait à obtenir le token et à valider un compte sans accès à la boîte mail. Le token ne sort désormais que par courriel
+- Réponse générique unique sur `resend-verification-email`, identique que le compte existe, n'existe pas ou soit déjà vérifié : « Si cette adresse est associée à un compte non vérifié, un email de vérification sera envoyé. » Les champs `email` et `token_expires_at` sont retirés du body (anti-énumération)
+- Longueur du token **maintenue à 8 chiffres** (premier chiffre 1-9), confirmée à jdb : `VERIFY_CODE_LENGTH` reste à 8 côté client, aucune coordination requise. Génération par `random_int()` au lieu de `mt_rand()`
+- Un seul token actif par usager : les tokens précédents sont supprimés à chaque émission, avec régénération en cas de collision sur la contrainte `UNIQUE`. Validité portée par `EMAIL_VERIFICATION_EXPIRY_HOURS` (24 h par défaut, comportement historique conservé)
+- Rate limit **5 tentatives / 10 min** sur `verify-email` (par IP, et par email si le champ facultatif `email` est fourni) → `429` `RATE_LIMIT_EXCEEDED`. Compteur par token : nouvelles colonnes `attempts` / `max_attempts` sur `email_verifications` (`docs/20260729_email_verifications_attempts.sql`) ; au-delà de `max_attempts` (5), le token est supprimé et l'API répond `429` `TOO_MANY_ATTEMPTS`
+- Rate limit **5 demandes / 10 min par couple (email + IP)** sur `resend-verification-email` → `429` (bombing de courriels)
+- Message d'erreur générique sur token refusé : « Token invalide ou expiré » (`404`), sans distinction entre token inconnu, expiré et usager introuvable
+- Token fixe de développement `EMAIL_VERIFICATION_TEST_CODE` : aucun courriel envoyé, token fixe, exempt du rate limit. Actif seulement si `APP_ENV !== 'production'` ; en production la variable est ignorée et journalisée en `warning`. Volontairement **non configuré** sur `dev-cmem2` (un token fixe partagé casserait les inscriptions parallèles — contrainte `UNIQUE`)
+- Doc : `docs/core/API_ENDPOINTS.json` (les trois routes, erreurs `429`, retrait du champ `verification_token`), `docs/core/GUIDE.md`, `.env.example`
+- Tests : `private/tests/test_email_verification.php` (28 tests) ; nouveaux helpers `getVerificationTokenFromDB()` / `getVerificationTokenFromRegister()` dans `test_new_base.php` — les 16 fichiers de test qui lisaient `data.verification_token` lisent maintenant le token en base. Suite complète 2173/2173
+- Migration `docs/20260729_email_verifications_attempts.sql` appliquée sur **dev-cmem2** et en **production** ; code déployé sur les deux cibles avec `-LocalComposerInstall`
+- Répond à la directive inter-projet `20260728_211346_jdb_vers_cmem2_API__verification-courriel-token-securite.md` ; suites client à ajuster via la directive retour `20260729_073000_cmem2_API_vers_jdb__verification-courriel-securisee.md`
+
+### Correction — Déploiement : `APP_COMMIT` collé à la variable précédente
+
+- `private/deploy.ps1` — l'injection de traçabilité ajoutait `APP_COMMIT` avec `echo >> .env` sans garantir de saut de ligne final. Sur un `.env` qui n'en avait pas, la clé se collait à la dernière variable (`PUSH_TTL_SECONDS=86400APP_COMMIT=abc123`) : `APP_COMMIT` n'était pas lu et la variable précédente était corrompue. Constaté en production. Un saut de ligne est désormais garanti avant tout ajout
+- Gabarit `private/utilitaires/.env.prod` : saut de ligne final ajouté (cause racine)
+- Déploiements refaits avec `-LocalComposerInstall` (composer absent des serveurs cPanel) : `vendor/` bâti localement puis transféré, `APP_COMMIT` / `APP_DEPLOYED_AT` correctement injectés sur dev et prod
+
+### BREAKING — Politique de mot de passe unique et invalidation de tous les mots de passe existants
+
+- **Règle unique** (`Validator::passwordErrors()`, nouvelle règle de validation `password`) : minimum **8 caractères**, au moins une **minuscule**, une **majuscule**, un **chiffre** et un **caractère spécial**. Les exigences non satisfaites sont renvoyées en `400` sous forme de tableau de messages prêts à afficher
+- Appliquée à **tous** les points d'entrée acceptant un mot de passe : `POST /users/register` (était `min:6`), `POST /users/reset-password`, `PUT /users/{id}/password` (était `min:6`) — l'incohérence du changement authentifié est corrigée
+- **`password_policy` n'a plus d'effet** : une seule politique existe. Seule la valeur `strong` reste tolérée par compatibilité (JdB l'envoie en dur) ; `any` et toute autre valeur renvoient `400`. La journalisation de dépréciation est retirée, sans objet
+- **Tous les `password_hash` ont été invalidés** sur dev-cmem2 (307 comptes) et en production (4 comptes) le 2026-07-28 : chaque hash est remplacé par celui d'un secret aléatoire de 32 octets jamais conservé. Aucun mot de passe antérieur n'authentifie plus — chaque usager doit passer par « mot de passe oublié » (code par courriel) ou par connexion OTP, qui n'est pas affectée. Les hash d'origine sont sauvegardés hors dépôt côté serveur (`~/backup_password_hashes_20260728_{env}.json`, mode 600). Script : `private/utilitaires/invalidate_passwords.php` (option `--dry-run`)
+- Tests : mots de passe des jeux d'essai rendus conformes ; nouveau helper `injectPassword()` dans `private/tests/test_new_base.php` pour reposer un mot de passe connu sur les comptes fixes (dev/local seulement). Suite complète 2177/2177
+- Clients notifiés par les directives `20260728_203000_cmem2_API_vers_{jdb,cmem_web,kestyon}__politique-mot-de-passe-unique-et-invalidation.md`
+
+### Sécurité — Réinitialisation de mot de passe par code : code retiré de la réponse, 6 chiffres, limites de tentatives
+
+- **`POST /users/request-password-reset` ne renvoie plus le code** dans le body (`data.token` supprimé). Auparavant, connaître une adresse courriel suffisait à obtenir le code sans accès à la boîte mail — prise de compte triviale. Le code part désormais uniquement par courriel
+- Réponse générique unique, identique que le courriel existe ou non : « Si ce courriel existe, un code de réinitialisation a été envoyé. » (anti-énumération de comptes)
+- Code ramené de **8 à 6 chiffres** (premier chiffre 1-9), aligné sur l'OTP de `/auth/send-code` ; gabarit courriel `EmailService::buildPasswordResetTemplate()` mis à jour. Un seul code actif par usager : les codes précédents sont supprimés à chaque demande, avec régénération en cas de collision sur la contrainte `UNIQUE`
+- Validité du code portée par `PASSWORD_RESET_EXPIRY_MINUTES` (60 min par défaut, comportement historique conservé)
+- Rate limit **5 demandes / 10 min par couple (email + IP)** sur `request-password-reset` → `429` `RATE_LIMIT_EXCEEDED` (même politique que `/auth/send-code`)
+- Rate limit **5 tentatives / 10 min** sur `reset-password` (par IP, et par email si le champ facultatif `email` est fourni) → `429`. Compteur par code : nouvelles colonnes `attempts` / `max_attempts` sur `password_resets` (`docs/20260728_password_resets_attempts.sql`) ; au-delà de `max_attempts`, le code est supprimé et l'API répond `429` `TOO_MANY_ATTEMPTS`
+- Le code est consommé à l'usage : suppression définitive de la ligne après changement du mot de passe (plus de soft delete)
+- **Nouveau champ `password_policy`** sur `POST /users/reset-password` : **défaut `strong` (min 8 caractères)** — l'omission du champ ne vaut pas dérogation, le plancher est imposé par le serveur. `any` (min 6 caractères) reste accepté comme dérogation **explicite et dépréciée** pour les clients legacy : chaque usage est journalisé en `warning` (`endpoint`, `user_id`, `user_agent`) afin d'identifier les clients à migrer avant retrait de l'option. Valeur hors liste → `400`
+- Code fixe de développement `PASSWORD_RESET_TEST_CODE` : aucun courriel envoyé, code fixe, exempt du rate limit. Actif seulement si `APP_ENV !== 'production'` ; en production la variable est ignorée et journalisée en `warning`. Documenté dans `.env.example`, configuré sur `dev-cmem2` (`654321`)
+- Doc : `docs/core/API_ENDPOINTS.json` (les deux routes, erreurs `429`, retrait du champ `token`), `docs/core/GUIDE.md`
+- Tests : `private/tests/test_password_reset.php` (28 tests) ; suite complète 2167/2167
+- Répond aux directives inter-projet `20260728_142154_jdb_vers_cmem2_API__reset-password-code-6-chiffres-securite.md` et `20260728_181216_jdb_vers_cmem2_API__password-policy-defaut-strong.md`
+
+### Ajout — Registre de modules activables : `GET /modules`, `PATCH /modules/{key}`
+
+- Nouvelle table `tenant_modules` (`docs/20260727_tenant_modules.sql`) : `app_id`, `owner_id`/`group_id`, `module_key`, `enabled`, `quota_used`, `quota_reset_at` — unicité sur `(owner_id, module_key)` et `(group_id, module_key)`, CHECK `owner_id` XOR `group_id`
+- Énumération `module_key` figée dès la v1 : `projet | contacts | crm | ged | ia | caldav | booking | push_avance`
+- Trois états séparés : **disponible** (décidé par le plan Stripe, `src/stripe/Config/CmemModules.php`), **activé** (choix de l'usager, `tenant_modules.enabled`), **quota** (serveur, `quota_used`/`quota_reset_at`). Un module peut être disponible mais éteint — aucun appel, aucun coût
+- `GET /modules` renvoie les 8 modules avec `available` / `enabled` / `quota`, plus le code du plan effectif. N'écrit aucune ligne : l'absence de ligne vaut état par défaut
+- `PATCH /modules/{key}` allume ou éteint un module (UPSERT, jamais de doublon). `403` `MODULE_NOT_AVAILABLE` si le plan n'y donne pas droit, `422` `UNKNOWN_MODULE_KEY` sur clé inconnue, `422` `VALIDATION_ERROR` si `enabled` absent ou non booléen
+- Rétro-fit sans perte d'accès : `projet`, `contacts`, `crm` et `ged` restent disponibles sur **tous** les plans (Gratuit inclus) et sont allumés par défaut — pas de clause grand-père, pas de backfill de données. Le plan `ami` ouvre les 8 modules
+- `ia` : non disponible sur Gratuit, éteint par défaut sur les plans payants, quota de 30 appels/mois décompté côté serveur (`TenantModule::incrementQuota`) pour la future directive `ai-proxy`
+- Quota de stockage `ged` reporté (`quota: null`) ; `group_id` présent en base mais non servi en v1 (prépare le plan équipe)
+- Désactiver un module coupe l'accès, jamais le contenu : réactiver rend les données telles quelles
+- Doc : `docs/modules/GUIDE.md`, `docs/modules/API_MODULES_ENDPOINTS.json`, `docs/entrypoints.md`
+- Tests : `private/tests/test_modules.php` (54 tests) ; suite complète 2139/2139
+- Répond à la directive inter-projet `20260727_144926_cmem_web_vers_cmem2_API__modules-gating.md`
+
+### Ajout — Corbeille des fichiers : `GET /files/user/{user_id}?deleted=`
+
+- Nouveau paramètre `deleted` sur `GET /files/user/{user_id}` : `exclude` (défaut, comportement historique), `include` (actifs + supprimés), `only` (corbeille). Valeur hors liste → `422`
+- Chaque ligne de la liste expose désormais `deleted_at` (`null` si le fichier est actif) et `accessibility` (jusqu'ici documenté mais absent de la réponse)
+- `pagination` et `statistics` suivent le même filtre que la liste
+- Sans le paramètre, la réponse reste strictement celle d'avant (hors champs ajoutés) — la vue `/documents` de cmem_web n'est pas impactée
+- Un fichier soft-deleted redevient récupérable depuis l'UI : lister en `deleted=only` puis `POST /files/{id}/restore`
+- Doc : `docs/core/GUIDE.md` (section « Corbeille »), `docs/core/API_ENDPOINTS.json`
+- Tests : `private/tests/test_files.php` section 6b ; suite complète 2085/2085
+- Répond à la directive inter-projet `20260727_130000_cmem_web_vers_cmem2_API__files-lister-supprimes.md`
+
 ## [2.11.0] — 2026-07-26
 
 ### Ajout — Relance de contact : 2e source de `contact_followup` (Phase G-F)

@@ -2,6 +2,7 @@
 
 namespace AuthGroups\Middleware;
 
+use AuthGroups\Models\User;
 use AuthGroups\Services\JwtService;
 use AuthGroups\Services\LogService;
 use AuthGroups\Utils\Response;
@@ -46,13 +47,33 @@ class JwtAuthMiddleware
             return null;
         }
 
+        // Le payload seul ne suffit pas : un JWT émis avant une suppression de compte
+        // resterait valide jusqu'à son expiration (15 jours), et continuerait
+        // d'authentifier un user_id déjà purgé. La signature prouve l'émission,
+        // pas que le compte existe encore.
+        $userId   = (int) $payload['sub'];
+        $userData = (new User())->findById($userId);
+
+        if (!$userData || !empty($userData['deleted_at'])) {
+            LogService::warning('JWT valide mais compte supprimé ou introuvable', [
+                'user_id' => $userId,
+                'ip'      => self::getClientIp(),
+                'route'   => $_SERVER['REQUEST_URI'] ?? 'UNKNOWN',
+            ]);
+            Response::error('Token JWT invalide ou expiré', [
+                'error'   => 'ACCOUNT_UNAVAILABLE',
+                'message' => 'Le compte associé à ce token n\'est plus accessible.',
+            ], 401);
+            return null;
+        }
+
         return [
-            'user_id'   => (int) $payload['sub'],
-            'email'     => $payload['email'],
-            'role'      => $payload['role'],
-            'name'      => $payload['name'] ?? '',
-            'jti'       => $payload['jti']  ?? null,
-            'exp'       => $payload['exp']  ?? null,
+            'user_id'   => $userId,
+            'email'     => $userData['email'] ?? $payload['email'],
+            'role'      => $userData['role']  ?? $payload['role'],
+            'name'      => $userData['name']  ?? ($payload['name'] ?? ''),
+            'jti'       => $payload['jti']    ?? null,
+            'exp'       => $payload['exp']    ?? null,
             'auth_type' => 'jwt',
         ];
     }

@@ -11,6 +11,7 @@ use AuthGroups\Utils\RoleHelper;
 use AuthGroups\Utils\Validator;
 use AuthGroups\Utils\Database;
 use AuthGroups\Services\LogService;
+use AuthGroups\Services\RateLimitService;
 use AuthGroups\Services\UserSessionService;
 use AuthGroups\Middleware\LoggingMiddleware;
 use Stripe\Config\CmemPlans;
@@ -21,7 +22,131 @@ use Exception;
  * Version simplifiée sans injection de dépendance PDO
  */
 class UserManagerController {
-    
+
+    /** Longueur du token de vérification de courriel (confirmée à jdb : 8 chiffres). */
+    const VERIFY_CODE_LENGTH = 8;
+
+    /** Message unique renvoyé par resend-verification-email (anti-énumération de comptes). */
+    const GENERIC_RESEND_MESSAGE = 'Si cette adresse est associée à un compte non vérifié, un email de vérification sera envoyé.';
+
+    /** Message unique renvoyé sur token de vérification refusé (ne révèle rien sur le compte). */
+    const GENERIC_VERIFY_ERROR = 'Token invalide ou expiré';
+
+    /**
+     * Indique si le token de vérification fixe de développement est actif.
+     * Toujours faux en production : la constante y est forcée à ''.
+     */
+    private function verificationFixedCode(): string
+    {
+        if (defined('EMAIL_VERIFICATION_TEST_CODE_IGNORED') && EMAIL_VERIFICATION_TEST_CODE_IGNORED) {
+            LogService::warning('EMAIL_VERIFICATION_TEST_CODE défini en production — variable ignorée');
+        }
+        return defined('EMAIL_VERIFICATION_TEST_CODE') ? EMAIL_VERIFICATION_TEST_CODE : '';
+    }
+
+    /**
+     * Génère un token numérique de VERIFY_CODE_LENGTH chiffres, premier chiffre 1-9.
+     */
+    private function generateVerificationToken(): string
+    {
+        $token = (string) random_int(1, 9);
+        for ($i = 1; $i < self::VERIFY_CODE_LENGTH; $i++) {
+            $token .= random_int(0, 9);
+        }
+        return $token;
+    }
+
+    /**
+     * Crée un token de vérification pour un usager et l'insère en base.
+     *
+     * Le token n'est jamais renvoyé au client : il ne sort que par courriel.
+     * En développement, EMAIL_VERIFICATION_TEST_CODE impose un token fixe
+     * (les lignes portant déjà ce token sont libérées — contrainte UNIQUE).
+     *
+     * @return array{token: string, expires_at: string, fixed: bool}
+     */
+    private function issueVerificationToken(\PDO $pdo, int $userId): array
+    {
+        $fixedCode  = $this->verificationFixedCode();
+        $useFixed   = $fixedCode !== '';
+        $expiryH    = defined('EMAIL_VERIFICATION_EXPIRY_HOURS') ? (int) EMAIL_VERIFICATION_EXPIRY_HOURS : 24;
+        $maxAttempts = defined('EMAIL_VERIFICATION_MAX_ATTEMPTS') ? (int) EMAIL_VERIFICATION_MAX_ATTEMPTS : 5;
+        $expiresAt  = date('Y-m-d H:i:s', time() + ($expiryH * 3600));
+
+        // Un seul token actif par usager
+        $pdo->prepare("DELETE FROM email_verifications WHERE user_id = :user_id")
+            ->execute(['user_id' => $userId]);
+        if ($useFixed) {
+            // `token` porte une contrainte UNIQUE : libérer le code fixe détenu par un autre usager
+            $pdo->prepare("DELETE FROM email_verifications WHERE token = :token")
+                ->execute(['token' => $fixedCode]);
+        }
+
+        $token    = null;
+        $inserted = false;
+        for ($try = 0; $try < 5 && !$inserted; $try++) {
+            $token = $useFixed ? $fixedCode : $this->generateVerificationToken();
+            try {
+                $stmt = $pdo->prepare(
+                    "INSERT INTO email_verifications (user_id, token, attempts, max_attempts, expires_at)
+                     VALUES (:user_id, :token, 0, :max_attempts, :expires_at)"
+                );
+                $stmt->execute([
+                    'user_id'      => $userId,
+                    'token'        => $token,
+                    'max_attempts' => $maxAttempts,
+                    'expires_at'   => $expiresAt,
+                ]);
+                $inserted = true;
+            } catch (\PDOException $e) {
+                // 23000 = violation d'unicité → régénérer un token
+                if ($e->getCode() !== '23000' || $useFixed) {
+                    throw $e;
+                }
+                $pdo->query("DELETE FROM email_verifications WHERE expires_at < NOW()");
+            }
+        }
+
+        if (!$inserted) {
+            throw new Exception('Impossible de générer un token de vérification unique');
+        }
+
+        return ['token' => $token, 'expires_at' => $expiresAt, 'fixed' => $useFixed];
+    }
+
+    /**
+     * Incrémente le compteur de tentatives du token actif d'un usager.
+     * Supprime le token si le maximum est atteint.
+     *
+     * @return bool true si le token vient d'être invalidé (→ répondre 429)
+     */
+    private function registerFailedVerification(\PDO $pdo, string $email): bool
+    {
+        $stmt = $pdo->prepare(
+            "SELECT ev.id, ev.attempts, ev.max_attempts
+               FROM email_verifications ev
+               JOIN users u ON u.id = ev.user_id
+              WHERE u.email = :email AND ev.expires_at > NOW() AND ev.deleted_at IS NULL
+              ORDER BY ev.id DESC LIMIT 1"
+        );
+        $stmt->execute(['email' => $email]);
+        $row = $stmt->fetch();
+        if (!$row) {
+            return false;
+        }
+
+        $attempts = (int) $row['attempts'] + 1;
+        if ($attempts >= (int) $row['max_attempts']) {
+            $pdo->prepare("DELETE FROM email_verifications WHERE id = :id")->execute(['id' => $row['id']]);
+            LogService::warning('Token de vérification invalidé après trop de tentatives', ['email' => $email]);
+            return true;
+        }
+
+        $pdo->prepare("UPDATE email_verifications SET attempts = :attempts WHERE id = :id")
+            ->execute(['attempts' => $attempts, 'id' => $row['id']]);
+        return false;
+    }
+
      /**
      * Créer un nouvel utilisateur
      */
@@ -33,7 +158,7 @@ class UserManagerController {
             $validation = Validator::validate($input, [
                 'name' => 'required|string|min:2|max:255',
                 'email' => 'required|email|max:255',
-                'password' => 'required|string|min:6',  // Changé de min:8 à min:6
+                'password' => 'required|string|password',  // Politique unique : Validator::passwordErrors()
                 'bio' => 'string',
                 'phone' => 'string',
                 'date_of_birth' => 'date',
@@ -117,60 +242,48 @@ class UserManagerController {
                     ]);
                 }
                 
-                // 2. Générer un token de vérification d'email 1 chiffre de 1 à 9 et 7 chiffres de 0 à 9
-                
-                $verificationToken = mt_rand(1, 9) . str_pad(mt_rand(0, 9999999), 7, '0', STR_PAD_LEFT);
-                $expiresAt = date('Y-m-d H:i:s', time() + (24 * 60 * 60)); // Expire dans 24h
-                
-                // 4. Créer un token d'invitation pour choisir un plan
-               // $planInvitationToken = bin2hex(random_bytes(32));
-               // $planInvitationExpires = date('Y-m-d H:i:s', time() + (7 * 24 * 60 * 60)); // 7 jours
-                
-                // Insérer le token de vérification dans la base de données
-                $stmt = $pdo->prepare("
-                    INSERT INTO email_verifications (user_id, token, expires_at) 
-                    VALUES (:user_id, :token, :expires_at)
-                ");
-                $stmt->execute([
-                    'user_id' => $createdUser['id'],
-                    'token' => $verificationToken,
-                    'expires_at' => $expiresAt
-                ]);
-                
-                // Insérer l'invitation au choix de plan
-                //$stmt = $pdo->prepare(" INSERT INTO plan_invitations (user_id, invitation_token, expires_at) VALUES (:user_id, :token, :expires_at)");
-                //$stmt->execute([ 'user_id' => $createdUser['id'], 'expires_at' => $planInvitationExpires ]);
-                
-                // 3. Envoyer l'email de vérification
-                try {
-                    $emailService = new EmailService();
-                    $emailSent = $emailService->sendRegistrationVerification(
-                        $createdUser['email'],
-                        $createdUser['name'],
-                        $verificationToken
-                    );
+                // 2. Générer et stocker le token de vérification d'email (8 chiffres)
+                //    Le token ne sort que par courriel — jamais dans la réponse HTTP.
+                $issued            = $this->issueVerificationToken($pdo, (int) $createdUser['id']);
+                $verificationToken = $issued['token'];
 
-                    if ($emailSent) {
-                        LogService::info("Email de vérification d'inscription envoyé", [
+                // 3. Envoyer l'email de vérification
+                //    En mode token fixe (dev), aucun courriel n'est envoyé.
+                if ($issued['fixed']) {
+                    LogService::info('Token de vérification fixe stocké (dev) — aucun courriel envoyé', [
+                        'user_id' => $createdUser['id'],
+                    ]);
+                } else {
+                    try {
+                        $emailService = new EmailService();
+                        $emailSent = $emailService->sendRegistrationVerification(
+                            $createdUser['email'],
+                            $createdUser['name'],
+                            $verificationToken
+                        );
+
+                        if ($emailSent) {
+                            LogService::info("Email de vérification d'inscription envoyé", [
+                                'user_id' => $createdUser['id'],
+                                'email'   => $createdUser['email']
+                            ]);
+                        } else {
+                            LogService::warning("Échec envoi email d'inscription", [
+                                'user_id' => $createdUser['id'],
+                                'email'   => $createdUser['email']
+                            ]);
+                            Response::error("Échec de l'envoi de l'email d'inscription", null, 500);
+                        }
+                    } catch (Exception $emailError) {
+                        LogService::error("Erreur lors de l'envoi de l'email d'inscription", [
                             'user_id' => $createdUser['id'],
-                            'email'   => $createdUser['email']
-                        ]);
-                    } else {
-                        LogService::warning("Échec envoi email d'inscription", [
-                            'user_id' => $createdUser['id'],
-                            'email'   => $createdUser['email']
+                            'email'   => $createdUser['email'],
+                            'error'   => $emailError->getMessage()
                         ]);
                         Response::error("Échec de l'envoi de l'email d'inscription", null, 500);
+                        return false;
                     }
-                } catch (Exception $emailError) {
-                    LogService::error("Erreur lors de l'envoi de l'email d'inscription", [
-                        'user_id' => $createdUser['id'],
-                        'email'   => $createdUser['email'],
-                        'error'   => $emailError->getMessage()
-                    ]);
-                    Response::error("Échec de l'envoi de l'email d'inscription", null, 500);
-                    return false;
-                }               
+                }
                 
                 
                 LogService::info("Nouvel utilisateur créé", [
@@ -204,10 +317,9 @@ class UserManagerController {
                     'auth_method' => 'jwt',
                 ];
 
-                // En développement, inclure le token de vérification pour les tests
-                if (defined('APP_ENV') && APP_ENV === 'development') {
-                    $responseData['verification_token'] = $verificationToken;
-                }
+                // Le token de vérification n'apparaît dans AUCUNE réponse HTTP.
+                // En développement, EMAIL_VERIFICATION_TEST_CODE fournit un token fixe
+                // (voir issueVerificationToken) — inopérant en production.
 
                 LoggingMiddleware::logExit(201);
                 Response::success('Nouvel utilisateur créée ', $responseData, 201);
@@ -234,6 +346,105 @@ class UserManagerController {
         }
     }
     
+    /**
+     * Date d'effacement physique prévue pour un compte supprimé (ISO 8601 UTC).
+     * Retourne null si le compte n'est pas en attente de purge.
+     */
+    public static function purgeScheduledAt($userId): ?string
+    {
+        try {
+            $db   = \Database::getInstance()->getConnection();
+            $stmt = $db->prepare(
+                'SELECT DATE_FORMAT(
+                            CONVERT_TZ(deleted_at + INTERVAL ? DAY, @@session.time_zone, "+00:00"),
+                            "%Y-%m-%dT%H:%i:%sZ")
+                   FROM users WHERE id = ? AND deleted_at IS NOT NULL'
+            );
+            $stmt->execute([\AuthGroups\Services\AccountPurgeService::graceDays(), $userId]);
+            $value = $stmt->fetchColumn();
+
+            if ($value) {
+                return (string) $value;
+            }
+
+            // CONVERT_TZ renvoie NULL si les tables de fuseaux MySQL ne sont pas chargées.
+            $stmt = $db->prepare(
+                'SELECT DATE_FORMAT(deleted_at + INTERVAL ? DAY, "%Y-%m-%dT%H:%i:%sZ")
+                   FROM users WHERE id = ? AND deleted_at IS NOT NULL'
+            );
+            $stmt->execute([\AuthGroups\Services\AccountPurgeService::graceDays(), $userId]);
+            $fallback = $stmt->fetchColumn();
+
+            return $fallback ? (string) $fallback : null;
+        } catch (\Throwable $e) {
+            LogService::error('purgeScheduledAt: échec du calcul', [
+                'user_id' => $userId,
+                'error'   => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Filet Stripe avant suppression de compte.
+     *
+     * Annule un abonnement encore actif ; si l'appel Stripe échoue, refuse la
+     * suppression (409) plutôt que de laisser un compte supprimé être facturé.
+     *
+     * @return bool true si la suppression peut se poursuivre.
+     */
+    private function cancelStripeSafetyNet($userId): bool
+    {
+        if (!class_exists('\Stripe\Services\StripeSubscriptionService')) {
+            return true; // Module Stripe non activé sur cette installation
+        }
+
+        try {
+            $db   = \Database::getInstance()->getConnection();
+            $stmt = $db->prepare(
+                "SELECT app_id FROM stripe_subscriptions
+                  WHERE user_id = ?
+                    AND status IN ('active', 'trialing', 'past_due')
+                    AND cancel_at_period_end = 0"
+            );
+            $stmt->execute([$userId]);
+            $appIds = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+        } catch (\Throwable $e) {
+            // Table absente : rien à annuler.
+            return true;
+        }
+
+        foreach ($appIds as $appId) {
+            try {
+                \Stripe\Services\StripeSubscriptionService::cancel((int) $userId, (string) $appId);
+                LogService::info('Abonnement Stripe annulé avant suppression de compte', [
+                    'user_id' => $userId,
+                    'app_id'  => $appId,
+                ]);
+            } catch (\Throwable $e) {
+                LogService::error('Annulation Stripe impossible — suppression refusée', [
+                    'user_id' => $userId,
+                    'app_id'  => $appId,
+                    'error'   => $e->getMessage(),
+                ]);
+                LoggingMiddleware::logExit(409);
+                Response::error(
+                    'Impossible d\'annuler l\'abonnement Stripe — suppression annulée',
+                    [
+                        'error_code' => 'STRIPE_CANCEL_FAILED',
+                        'message'    => 'L\'abonnement n\'a pas pu être annulé. Réessayez plus tard '
+                                      . 'ou annulez-le avant de supprimer le compte.',
+                        'app_id'     => $appId,
+                    ],
+                    409
+                );
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     /**
      * Supprimer un utilisateur (soft delete)
      */
@@ -286,14 +497,27 @@ class UserManagerController {
 
                 $force_delete = $input['force_delete']?? false; // Par défaut, on fait un soft delete
             }
+            // Filet Stripe — un compte supprimé qui reste facturé est le pire scénario.
+            // Le client annule normalement avant d'appeler cette route ; le serveur ne
+            // peut pas en dépendre (autre client, coupure réseau, appel direct à l'API).
+            if (!$force_delete && !$this->cancelStripeSafetyNet($userId)) {
+                return false; // Réponse 409 déjà envoyée
+            }
+
             if( $user->delete($force_delete)){
                 LogService::info("Utilisateur supprimé (force delete = $force_delete)", [
                     'deleted_user_id' => $userId,
                     'deleted_by' => $currentUserId,
                     'deleted_user_name' => $userData['name']
-                ]);                
+                ]);
                 LoggingMiddleware::logExit(200);
-                Response::success('Utilisateur supprimé avec succès', ['deleted' => true]);
+
+                $data = ['deleted' => true];
+                if (!$force_delete) {
+                    $data['purge_scheduled_at'] = self::purgeScheduledAt($userId);
+                }
+
+                Response::success('Utilisateur supprimé avec succès', $data);
                 return true;
             } else {
                 LogService::error("Échec de la suppression utilisateur", [
@@ -602,25 +826,62 @@ class UserManagerController {
                 Response::error('Données de validation invalides', $validation['errors'], 400);
                 return false;
             }                      
+            // Rate limit anti-brute-force sur le token (par IP, et par email s'il est fourni)
+            $rateKey = isset($input['email']) && is_string($input['email']) && trim($input['email']) !== ''
+                ? strtolower(trim($input['email']))
+                : 'anonymous';
+
+            if (!RateLimitService::check($rateKey, 'verify-email')) {
+                LogService::warning('Rate limit verify-email dépassé', ['key' => $rateKey]);
+                LoggingMiddleware::logExit(429);
+                Response::error('Trop de tentatives. Réessayez plus tard.', [
+                    'error'   => 'RATE_LIMIT_EXCEEDED',
+                    'message' => 'Trop de tentatives consécutives. Réessayez dans ' . RATE_LIMIT_AUTH_WINDOW_MINUTES . ' minutes.',
+                ], 429);
+                return false;
+            }
+
             $userModel = new User();
-            $userData = null;            
+            $userData = null;
             // Vérifier le token en base (token non expiré et non supprimé)
             $pdo = \Database::getInstance()->getConnection();
-            $stmt = $pdo->prepare("SELECT user_id FROM email_verifications WHERE token = :token AND expires_at > NOW() AND deleted_at IS NULL");
+            $stmt = $pdo->prepare("SELECT id, user_id, attempts, max_attempts FROM email_verifications WHERE token = :token AND expires_at > NOW() AND deleted_at IS NULL");
             $stmt->execute(['token' => $input['token']]);
             $row = $stmt->fetch();
             if (!$row) {
+                RateLimitService::record($rateKey, 'verify-email');
+                // Compteur par token : si l'email est connu, on incrémente son token en cours
+                if ($rateKey !== 'anonymous' && $this->registerFailedVerification($pdo, $rateKey)) {
+                    LoggingMiddleware::logExit(429);
+                    Response::error('Trop de tentatives. Réessayez plus tard.', [
+                        'error' => 'TOO_MANY_ATTEMPTS',
+                    ], 429);
+                    return false;
+                }
                 LoggingMiddleware::logExit(404);
-                Response::error('token non trouvé', null, 404);
+                Response::error(self::GENERIC_VERIFY_ERROR, null, 404);
                 return false;
             }
+
+            // Token valide mais déjà saturé de tentatives → invalidation
+            if ((int) $row['attempts'] >= (int) $row['max_attempts']) {
+                $pdo->prepare("DELETE FROM email_verifications WHERE id = :id")->execute(['id' => $row['id']]);
+                LogService::warning('Token de vérification saturé — invalidé', ['user_id' => $row['user_id']]);
+                LoggingMiddleware::logExit(429);
+                Response::error('Trop de tentatives. Réessayez plus tard.', [
+                    'error' => 'TOO_MANY_ATTEMPTS',
+                ], 429);
+                return false;
+            }
+
             $userId = $row['user_id'];
             $userData = $userModel->findById($userId);
             if (!$userData) {
                 LoggingMiddleware::logExit(404);
-                Response::error('Token invalide...', null, 404);
+                Response::error(self::GENERIC_VERIFY_ERROR, null, 404);
                 return false;
             }
+            RateLimitService::clear($rateKey, 'verify-email');
             // Vérifier si l'email est déjà vérifié
             if ($userData['email_verified']) {
                 LoggingMiddleware::logExit(400);
@@ -763,42 +1024,56 @@ class UserManagerController {
                 return false;
             }
             
+            $email = strtolower(trim($input['email']));
+
+            // Token fixe de dev : aucun courriel envoyé, exempt du rate limit
+            $useFixedCode = $this->verificationFixedCode() !== '';
+
+            // Rate limit par (email + IP) — même politique que /auth/send-code
+            if (!$useFixedCode && !RateLimitService::check($email, 'verify-email-req')) {
+                LogService::warning('Rate limit resend-verification-email dépassé', ['email' => $email]);
+                LoggingMiddleware::logExit(429);
+                Response::error('Trop de demandes de vérification', [
+                    'error'   => 'RATE_LIMIT_EXCEEDED',
+                    'message' => 'Trop de demandes consécutives. Réessayez dans ' . RATE_LIMIT_AUTH_WINDOW_MINUTES . ' minutes.',
+                ], 429);
+                return false;
+            }
+            if (!$useFixedCode) {
+                RateLimitService::record($email, 'verify-email-req');
+            }
+
             $userModel = new User();
-            $userData = $userModel->findByEmail($input['email']);
-            
+            $userData = $userModel->findByEmail($email);
+
             if (!$userData) {
                 LoggingMiddleware::logExit(200);
-                Response::success('Si cette adresse est associée à un compte non vérifié, un email de vérification sera envoyé.');
+                Response::success(self::GENERIC_RESEND_MESSAGE);
                 return true;
             }
 
             // Vérifier si l'email est déjà vérifié
             if ($userData['email_verified']) {
                 LoggingMiddleware::logExit(200);
-                Response::success('Si cette adresse est associée à un compte non vérifié, un email de vérification sera envoyé.');
+                Response::success(self::GENERIC_RESEND_MESSAGE);
                 return true;
             }
-            
-            // Générer un nouveau token de vérification
-            $verificationToken = mt_rand(1, 9) . str_pad(mt_rand(0, 9999999), 7, '0', STR_PAD_LEFT);          
-            $expiresAt = date('Y-m-d H:i:s', time() + (24 * 60 * 60)); // Expire dans 24h
-            
-            // Invalider les anciens tokens de vérification pour cet utilisateur
+
+            // Générer un nouveau token de vérification (jamais renvoyé au client)
             $pdo = \Database::getInstance()->getConnection();
-            $stmt = $pdo->prepare("UPDATE email_verifications SET deleted_at = NOW() WHERE user_id = :user_id AND deleted_at IS NULL");
-            $stmt->execute(['user_id' => $userData['id']]);
-            
-            // Insérer le nouveau token de vérification
-            $stmt = $pdo->prepare("
-                INSERT INTO email_verifications (user_id, token, expires_at) 
-                VALUES (:user_id, :token, :expires_at)
-            ");
-            $stmt->execute([
-                'user_id' => $userData['id'],
-                'token' => $verificationToken,
-                'expires_at' => $expiresAt
-            ]);
-            
+            $issued            = $this->issueVerificationToken($pdo, (int) $userData['id']);
+            $verificationToken = $issued['token'];
+            $expiresAt         = $issued['expires_at'];
+
+            if ($issued['fixed']) {
+                LogService::info('Token de vérification fixe stocké (dev) — aucun courriel envoyé', [
+                    'user_id' => $userData['id'],
+                ]);
+                LoggingMiddleware::logExit(200);
+                Response::success(self::GENERIC_RESEND_MESSAGE);
+                return true;
+            }
+
             // Envoyer l'email de vérification
             try {
                 $emailService = new EmailService();
@@ -814,19 +1089,8 @@ class UserManagerController {
                         'email' => $userData['email']
                     ]);
                     LoggingMiddleware::logExit(200);
-                    if($_ENV['APP_ENV'] === 'development') {
-                        Response::success('Un nouvel email de vérification a été envoyé à votre adresse', [
-                            'email' => $userData['email'],
-                            'token_expires_at' => $expiresAt,
-                            'verification_token' => $verificationToken,
-                        ]);
-                        return true;
-                    } else {   
-                        Response::success('Un nouvel email de vérification a été envoyé à votre adresse', [
-                            'email' => $userData['email'],
-                            'token_expires_at' => $expiresAt,                      
-                        ]);
-                    }
+                    // Réponse générique : ni token, ni indice sur l'existence du compte
+                    Response::success(self::GENERIC_RESEND_MESSAGE);
                     return true;
                 } else {
                     LogService::warning("Échec renvoi email de vérification", [

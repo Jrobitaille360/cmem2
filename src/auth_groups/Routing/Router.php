@@ -14,6 +14,7 @@ use AuthGroups\Routing\RouteHandlers\{
     PlanRouteHandler,
     SubscriptionRouteHandler,
     LinkRouteHandler,
+    ModuleRouteHandler,
     V2RouteHandler
 };
 use AuthGroups\Services\{AuthService, LogService};
@@ -48,6 +49,7 @@ class Router
             'plans'        => fn() => new PlanRouteHandler($auth),
             'subscription' => fn() => new SubscriptionRouteHandler($auth),
             'links'        => fn() => new LinkRouteHandler($auth),
+            'modules'      => fn() => new ModuleRouteHandler($auth),
             'v2'           => fn() => new V2RouteHandler($auth),
         ];
 

@@ -1,6 +1,6 @@
 ﻿# cmem2 API
 
-![Version](https://img.shields.io/badge/version-2.11.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.12.0-blue.svg)
 ![PHP](https://img.shields.io/badge/PHP-8.0+-purple.svg)
 ![Status](https://img.shields.io/badge/status-production%20ready-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
@@ -269,7 +269,9 @@ Authorization: Bearer eyJhbGci...
 | DELETE | `/users/me` | Supprimer compte | JWT |
 | POST | `/users/avatar` | Upload avatar | JWT |
 | GET | `/users/{id}` | Détails utilisateur | JWT |
-| POST | `/users/verify-email` | Vérifier email | Non |
+| POST | `/users/verify-email` | Vérifier email (token à 8 chiffres reçu par courriel) | Non |
+| POST | `/users/resend-verification-email` | Renvoyer le courriel de vérification | Non |
+| POST | `/users/request-password-reset` | Demander un code de réinitialisation | Non |
 | POST | `/users/reset-password` | Réinitialiser mot de passe | Non |
 
 ### Core — Groupes
@@ -445,4 +447,4 @@ MIT — voir [LICENSE](LICENSE). Dépendances tierces : [THIRD_PARTY_LICENSES.md
 
 ---
 
-**Version** : 2.11.0 · **Mis à jour** : 2026-07-26 · **Auteur** : [Jrobitaille360](https://github.com/Jrobitaille360)
+**Version** : 2.12.0 · **Mis à jour** : 2026-08-02 · **Auteur** : [Jrobitaille360](https://github.com/Jrobitaille360)

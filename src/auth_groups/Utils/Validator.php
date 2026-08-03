@@ -27,6 +27,39 @@ class Validator {
         ];
     }
     
+    /** Longueur minimale d'un mot de passe. */
+    const PASSWORD_MIN_LENGTH = 8;
+
+    /**
+     * Politique de mot de passe — source unique pour toute l'API.
+     * Exigences : au moins PASSWORD_MIN_LENGTH caractères, une minuscule,
+     * une majuscule, un chiffre et un caractère spécial.
+     *
+     * @return string[] Liste des exigences non satisfaites (vide si conforme)
+     */
+    public static function passwordErrors(string $password): array
+    {
+        $errors = [];
+
+        if (strlen($password) < self::PASSWORD_MIN_LENGTH) {
+            $errors[] = 'Le mot de passe doit contenir au minimum ' . self::PASSWORD_MIN_LENGTH . ' caractères';
+        }
+        if (!preg_match('/[a-z]/', $password)) {
+            $errors[] = 'Le mot de passe doit contenir au moins une lettre minuscule';
+        }
+        if (!preg_match('/[A-Z]/', $password)) {
+            $errors[] = 'Le mot de passe doit contenir au moins une lettre majuscule';
+        }
+        if (!preg_match('/\d/', $password)) {
+            $errors[] = 'Le mot de passe doit contenir au moins un chiffre';
+        }
+        if (!preg_match('/[^A-Za-z0-9]/', $password)) {
+            $errors[] = 'Le mot de passe doit contenir au moins un caractère spécial';
+        }
+
+        return $errors;
+    }
+
     /**
      * Appliquer une règle de validation
      */
@@ -59,6 +92,14 @@ class Validator {
                     $length = is_string($value) ? strlen($value) : $value;
                     if ($length < (int)$parameter) {
                         self::addError($field, "Le champ {$field} doit avoir au minimum {$parameter} caractères", $errors);
+                    }
+                }
+                break;
+
+            case 'password':
+                if ($value !== null) {
+                    foreach (self::passwordErrors((string) $value) as $message) {
+                        self::addError($field, $message, $errors);
                     }
                 }
                 break;

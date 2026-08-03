@@ -103,6 +103,23 @@ class User extends BaseModel {
     }
 
     /**
+     * Compte supprimé mais pas encore purgé, pour une adresse donnée.
+     *
+     * `findByEmail` filtre `deleted_at IS NULL` : sans cette lecture, un compte en
+     * délai de grâce est invisible et l'auto-inscription heurte le UNIQUE KEY email.
+     * Loi 25 — directive 20260729_220000.
+     */
+    public function findPendingDeletionByEmail($email) {
+        $query = "SELECT * FROM {$this->table} WHERE email = :email AND deleted_at IS NOT NULL LIMIT 1";
+        $stmt  = $this->getDb()->prepare($query);
+        $stmt->bindParam(':email', $email);
+        $stmt->execute();
+        $data = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $data ?: null;
+    }
+
+    /**
      * Mettre à jour un utilisateur
      */
     public function update() {

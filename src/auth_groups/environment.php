@@ -254,6 +254,13 @@ define('RATE_LIMIT_AUTH_MAX_ATTEMPTS',   (int)($_ENV['RATE_LIMIT_AUTH_MAX_ATTEMP
 define('RATE_LIMIT_AUTH_WINDOW_MINUTES', (int)($_ENV['RATE_LIMIT_AUTH_WINDOW_MINUTES'] ?? 10));
 
 // ============================================
+// SUPPRESSION DE COMPTE — délai de grâce (Loi 25)
+// ============================================
+// Nombre de jours entre le soft delete et l'effacement physique du compte.
+// Valeur annoncée aux usagers dans la politique de confidentialité : 30 jours.
+define('ACCOUNT_PURGE_GRACE_DAYS', (int)($_ENV['ACCOUNT_PURGE_GRACE_DAYS'] ?? 30));
+
+// ============================================
 // JWT - JSON Web Tokens
 // ============================================
 define('JWT_SECRET', $_ENV['JWT_SECRET'] ?? '');
@@ -268,6 +275,26 @@ define('TMP_CODE', $_ENV['TMP_CODE'] ?? '');
 // Compte de test E2E à code OTP fixe (dev seulement — vars absentes en prod)
 define('OTP_TEST_ACCOUNT_EMAIL', strtolower(trim($_ENV['OTP_TEST_ACCOUNT_EMAIL'] ?? '')));
 define('OTP_TEST_ACCOUNT_CODE', trim($_ENV['OTP_TEST_ACCOUNT_CODE'] ?? ''));
+
+// ============================================
+// RESET DE MOT DE PASSE (code par courriel)
+// ============================================
+define('PASSWORD_RESET_EXPIRY_MINUTES', (int)($_ENV['PASSWORD_RESET_EXPIRY_MINUTES'] ?? 60));
+define('PASSWORD_RESET_MAX_ATTEMPTS', (int)($_ENV['PASSWORD_RESET_MAX_ATTEMPTS'] ?? ($_ENV['OTP_MAX_ATTEMPTS'] ?? 5)));
+// Code de reset fixe (dev seulement) — ignoré si APP_ENV === 'production'
+define('PASSWORD_RESET_TEST_CODE', APP_ENV === 'production' ? '' : trim($_ENV['PASSWORD_RESET_TEST_CODE'] ?? ''));
+// Trace la présence de la variable en production (configuration à corriger)
+define('PASSWORD_RESET_TEST_CODE_IGNORED', APP_ENV === 'production' && trim($_ENV['PASSWORD_RESET_TEST_CODE'] ?? '') !== '');
+
+// ============================================
+// VÉRIFICATION DE COURRIEL (token par courriel)
+// ============================================
+define('EMAIL_VERIFICATION_EXPIRY_HOURS', (int)($_ENV['EMAIL_VERIFICATION_EXPIRY_HOURS'] ?? 24));
+define('EMAIL_VERIFICATION_MAX_ATTEMPTS', (int)($_ENV['EMAIL_VERIFICATION_MAX_ATTEMPTS'] ?? ($_ENV['OTP_MAX_ATTEMPTS'] ?? 5)));
+// Token de vérification fixe (dev seulement) — ignoré si APP_ENV === 'production'
+define('EMAIL_VERIFICATION_TEST_CODE', APP_ENV === 'production' ? '' : trim($_ENV['EMAIL_VERIFICATION_TEST_CODE'] ?? ''));
+// Trace la présence de la variable en production (configuration à corriger)
+define('EMAIL_VERIFICATION_TEST_CODE_IGNORED', APP_ENV === 'production' && trim($_ENV['EMAIL_VERIFICATION_TEST_CODE'] ?? '') !== '');
 
 // ============================================
 // DEVICE TOKENS - Appareils de confiance

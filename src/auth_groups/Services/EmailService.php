@@ -688,7 +688,7 @@ class EmailService {
                 <div class='content'>
                     <h2>Demande de réinitialisation</h2>
                     <p>Une demande de réinitialisation de mot de passe a été effectuée pour {$data['email']}.</p>
-                    <p>Voici le code de 8 chiffres  : {$data['resetToken']}</p>
+                    <p>Voici le code de 6 chiffres  : {$data['resetToken']}</p>
                     <p><strong>Si vous n'avez pas demandé cette réinitialisation, ignorez cet email.</strong></p>
                 </div>
             </div>

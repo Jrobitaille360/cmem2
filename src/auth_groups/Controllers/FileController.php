@@ -542,19 +542,31 @@ class FileController
             $limit = min(100, max(1, intval($input['limit'] ?? 20)));
             $offset = ($page - 1) * $limit;
 
+            // Filtre corbeille : exclude (défaut) | include | only
+            $deleted = $input['deleted'] ?? 'exclude';
+            if (!in_array($deleted, ['exclude', 'include', 'only'], true)) {
+                Response::error(
+                    'Paramètre deleted invalide',
+                    ['deleted' => "Valeurs acceptées : 'exclude', 'include', 'only'"],
+                    422
+                );
+                return;
+            }
+
             LogService::info('Récupération des fichiers utilisateur', [
                 'target_user' => $targetUserId,
                 'requesting_user' => $requestingUserId,
                 'page' => $page,
-                'limit' => $limit
+                'limit' => $limit,
+                'deleted' => $deleted
             ]);
 
             // Récupérer les fichiers de l'utilisateur depuis la base de données
             $fileModel = new File();
-            $files = $fileModel->getByUserId($targetUserId, $limit, $offset);
-            
+            $files = $fileModel->getByUserId($targetUserId, $limit, $offset, $deleted);
+
             // Récupérer les statistiques
-            $stats = $fileModel->getUserFileStats($targetUserId);
+            $stats = $fileModel->getUserFileStats($targetUserId, $deleted);
             
             // Calculer les totaux
             $totalFiles = 0;
@@ -576,10 +588,12 @@ class FileController
                     'description' => $file['description'],
                     'mime_type' => $file['mime_type'],
                     'media_type' => $file['media_type'],
+                    'accessibility' => $file['accessibility'],
                     'file_size' => (int)$file['file_size'],
                     'download_count' => (int)$file['download_count'],
                     'upload_date' => $file['created_at'],
                     'updated_at' => $file['updated_at'],
+                    'deleted_at' => $file['deleted_at'] ?? null,
                     'url' => $file['file_path']
                 ];
             }

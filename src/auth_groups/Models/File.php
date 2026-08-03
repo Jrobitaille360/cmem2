@@ -94,16 +94,32 @@ class File extends BaseModel
     }
 
     /**
-     * Récupérer les fichiers d'un utilisateur
+     * Clause SQL de filtrage des fichiers supprimés (soft delete)
+     *
+     * @param string $deleted 'exclude' (défaut) | 'include' | 'only'
      */
-    public function getByUserId($userId, $limit = 20, $offset = 0)
+    private function deletedClause(string $deleted): string
+    {
+        return match ($deleted) {
+            'include' => '',
+            'only'    => ' AND deleted_at IS NOT NULL',
+            default   => ' AND deleted_at IS NULL',
+        };
+    }
+
+    /**
+     * Récupérer les fichiers d'un utilisateur
+     *
+     * @param string $deleted 'exclude' (défaut) | 'include' | 'only'
+     */
+    public function getByUserId($userId, $limit = 20, $offset = 0, string $deleted = 'exclude')
     {
         $query = "SELECT
                     id, original_name, description, file_name, file_path, mime_type,
                     file_size, media_type, accessibility, download_count,
-                    created_at, updated_at
+                    created_at, updated_at, deleted_at
                   FROM {$this->table}
-                  WHERE uploaded_by = :user_id AND deleted_at IS NULL
+                  WHERE uploaded_by = :user_id" . $this->deletedClause($deleted) . "
                   ORDER BY created_at DESC
                   LIMIT :limit OFFSET :offset";
 
@@ -151,15 +167,15 @@ class File extends BaseModel
     /**
      * Obtenir les statistiques de fichiers d'un utilisateur
      */
-    public function getUserFileStats($userId)
+    public function getUserFileStats($userId, string $deleted = 'exclude')
     {
-        $query = "SELECT 
+        $query = "SELECT
                     COUNT(*) as total_files,
                     SUM(file_size) as total_size,
                     media_type,
                     COUNT(*) as count_by_category
                   FROM {$this->table}
-                  WHERE uploaded_by = :user_id AND deleted_at IS NULL
+                  WHERE uploaded_by = :user_id" . $this->deletedClause($deleted) . "
                   GROUP BY media_type";
 
         $stmt = $this->getDb()->prepare($query);
