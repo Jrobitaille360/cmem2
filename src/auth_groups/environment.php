@@ -254,6 +254,13 @@ define('RATE_LIMIT_AUTH_MAX_ATTEMPTS',   (int)($_ENV['RATE_LIMIT_AUTH_MAX_ATTEMP
 define('RATE_LIMIT_AUTH_WINDOW_MINUTES', (int)($_ENV['RATE_LIMIT_AUTH_WINDOW_MINUTES'] ?? 10));
 
 // ============================================
+// SUPPRESSION DE COMPTE — délai de grâce (Loi 25)
+// ============================================
+// Nombre de jours entre le soft delete et l'effacement physique du compte.
+// Valeur annoncée aux usagers dans la politique de confidentialité : 30 jours.
+define('ACCOUNT_PURGE_GRACE_DAYS', (int)($_ENV['ACCOUNT_PURGE_GRACE_DAYS'] ?? 30));
+
+// ============================================
 // JWT - JSON Web Tokens
 // ============================================
 define('JWT_SECRET', $_ENV['JWT_SECRET'] ?? '');

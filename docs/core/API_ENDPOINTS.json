@@ -76,7 +76,7 @@
           "notes": [
             "Réponse toujours générique (HTTP 200) pour protéger l'énumération d'emails, sauf 403 si l'email existe mais n'est pas vérifié",
             "Auto-register Option A : si l'email est inconnu, un compte est créé immédiatement (name=partie gauche de l'email, email_verified=1, mot de passe aléatoire inutilisable) et un code OTP est envoyé",
-            "Si le compte est soft-deleted : retour générique 200 sans recréation",
+            "Si le compte est en attente de purge (supprimé, délai de grâce en cours) : 409 ACCOUNT_PENDING_DELETION avec la date de purge prévue — aucun code n'est envoyé. Pour restaurer le compte, utiliser POST /auth/restore-account",
             "Compte de test E2E (dev-cmem2 seulement) : e2e@test.local — aucun email envoyé, code OTP fixe 000000, exempt du rate limit ; inactif en production (vars OTP_TEST_ACCOUNT_* absentes)"
           ],
           "response": {
@@ -85,7 +85,52 @@
           "errors": {
             "400": "Email manquant ou format invalide",
             "403": "Email existant mais non vérifié",
+            "409": "Compte en attente de suppression définitive — errors.error_code = ACCOUNT_PENDING_DELETION, errors.purge_scheduled_at = date ISO 8601 UTC de l'effacement physique",
             "429": "Trop de tentatives — réessayez dans 10 minutes (5 max / 10 min par email+IP)"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/auth/restore-account",
+          "description": "Demander un code de restauration pour un compte supprimé dont le délai de grâce (30 jours) court encore. Canal distinct de /auth/send-code, qui répond 409 sur un tel compte.",
+          "auth_required": false,
+          "body": {
+            "email": "string (required)"
+          },
+          "notes": [
+            "Réponse générique 200 dans tous les cas — aucun signal supplémentaire sur l'existence du compte",
+            "Aucun code n'est envoyé si le compte n'existe pas ou a déjà été purgé",
+            "Même rate limit que send-code (5 / 10 min par email+IP)"
+          ],
+          "response": {
+            "message": "string — réponse générique"
+          },
+          "errors": {
+            "400": "Email manquant ou format invalide",
+            "429": "Trop de demandes consécutives"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/auth/restore-account/verify",
+          "description": "Valider le code reçu, restaurer le compte (deleted_at remis à NULL) et obtenir un JWT. La purge programmée est annulée.",
+          "auth_required": false,
+          "body": {
+            "email": "string (required)",
+            "code": "string (required) — code à 6 chiffres reçu par email"
+          },
+          "notes": [
+            "Un compte déjà purgé n'est jamais recréé par cette route : 404 NO_ACCOUNT_TO_RESTORE",
+            "Une connexion réussie via POST /auth/login (email + mot de passe) restaure également un compte en délai de grâce"
+          ],
+          "response": {
+            "token": "string — JWT",
+            "user": "User object"
+          },
+          "errors": {
+            "400": "Données invalides",
+            "401": "Code invalide ou expiré",
+            "404": "Aucun compte à restaurer — errors.error_code = NO_ACCOUNT_TO_RESTORE"
           }
         },
         {
@@ -493,11 +538,20 @@
         {
           "method": "DELETE",
           "path": "/users/me",
-          "description": "Supprimer son propre compte",
+          "description": "Supprimer son propre compte. L'accès est coupé immédiatement ; les données sont effacées définitivement après un délai de grâce de 30 jours (Loi 25).",
           "body": {
             "password": "string (required)"
           },
-          "response": "{ deleted: true }"
+          "notes": [
+            "Filet Stripe : si un abonnement Stripe actif subsiste, le serveur l'annule avant de supprimer le compte. Si l'annulation échoue, la suppression est refusée (409 STRIPE_CANCEL_FAILED) — aucun compte supprimé ne reste facturé",
+            "purge_scheduled_at indique la date d'effacement physique. Le champ est informatif : son absence ne remet pas en cause le succès de la suppression",
+            "Pendant le délai de grâce, POST /auth/send-code renvoie 409 ACCOUNT_PENDING_DELETION ; la restauration passe par POST /auth/restore-account ou une connexion mot de passe réussie",
+            "Après la purge, l'adresse redevient disponible pour une inscription neuve"
+          ],
+          "response": "{ deleted: true, purge_scheduled_at: \"2026-08-28T00:00:00Z\" }",
+          "errors": {
+            "409": "Abonnement Stripe non annulable — errors.error_code = STRIPE_CANCEL_FAILED, errors.app_id = app concernée. Réessayer plus tard ou annuler l'abonnement d'abord"
+          }
         },
         {
           "method": "GET",

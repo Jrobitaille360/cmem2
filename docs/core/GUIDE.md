@@ -11,6 +11,7 @@ Version 2.2.4 · Base URL : `/`
 - [Flux typiques](#flux-typiques)
 - [Endpoints — Auth](#endpoints--auth)
 - [Endpoints — Utilisateurs](#endpoints--utilisateurs)
+- [Suppression de compte et restauration](#suppression-de-compte-et-restauration)
 - [Endpoints — Groupes](#endpoints--groupes)
 - [Endpoints — Fichiers](#endpoints--fichiers)
 - [Endpoints — Tags](#endpoints--tags)
@@ -194,6 +195,21 @@ Réponse générique `200` (même si email inconnu) :
 
 `403` retourné uniquement si le compte **existe** mais que l'email n'est pas vérifié.
 
+`409` retourné si le compte est **en attente de purge** (supprimé, délai de grâce en cours) — aucun code n'est envoyé :
+
+```json
+{
+  "success": false,
+  "message": "Compte en attente de suppression définitive",
+  "errors": {
+    "error_code": "ACCOUNT_PENDING_DELETION",
+    "purge_scheduled_at": "2026-08-28T02:14:07Z"
+  }
+}
+```
+
+Voir [Suppression de compte](#suppression-de-compte-et-restauration) pour la restauration.
+
 ### POST /auth/refresh
 
 ```json
@@ -328,6 +344,84 @@ Matrice d'autorité (`PUT /users/{id}` champ `role`, `DELETE /users/{id}`) :
 - `ADMINISTRATEUR` : peut seulement promouvoir `UTILISATEUR → ADMINISTRATEUR` ; ne touche jamais un pair `ADMINISTRATEUR`/`SUPERADMINISTRATEUR` ; révoque un `UTILISATEUR` seulement.
 - `SUPERADMINISTRATEUR` : toute transition `UTILISATEUR ↔ ADMINISTRATEUR` ; révoque `UTILISATEUR` ou `ADMINISTRATEUR`.
 - Personne ne peut attribuer ni révoquer `SUPERADMINISTRATEUR` via l'API.
+
+---
+
+## Suppression de compte et restauration
+
+Conformité Loi 25 (Québec). L'accès est coupé immédiatement, les données sont effacées
+définitivement après un **délai de grâce de 30 jours** (`ACCOUNT_PURGE_GRACE_DAYS`).
+
+### Parcours
+
+1. `DELETE /users/me` — le serveur annule d'abord tout abonnement Stripe encore actif, puis pose
+   `deleted_at`. Réponse :
+
+   ```json
+   { "deleted": true, "purge_scheduled_at": "2026-08-28T02:14:07Z" }
+   ```
+
+   `purge_scheduled_at` est informatif : son absence ne remet pas en cause le succès.
+
+2. Pendant le délai de grâce : toute connexion est refusée, un JWT déjà émis cesse d'être accepté,
+   et `POST /auth/send-code` répond `409 ACCOUNT_PENDING_DELETION` avec la date de purge.
+
+3. Restauration, deux voies :
+   - `POST /auth/restore-account` `{ email }` → code envoyé, réponse générique ;
+     puis `POST /auth/restore-account/verify` `{ email, code }` → compte restauré + JWT ;
+   - `POST /auth/login` avec le mot de passe du compte — une connexion réussie restaure le compte.
+   - Voie admin : `POST /users/{id}/restore` (`ADMINISTRATEUR` et plus).
+
+4. Après 30 jours, le cron de maintenance efface physiquement le compte. L'adresse redevient
+   disponible pour une inscription neuve, sans aucun reliquat.
+
+### Si l'annulation Stripe échoue
+
+`DELETE /users/me` renvoie `409` et **ne supprime pas** le compte :
+
+```json
+{
+  "success": false,
+  "errors": {
+    "error_code": "STRIPE_CANCEL_FAILED",
+    "app_id": "cmemweb"
+  }
+}
+```
+
+Aucun compte supprimé ne reste facturé. Réessayer plus tard, ou annuler l'abonnement d'abord via
+`DELETE /v2/subscriptions/stripe`.
+
+### Ce qui est effacé, ce qui est conservé
+
+| Donnée | Sort |
+| - | - |
+| Calendriers, événements, occurrences, journaux, tâches | Effacé |
+| Projets et dépendances de tâches | Effacé |
+| Contacts, interactions CRM, opportunités | Effacé |
+| Fichiers téléversés (base **et** disque) | Effacé |
+| Liens `/links`, étiquettes | Effacé |
+| Compte, profil, préférences, sessions, jetons d'appareil | Effacé |
+| Abonnements Web Push et préférences de notification | Effacé |
+| Données de jeu traque | Effacé |
+| Adhésion aux groupes partagés | Effacée — le groupe des autres membres survit |
+| Groupe dont l'usager est le seul membre | Effacé |
+| Propriété d'un groupe partagé | Transférée au membre le plus ancien |
+| Partie de casse-tête partagée | Conservée chez le partenaire, sans trace de l'usager parti |
+| Registres de facturation Stripe | Conservés **anonymisés** (`billing_archive`) — obligation fiscale, aucun identifiant d'usager |
+
+### Cron
+
+La purge tourne dans `src/cron/maintenance.php` (tâche `auth_groups`). Elle peut être déclenchée
+seule :
+
+```bash
+php src/cron/purge_accounts.php --dry-run   # compte sans rien supprimer
+php src/cron/purge_accounts.php             # exécution réelle
+php src/cron/purge_accounts.php --json      # rapport machine
+```
+
+Le traitement est idempotent et journalise un décompte par usager purgé.
 
 ---
 

@@ -347,6 +347,105 @@ class UserManagerController {
     }
     
     /**
+     * Date d'effacement physique prévue pour un compte supprimé (ISO 8601 UTC).
+     * Retourne null si le compte n'est pas en attente de purge.
+     */
+    public static function purgeScheduledAt($userId): ?string
+    {
+        try {
+            $db   = \Database::getInstance()->getConnection();
+            $stmt = $db->prepare(
+                'SELECT DATE_FORMAT(
+                            CONVERT_TZ(deleted_at + INTERVAL ? DAY, @@session.time_zone, "+00:00"),
+                            "%Y-%m-%dT%H:%i:%sZ")
+                   FROM users WHERE id = ? AND deleted_at IS NOT NULL'
+            );
+            $stmt->execute([\AuthGroups\Services\AccountPurgeService::graceDays(), $userId]);
+            $value = $stmt->fetchColumn();
+
+            if ($value) {
+                return (string) $value;
+            }
+
+            // CONVERT_TZ renvoie NULL si les tables de fuseaux MySQL ne sont pas chargées.
+            $stmt = $db->prepare(
+                'SELECT DATE_FORMAT(deleted_at + INTERVAL ? DAY, "%Y-%m-%dT%H:%i:%sZ")
+                   FROM users WHERE id = ? AND deleted_at IS NOT NULL'
+            );
+            $stmt->execute([\AuthGroups\Services\AccountPurgeService::graceDays(), $userId]);
+            $fallback = $stmt->fetchColumn();
+
+            return $fallback ? (string) $fallback : null;
+        } catch (\Throwable $e) {
+            LogService::error('purgeScheduledAt: échec du calcul', [
+                'user_id' => $userId,
+                'error'   => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Filet Stripe avant suppression de compte.
+     *
+     * Annule un abonnement encore actif ; si l'appel Stripe échoue, refuse la
+     * suppression (409) plutôt que de laisser un compte supprimé être facturé.
+     *
+     * @return bool true si la suppression peut se poursuivre.
+     */
+    private function cancelStripeSafetyNet($userId): bool
+    {
+        if (!class_exists('\Stripe\Services\StripeSubscriptionService')) {
+            return true; // Module Stripe non activé sur cette installation
+        }
+
+        try {
+            $db   = \Database::getInstance()->getConnection();
+            $stmt = $db->prepare(
+                "SELECT app_id FROM stripe_subscriptions
+                  WHERE user_id = ?
+                    AND status IN ('active', 'trialing', 'past_due')
+                    AND cancel_at_period_end = 0"
+            );
+            $stmt->execute([$userId]);
+            $appIds = $stmt->fetchAll(\PDO::FETCH_COLUMN);
+        } catch (\Throwable $e) {
+            // Table absente : rien à annuler.
+            return true;
+        }
+
+        foreach ($appIds as $appId) {
+            try {
+                \Stripe\Services\StripeSubscriptionService::cancel((int) $userId, (string) $appId);
+                LogService::info('Abonnement Stripe annulé avant suppression de compte', [
+                    'user_id' => $userId,
+                    'app_id'  => $appId,
+                ]);
+            } catch (\Throwable $e) {
+                LogService::error('Annulation Stripe impossible — suppression refusée', [
+                    'user_id' => $userId,
+                    'app_id'  => $appId,
+                    'error'   => $e->getMessage(),
+                ]);
+                LoggingMiddleware::logExit(409);
+                Response::error(
+                    'Impossible d\'annuler l\'abonnement Stripe — suppression annulée',
+                    [
+                        'error_code' => 'STRIPE_CANCEL_FAILED',
+                        'message'    => 'L\'abonnement n\'a pas pu être annulé. Réessayez plus tard '
+                                      . 'ou annulez-le avant de supprimer le compte.',
+                        'app_id'     => $appId,
+                    ],
+                    409
+                );
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * Supprimer un utilisateur (soft delete)
      */
     public function delete($userId, $currentUserId, $currentUserRole) {
@@ -398,14 +497,27 @@ class UserManagerController {
 
                 $force_delete = $input['force_delete']?? false; // Par défaut, on fait un soft delete
             }
+            // Filet Stripe — un compte supprimé qui reste facturé est le pire scénario.
+            // Le client annule normalement avant d'appeler cette route ; le serveur ne
+            // peut pas en dépendre (autre client, coupure réseau, appel direct à l'API).
+            if (!$force_delete && !$this->cancelStripeSafetyNet($userId)) {
+                return false; // Réponse 409 déjà envoyée
+            }
+
             if( $user->delete($force_delete)){
                 LogService::info("Utilisateur supprimé (force delete = $force_delete)", [
                     'deleted_user_id' => $userId,
                     'deleted_by' => $currentUserId,
                     'deleted_user_name' => $userData['name']
-                ]);                
+                ]);
                 LoggingMiddleware::logExit(200);
-                Response::success('Utilisateur supprimé avec succès', ['deleted' => true]);
+
+                $data = ['deleted' => true];
+                if (!$force_delete) {
+                    $data['purge_scheduled_at'] = self::purgeScheduledAt($userId);
+                }
+
+                Response::success('Utilisateur supprimé avec succès', $data);
                 return true;
             } else {
                 LogService::error("Échec de la suppression utilisateur", [

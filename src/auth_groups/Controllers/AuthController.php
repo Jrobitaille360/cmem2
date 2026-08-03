@@ -62,7 +62,22 @@ class AuthController
         }
 
         $userModel = new User();
-        $userData  = $userModel->authenticate($email, $input['password']);
+
+        // Compte en délai de grâce : un mot de passe valide prouve la propriété du
+        // compte aussi bien qu'un code OTP — la connexion vaut alors restauration.
+        // (Directive Loi 25 du 2026-08-02, voie de restauration usager.)
+        $pending = $userModel->findPendingDeletionByEmail($email);
+        if ($pending && password_verify($input['password'], $pending['password_hash'] ?? '')) {
+            $userModel->id = (int) $pending['id'];
+            if ($userModel->restore()) {
+                LogService::info('Compte restauré par connexion mot de passe', [
+                    'user_id' => $pending['id'],
+                    'email'   => $email,
+                ]);
+            }
+        }
+
+        $userData = $userModel->authenticate($email, $input['password']);
 
         if (!$userData) {
             RateLimitService::record($email, 'login');
@@ -137,6 +152,22 @@ class AuthController
 
         // Réponse générique pour éviter l'énumération d'emails
         $genericOk = ['message' => 'Si cet email est enregistré, un code de connexion vous a été envoyé.'];
+
+        // Compte en attente de purge : réponse explicite et stable, plutôt qu'une
+        // auto-inscription qui heurterait le UNIQUE KEY sur users.email (500).
+        // Le 409 révèle l'existence de l'adresse : c'est un arbitrage assumé
+        // (directive du 2026-08-02), atténué par le rate limit ci-dessus.
+        $pending = $userModel->findPendingDeletionByEmail($email);
+        if ($pending) {
+            LoggingMiddleware::logExit(409);
+            Response::error('Compte en attente de suppression définitive', [
+                'error_code'         => 'ACCOUNT_PENDING_DELETION',
+                'message'            => 'Ce compte a été supprimé et sera effacé définitivement. '
+                                      . 'Sa restauration reste possible jusqu\'à cette date.',
+                'purge_scheduled_at' => UserManagerController::purgeScheduledAt($pending['id']),
+            ], 409);
+            return;
+        }
 
         if (!$userData || !empty($userData['deleted_at'])) {
             if (!$userData) {
@@ -244,6 +275,141 @@ class AuthController
         }
 
         $this->issueToken($userData, 'OTP');
+    }
+
+    // -----------------------------------------------------------------------
+    // POST /auth/restore-account
+    // -----------------------------------------------------------------------
+
+    /**
+     * Demande de restauration d'un compte en délai de grâce.
+     *
+     * `send-code` répond 409 sur un compte supprimé : il faut donc un canal distinct
+     * pour envoyer le code qui prouvera la propriété de l'adresse. Réponse générique
+     * dans tous les cas — le 409 de send-code a déjà révélé l'état du compte, inutile
+     * d'ajouter un second signal ici.
+     */
+    public function restoreAccount(): void
+    {
+        LoggingMiddleware::logEntry();
+
+        $input      = Response::getRequestParams();
+        $validation = Validator::validate($input, ['email' => 'required|email']);
+
+        if (!$validation['valid']) {
+            LoggingMiddleware::logExit(400);
+            Response::error('Données invalides', $validation['errors'], 400);
+            return;
+        }
+
+        $email     = strtolower(trim($input['email']));
+        $genericOk = ['message' => 'Si ce compte peut être restauré, un code vous a été envoyé.'];
+
+        if (!RateLimitService::check($email, 'send-code')) {
+            LoggingMiddleware::logExit(429);
+            Response::error('Trop de demandes de code', [
+                'error'   => 'RATE_LIMIT_EXCEEDED',
+                'message' => 'Trop de demandes consécutives. Réessayez dans '
+                           . RATE_LIMIT_AUTH_WINDOW_MINUTES . ' minutes.',
+            ], 429);
+            return;
+        }
+        RateLimitService::record($email, 'send-code');
+
+        $pending = (new User())->findPendingDeletionByEmail($email);
+
+        if (!$pending) {
+            LoggingMiddleware::logExit(200);
+            Response::success('Code envoyé', $genericOk);
+            return;
+        }
+
+        try {
+            $forceCode = (defined('APP_ENV') && APP_ENV === 'development' && defined('TMP_CODE') && TMP_CODE !== '')
+                ? TMP_CODE
+                : null;
+            $code = OtpService::generateAndStore($email, $forceCode);
+            (new EmailService())->sendOtpCode($email, $pending['name'] ?? '', $code);
+        } catch (Exception $e) {
+            LogService::error('Erreur envoi code de restauration', [
+                'email' => $email,
+                'error' => $e->getMessage(),
+            ]);
+            LoggingMiddleware::logExit(500);
+            Response::error('Erreur lors de l\'envoi du code', null, 500);
+            return;
+        }
+
+        LogService::info('Code de restauration envoyé', ['email' => $email]);
+        LoggingMiddleware::logExit(200);
+        Response::success('Code envoyé', $genericOk);
+    }
+
+    // -----------------------------------------------------------------------
+    // POST /auth/restore-account/verify
+    // -----------------------------------------------------------------------
+
+    /**
+     * Restaure un compte en délai de grâce après validation du code, et connecte
+     * l'usager. Refuse un compte déjà purgé : la ligne n'existe plus, il n'y a rien
+     * à restaurer et aucune recréation silencieuse ne doit avoir lieu par cette voie.
+     */
+    public function restoreAccountVerify(): void
+    {
+        LoggingMiddleware::logEntry();
+
+        $input      = Response::getRequestParams();
+        $validation = Validator::validate($input, [
+            'email' => 'required|email',
+            'code'  => 'required|string',
+        ]);
+
+        if (!$validation['valid']) {
+            LoggingMiddleware::logExit(400);
+            Response::error('Données invalides', $validation['errors'], 400);
+            return;
+        }
+
+        $email = strtolower(trim($input['email']));
+        $code  = trim($input['code']);
+
+        $userModel = new User();
+        $pending   = $userModel->findPendingDeletionByEmail($email);
+
+        if (!$pending) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Aucun compte à restaurer pour cette adresse', [
+                'error_code' => 'NO_ACCOUNT_TO_RESTORE',
+                'message'    => 'Ce compte n\'existe pas ou a déjà été effacé définitivement.',
+            ], 404);
+            return;
+        }
+
+        if (!OtpService::verify($email, $code)) {
+            LogService::warning('Code de restauration invalide', ['email' => $email]);
+            LoggingMiddleware::logExit(401);
+            Response::error('Code invalide ou expiré', [
+                'error'   => 'INVALID_CODE',
+                'message' => 'Le code est incorrect ou a expiré. Demandez un nouveau code.',
+            ], 401);
+            return;
+        }
+
+        $userModel->id = (int) $pending['id'];
+        if (!$userModel->restore()) {
+            LogService::error('Échec de restauration de compte', ['user_id' => $pending['id']]);
+            LoggingMiddleware::logExit(500);
+            Response::error('Erreur lors de la restauration du compte', null, 500);
+            return;
+        }
+
+        LogService::info('Compte restauré par son usager', [
+            'user_id' => $pending['id'],
+            'email'   => $email,
+        ]);
+
+        $userData = $userModel->findByEmail($email);
+        $this->issueToken($userData, 'restore/OTP');
     }
 
     // -----------------------------------------------------------------------

@@ -7,6 +7,30 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-08-02 22:30]
+
+### Sécurité — JWT accepté après suppression de compte
+
+- **Un JWT émis avant `DELETE /users/me` restait valide jusqu'à 15 jours sur les routes `/auth/*`.** `JwtAuthMiddleware::authenticate()` validait signature et expiration sans jamais consulter la base ; les routes `/auth/*` l'appellent directement (`withAuth`) au lieu de passer par `AuthService`, qui vérifiait déjà `deleted_at`. Exposition : `GET /auth/me` (profil complet d'un compte supprimé), `GET|DELETE /auth/devices`, `GET|DELETE /auth/sessions`, `POST /auth/logout`. Après purge physique, le jeton aurait continué d'authentifier un `user_id` inexistant
+- Le middleware vérifie désormais que le compte existe et n'est pas supprimé → `401` `ACCOUNT_UNAVAILABLE`. Rôle, courriel et nom sont lus en base plutôt que dans le payload : une révocation de rôle prend effet immédiatement
+
+### Suppression de compte — purge physique après 30 jours (Loi 25)
+
+- **Purge complète des comptes supprimés au-delà du délai de grâce.** `AccountPurgeService` traite ce que la cascade FK ne peut pas faire : fichiers retirés du **disque et de la base** (`files.uploaded_by` n'a aucune contrainte FK), tables sans FK vidées (`otp_codes`, `login_attempts`, `device_tokens`, `jwt_blacklist`, `pomo_engagements`), transaction par compte, mode dry-run, idempotence, décompte journalisé par usager
+- **Groupes partagés préservés** : la FK `groups.owner_id ON DELETE CASCADE` détruisait le groupe de tous ses membres. La propriété est désormais transférée au membre le plus ancien ; un groupe sans autre membre est supprimé
+- **Parties de casse-tête préservées** : `puzzle_shared.creator_id` / `partner_id` sont `NOT NULL` en cascade — la partie disparaissait aussi pour le partenaire. Elle lui est maintenant réattribuée, sans trace de l'usager parti
+- **Registres de facturation conservés anonymisés** : nouvelle table `billing_archive` (montants chez Stripe, identifiants de rapprochement, **aucun** `user_id`, courriel ni nom) alimentée avant la purge — obligation fiscale. Migration `docs/20260802_suppression_compte_purge.sql`
+- `DELETE /users/me` renvoie `purge_scheduled_at` (date d'effacement physique, ISO 8601 UTC)
+- **Filet Stripe sur `DELETE /users/me`** : un abonnement encore actif est annulé par le serveur avant la suppression ; si l'appel Stripe échoue, la suppression est **refusée** (`409` `STRIPE_CANCEL_FAILED`). Aucun compte supprimé ne peut rester facturé, même si le client saute l'étape d'annulation
+- **`POST /auth/send-code` sur un compte en délai de grâce** : `409` `ACCOUNT_PENDING_DELETION` avec `purge_scheduled_at`, au lieu d'un `500` — l'auto-inscription heurtait le `UNIQUE KEY` sur `users.email`
+- **Restauration pendant le délai de grâce** : nouvelles routes `POST /auth/restore-account` (envoi du code, réponse générique) et `POST /auth/restore-account/verify` (restauration + JWT). Une connexion réussie par mot de passe restaure également le compte. Voie admin `POST /users/{id}/restore` inchangée
+- **Le courriel redevient disponible après la purge** : la ligne `users` étant physiquement supprimée, une inscription neuve avec la même adresse fonctionne sans reliquat
+- Nouveau `ACCOUNT_PURGE_GRACE_DAYS` (30 jours par défaut) dans `.env.example` et `environment.php`
+- Nouveau script `src/cron/purge_accounts.php` (`--dry-run`, `--user=ID`, `--json`) — la purge tourne déjà dans `maintenance.php`, aucune entrée crontab supplémentaire
+- Doc : `docs/core/API_ENDPOINTS.json`, `docs/core/GUIDE.md` (section « Suppression de compte et restauration » avec le tableau effacé / conservé), `docs/cron.md`, `docs/entrypoints.md`
+- Tests : `private/tests/test_account_deletion.php` (44 tests). Suite complète 2245/2245
+- Répond à la directive inter-projet `20260729_220000_cmem_web_vers_cmem2_API__suppression-compte-purge-30-jours.md`
+
 ## [Unreleased 2026-07-29 07:45]
 
 ### Sécurité — Vérification de courriel : token retiré des réponses, limites de tentatives

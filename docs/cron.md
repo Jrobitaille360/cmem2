@@ -23,3 +23,21 @@ Snapshot du crontab serveur (`lmdkhdg5@15.235.14.237:27`), relevé le 2026-07-15
 - `notifications/send_email_notifications.php` tourne **chaque minute** sur prod et dev — ce
   n'est pas un cron cmem2_API géré via `src/cron/maintenance.php`, à ne pas confondre.
 - Référence complète du script maintenance : `src/cron/maintenance.php` (en-tête du fichier).
+
+## Purge des comptes supprimés (Loi 25)
+
+L'effacement physique des comptes au-delà du délai de grâce (`ACCOUNT_PURGE_GRACE_DAYS`, 30 jours)
+est une tâche de `maintenance.php` — **aucune entrée crontab supplémentaire n'est requise**.
+
+Le script `src/cron/purge_accounts.php` permet de la déclencher seule, pour vérification ou
+exécution manuelle :
+
+```bash
+php src/cron/purge_accounts.php --dry-run   # compte sans rien supprimer
+php src/cron/purge_accounts.php             # exécution réelle
+php src/cron/purge_accounts.php --user=78   # un seul compte (délai de grâce quand même exigé)
+php src/cron/purge_accounts.php --json      # rapport machine
+```
+
+> Avant la première exécution réelle en production, lancer `--dry-run` : la purge traitera d'un
+> seul coup tous les comptes soft-deleted de plus de 30 jours accumulés jusque-là.

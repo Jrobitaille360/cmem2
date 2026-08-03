@@ -4,7 +4,7 @@ Chaque module expose sa documentation d'API au format JSON. Ces fichiers décriv
 
 | Fichier | Routes | Description |
 | - | - | - |
-| [core/API_ENDPOINTS.json](core/API_ENDPOINTS.json) | 89 | API cœur : auth JWT/OTP, users, groups, files, tags, stats, plans. Document de référence transmis aux clients. |
+| [core/API_ENDPOINTS.json](core/API_ENDPOINTS.json) | 91 | API cœur : auth JWT/OTP, users, groups, files, tags, stats, plans, suppression de compte et restauration. Document de référence transmis aux clients. |
 | [ics/API_ICS_ENDPOINTS.json](ics/API_ICS_ENDPOINTS.json) | 43 | Calendriers ICS/CalDAV : événements, occurrences, todos, journaux, partage, notifications email. |
 | [items/API_ITEMS_ENDPOINTS.json](items/API_ITEMS_ENDPOINTS.json) | 13 | Gestionnaire d'items génériques — privé / public / partagé, catégories, permissions par utilisateur. |
 | [quiz/API_QUIZ_ENDPOINTS_v1_0_0.json](quiz/API_QUIZ_ENDPOINTS_v1_0_0.json) | 17 | Quiz temps réel : CRUD quiz/questions, sessions animateur (JWT) et participants (participant_token). |

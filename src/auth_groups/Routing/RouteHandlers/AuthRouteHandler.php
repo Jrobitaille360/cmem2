@@ -57,6 +57,14 @@ class AuthRouteHandler extends BaseRouteHandler
             ($action === 'verify-code' && $method === 'POST') =>
                 $this->controller->verifyCode(),
 
+            // POST /auth/restore-account  (compte en délai de grâce, pas de JWT)
+            ($action === 'restore-account' && $method === 'POST' && !isset($segments[2])) =>
+                $this->controller->restoreAccount(),
+
+            // POST /auth/restore-account/verify
+            ($action === 'restore-account' && $method === 'POST' && ($segments[2] ?? '') === 'verify') =>
+                $this->controller->restoreAccountVerify(),
+
             // POST /auth/refresh  (device token, pas de JWT requis)
             ($action === 'refresh' && $method === 'POST') =>
                 $this->controller->refresh(),

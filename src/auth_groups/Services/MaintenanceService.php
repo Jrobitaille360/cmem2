@@ -329,25 +329,40 @@ class MaintenanceService implements MaintenanceTaskInterface
     }
 
     /**
-     * Purge RGPD — hard delete des comptes soft-deleted depuis plus de 30 jours.
-     * Toutes les FK sur users.id sont CASCADE/SET NULL (vérifié 2026-07-15,
-     * voir docs/20260715_calendar_journals_todos_fk.sql) — pas de risque d'échec silencieux.
+     * Purge Loi 25 — effacement physique des comptes soft-deleted au-delà du délai de grâce.
+     *
+     * Un simple DELETE FROM users ne suffit pas : la cascade laisserait les fichiers sur
+     * disque et leurs lignes (files.uploaded_by n'a aucune FK), détruirait les groupes
+     * partagés encore vivants et les parties de casse-tête du partenaire, et emporterait
+     * les registres de facturation à conserver. AccountPurgeService traite chaque compte.
+     *
+     * Directive : 20260729_220000_cmem_web_vers_cmem2_API__suppression-compte-purge-30-jours
      */
     private function purgeDeletedUsers(\PDO $db, array &$result): void
     {
         try {
-            $sql = "DELETE FROM users WHERE deleted_at IS NOT NULL AND deleted_at < NOW() - INTERVAL 30 DAY";
+            $userIds = AccountPurgeService::findPurgeable($db);
+            $label   = 'users (soft-deleted >' . AccountPurgeService::graceDays() . 'd, purge physique)';
 
-            if ($this->dryRun) {
-                $stmt = $db->prepare("SELECT COUNT(*) FROM users WHERE deleted_at IS NOT NULL AND deleted_at < NOW() - INTERVAL 30 DAY");
-                $stmt->execute();
-                $result['rows_deleted']['users (soft-deleted >30d, hard purge)'] = (int) $stmt->fetchColumn();
-                return;
+            $result['rows_deleted'][$label] = 0;
+
+            foreach ($userIds as $userId) {
+                $report = AccountPurgeService::purgeUser($db, $userId, $this->dryRun);
+
+                $result['rows_deleted'][$label] += (int) $report['user_deleted'];
+                $result['rows_counted']["purge user {$userId}"] = [
+                    'fichiers (base)'    => $report['files_rows_deleted'],
+                    'fichiers (disque)'  => $report['files_disk_deleted'],
+                    'groupes transférés' => $report['groups_transferred'],
+                    'groupes supprimés'  => $report['groups_deleted'],
+                    'casse-têtes'        => $report['puzzles_reassigned'],
+                    'facturation'        => $report['billing_archived'],
+                ];
+
+                foreach ($report['warnings'] as $warning) {
+                    $result['warnings'][] = "purge user {$userId}: {$warning}";
+                }
             }
-
-            $stmt = $db->prepare($sql);
-            $stmt->execute();
-            $result['rows_deleted']['users (soft-deleted >30d, hard purge)'] = $stmt->rowCount();
         } catch (\Throwable $e) {
             $result['errors'][] = 'purgeDeletedUsers: ' . $e->getMessage();
             LogService::error('Maintenance[auth_groups] purgeDeletedUsers', ['exception' => $e->getMessage()]);
