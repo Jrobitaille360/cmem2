@@ -25,9 +25,9 @@ RewriteRule ^(.*)$ index.php [QSA,L]
     Require all denied
 </Files>
 
-# Limites PHP pour upload de fichiers
-php_value upload_max_filesize 20M
-php_value post_max_size 25M
+# Limites PHP pour upload de fichiers (alignées sur user.ini / .user.ini)
+php_value upload_max_filesize 100M
+php_value post_max_size 105M
 
 # Configuration du cache pour les images
 <IfModule mod_expires.c>

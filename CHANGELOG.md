@@ -9,6 +9,27 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+## [2.13.0] — 2026-08-03
+
+### Sécurité — SVG servi inline, MIME déclaré par le client
+
+- **`GET /files/{id}` posait `Content-Disposition: inline` pour tout `image/*`, SVG compris.** Un SVG est du XML exécutable : servi inline, son script s'exécutait sur l'origine de l'API. Un `image/svg+xml` est désormais servi `attachment` + `X-Content-Type-Options: nosniff`, comme les non-images ; `GET /files/png-from-svg` reste le chemin d'affichage sûr. Les autres `image/*` gardent l'inline et le cache long
+- **Le `mime_type` enregistré était le `Content-Type` déclaré par le client**, jamais vérifié : un client annonçant `application/octet-stream` faisait stocker une image en `media_type = executable`, et un SVG pouvait être présenté sous n'importe quel type. Le MIME stocké provient maintenant de la signature réelle du fichier, `media_type` en découle
+- **L'extension seule pouvait faire passer un fichier** : un texte renommé `.png` était accepté (MIME réel `text/plain`, présent dans la liste globale ; extension `png`, présente dans l'autre liste). La validation croise désormais la paire (extension, signature) — un MIME générique (`application/zip`, `text/plain`, `application/octet-stream`) n'est accepté que pour les extensions dont c'est la signature attendue
+
+### Fichiers — types acceptés élargis
+
+- Nouvelles extensions au dépôt : `pptx`, `odt`, `ods`, `odp` (conteneurs ZIP), `csv`, `md`, `rtf` (texte), `heic`, `heif`, `avif`, `tiff`, `tif` (images). Elles étaient refusées par la liste d'extensions alors que leur MIME réel passait déjà
+- Les exécutables et archives Windows (`exe`, `msi`, `zip`, `7z` via `application/octet-stream`) restent acceptés — voie de publication des installateurs de jdb et puzzle
+
+### Fichiers — codes d'erreur, renommage, étiquettes
+
+- Les refus de `POST /files` portent un code applicatif exploitable sans lire le message français : `FILE_TYPE_REFUSED` (avec `detected_type`, `extension`) et `FILE_TOO_LARGE` (avec `max_size_bytes`, `file_size_bytes`)
+- **`PATCH /files/{id}`** — renomme un fichier (`original_name`) et modifie sa `description` sans toucher au stockage (`file_name`, `file_path` inchangés). Propriétaire ou administrateur. Nom vide, de plus de 255 caractères ou contenant `/`, `\` ou `..` → `400` `FILE_NAME_INVALID`
+- **`GET /files/{id}/tags`** — étiquettes associées à un fichier ; `GET /files/user/{user_id}` retourne aussi un champ `tags` par ligne, en une seule requête pour toute la page (le filtre par étiquette des clients n'imposait plus qu'un fan-out d'une requête par fichier)
+- Nouveau `FILES_MAX_UPLOAD_MB` (100 par défaut) : plafond dur de `POST /files`, reporté dans le message d'erreur. `.htaccess` passe de `20M`/`25M` à `100M`/`105M`, aligné sur `user.ini` — les installateurs Windows de plus de 20 Mo étaient refusés par PHP avant même d'atteindre le contrôleur
+- Nouveau fichier de tests `private/tests/test_files_types.php` (57 tests)
+
 ## [2.12.0] — 2026-08-02
 
 ### Sécurité — JWT accepté après suppression de compte

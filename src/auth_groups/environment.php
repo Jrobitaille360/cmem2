@@ -99,6 +99,8 @@ define('MAX_VIDEO_SIZE', (int)($_ENV['MAX_VIDEO_SIZE'] ?? 52428800)); // 50MB pa
 define('MAX_AUDIO_SIZE', (int)($_ENV['MAX_AUDIO_SIZE'] ?? 20971520)); // 20MB par défaut
 define('MAX_DOCUMENT_SIZE', (int)($_ENV['MAX_DOCUMENT_SIZE'] ?? 10485760)); // 10MB par défaut
 define('MAX_EXECUTABLE_SIZE', (int)($_ENV['MAX_EXECUTABLE_SIZE'] ?? 209715200)); // 200MB par défaut
+// Plafond dur de POST /files, aligné sur upload_max_filesize / post_max_size (user.ini)
+define('FILES_MAX_UPLOAD_MB', (int)($_ENV['FILES_MAX_UPLOAD_MB'] ?? 100));
 
 // Types de fichiers autorisés
 define('ALLOWED_IMAGE_TYPES', explode(',', $_ENV['ALLOWED_IMAGE_TYPES'] ?? 'image/jpeg,image/png,image/gif'));

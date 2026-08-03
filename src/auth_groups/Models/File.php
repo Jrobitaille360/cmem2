@@ -246,6 +246,62 @@ class File extends BaseModel
     }
 
     /**
+     * Mettre à jour le nom affiché et la description d'un fichier.
+     * Le stockage (file_name, file_path) n'est jamais touché.
+     */
+    public function updateMetadata($fileId, string $originalName, ?string $description): bool
+    {
+        $query = "UPDATE {$this->table}
+                 SET original_name = :original_name, description = :description, updated_at = NOW()
+                 WHERE id = :id AND deleted_at IS NULL";
+
+        $stmt = $this->getDb()->prepare($query);
+
+        $cleanName = htmlspecialchars(strip_tags($originalName));
+        $cleanDesc = $description === null ? null : htmlspecialchars(strip_tags($description));
+
+        $stmt->bindParam(':original_name', $cleanName);
+        $stmt->bindParam(':description', $cleanDesc);
+        $stmt->bindParam(':id', $fileId, PDO::PARAM_INT);
+
+        return $stmt->execute();
+    }
+
+    /**
+     * Étiquettes associées à un lot de fichiers.
+     *
+     * @return array file_id → [{id, name, color}]
+     */
+    public function getTagsByFileIds(array $fileIds): array
+    {
+        $fileIds = array_values(array_unique(array_map('intval', $fileIds)));
+        if (empty($fileIds)) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($fileIds), '?'));
+        $query = "SELECT r.file_id, t.id, t.name, t.color
+                  FROM file_tag_relations r
+                  INNER JOIN tags t ON t.id = r.tag_id
+                  WHERE r.file_id IN ({$placeholders}) AND t.deleted_at IS NULL
+                  ORDER BY t.name";
+
+        $stmt = $this->getDb()->prepare($query);
+        $stmt->execute($fileIds);
+
+        $result = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $result[(int) $row['file_id']][] = [
+                'id'    => (int) $row['id'],
+                'name'  => $row['name'],
+                'color' => $row['color'],
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
      * Mettre à jour uniquement l'accessibilité d'un fichier
      */
     public function updateAccessibility($fileId, string $accessibility): bool

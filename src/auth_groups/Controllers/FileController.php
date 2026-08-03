@@ -11,39 +11,61 @@ use Exception;
 
 class FileController
 {
-    private array $allowedMimeTypes = [
-        'image/jpeg',
-        'image/jpg',
-        'image/png',
-        'image/gif',
-        'image/webp',
-        'image/svg+xml',
-        'application/pdf',
-        'text/plain',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'application/vnd.ms-excel',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'audio/mpeg',
-        'audio/wav',
-        'audio/ogg',
-        'audio/mp3',
-        'video/mp4',
-        'video/avi',
-        'video/quicktime',
-        'video/x-msvideo',
-        // Exécutables et archives Windows
-        'application/x-msdownload',
-        'application/x-dosexec',
-        'application/x-msi',
-        'application/zip',
-        'application/x-zip-compressed',
-        'application/x-7z-compressed',
-        'application/octet-stream',
+    /**
+     * Types acceptés à l'upload : extension → types MIME réels admis pour cette extension.
+     *
+     * La paire (extension, signature) est validée ensemble : une extension seule ne
+     * suffit jamais à faire passer un fichier, et un MIME générique (application/zip,
+     * text/plain, application/octet-stream) n'est accepté que pour les extensions dont
+     * c'est la signature attendue.
+     */
+    private array $allowedTypes = [
+        // Images
+        'jpg'  => ['image/jpeg', 'image/jpg'],
+        'jpeg' => ['image/jpeg', 'image/jpg'],
+        'png'  => ['image/png'],
+        'gif'  => ['image/gif'],
+        'webp' => ['image/webp'],
+        'svg'  => ['image/svg+xml', 'text/xml', 'application/xml', 'text/plain'],
+        'heic' => ['image/heic', 'image/heif'],
+        'heif' => ['image/heif', 'image/heic'],
+        'avif' => ['image/avif'],
+        'tiff' => ['image/tiff'],
+        'tif'  => ['image/tiff'],
+
+        // Documents
+        'pdf'  => ['application/pdf'],
+        'txt'  => ['text/plain'],
+        'csv'  => ['text/csv', 'text/plain'],
+        'md'   => ['text/markdown', 'text/plain'],
+        'rtf'  => ['application/rtf', 'text/rtf', 'text/plain'],
+        'doc'  => ['application/msword', 'application/vnd.ms-office', 'application/x-ole-storage'],
+        'xls'  => ['application/vnd.ms-excel', 'application/vnd.ms-office', 'application/x-ole-storage'],
+
+        // Bureautique OpenXML et OpenDocument (conteneurs ZIP)
+        'docx' => ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/zip', 'application/x-zip-compressed'],
+        'xlsx' => ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/zip', 'application/x-zip-compressed'],
+        'pptx' => ['application/vnd.openxmlformats-officedocument.presentationml.presentation', 'application/zip', 'application/x-zip-compressed'],
+        'odt'  => ['application/vnd.oasis.opendocument.text', 'application/zip', 'application/x-zip-compressed'],
+        'ods'  => ['application/vnd.oasis.opendocument.spreadsheet', 'application/zip', 'application/x-zip-compressed'],
+        'odp'  => ['application/vnd.oasis.opendocument.presentation', 'application/zip', 'application/x-zip-compressed'],
+
+        // Audio / vidéo
+        'mp3'  => ['audio/mpeg', 'audio/mp3'],
+        'wav'  => ['audio/wav', 'audio/x-wav'],
+        'ogg'  => ['audio/ogg', 'video/ogg', 'application/ogg'],
+        'mp4'  => ['video/mp4'],
+        'avi'  => ['video/avi', 'video/x-msvideo'],
+        'mov'  => ['video/quicktime'],
+
+        // Exécutables et archives Windows (installateurs distribués par jdb / puzzle)
+        'exe'  => ['application/x-msdownload', 'application/x-dosexec', 'application/octet-stream'],
+        'msi'  => ['application/x-msi', 'application/x-msdownload', 'application/vnd.ms-office', 'application/x-ole-storage', 'application/octet-stream'],
+        'zip'  => ['application/zip', 'application/x-zip-compressed', 'application/octet-stream'],
+        '7z'   => ['application/x-7z-compressed', 'application/octet-stream'],
+
         // Traces GPS
-        'application/gpx+xml',
-        'text/xml',
-        'application/xml',
+        'gpx'  => ['application/gpx+xml', 'text/xml', 'application/xml', 'text/plain'],
     ];
 
     private array $maxFileSizes = [
@@ -82,7 +104,11 @@ class FileController
             if (!isset($_FILES['file']) || $uploadError !== UPLOAD_ERR_OK) {
                 LoggingMiddleware::logExit(400);
                 if ($uploadError === UPLOAD_ERR_INI_SIZE || $uploadError === UPLOAD_ERR_FORM_SIZE) {
-                    Response::error('Fichier trop volumineux — maximum 20 MB', null, 400);
+                    Response::error(
+                        'Fichier trop volumineux — maximum ' . FILES_MAX_UPLOAD_MB . ' MB',
+                        ['code' => 'FILE_TOO_LARGE', 'max_size_bytes' => FILES_MAX_UPLOAD_MB * 1024 * 1024],
+                        400
+                    );
                 } else {
                     Response::error('Aucun fichier valide uploadé', null, 400);
                 }
@@ -167,9 +193,12 @@ class FileController
             $fileModel->description = $description;
             $fileModel->file_name = $uniqueName;
             $fileModel->file_path = $urlPrefix . $uniqueName;
-            $fileModel->mime_type = $file['type'];
+            // MIME réel (signature) plutôt que le Content-Type déclaré par le client :
+            // le client peut mentir, et media_type en dépend.
+            $realMimeType = $this->detectMimeType($filePath);
+            $fileModel->mime_type = $realMimeType;
             $fileModel->file_size = $file['size'];
-            $fileModel->media_type   = $fileExtension === 'gpx' ? 'document' : $this->getFileCategory($file['type']);
+            $fileModel->media_type   = $fileExtension === 'gpx' ? 'document' : $this->getFileCategory($realMimeType);
             $fileModel->uploaded_by  = $userId;
             $fileModel->accessibility = $accessibility;
             $fileModel->upload_ip    = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
@@ -276,7 +305,13 @@ class FileController
         // Déterminer le type MIME
         $mimeType = $fileInfo['mime_type'] ?? mime_content_type($filePath) ?? 'application/octet-stream';
         
-        $isImage = str_starts_with($mimeType, 'image/');
+        // Un SVG est du XML exécutable : servi inline, son script s'exécuterait sur
+        // l'origine de l'API. Il est traité comme un non-image (attachment, no-cache).
+        // GET /files/png-from-svg reste le chemin d'affichage sûr.
+        $extension = strtolower(pathinfo($fileInfo['original_name'] ?? '', PATHINFO_EXTENSION));
+        $isSvg     = $mimeType === 'image/svg+xml' || $extension === 'svg';
+
+        $isImage = str_starts_with($mimeType, 'image/') && !$isSvg;
 
         header('Content-Type: ' . $mimeType);
         // Images: inline + long cache (ID immuable = safe). Autres: attachment, no-cache.
@@ -287,6 +322,7 @@ class FileController
         } else {
             header('Content-Description: File Transfer');
             header('Content-Disposition: attachment; filename="' . $fileInfo['original_name'] . '"');
+            header('X-Content-Type-Options: nosniff');
             header('Cache-Control: no-cache, must-revalidate');
             header('Expires: 0');
         }
@@ -388,6 +424,140 @@ class FileController
         ]);
     }
     
+    /**
+     * Renommer un fichier / modifier sa description
+     * PATCH /files/{id}
+     *
+     * Ne touche jamais au stockage : file_name et file_path restent inchangés.
+     */
+    public function update(int $fileId, int $userId, string $role): void
+    {
+        $fileModel = new File();
+        $fileInfo  = $fileModel->findById($fileId);
+
+        if (!$fileInfo) {
+            Response::error('Fichier non trouvé', null, 404);
+            return;
+        }
+
+        $isAdmin = RoleHelper::isAtLeast($role, 'ADMINISTRATEUR');
+        $isOwner = (int) $fileInfo['uploaded_by'] === (int) $userId;
+
+        if (!$isOwner && !$isAdmin) {
+            Response::error('Accès non autorisé', null, 403);
+            return;
+        }
+
+        $input        = Response::getRequestParams();
+        $hasName        = array_key_exists('original_name', $input);
+        $hasDescription = array_key_exists('description', $input);
+
+        if (!$hasName && !$hasDescription) {
+            Response::error(
+                'Aucun champ modifiable fourni — attendus : original_name, description',
+                null, 400
+            );
+            return;
+        }
+
+        $originalName = $fileInfo['original_name'];
+        if ($hasName) {
+            $originalName = trim((string) $input['original_name']);
+            if (!$this->validateOriginalName($originalName)) {
+                Response::error(
+                    'original_name invalide — non vide, 255 caractères maximum, sans séparateur de chemin',
+                    ['code' => 'FILE_NAME_INVALID'],
+                    400
+                );
+                return;
+            }
+        }
+
+        $description = $fileInfo['description'];
+        if ($hasDescription) {
+            $description = $input['description'] === null ? null : (string) $input['description'];
+        }
+
+        if (!$fileModel->updateMetadata($fileId, $originalName, $description)) {
+            Response::error('Erreur lors de la mise à jour', null, 500);
+            return;
+        }
+
+        $updated = $fileModel->findById($fileId);
+
+        LogService::info('Métadonnées de fichier mises à jour', [
+            'file_id' => $fileId,
+            'user_id' => $userId,
+        ]);
+
+        Response::success('Fichier mis à jour', [
+            'file' => [
+                'id'            => (int) $fileId,
+                'original_name' => $updated['original_name'] ?? $originalName,
+                'description'   => $updated['description'] ?? $description,
+                'file_name'     => $updated['file_name'] ?? $fileInfo['file_name'],
+                'url'           => $updated['file_path'] ?? $fileInfo['file_path'],
+            ]
+        ]);
+    }
+
+    /**
+     * Valider un nom affiché de fichier :
+     * non vide, 255 caractères max, aucun séparateur de chemin ni traversal.
+     */
+    private function validateOriginalName(string $name): bool
+    {
+        if ($name === '' || strlen($name) > 255) {
+            return false;
+        }
+
+        if (str_contains($name, '/') || str_contains($name, '\\') || str_contains($name, "\0")) {
+            return false;
+        }
+
+        return !str_contains($name, '..');
+    }
+
+    /**
+     * Étiquettes associées à un fichier
+     * GET /files/{id}/tags
+     */
+    public function getFileTags(int $fileId, ?int $userId, ?string $role): void
+    {
+        $fileModel = new File();
+        $fileInfo  = $fileModel->findById($fileId);
+
+        if (!$fileInfo) {
+            Response::error('Fichier non trouvé', null, 404);
+            return;
+        }
+
+        $accessibility = $fileInfo['accessibility'] ?? 'private';
+
+        if ($accessibility === 'grand-public') {
+            // accès libre
+        } elseif ($accessibility === 'public') {
+            if (!$userId) {
+                Response::error('Authentification requise', null, 401);
+                return;
+            }
+        } else {
+            $isAdmin = RoleHelper::isAtLeast($role ?? null, 'ADMINISTRATEUR');
+            $isOwner = $userId && (int) $fileInfo['uploaded_by'] === (int) $userId;
+            if (!$isOwner && !$isAdmin) {
+                Response::error('Accès non autorisé', null, 403);
+                return;
+            }
+        }
+
+        $tagsByFile = $fileModel->getTagsByFileIds([$fileId]);
+
+        Response::success('Étiquettes du fichier récupérées', [
+            'file_id' => (int) $fileId,
+            'tags'    => $tagsByFile[$fileId] ?? [],
+        ]);
+    }
+
     /**
      * Supprimer un fichier
      */
@@ -579,6 +749,9 @@ class FileController
                 $categoriesCount[$stat['media_type']] = $stat['count_by_category'];
             }
 
+            // Étiquettes de la page courante, en une seule requête (pas de fan-out client)
+            $tagsByFile = $fileModel->getTagsByFileIds(array_column($files, 'id'));
+
             // Formater les fichiers pour la réponse
             $formattedFiles = [];
             foreach ($files as $file) {
@@ -594,7 +767,8 @@ class FileController
                     'upload_date' => $file['created_at'],
                     'updated_at' => $file['updated_at'],
                     'deleted_at' => $file['deleted_at'] ?? null,
-                    'url' => $file['file_path']
+                    'url' => $file['file_path'],
+                    'tags' => $tagsByFile[(int)$file['id']] ?? []
                 ];
             }
 
@@ -687,41 +861,56 @@ class FileController
      */
     private function validateFile(array $file): bool
     {
-        // Détecter le type MIME réel du fichier
-        $realMimeType = mime_content_type($file['tmp_name']);
+        // Type MIME réel, lu dans la signature du fichier (jamais celui déclaré par le client)
+        $realMimeType = $this->detectMimeType($file['tmp_name']);
+        $extension    = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
 
-        // Vérifier le type MIME réel d'abord
-        if (!in_array($realMimeType, $this->allowedMimeTypes))
+        // La paire (extension, signature) doit être cohérente : ni l'une ni l'autre ne suffit
+        if (!isset($this->allowedTypes[$extension])
+            || !in_array($realMimeType, $this->allowedTypes[$extension], true))
         {
-            Response::error("Type de fichier non autorisé. Type détecté: $realMimeType", null, 400);
+            Response::error(
+                "Type de fichier non autorisé. Type détecté: $realMimeType",
+                ['code' => 'FILE_TYPE_REFUSED', 'detected_type' => $realMimeType, 'extension' => $extension],
+                400
+            );
             return false;
         }
 
-        // Vérifier la taille (les exécutables/archives ont leur propre limite)
-        if (in_array($realMimeType, $this->executableMimeTypes)) {
+        // Plafond dur, aligné sur upload_max_filesize
+        $hardLimit = FILES_MAX_UPLOAD_MB * 1024 * 1024;
+
+        // Limite par catégorie (les exécutables/archives ont la leur)
+        if (in_array($realMimeType, $this->executableMimeTypes, true)) {
             $maxSize = MAX_EXECUTABLE_SIZE;
         } else {
             $fileType = $this->getFileCategory($realMimeType);
             $maxSize  = $this->maxFileSizes[$fileType] ?? $this->maxFileSizes['default'];
         }
 
+        $maxSize = min($maxSize, $hardLimit);
+
         if ($file['size'] > $maxSize)
         {
-            Response::error('Fichier trop volumineux. Taille maximum: ' . ($maxSize / 1024 / 1024) . ' MB', null, 400);
-            return false;
-        }
-
-        // Vérifier l'extension
-        $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-        $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'pdf', 'txt', 'doc', 'docx', 'xls', 'xlsx', 'mp3', 'wav', 'ogg', 'mp4', 'avi', 'mov', 'exe', 'msi', 'zip', '7z', 'gpx'];
-
-        if (!in_array($extension, $allowedExtensions))
-        {
-            Response::error('Extension de fichier non autorisée', null, 400);
+            Response::error(
+                'Fichier trop volumineux. Taille maximum: ' . round($maxSize / 1024 / 1024, 2) . ' MB',
+                ['code' => 'FILE_TOO_LARGE', 'max_size_bytes' => $maxSize, 'file_size_bytes' => (int) $file['size']],
+                400
+            );
             return false;
         }
 
         return true;
+    }
+
+    /**
+     * Type MIME réel d'un fichier, d'après sa signature.
+     */
+    private function detectMimeType(string $path): string
+    {
+        $mime = @mime_content_type($path);
+
+        return $mime !== false && $mime !== '' ? $mime : 'application/octet-stream';
     }
 
     /**

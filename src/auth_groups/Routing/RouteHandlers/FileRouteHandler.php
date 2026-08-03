@@ -79,6 +79,16 @@ class FileRouteHandler extends BaseRouteHandler
                 $this->validateIdAndCall($action, fn($fileId) =>
                     $this->controller->getFileInfo($fileId, $user['user_id'], $user['role'])),
                 
+            // PATCH /files/{id}
+            ($action && ctype_digit($action) && !$id && $method === 'PATCH') =>
+                $this->validateIdAndCall($action, fn($fileId) =>
+                    $this->controller->update($fileId, $user['user_id'], $user['role'])),
+
+            // GET /files/{id}/tags
+            ($action && ctype_digit($action) && $id === 'tags' && $method === 'GET') =>
+                $this->validateIdAndCall($action, fn($fileId) =>
+                    $this->controller->getFileTags($fileId, $user['user_id'], $user['role'])),
+
             // DELETE /files/{id}
             ($action && ctype_digit($action) && !$id && $method === 'DELETE') => 
                 $this->validateIdAndCall($action, fn($fileId) => 
