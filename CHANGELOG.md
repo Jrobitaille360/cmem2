@@ -9,6 +9,10 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+## [2.14.0] — 2026-08-04
+
+Version « chiffrement de bout en bout » : les journaux, les tâches et les contacts peuvent désormais être chiffrés côté client, l'API n'en conservant que des octets opaques. Trois directives `cmem_web` livrées, aucune rupture de contrat — tout contenu non chiffré se comporte exactement comme avant.
+
 ### Tâches et contacts — chiffrement de bout en bout
 
 > Directive `20260804_090000_cmem_web_vers_cmem2_API__e2e-taches-contacts`
