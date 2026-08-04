@@ -25,6 +25,20 @@
     "reseaux": "[{ type: string, handle: string }]",
     "categories": "string[] — étiquettes libres, aucune entité dédiée"
   },
+  "chiffrement_e2e": {
+    "directive": "20260804_090000_cmem_web_vers_cmem2_API__e2e-taches-contacts",
+    "principe": "Chiffrement fait entièrement côté client (PBKDF2-SHA256 → AES-GCM 256). Aucune clé ni passphrase ne transite vers l'API. Le serveur stocke et restitue des octets opaques.",
+    "modele": "Contrairement aux journaux et aux tâches, les contacts n'ont pas de champs texte libres où loger du chiffré : courriels, telephones, adresses, sites et reseaux sont structurés et validés. Le client chiffre donc un JSON unique dans enc_payload et envoie les colonnes structurées vides.",
+    "enc_alg": "string|null (max 32) — Algorithme, ex. AES-GCM-256. null = contact en clair",
+    "enc_iv": "string|null (max 32) — Vecteur d'initialisation base64. null = contact en clair",
+    "enc_payload": "string|null (MEDIUMTEXT, max 16000000) — Base64 opaque : JSON chiffré de organisation, fonction, courriels, telephones, adresses, sites, reseaux, notes, anniversaire, motif_relance",
+    "champs_en_clair": "prenom, nom, categories, favori, photo_file_id, partage_scope, cree_le, maj_le, date_relance, relance_faite_le — décision C2, pour garder tri, pagination et rappel push côté serveur",
+    "colonnes_structurees_vides": "Quand enc_alg est renseigné, courriels / telephones / adresses / sites / reseaux arrivent vides (null ou []) : aucun 422 n'est renvoyé pour cette raison. La règle « au moins un de prenom / nom / organisation » reste satisfaite par prenom / nom.",
+    "opacite": "enc_payload n'est ni normalisé, ni tronqué, ni lu. Un dépassement de la borne renvoie 400 — jamais de troncature silencieuse, qui rendrait la fiche indéchiffrable.",
+    "recherche": "GET /contacts?q= ne peut pas trouver une fiche chiffrée par courriel, organisation ou notes : ces colonnes sont vides. La recherche se réduit alors à prenom / nom / categories, sans erreur. enc_payload n'est jamais interrogé.",
+    "import_export": "L'export vCard n'émet que les champs en clair (jamais de base64 dans EMAIL, ORG ou NOTE). À l'import, une fiche existante chiffrée est ignorée (comptée dans « ignores ») plutôt qu'écrasée.",
+    "push": "Une relance portant sur une fiche chiffrée affiche un libellé générique — jamais le nom, jamais le blob."
+  },
   "endpoints": {
     "contacts": {
       "description": "CRUD des fiches contact",
@@ -36,7 +50,7 @@
           "auth_required": true,
           "query": {
             "app_id": "string — optionnel, défaut 'puzzle' ('cmemweb' pour cmem_web)",
-            "q": "string — optionnel, recherche sur prenom, nom, organisation et courriels",
+            "q": "string — optionnel, recherche sur prenom, nom, organisation, courriels et categories ; voir chiffrement_e2e.recherche pour les fiches chiffrées",
             "categorie": "string — optionnel, fiche dont categories[] contient cette valeur",
             "favori": "0|1 — optionnel",
             "limit": "int — optionnel, 1..500 ; absent = pas de pagination",
@@ -73,11 +87,15 @@
             "partage_scope": "enum(prive|groupe|utilisateurs) — défaut 'prive', réservé P1 (inactif)",
             "date_relance": "date YYYY-MM-DD|null — prochaine relance à faire sur la fiche",
             "motif_relance": "string|null — tronqué à 255 caractères, jamais inclus dans le push",
-            "relance_faite_le": "bool|datetime|null — true horodate côté serveur, null annule la marque"
+            "relance_faite_le": "bool|datetime|null — true horodate côté serveur, null annule la marque",
+            "enc_alg": "string|null — optionnel, max 32 ; voir chiffrement_e2e",
+            "enc_iv": "string|null — optionnel, max 32 ; voir chiffrement_e2e",
+            "enc_payload": "string|null — optionnel, max 16000000 ; base64 opaque, voir chiffrement_e2e"
           },
           "response": { "contact": "Contact" },
           "status_codes": { "201": "Contact créé" },
           "errors": {
+            "400": "enc_alg / enc_iv au-delà de 32 caractères, ou enc_payload au-delà de 16 000 000",
             "401": "JWT absent ou invalide",
             "403": "QUOTA_EXCEEDED — cap max_contacts atteint (payload { code, resource, limit, current })",
             "422": "prenom, nom et organisation tous absents"
@@ -97,15 +115,17 @@
           }
         },
         {
-          "method": "PUT",
+          "method": "PUT | PATCH",
           "path": "/contacts/{id}",
-          "description": "Mise à jour partielle : seuls les champs transmis sont écrits. PATCH est accepté et se comporte à l'identique.",
+          "description": "Mise à jour partielle : seuls les champs transmis sont écrits. PUT et PATCH se comportent à l'identique.",
           "auth_required": true,
           "body": "Mêmes champs que POST, tous optionnels",
           "regle_relance": "Poser une date_relance différente de l'existante remet relance_faite_le à null, sauf si relance_faite_le est fourni dans la même requête.",
+          "regle_chiffrement": "enc_alg / enc_iv / enc_payload à null remettent la fiche en clair ; champs omis = inchangés.",
           "response": { "contact": "Contact" },
           "status_codes": { "200": "Contact mis à jour" },
           "errors": {
+            "400": "enc_alg / enc_iv au-delà de 32 caractères, ou enc_payload au-delà de 16 000 000",
             "401": "JWT absent ou invalide",
             "403": "La fiche appartient à un autre propriétaire",
             "404": "Fiche inexistante ou soft-supprimée",

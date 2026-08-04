@@ -18,6 +18,15 @@ use Stripe\Services\EntitlementService;
  */
 class TodoController
 {
+    /**
+     * Longueurs maximales — chiffrement E2E (directive 20260804_090000).
+     * Le base64 gonfle le contenu d'environ 4/3 : les bornes du clair seraient
+     * trop courtes pour un corps chiffré. Elles bornent l'entrée pour renvoyer
+     * un 400 explicite plutôt qu'une erreur SQL sur VARCHAR(2000) / MEDIUMTEXT.
+     */
+    private const TITLE_MAX       = 2000;
+    private const DESCRIPTION_MAX = 16000000;
+
     private Calendar $calModel;
     private CalendarTodo $todoModel;
 
@@ -36,8 +45,10 @@ class TodoController
         $input = Response::getRequestParams();
 
         $validation = Validator::validate($input, [
-            'title'            => 'required|string|max:255',
-            'description'      => 'optional|string',
+            'title'            => 'required|string|max:' . self::TITLE_MAX,
+            'description'      => 'optional|string|max:' . self::DESCRIPTION_MAX,
+            'enc_alg'          => 'optional|string|max:32',
+            'enc_iv'           => 'optional|string|max:32',
             'due'              => 'optional|date_or_datetime',
             'dtstart'          => 'optional|date_or_datetime',
             'status'           => 'optional|string|in:NEEDS-ACTION,IN-PROCESS,COMPLETED,CANCELLED',
@@ -88,6 +99,9 @@ class TodoController
             $todo->userId          = $userId;
             $todo->title           = $input['title'];
             $todo->description     = $input['description'] ?? null;
+            // Chiffrement E2E : stockés tels quels, jamais interprétés côté serveur.
+            $todo->encAlg          = $input['enc_alg'] ?? null;
+            $todo->encIv           = $input['enc_iv'] ?? null;
             $todo->due             = isset($input['due']) ? date('Y-m-d H:i:s', strtotime($input['due'])) : null;
             $todo->dtstart         = isset($input['dtstart']) ? date('Y-m-d H:i:s', strtotime($input['dtstart'])) : null;
             $todo->isAllDay        = $isAllDay;
@@ -171,8 +185,10 @@ class TodoController
         $input = Response::getRequestParams();
 
         $validation = Validator::validate($input, [
-            'title'            => 'optional|string|max:255',
-            'description'      => 'optional|string',
+            'title'            => 'optional|string|max:' . self::TITLE_MAX,
+            'description'      => 'optional|string|max:' . self::DESCRIPTION_MAX,
+            'enc_alg'          => 'optional|string|max:32',
+            'enc_iv'           => 'optional|string|max:32',
             'due'              => 'optional|date_or_datetime',
             'dtstart'          => 'optional|date_or_datetime',
             'completed'        => 'optional|date_or_datetime',
@@ -237,6 +253,21 @@ class TodoController
             }
             if (array_key_exists('is_all_day', $input)) {
                 $todo->isAllDay = !empty($input['is_all_day']);
+            }
+            // Chiffrement E2E : null explicite = retour au clair ; champ omis = inchangé.
+            if (array_key_exists('enc_alg', $input)) {
+                if ($input['enc_alg'] === null) {
+                    $todo->clearEncAlg = true;
+                } else {
+                    $todo->encAlg = $input['enc_alg'];
+                }
+            }
+            if (array_key_exists('enc_iv', $input)) {
+                if ($input['enc_iv'] === null) {
+                    $todo->clearEncIv = true;
+                } else {
+                    $todo->encIv = $input['enc_iv'];
+                }
             }
 
             $todo->update();

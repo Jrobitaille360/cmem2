@@ -163,8 +163,8 @@ class CalendarRouteHandler extends BaseRouteHandler
             ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'todos' && isset($segments[3]) && ctype_digit($segments[3]) && !isset($segments[4]) && $method === 'GET') =>
                 $this->todoController->getTodo((int)$action, (int)$segments[3], $user['user_id']),
 
-            // PUT /calendars/{id}/todos/{todoId}
-            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'todos' && isset($segments[3]) && ctype_digit($segments[3]) && !isset($segments[4]) && $method === 'PUT') =>
+            // PUT|PATCH /calendars/{id}/todos/{todoId} — mise à jour partielle dans les deux cas
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'todos' && isset($segments[3]) && ctype_digit($segments[3]) && !isset($segments[4]) && in_array($method, ['PUT', 'PATCH'], true)) =>
                 $this->todoController->updateTodo((int)$action, (int)$segments[3], $user['user_id']),
 
             // DELETE /calendars/{id}/todos/{todoId}

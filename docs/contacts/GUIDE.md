@@ -51,7 +51,10 @@ Toutes les routes exigent un JWT valide.
 
 ### Filtres de liste
 
-`?q=` cherche dans `prenom`, `nom`, `organisation` et `courriels`.
+`?q=` cherche dans `prenom`, `nom`, `organisation`, `courriels` et `categories`.
+Sur une fiche chiffrée, `organisation` et `courriels` sont vides côté serveur : la recherche
+s'y réduit d'elle-même à `prenom` / `nom` / `categories`, sans erreur. `enc_payload` n'est
+jamais interrogé.
 `?categorie=` filtre sur une valeur de `categories[]`.
 `?favori=1` limite aux favoris.
 `?limit=` (1..500) et `?offset=` paginent ; `total` renvoie le nombre avant pagination.
@@ -79,6 +82,46 @@ Types acceptés : `courriels.type` ∈ `perso|pro|autre` ; `telephones.type` ∈
 Une fiche doit porter au moins un de `prenom`, `nom`, `organisation` — une fiche
 « organisation seule » est valide. Le vide intégral renvoie `422`, en création comme en
 mise à jour.
+
+## Chiffrement de bout en bout
+
+> Directive `20260804_090000_cmem_web_vers_cmem2_API__e2e-taches-contacts`
+
+Le chiffrement est fait **entièrement côté client** (PBKDF2-SHA256 → AES-GCM 256). Aucune clé
+ni passphrase ne transite vers l'API.
+
+Les contacts ne suivent pas le modèle « champs chiffrés en place » des journaux et des tâches :
+`courriels`, `telephones`, `adresses`, `sites` et `reseaux` sont structurés et validés, donc un
+blob base64 n'y entre pas. D'où un champ dédié :
+
+| Champ | Type | Défaut | Rôle |
+| - | - | - | - |
+| `enc_alg` | string, max 32 | `null` | Algorithme, ex. `AES-GCM-256`. `null` = contact en clair |
+| `enc_iv` | string, max 32 | `null` | Vecteur d'initialisation base64 |
+| `enc_payload` | `MEDIUMTEXT`, max 16 000 000 | `null` | Base64 opaque : JSON chiffré des champs sensibles |
+
+Le client y place le JSON chiffré de `organisation`, `fonction`, `courriels`, `telephones`,
+`adresses`, `sites`, `reseaux`, `notes`, `anniversaire`, `motif_relance`, et envoie les colonnes
+structurées correspondantes **vides** (`null` ou `[]`) — ce qui ne déclenche aucun `422`.
+
+Restent **en clair** (décision « C2 », pour garder tri et pagination côté serveur) : `prenom`,
+`nom`, `categories`, `favori`, `photo_file_id`, `partage_scope`, `cree_le`, `maj_le`,
+`date_relance`, `relance_faite_le`.
+
+`enc_payload` est **opaque** : ni `strip_tags`, ni normalisation, ni troncature. Un dépassement
+de la borne renvoie `400` — jamais une troncature silencieuse, qui rendrait la fiche
+définitivement indéchiffrable.
+
+Les trois champs sont acceptés sur `POST`, `PUT` et `PATCH`, et restitués par les `GET`. Envoyer
+`null` explicitement remet la fiche en clair ; omettre les champs les laisse inchangés.
+
+**Import / export.** L'export vCard n'émet que les champs en clair d'une fiche chiffrée (pas de
+base64 dans `EMAIL`, `ORG` ni `NOTE`). À l'import, une fiche existante chiffrée est **ignorée**
+(comptée dans `ignores`) : l'écraser produirait une fiche mi-claire mi-chiffrée, indéchiffrable
+côté client. La sauvegarde complète déchiffrée est fournie par le client (ZIP de compte).
+
+**Rappels push.** Une relance portant sur une fiche chiffrée affiche un libellé générique
+(`DueScanner::genericBody`) — jamais le nom, jamais le blob.
 
 ## vCard 4.0
 

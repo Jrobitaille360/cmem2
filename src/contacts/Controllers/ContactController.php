@@ -81,6 +81,10 @@ class ContactController
             'date_relance'     => $c['date_relance']     ?? null,
             'motif_relance'    => $c['motif_relance']    ?? null,
             'relance_faite_le' => $c['relance_faite_le'] ?? null,
+            // Chiffrement de bout en bout — restitués tels quels, jamais interprétés.
+            'enc_alg'       => $c['enc_alg']     ?? null,
+            'enc_iv'        => $c['enc_iv']      ?? null,
+            'enc_payload'   => $c['enc_payload'] ?? null,
             'cree_le'       => $c['cree_le'],
             'maj_le'        => $c['maj_le'],
         ];
@@ -150,6 +154,15 @@ class ContactController
             }
         }
 
+        // Chiffrement de bout en bout : stockés tels quels — aucun trim, aucun strip_tags,
+        // aucune normalisation. Un octet réécrit rendrait la fiche indéchiffrable.
+        // null explicite = retour au clair ; champ omis = inchangé.
+        foreach (Contact::ENC_FIELDS as $f) {
+            if (array_key_exists($f, $p)) {
+                $fields[$f] = $p[$f] === null ? null : (string) $p[$f];
+            }
+        }
+
         return $fields;
     }
 
@@ -173,6 +186,27 @@ class ContactController
             if ($v !== '' && !self::isValidDateTime($v)) {
                 return 'relance_faite_le invalide (attendu booléen ou AAAA-MM-JJ HH:MM:SS)';
             }
+        }
+
+        return null;
+    }
+
+    /**
+     * Valide les champs de chiffrement. Retourne le message d'erreur à renvoyer en 400,
+     * ou null si tout est acceptable. Un dépassement de borne est refusé explicitement :
+     * jamais de troncature silencieuse, qui rendrait la fiche indéchiffrable.
+     */
+    private function validateEnc(array $p): ?string
+    {
+        foreach (['enc_alg', 'enc_iv'] as $f) {
+            if (array_key_exists($f, $p) && $p[$f] !== null && strlen((string) $p[$f]) > 32) {
+                return "{$f} dépasse 32 caractères";
+            }
+        }
+
+        if (array_key_exists('enc_payload', $p) && $p['enc_payload'] !== null
+            && strlen((string) $p['enc_payload']) > Contact::ENC_PAYLOAD_MAX) {
+            return 'enc_payload dépasse ' . Contact::ENC_PAYLOAD_MAX . ' caractères';
         }
 
         return null;
@@ -282,6 +316,12 @@ class ContactController
             return;
         }
 
+        if ($err = $this->validateEnc($p)) {
+            LoggingMiddleware::logExit(400);
+            Response::error($err, null, 400);
+            return;
+        }
+
         $fields = $this->extractFields($p, true);
 
         if ($fields['prenom'] === '' && $fields['nom'] === '' && empty($fields['organisation'])) {
@@ -312,6 +352,12 @@ class ContactController
         if ($err = $this->validateRelance($p)) {
             LoggingMiddleware::logExit(422);
             Response::error($err, null, 422);
+            return;
+        }
+
+        if ($err = $this->validateEnc($p)) {
+            LoggingMiddleware::logExit(400);
+            Response::error($err, null, 400);
             return;
         }
 
@@ -666,6 +712,13 @@ class ContactController
             }
 
             if ($existant) {
+                // Fiche chiffrée : l'import n'a aucun moyen de fusionner avec le corps opaque.
+                // L'écraser produirait une fiche mi-claire mi-chiffrée, indéchiffrable côté
+                // client. On la laisse intacte (directive 20260804 §3).
+                if (!empty($existant['enc_alg'])) {
+                    $ignores++;
+                    continue;
+                }
                 $this->model->updateContact((int) $existant['id'], $entree);
                 $maj++;
                 continue;

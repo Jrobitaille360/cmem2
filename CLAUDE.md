@@ -21,6 +21,7 @@ php private/tests/test_account_deletion.php
 php private/tests/test_auth_otp.php
 php private/tests/test_calendars.php
 php private/tests/test_contacts.php
+php private/tests/test_contacts_e2e.php
 php private/tests/test_contacts_messages.php
 php private/tests/test_contacts_interactions.php
 php private/tests/test_contacts_opportunites.php
@@ -39,6 +40,7 @@ php private/tests/test_ics_occurrences_end_date_bound.php
 php private/tests/test_ics_occurrences_exceptions_by_date.php
 php private/tests/test_ics_occurrences_expand.php
 php private/tests/test_ics_tags.php
+php private/tests/test_ics_todos_e2e.php
 php private/tests/test_items.php
 php private/tests/test_kestyon_tags.php
 php private/tests/test_kestyon_upload.php

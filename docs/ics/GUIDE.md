@@ -315,19 +315,45 @@ PUT    /calendars/12/events/45/occurrences?occurrence_date=2026-08-18
 | POST | `/calendars/{id}/todos` | Créer une tâche |
 | GET | `/calendars/{id}/todos` | Lister |
 | GET | `/calendars/{id}/todos/{todoId}` | Détails |
-| PUT | `/calendars/{id}/todos/{todoId}` | Modifier |
+| PUT \| PATCH | `/calendars/{id}/todos/{todoId}` | Modifier (les deux verbes sont équivalents : seuls les champs envoyés sont modifiés) |
 | DELETE | `/calendars/{id}/todos/{todoId}` | Supprimer (soft) |
 
 ### Champs principaux
 
 | Champ | Type | Description |
 | --- | --- | --- |
-| `title` | string (requis) | SUMMARY |
+| `title` | string (requis, max 2 000) | SUMMARY |
+| `description` | string (max 16 000 000) | DESCRIPTION |
 | `due` | date \| datetime | Échéance DUE |
 | `status` | string | `NEEDS-ACTION` \| `IN-PROCESS` \| `COMPLETED` \| `CANCELLED` |
 | `percent_complete` | integer 0–100 | Avancement |
 | `priority` | integer 0–9 | Priorité |
 | `recurrence_rule` | string | RRULE valide |
+| `enc_alg` | string, max 32 | Algorithme de chiffrement client. `null` = tâche en clair |
+| `enc_iv` | string, max 32 | Vecteur d'initialisation base64 |
+
+### Chiffrement de bout en bout des tâches
+
+> Directive `20260804_090000_cmem_web_vers_cmem2_API__e2e-taches-contacts`
+
+Même modèle que les journaux : chiffrement intégral côté client (PBKDF2-SHA256 → AES-GCM 256),
+serveur dépositaire d'octets opaques. Quand `enc_alg` est renseigné, seuls **`title` et
+`description`** sont chiffrés ; le serveur ne leur applique **aucune** transformation.
+
+Restent en clair, et doivent le rester : `due`, `dtstart`, `status`, `priority`,
+`percent_complete`, `categories`, `recurrence_rule`, `calendar_id`, `uid`. Le Gantt, le Kanban,
+les rappels push et les échéances s'appuient dessus.
+
+`enc_alg` / `enc_iv` sont acceptés sur `POST`, `PUT` et `PATCH`, et restitués par tous les `GET`
+(détail, liste, corbeille). Envoyer `null` explicitement remet la tâche en clair ; omettre les
+champs les laisse inchangés.
+
+Les rappels push d'une tâche chiffrée affichent un libellé générique
+(`DueScanner::genericBody`) — jamais le titre, jamais le blob.
+
+L'export `.ics` restitue la valeur stockée telle quelle : pour une tâche chiffrée, `SUMMARY`
+contient donc le base64. L'échappement RFC 5545 et le pliage à 75 octets sont réversibles, le
+blob se reconstitue à l'octet près après dépliage.
 
 ---
 

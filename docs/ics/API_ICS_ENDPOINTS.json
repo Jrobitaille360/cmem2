@@ -429,6 +429,15 @@
       "description": "Tâches CalDAV VTODO (RFC 5545 §3.6.2) — Phase 5.1",
       "base_path": "/calendars/{id}/todos",
       "auth_required": true,
+      "chiffrement_e2e": {
+        "principe": "Le chiffrement est fait entièrement côté client (WebCrypto : PBKDF2-SHA256 pour la dérivation, AES-GCM 256 pour le contenu). Le serveur stocke et restitue des octets opaques. Aucune clé, aucune passphrase, aucun code de secours ne doit transiter vers l'API.",
+        "enc_alg": "string ou null (optional, max 32) - Algorithme, ex. AES-GCM-256. null = tâche en clair",
+        "enc_iv": "string ou null (optional, max 32) - Vecteur d'initialisation base64 (12 octets → 16 caractères). null = tâche en clair",
+        "regle_de_non_transformation": "Quand enc_alg est renseigné, title et description contiennent du base64 opaque. Le serveur n'applique aucune transformation : ni strip_tags, ni htmlspecialchars, ni purificateur HTML, ni normalisation d'espaces. Un seul octet modifié rend la tâche définitivement indéchiffrable (AES-GCM échoue à l'authentification, aucune récupération partielle possible).",
+        "longueurs": "title jusqu'à 2 000 caractères, description jusqu'à 16 000 000 caractères (le base64 gonfle d'environ 4/3). Encodage utf8mb4 : l'alphabet base64 (A-Za-z0-9+/=) traverse intact.",
+        "metadonnees_en_clair": "due, dtstart, status, priority, percent_complete, categories, recurrence_rule, calendar_id, uid restent en clair et exploitables par l'API (Gantt, Kanban, rappels push, échéances).",
+        "interdits_serveur": "Aucun endpoint ne déchiffre, n'indexe ni ne résume une tâche dont enc_alg est renseigné (recherche, export, IA, notifications, courriels). Un rappel push portant sur une tâche chiffrée affiche un libellé générique — jamais le titre, jamais le blob."
+      },
       "routes": [
         {
           "method": "POST",
@@ -436,8 +445,10 @@
           "description": "Créer une tâche VTODO dans un calendrier",
           "params": { "id": "integer (required)" },
           "body": {
-            "title": "string (required) - Titre de la tâche (SUMMARY)",
-            "description": "string (optional)",
+            "title": "string (required, max 2000) - Titre de la tâche (SUMMARY), ou base64 opaque si enc_alg est renseigné",
+            "description": "string (optional, max 16000000) - Contenu, ou base64 opaque si enc_alg est renseigné",
+            "enc_alg": "string (optional, max 32) - Chiffrement E2E, ex. AES-GCM-256 ; voir chiffrement_e2e",
+            "enc_iv": "string (optional, max 32) - Vecteur d'initialisation base64 ; voir chiffrement_e2e",
             "due": "date ou datetime (optional) - Échéance DUE",
             "dtstart": "date ou datetime (optional) - DTSTART",
             "status": "string (optional) - NEEDS-ACTION | IN-PROCESS | COMPLETED | CANCELLED (défaut: NEEDS-ACTION)",
@@ -471,13 +482,15 @@
           "errors": { "404": "Tâche non trouvée" }
         },
         {
-          "method": "PUT",
+          "method": "PUT | PATCH",
           "path": "/calendars/{id}/todos/{todoId}",
-          "description": "Mettre à jour une tâche",
+          "description": "Mettre à jour une tâche. PUT et PATCH sont équivalents : dans les deux cas seuls les champs présents dans le corps sont modifiés.",
           "params": { "id": "integer (required)", "todoId": "integer (required)" },
           "body": {
-            "title": "string (optional)",
-            "description": "string (optional)",
+            "title": "string (optional, max 2000)",
+            "description": "string (optional, max 16000000)",
+            "enc_alg": "string ou null (optional, max 32) - null remet la tâche en clair ; omettre le champ le laisse inchangé ; voir chiffrement_e2e",
+            "enc_iv": "string ou null (optional, max 32) - null remet la tâche en clair ; omettre le champ le laisse inchangé ; voir chiffrement_e2e",
             "due": "date ou datetime (optional)",
             "status": "string (optional)",
             "priority": "integer (optional)",

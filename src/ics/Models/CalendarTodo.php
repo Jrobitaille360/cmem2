@@ -22,6 +22,10 @@ class CalendarTodo extends BaseModel
     public $uid;
     public $title;
     public $description;
+    /** Algorithme de chiffrement client (ex. AES-GCM-256) ; NULL = tâche en clair */
+    public $encAlg;
+    /** Vecteur d'initialisation base64 ; NULL = tâche en clair */
+    public $encIv;
     public $due;
     public $dtstart;
     public $completed;
@@ -39,6 +43,8 @@ class CalendarTodo extends BaseModel
     public $sequence;
     public $timezone;
     public $isAllDay;
+    public $clearEncAlg = false;    // true = remise à NULL explicite (retour au clair)
+    public $clearEncIv  = false;    // true = remise à NULL explicite (retour au clair)
 
     public function __construct()
     {
@@ -70,10 +76,10 @@ class CalendarTodo extends BaseModel
 
         $stmt = $this->getDb()->prepare("
             INSERT INTO calendar_todos
-                (calendar_id, user_id, uid, title, description, due, dtstart, completed,
+                (calendar_id, user_id, uid, title, description, enc_alg, enc_iv, due, dtstart, completed,
                  status, priority, percent_complete, location, categories, url,
                  related_to, recurrence_rule, organizer_email, organizer_name, attendees, sequence, timezone, is_all_day)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ");
 
         $stmt->execute([
@@ -82,6 +88,8 @@ class CalendarTodo extends BaseModel
             $this->uid,
             $this->title,
             $this->description ?? null,
+            $this->encAlg ?? null,
+            $this->encIv ?? null,
             $this->due ?? null,
             $this->dtstart ?? null,
             $this->completed ?? null,
@@ -143,6 +151,21 @@ class CalendarTodo extends BaseModel
         if (isset($this->attendees)) {
             $fields[] = 'attendees = ?';
             $params[] = json_encode($this->attendees);
+        }
+
+        // Chiffrement E2E : remise à NULL explicite = retour au clair.
+        if ($this->clearEncAlg) {
+            $fields[] = 'enc_alg = NULL';
+        } elseif (isset($this->encAlg)) {
+            $fields[] = 'enc_alg = ?';
+            $params[] = $this->encAlg;
+        }
+
+        if ($this->clearEncIv) {
+            $fields[] = 'enc_iv = NULL';
+        } elseif (isset($this->encIv)) {
+            $fields[] = 'enc_iv = ?';
+            $params[] = $this->encIv;
         }
 
         if (empty($fields)) {

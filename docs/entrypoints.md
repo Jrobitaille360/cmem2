@@ -60,6 +60,14 @@ indexer ou résumer un contenu marqué comme chiffré.
 | Entité | Champs marqueurs | Champs opaques | Référence |
 | - | - | - | - |
 | Journaux (VJOURNAL) | `enc_alg`, `enc_iv` | `summary`, `description` | [ics/GUIDE.md](ics/GUIDE.md#chiffrement-de-bout-en-bout) |
+| Tâches (VTODO) | `enc_alg`, `enc_iv` | `title`, `description` | [ics/GUIDE.md](ics/GUIDE.md#chiffrement-de-bout-en-bout-des-tâches) |
+| Contacts | `enc_alg`, `enc_iv` | `enc_payload` | [contacts/GUIDE.md](contacts/GUIDE.md#chiffrement-de-bout-en-bout) |
 
 `enc_alg` et `enc_iv` valent `null` pour un contenu en clair, et sont acceptés en écriture
 (`POST`, `PUT`, `PATCH`) comme restitués en lecture (`GET`) au même titre que les autres champs.
+
+Les contacts font exception au modèle « champs chiffrés en place » : leurs données sensibles
+sont structurées et validées (courriels, téléphones, adresses), donc un blob base64 n'y entre
+pas. Le client place le JSON chiffré de ces champs dans `enc_payload` (`MEDIUMTEXT`, borne
+16 000 000 caractères, dépassement → `400`) et laisse `prenom` / `nom` / `categories` en clair
+pour préserver le tri, la pagination et la recherche serveur.

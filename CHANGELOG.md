@@ -9,6 +9,25 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+### Tâches et contacts — chiffrement de bout en bout
+
+> Directive `20260804_090000_cmem_web_vers_cmem2_API__e2e-taches-contacts`
+
+Troisième et dernier volet du chiffrement v1, après les journaux et les métadonnées de clé. Le modèle est inchangé : chiffrement intégral côté client (PBKDF2-SHA256 → AES-GCM 256), une seule clé maîtresse, aucune clé ni passphrase transmise à l'API.
+
+- **Tâches (VTODO) — mêmes champs que les journaux** : `enc_alg` et `enc_iv` sont acceptés par `POST /calendars/{id}/todos` et `PUT|PATCH /calendars/{id}/todos/{todoId}`, et restitués par tous les `GET` (détail, liste, corbeille). Quand `enc_alg` est renseigné, seuls `title` et `description` sont chiffrés ; envoyer `null` explicitement remet la tâche en clair, omettre les champs les laisse inchangés
+- **`PATCH` accepté sur une tâche**, à parité avec `PUT` — dans les deux cas seuls les champs présents dans le corps sont modifiés
+- **Longueurs relevées** : le base64 gonfle le contenu d'environ 4/3, donc `calendar_todos.title` passe de `VARCHAR(255)` à `VARCHAR(2000)` et `description` de `TEXT` (65 535 octets, insuffisant) à `MEDIUMTEXT`. Élargissements seuls, aucune troncature, aucun impact sur les tâches existantes
+- **Métadonnées de tâche restées en clair** : `due`, `dtstart`, `status`, `priority`, `percent_complete`, `categories`, `recurrence_rule`, `calendar_id`, `uid`. Le Gantt, le Kanban, les rappels push et les échéances s'appuient dessus ; les chiffrer casserait ces écrans sans gain proportionné
+- **Contacts — une charge utile chiffrée, le nom en clair** : trois champs sur `contacts`, `enc_alg`, `enc_iv` et `enc_payload` (`MEDIUMTEXT`). Les données sensibles d'un contact ne tiennent pas dans deux champs texte : `courriels`, `telephones`, `adresses`, `sites` et `reseaux` sont des colonnes structurées et validées, où un blob base64 ferait échouer la validation. Le client chiffre donc un JSON unique — `organisation`, `fonction`, `courriels`, `telephones`, `adresses`, `sites`, `reseaux`, `notes`, `anniversaire`, `motif_relance` — dans `enc_payload`, et envoie les colonnes structurées vides
+- **Une fiche chiffrée se crée sans `422`** : `courriels`, `telephones` et `adresses` vides sont acceptés tels quels. La règle « au moins un de `prenom` / `nom` / `organisation` » reste satisfaite par `prenom` / `nom`, qui restent en clair
+- **Champs de contact restés en clair** (décision « C2 ») : `prenom`, `nom`, `categories`, `favori`, `photo_file_id`, `partage_scope`, `cree_le`, `maj_le`, `date_relance`, `relance_faite_le`. Chiffrer le nom obligerait à télécharger toute la liste pour la trier ; `date_relance` alimente le rappel push calculé côté serveur
+- **`enc_payload` est opaque** : ni `strip_tags`, ni normalisation, ni troncature. Borne à 16 000 000 caractères — un dépassement renvoie `400` sans rien écrire, jamais une troncature silencieuse, qui rendrait la fiche définitivement indéchiffrable
+- **Recherche** : `GET /contacts?q=` cherche désormais aussi dans `categories`. Sur une fiche chiffrée, `organisation` et `courriels` sont vides côté serveur, donc la recherche s'y réduit d'elle-même à `prenom` / `nom` / `categories`, sans erreur ; `enc_payload` n'est jamais interrogé. Chercher un contact chiffré par son courriel ne renvoie rien — c'est le comportement attendu, le complément est fait côté client
+- **Import / export** : l'export vCard n'émet que les champs en clair d'une fiche chiffrée, jamais de base64 dans `EMAIL`, `ORG` ou `NOTE`. À l'import, une fiche existante chiffrée est ignorée (comptée dans `ignores`) plutôt qu'écrasée : la fusionner produirait une fiche mi-claire mi-chiffrée, indéchiffrable côté client
+- **Rappels push inchangés** : ils utilisaient déjà un libellé générique (`DueScanner::genericBody`) — jamais le titre d'une tâche ni le nom d'un contact, donc jamais un blob
+- Migration `docs/20260804_e2e_taches_contacts.sql`. Nouveaux tests `private/tests/test_ics_todos_e2e.php` (59 assertions) et `private/tests/test_contacts_e2e.php` (56 assertions) : round-trip octet pour octet vérifié par `strcmp` et `md5` sur des blobs base64 de 200 000 caractères, borne de `enc_payload`, recherche, export vCard et non-régression des fiches en clair
+
 ### Chiffrement de bout en bout — métadonnées de clé (`/users/me/e2e-key`)
 
 > Directive `20260803_205805_cmem_web_vers_cmem2_API__e2e-metadonnees-de-cle`

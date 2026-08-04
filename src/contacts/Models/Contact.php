@@ -21,10 +21,20 @@ class Contact extends BaseModel
     /** Champs JSON répétables — toujours stockés comme tableaux (jamais NULL). */
     public const JSON_FIELDS = ['courriels', 'telephones', 'adresses', 'sites', 'reseaux', 'categories'];
 
+    /**
+     * Champs du chiffrement de bout en bout (directive 20260804_090000).
+     * enc_payload est opaque : ni normalisé, ni tronqué, ni lu par le serveur.
+     */
+    public const ENC_FIELDS = ['enc_alg', 'enc_iv', 'enc_payload'];
+
+    /** Borne de enc_payload — au-delà, 400 explicite plutôt qu'une troncature MEDIUMTEXT. */
+    public const ENC_PAYLOAD_MAX = 16000000;
+
     /** Champs scalaires acceptés en création/mise à jour. */
     public const SCALAR_FIELDS = ['prenom', 'nom', 'organisation', 'fonction', 'notes',
                                   'anniversaire', 'photo_file_id', 'favori', 'partage_scope',
-                                  'date_relance', 'motif_relance', 'relance_faite_le'];
+                                  'date_relance', 'motif_relance', 'relance_faite_le',
+                                  'enc_alg', 'enc_iv', 'enc_payload'];
 
     /** Requis par BaseModel — création via createContact(). */
     public function create()
@@ -76,9 +86,12 @@ class Contact extends BaseModel
 
         if (!empty($filters['q'])) {
             // Le courriel vit dans une colonne JSON → recherche sur la représentation texte.
-            $where .= " AND (prenom LIKE ? OR nom LIKE ? OR organisation LIKE ? OR courriels LIKE ?)";
+            // Fiche chiffrée : organisation et courriels sont vides côté serveur, la recherche
+            // se réduit donc d'elle-même à prenom / nom / categories (directive 20260804 §2.3).
+            // enc_payload n'est jamais interrogé : le corps chiffré n'est pas indexable.
+            $where .= " AND (prenom LIKE ? OR nom LIKE ? OR organisation LIKE ? OR courriels LIKE ? OR categories LIKE ?)";
             $like   = '%' . $filters['q'] . '%';
-            array_push($params, $like, $like, $like, $like);
+            array_push($params, $like, $like, $like, $like, $like);
         }
 
         if (!empty($filters['categorie'])) {
