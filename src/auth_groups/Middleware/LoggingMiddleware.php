@@ -10,7 +10,32 @@ use AuthGroups\Services\LogService;
 class LoggingMiddleware
 {
     private static ?float $startTime = null;
-    
+
+    /**
+     * Routes dont le corps ne doit jamais être journalisé, même masqué.
+     *
+     * /users/me/e2e-key transporte la clé maîtresse enveloppée : les blobs sont
+     * inertes sans la passphrase, mais les accumuler dans les journaux serveur
+     * n'a aucun intérêt et élargit la surface d'exposition.
+     * (Directive 20260803_205805 — e2e-metadonnees-de-cle, §5.)
+     */
+    private const UNLOGGED_BODY_PATHS = [
+        'e2e-key',
+    ];
+
+    /**
+     * Le corps de cette requête doit-il rester hors des journaux ?
+     */
+    private static function bodyIsUnlogged(string $endpoint): bool
+    {
+        foreach (self::UNLOGGED_BODY_PATHS as $needle) {
+            if (strpos($endpoint, $needle) !== false) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * Log l'entrée d'une requête API
      */
@@ -53,7 +78,9 @@ class LoggingMiddleware
         }
         
         // Body data (pour POST, PUT, PATCH)
-        if (in_array($method, ['POST', 'PUT', 'PATCH'])) {
+        if (in_array($method, ['POST', 'PUT', 'PATCH']) && self::bodyIsUnlogged($endpoint)) {
+            $data['body'] = '[NOT_LOGGED]';
+        } elseif (in_array($method, ['POST', 'PUT', 'PATCH'])) {
             $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
             
             if (strpos($contentType, 'application/json') !== false) {

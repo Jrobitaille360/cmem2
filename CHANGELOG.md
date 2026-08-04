@@ -9,6 +9,20 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+### Chiffrement de bout en bout — métadonnées de clé (`/users/me/e2e-key`)
+
+> Directive `20260803_205805_cmem_web_vers_cmem2_API__e2e-metadonnees-de-cle`
+
+- **Trois nouveaux endpoints** : `GET`, `PUT` et `DELETE /users/me/e2e-key`, authentifiés par le JWT existant et de portée owner-strict — un usager ne lit et n'écrit que sa propre ligne, jamais celle d'un autre, même administrateur. Aucune route par id n'existe. `app_id` est toujours transmis par le client (paramètre de requête sur `GET`/`DELETE`, corps sur `PUT`) : aucun défaut serveur
+- **Ce que le serveur stocke** : le sel PBKDF2 (public par conception), le nombre d'itérations, la clé maîtresse enveloppée deux fois — une fois par la clé dérivée de la passphrase, une fois par celle dérivée du code de secours — et un vérificateur chiffré. La passphrase, le code de secours et la clé maîtresse en clair ne transitent jamais : le serveur héberge le coffre sans pouvoir l'ouvrir. Sans ces métadonnées, le multi-appareils, le code de secours et le changement de passphrase sont impossibles
+- **`GET` renvoie `404` quand aucune ligne n'existe** : c'est l'état normal « chiffrement jamais activé », pas une anomalie. Le client s'en sert pour proposer l'activation
+- **`PUT` crée (`201`) ou remplace (`200`)** — activation, changement de passphrase, régénération du code de secours. Unicité `(owner_id, app_id)` : le remplacement conserve l'id d'origine. `wrapped_key_recovery` est optionnel (`null` si l'usager a refusé le code de secours)
+- **Aucune transformation des blobs** : ni `strip_tags`, ni normalisation, ni troncature — un octet modifié rendrait la clé maîtresse irrécupérable, donc tous les journaux chiffrés de l'usager illisibles, définitivement. Bornes : `wrapped_*` et `verifier` ≤ 4 096 caractères, `kdf_salt` ≤ 64, `kdf` ≤ 32, `kdf_iterations` entier strictement positif. Un dépassement renvoie `400` sans rien écrire, jamais une erreur SQL ni une troncature silencieuse
+- **`DELETE` est la seule opération réellement dangereuse** : elle ne supprime aucun journal, mais rend illisibles tous ceux qui sont chiffrés. Aucune autre opération serveur ne touche cette ligne — ni désabonnement, ni changement de plan, ni révocation d'appareil, ni maintenance. Seule la purge définitive de compte l'emporte, via la clé étrangère `ON DELETE CASCADE`
+- **Le corps des requêtes `PUT /users/me/e2e-key` n'est jamais journalisé** (`"body": "[NOT_LOGGED]"`) : les blobs sont inertes, mais les accumuler dans les journaux serveur élargit la surface sans contrepartie
+- **Correctif de routage** : `DELETE /users/me/e2e-key` retombait sur la branche `DELETE /users/me` du routeur, qui ne regarde pas le troisième segment — l'appel supprimait le compte. Les branches `e2e-key` passent désormais avant celles de `/users/me`
+- Migration `docs/20260803_user_e2e_keys.sql` (table `user_e2e_keys`, unicité `(owner_id, app_id)`). Nouveau test `private/tests/test_user_e2e_key.php` (60 assertions) : round-trip octet pour octet sur un blob de 4 000 caractères vérifié par `strcmp` et `md5`, bornes, portée owner-strict, absence du corps dans les journaux
+
 ### Journaux — chiffrement de bout en bout (`enc_alg` / `enc_iv`)
 
 > Directive `20260803_165946_cmem_web_vers_cmem2_API__e2e-journaux-champs-chiffres`

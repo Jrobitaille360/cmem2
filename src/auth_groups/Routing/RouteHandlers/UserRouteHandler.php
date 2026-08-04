@@ -6,6 +6,7 @@ use AuthGroups\Routing\BaseRouteHandler;
 use AuthGroups\Controllers\UserController;
 use AuthGroups\Controllers\UserSessionController;
 use AuthGroups\Controllers\PlanController;
+use AuthGroups\Controllers\UserE2eKeyController;
 use AuthGroups\Utils\Response;
 
 class UserRouteHandler extends BaseRouteHandler
@@ -14,12 +15,21 @@ class UserRouteHandler extends BaseRouteHandler
     private UserSessionController $sessionController;
     private PlanController $planController;
     private ?object $notificationController = null;
+    private ?UserE2eKeyController $e2eKeyController = null;
 
     public function __construct($authService) {
         parent::__construct($authService);
         $this->controller = new UserController();
         $this->sessionController = new UserSessionController();
         $this->planController = new PlanController();
+    }
+
+    private function getE2eKeyController(): UserE2eKeyController
+    {
+        if ($this->e2eKeyController === null) {
+            $this->e2eKeyController = new UserE2eKeyController();
+        }
+        return $this->e2eKeyController;
     }
 
     private function getNotificationController(): ?object
@@ -79,6 +89,21 @@ class UserRouteHandler extends BaseRouteHandler
             // GET /users
             ($action === '' && $method === 'GET') =>
                 $this->controller->getAll($user['role']),
+
+            // GET /users/me/e2e-key?app_id=xxx
+            // Ces trois branches doivent rester AVANT celles de /users/me : ces
+            // dernières ne regardent pas segments[2] et captureraient la route
+            // (un DELETE /users/me/e2e-key supprimerait alors le compte).
+            ($action === 'me' && isset($segments[2]) && $segments[2] === 'e2e-key' && $method === 'GET') =>
+                $this->getE2eKeyController()->get((int) $user['user_id']),
+
+            // PUT /users/me/e2e-key
+            ($action === 'me' && isset($segments[2]) && $segments[2] === 'e2e-key' && $method === 'PUT') =>
+                $this->getE2eKeyController()->put((int) $user['user_id']),
+
+            // DELETE /users/me/e2e-key?app_id=xxx
+            ($action === 'me' && isset($segments[2]) && $segments[2] === 'e2e-key' && $method === 'DELETE') =>
+                $this->getE2eKeyController()->delete((int) $user['user_id']),
 
             // GET /users/me
             ($action === 'me' && $method === 'GET') =>

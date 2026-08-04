@@ -34,6 +34,7 @@ php private/tests/test_groups.php
 php private/tests/test_ics_email_notifications.php
 php private/tests/test_ics_freebusy_recurrence.php
 php private/tests/test_ics_generator_uid_dtstamp.php
+php private/tests/test_ics_journals_e2e.php
 php private/tests/test_ics_occurrences_end_date_bound.php
 php private/tests/test_ics_occurrences_exceptions_by_date.php
 php private/tests/test_ics_occurrences_expand.php
@@ -69,6 +70,7 @@ php private/tests/test_tags.php
 php private/tests/test_traque.php
 php private/tests/test_traque_rest.php
 php private/tests/test_users.php
+php private/tests/test_user_e2e_key.php
 php private/tests/test_user_timezone.php
 ```
 

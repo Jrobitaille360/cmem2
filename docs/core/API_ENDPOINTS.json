@@ -779,6 +779,62 @@
           "errors": {
             "503": "Plugin de notifications non disponible"
           }
+        },
+        {
+          "method": "GET",
+          "path": "/users/me/e2e-key",
+          "description": "Métadonnées de clé du chiffrement de bout en bout. Portée owner-strict : la ligne renvoyée est toujours celle du JWT, jamais celle d'un autre usager, même pour un administrateur.",
+          "params": {
+            "app_id": "string (required) - application cliente, ex. cmemweb. Aucun défaut serveur"
+          },
+          "response": "{ id, app_id, kdf, kdf_salt, kdf_iterations, wrapped_key_passphrase, wrapped_key_recovery, verifier, created_at, updated_at }",
+          "notes": [
+            "404 = état normal « chiffrement jamais activé ». Le client s'en sert pour proposer l'activation",
+            "Le serveur ne peut rien déchiffrer : ni la passphrase, ni le code de secours, ni la clé maîtresse en clair ne transitent"
+          ],
+          "errors": {
+            "400": "app_id absent ou trop long",
+            "404": "Chiffrement de bout en bout non activé pour cet app_id"
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/users/me/e2e-key",
+          "description": "Créer (201) ou remplacer (200) les métadonnées de clé : activation, changement de passphrase, régénération du code de secours. Une seule ligne par (owner_id, app_id).",
+          "body": {
+            "app_id": "string (required) - ex. cmemweb, max 50 caractères",
+            "kdf": "string (required) - fonction de dérivation, ex. PBKDF2-SHA256, max 32 caractères",
+            "kdf_salt": "string (required) - sel base64, max 64 caractères",
+            "kdf_iterations": "integer (required) - entier strictement positif, ex. 310000",
+            "wrapped_key_passphrase": "string (required) - clé maîtresse enveloppée par la passphrase, base64, max 4096 caractères",
+            "wrapped_key_recovery": "string|null (optional) - idem par le code de secours ; null si l'usager a refusé",
+            "verifier": "string (required) - blob chiffré court, base64, max 4096 caractères"
+          },
+          "response": "La ligne enregistrée, blobs restitués octet pour octet",
+          "notes": [
+            "Aucune transformation des blobs : ni strip_tags, ni normalisation, ni troncature. Un octet modifié rend la clé maîtresse irrécupérable",
+            "Le corps de cette requête n'est jamais journalisé côté serveur"
+          ],
+          "errors": {
+            "400": "Champ manquant, type invalide ou borne dépassée — aucune écriture n'a lieu"
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/users/me/e2e-key",
+          "description": "Supprimer les métadonnées de clé. Opération destructrice : aucun journal n'est supprimé, mais tous ceux qui sont chiffrés deviennent définitivement illisibles.",
+          "params": {
+            "app_id": "string (required)"
+          },
+          "response": "{ deleted: true }",
+          "notes": [
+            "Aucune autre opération serveur ne supprime cette ligne : ni désabonnement, ni changement de plan, ni révocation d'appareil, ni maintenance",
+            "Seule la purge définitive de compte l'emporte, via la clé étrangère ON DELETE CASCADE"
+          ],
+          "errors": {
+            "400": "app_id absent",
+            "404": "Aucune ligne pour cet app_id"
+          }
         }
       ]
     },
