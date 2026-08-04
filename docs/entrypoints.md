@@ -47,3 +47,19 @@ Chaque guide complète le JSON avec les flux d'intégration, exemples et codes d
 - Routes legacy actives : section `deprecated_routes` avec `replaced_by`.
 - Routes supprimées (404/410) : section `removed_routes`.
 - Les routes `secret-admin` ne sont volontairement pas documentées.
+
+## Contenus chiffrés de bout en bout
+
+Certains contenus sont chiffrés côté client et stockés par l'API comme des octets opaques.
+Le serveur ne détient aucune clé et n'applique **aucune transformation** sur ces champs :
+ni `strip_tags`, ni `htmlspecialchars`, ni purificateur HTML, ni normalisation d'espaces.
+Un seul octet modifié rend le contenu définitivement indéchiffrable (AES-GCM échoue à
+l'authentification, aucune récupération partielle). Aucun endpoint ne doit déchiffrer,
+indexer ou résumer un contenu marqué comme chiffré.
+
+| Entité | Champs marqueurs | Champs opaques | Référence |
+| - | - | - | - |
+| Journaux (VJOURNAL) | `enc_alg`, `enc_iv` | `summary`, `description` | [ics/GUIDE.md](ics/GUIDE.md#chiffrement-de-bout-en-bout) |
+
+`enc_alg` et `enc_iv` valent `null` pour un contenu en clair, et sont acceptés en écriture
+(`POST`, `PUT`, `PATCH`) comme restitués en lecture (`GET`) au même titre que les autres champs.

@@ -17,6 +17,15 @@ use Stripe\Services\EntitlementService;
  */
 class JournalController
 {
+    /**
+     * Longueurs maximales — chiffrement E2E (directive 20260803_165946).
+     * Le base64 gonfle le contenu d'environ 4/3 : les bornes du clair seraient
+     * trop courtes pour un corps chiffré. Elles bornent l'entrée pour renvoyer
+     * un 400 explicite plutôt qu'une erreur SQL sur VARCHAR(2000) / MEDIUMTEXT.
+     */
+    private const SUMMARY_MAX     = 2000;
+    private const DESCRIPTION_MAX = 16000000;
+
     private Calendar $calModel;
     private CalendarJournal $journalModel;
 
@@ -35,8 +44,10 @@ class JournalController
         $input = Response::getRequestParams();
 
         $validation = Validator::validate($input, [
-            'summary'     => 'required|string|max:255',
-            'description' => 'optional|string',
+            'summary'     => 'required|string|max:' . self::SUMMARY_MAX,
+            'description' => 'optional|string|max:' . self::DESCRIPTION_MAX,
+            'enc_alg'     => 'optional|string|max:32',
+            'enc_iv'      => 'optional|string|max:32',
             'dtstart'     => 'optional|date_or_datetime',
             'status'      => 'optional|string|in:DRAFT,FINAL,CANCELLED',
             'categories'  => 'optional|array',
@@ -74,6 +85,9 @@ class JournalController
             $journal->userId      = $userId;
             $journal->summary     = $input['summary'];
             $journal->description = $input['description'] ?? null;
+            // Chiffrement E2E : stockés tels quels, jamais interprétés côté serveur.
+            $journal->encAlg      = $input['enc_alg'] ?? null;
+            $journal->encIv       = $input['enc_iv'] ?? null;
             $journal->dtstart     = isset($input['dtstart'])
                 ? date('Y-m-d H:i:s', strtotime($input['dtstart'])) : null;
             $journal->status      = $input['status'] ?? 'DRAFT';
@@ -151,8 +165,10 @@ class JournalController
         $input = Response::getRequestParams();
 
         $validation = Validator::validate($input, [
-            'summary'     => 'optional|string|max:255',
-            'description' => 'optional|string',
+            'summary'     => 'optional|string|max:' . self::SUMMARY_MAX,
+            'description' => 'optional|string|max:' . self::DESCRIPTION_MAX,
+            'enc_alg'     => 'optional|string|max:32',
+            'enc_iv'      => 'optional|string|max:32',
             'dtstart'     => 'optional|date_or_datetime',
             'status'      => 'optional|string|in:DRAFT,FINAL,CANCELLED',
             'categories'  => 'optional|array',
@@ -187,6 +203,21 @@ class JournalController
             }
             if (isset($input['categories'])) {
                 $journal->categories = $input['categories'];
+            }
+            // Chiffrement E2E : null explicite = retour au clair.
+            if (array_key_exists('enc_alg', $input)) {
+                if ($input['enc_alg'] === null) {
+                    $journal->clearEncAlg = true;
+                } else {
+                    $journal->encAlg = $input['enc_alg'];
+                }
+            }
+            if (array_key_exists('enc_iv', $input)) {
+                if ($input['enc_iv'] === null) {
+                    $journal->clearEncIv = true;
+                } else {
+                    $journal->encIv = $input['enc_iv'];
+                }
             }
             if (array_key_exists('related_to', $input)) {
                 if ($input['related_to'] === null) {

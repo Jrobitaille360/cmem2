@@ -9,6 +9,17 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+### Journaux — chiffrement de bout en bout (`enc_alg` / `enc_iv`)
+
+> Directive `20260803_165946_cmem_web_vers_cmem2_API__e2e-journaux-champs-chiffres`
+
+- **Deux nouveaux champs sur les journaux VJOURNAL** : `enc_alg` (algorithme, ex. `AES-GCM-256`) et `enc_iv` (vecteur d'initialisation base64). Acceptés par `POST /calendars/{id}/journals` et `PUT|PATCH /calendars/{id}/journals/{journalId}`, restitués par tous les `GET` (détail, liste, corbeille). `null` sur les deux = journal en clair, seul état existant jusqu'ici. Sur une mise à jour, envoyer `null` explicitement remet le journal en clair
+- **Le chiffrement est fait entièrement côté client** (WebCrypto : PBKDF2-SHA256 pour la dérivation, AES-GCM 256 pour le contenu). Le serveur stocke et restitue des octets opaques et ne détient aucune clé. Aucun endpoint ne déchiffre, n'indexe ni ne résume un journal dont `enc_alg` est renseigné
+- **Règle de non-transformation** : quand `enc_alg` est renseigné, `summary` et `description` traversent l'API sans `strip_tags`, `htmlspecialchars`, purificateur HTML ni normalisation d'espaces. Un seul octet modifié rendrait le journal définitivement indéchiffrable — AES-GCM échoue à l'authentification, sans récupération partielle
+- **Longueurs relevées** : le base64 gonfle le contenu d'environ 4/3, donc `summary` passe de `VARCHAR(255)` à `VARCHAR(2000)` et `description` de `TEXT` (65 535 octets, insuffisant) à `MEDIUMTEXT`. Élargissements seuls : aucune troncature, aucun impact sur les journaux existants
+- **`PATCH` accepté sur un journal**, à parité avec `PUT` — dans les deux cas seuls les champs présents dans le corps sont modifiés
+- Migration `docs/20260803_journaux_e2e.sql`. Nouveau test `private/tests/test_ics_journals_e2e.php` (52 assertions) : round-trip octet pour octet vérifié par `strcmp` et `md5` sur un blob base64 de 200 000 caractères, plus non-régression des journaux en clair
+
 ## [2.13.0] — 2026-08-03
 
 ### Sécurité — SVG servi inline, MIME déclaré par le client

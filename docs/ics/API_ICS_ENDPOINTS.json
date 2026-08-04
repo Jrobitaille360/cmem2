@@ -580,6 +580,15 @@
       "description": "Journaux CalDAV VJOURNAL (RFC 5545 §3.6.3) — Phase 5.2",
       "base_path": "/calendars/{id}/journals",
       "auth_required": true,
+      "chiffrement_e2e": {
+        "principe": "Le chiffrement est fait entièrement côté client (WebCrypto : PBKDF2-SHA256 pour la dérivation, AES-GCM 256 pour le contenu). Le serveur stocke et restitue des octets opaques. Aucune clé, aucune passphrase, aucun code de secours ne doit transiter vers l'API.",
+        "enc_alg": "string ou null (optional, max 32) - Algorithme, ex. AES-GCM-256. null = journal en clair",
+        "enc_iv": "string ou null (optional, max 32) - Vecteur d'initialisation base64 (12 octets → 16 caractères). null = journal en clair",
+        "regle_de_non_transformation": "Quand enc_alg est renseigné, summary et description contiennent du base64 opaque. Le serveur n'applique aucune transformation : ni strip_tags, ni htmlspecialchars, ni purificateur HTML, ni normalisation d'espaces. Un seul octet modifié rend le journal définitivement indéchiffrable (AES-GCM échoue à l'authentification, aucune récupération partielle possible).",
+        "longueurs": "summary jusqu'à 2 000 caractères, description jusqu'à 16 000 000 caractères (le base64 gonfle d'environ 4/3). Encodage utf8mb4 : l'alphabet base64 (A-Za-z0-9+/=) traverse intact.",
+        "metadonnees_en_clair": "dtstart, calendar_id, uid, status, categories, related_to, url, created_at, updated_at restent en clair et exploitables par l'API.",
+        "interdits_serveur": "Aucun endpoint ne déchiffre, n'indexe ni ne résume un journal dont enc_alg est renseigné (recherche, export, IA, notifications, courriels). Un contenu chiffré apparaissant dans un courriel ou une notification est remplacé par un libellé générique — jamais le blob."
+      },
       "routes": [
         {
           "method": "POST",
@@ -587,8 +596,10 @@
           "description": "Créer une entrée de journal VJOURNAL",
           "params": { "id": "integer (required)" },
           "body": {
-            "summary": "string (required) - Résumé du journal",
-            "description": "string (optional) - Contenu",
+            "summary": "string (required, max 2000) - Résumé du journal, ou base64 opaque si enc_alg est renseigné",
+            "description": "string (optional, max 16000000) - Contenu, ou base64 opaque si enc_alg est renseigné",
+            "enc_alg": "string (optional, max 32) - Chiffrement E2E, ex. AES-GCM-256 ; voir chiffrement_e2e",
+            "enc_iv": "string (optional, max 32) - Vecteur d'initialisation base64 ; voir chiffrement_e2e",
             "dtstart": "date ou datetime (optional) - Date du journal",
             "status": "string (optional) - DRAFT | FINAL | CANCELLED (défaut: DRAFT)",
             "categories": "array of strings (optional)",
@@ -618,13 +629,15 @@
           "errors": { "404": "Journal non trouvé" }
         },
         {
-          "method": "PUT",
+          "method": "PUT | PATCH",
           "path": "/calendars/{id}/journals/{journalId}",
-          "description": "Mettre à jour une entrée de journal",
+          "description": "Mettre à jour une entrée de journal. PUT et PATCH sont équivalents : dans les deux cas seuls les champs présents dans le corps sont modifiés.",
           "params": { "id": "integer (required)", "journalId": "integer (required)" },
           "body": {
-            "summary": "string (optional)",
-            "description": "string (optional)",
+            "summary": "string (optional, max 2000)",
+            "description": "string (optional, max 16000000)",
+            "enc_alg": "string ou null (optional, max 32) - null remet le journal en clair ; voir chiffrement_e2e",
+            "enc_iv": "string ou null (optional, max 32) - null remet le journal en clair ; voir chiffrement_e2e",
             "dtstart": "date ou datetime (optional)",
             "status": "string (optional) - DRAFT | FINAL | CANCELLED",
             "categories": "array of strings (optional)",

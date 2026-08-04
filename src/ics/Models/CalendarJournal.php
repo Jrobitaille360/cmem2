@@ -22,6 +22,10 @@ class CalendarJournal extends BaseModel
     public $uid;
     public $summary;
     public $description;
+    /** Algorithme de chiffrement client (ex. AES-GCM-256) ; NULL = journal en clair */
+    public $encAlg;
+    /** Vecteur d'initialisation base64 ; NULL = journal en clair */
+    public $encIv;
     public $dtstart;
     public $status;
     public $categories;
@@ -32,6 +36,8 @@ class CalendarJournal extends BaseModel
     public $sequence;
     public $timezone;
     public $clearRelatedTo = false; // true = remise à NULL explicite (retrait du lien)
+    public $clearEncAlg = false;    // true = remise à NULL explicite (retour au clair)
+    public $clearEncIv = false;     // true = remise à NULL explicite (retour au clair)
 
     public function __construct()
     {
@@ -63,10 +69,10 @@ class CalendarJournal extends BaseModel
 
         $stmt = $this->getDb()->prepare("
             INSERT INTO calendar_journals
-                (calendar_id, user_id, uid, summary, description, dtstart,
+                (calendar_id, user_id, uid, summary, description, enc_alg, enc_iv, dtstart,
                  status, categories, url, related_to, organizer_email, organizer_name,
                  sequence, timezone)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ");
 
         $stmt->execute([
@@ -75,6 +81,8 @@ class CalendarJournal extends BaseModel
             $this->uid,
             $this->summary,
             $this->description ?? null,
+            $this->encAlg ?? null,
+            $this->encIv ?? null,
             $this->dtstart ?? null,
             $this->status ?? 'DRAFT',
             isset($this->categories) ? json_encode($this->categories) : null,
@@ -123,6 +131,21 @@ class CalendarJournal extends BaseModel
         } elseif (isset($this->relatedTo)) {
             $fields[] = 'related_to = ?';
             $params[] = $this->relatedTo;
+        }
+
+        // Chiffrement E2E : remise à NULL explicite = retour au clair.
+        if ($this->clearEncAlg) {
+            $fields[] = 'enc_alg = NULL';
+        } elseif (isset($this->encAlg)) {
+            $fields[] = 'enc_alg = ?';
+            $params[] = $this->encAlg;
+        }
+
+        if ($this->clearEncIv) {
+            $fields[] = 'enc_iv = NULL';
+        } elseif (isset($this->encIv)) {
+            $fields[] = 'enc_iv = ?';
+            $params[] = $this->encIv;
         }
 
         if (empty($fields)) {

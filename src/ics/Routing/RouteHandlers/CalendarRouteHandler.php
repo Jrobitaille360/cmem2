@@ -192,8 +192,8 @@ class CalendarRouteHandler extends BaseRouteHandler
             ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'journals' && isset($segments[3]) && ctype_digit($segments[3]) && !isset($segments[4]) && $method === 'GET') =>
                 $this->journalController->getJournal((int)$action, (int)$segments[3], $user['user_id']),
 
-            // PUT /calendars/{id}/journals/{journalId}
-            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'journals' && isset($segments[3]) && ctype_digit($segments[3]) && !isset($segments[4]) && $method === 'PUT') =>
+            // PUT|PATCH /calendars/{id}/journals/{journalId} — mise à jour partielle dans les deux cas
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'journals' && isset($segments[3]) && ctype_digit($segments[3]) && !isset($segments[4]) && in_array($method, ['PUT', 'PATCH'], true)) =>
                 $this->journalController->updateJournal((int)$action, (int)$segments[3], $user['user_id']),
 
             // DELETE /calendars/{id}/journals/{journalId}

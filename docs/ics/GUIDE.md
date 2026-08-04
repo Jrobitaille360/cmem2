@@ -340,7 +340,7 @@ PUT    /calendars/12/events/45/occurrences?occurrence_date=2026-08-18
 | POST | `/calendars/{id}/journals` | Créer une entrée |
 | GET | `/calendars/{id}/journals` | Lister |
 | GET | `/calendars/{id}/journals/{journalId}` | Détails |
-| PUT | `/calendars/{id}/journals/{journalId}` | Modifier |
+| PUT \| PATCH | `/calendars/{id}/journals/{journalId}` | Modifier (les deux verbes sont équivalents : seuls les champs envoyés sont modifiés) |
 | DELETE | `/calendars/{id}/journals/{journalId}` | Supprimer (soft) |
 
 Statuts : `DRAFT` | `FINAL` | `CANCELLED`.
@@ -348,6 +348,47 @@ Statuts : `DRAFT` | `FINAL` | `CANCELLED`.
 `related_to` (optionnel, string max 255) — UID du journal parent (RFC 5545 §3.8.4.5), accepté
 sur `POST`/`PUT` ; envoyer `null` sur `PUT` retire le lien (directive
 `20260713_161125_cmem_web_vers_cmem2_API`).
+
+### Chiffrement de bout en bout
+
+> Directive `20260803_165946_cmem_web_vers_cmem2_API__e2e-journaux-champs-chiffres`
+
+Le chiffrement est fait **entièrement côté client** (WebCrypto : PBKDF2-SHA256 pour la
+dérivation, AES-GCM 256 pour le contenu). Le serveur stocke et restitue des octets opaques :
+il n'a besoin d'aucune primitive cryptographique. **Aucune clé, aucune passphrase, aucun code
+de secours ne doit transiter vers l'API** — si l'API en reçoit un, c'est un bug client.
+
+| Champ | Type | Défaut | Rôle |
+| - | - | - | - |
+| `enc_alg` | string, max 32 | `null` | Algorithme, ex. `AES-GCM-256`. `null` = journal en clair |
+| `enc_iv` | string, max 32 | `null` | Vecteur d'initialisation base64 (12 octets → 16 caractères) |
+
+Les deux champs sont acceptés sur `POST`, `PUT` et `PATCH`, et restitués par tous les `GET`
+(détail, liste, corbeille). Sur `PUT`/`PATCH`, envoyer `null` explicitement remet le journal
+en clair.
+
+**Règle de non-transformation.** Quand `enc_alg` est renseigné, `summary` et `description`
+contiennent du base64 opaque. Le serveur n'applique **aucune** transformation : ni
+`strip_tags`, ni `htmlspecialchars`, ni purificateur HTML, ni normalisation d'espaces. Un seul
+octet modifié rend le journal définitivement indéchiffrable — AES-GCM échoue à
+l'authentification et il n'existe aucune récupération partielle.
+
+**Longueurs.** Le base64 gonfle le contenu d'environ 4/3 : `summary` accepte jusqu'à 2 000
+caractères (`VARCHAR(2000)`) et `description` jusqu'à 16 000 000 (`MEDIUMTEXT`). Encodage
+`utf8mb4` — l'alphabet base64 (`A-Za-z0-9+/=`) traverse intact.
+
+**Métadonnées en clair.** `dtstart`, `calendar_id`, `uid`, `status`, `categories`,
+`related_to`, `url`, `created_at` et `updated_at` restent en clair et pleinement exploitables
+par l'API : le client s'appuie dessus pour la note du jour, la revue hebdomadaire et la heatmap.
+
+**Interdits côté serveur.** Aucun endpoint ne déchiffre, n'indexe ni ne résume un journal dont
+`enc_alg` est renseigné (recherche, export, IA, notifications, courriels). Un contenu chiffré
+qui devrait apparaître dans un gabarit de courriel ou une notification est remplacé par un
+libellé générique — jamais le blob.
+
+L'export `.ics` reste possible : l'échappement RFC 5545 et le pliage de lignes à 75 octets
+appliqués par sabre/vobject sont réversibles et l'alphabet base64 ne contient aucun caractère
+échappé, donc le blob se reconstitue à l'octet près après dépliage.
 
 ---
 
