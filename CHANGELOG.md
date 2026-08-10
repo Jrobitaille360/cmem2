@@ -9,6 +9,55 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+Cinq directives en attente traitées : entête `Urgency` manquant sur le push web, effacement explicite des champs texte du calendrier (deux directives `cmem_web`), code OTP fixe en développement pour la suite Playwright de `jdb`, et socle des rôles de jeu Traque.
+
+### Push web — entête `Urgency: high` pour livraison Android fiable
+
+> Directive `20260810_121500_cmem_web_vers_cmem2_API__urgency-high-web-push`
+
+- **`WebPushService::sendToOwner()` passe désormais `'urgency' => 'high'`** à `minishlink/web-push`. Son absence omettait complètement l'entête HTTP `Urgency` envoyé à FCM ; RFC 8030 §5.3 traite ce cas comme `normal`, qu'Android peut différer de plusieurs minutes à heures sous App Standby / Doze — reproduit sur Samsung S24+, app fermée ou au premier plan, alors que le desktop (jamais soumis à Doze) recevait systématiquement en quelques secondes
+- Serveur, VAPID, `sw.ts` client et livraison HTTP à FCM (2xx) étaient déjà corrects — seule la priorité de livraison manquait
+
+### Calendrier — `null` efface, champ absent laisse inchangé
+
+> Directive `20260729_174600_cmem_web_vers_cmem2_API__null-effacement-explicite-put-evenement`
+
+- **`PUT /calendars/{cid}/events/{eid}` distingue enfin « absent » de « null »** sur `location`, `description`, `color` et `recurrence_rule`. Jusqu'ici le contrôleur filtrait par `isset()` : un client envoyant `{"location": null}` recevait un `200` et rien n'était effacé — aucune erreur, aucune trace, un piège que chaque client redécouvrait à ses frais
+- **Contrat retenu** : champ absent → colonne inchangée ; `null` → colonne mise à `NULL` ; chaîne vide → normalisée en `NULL`. La chaîne vide reste acceptée pour ne pas casser l'écriture que `cmem_web` a branchée en contournement, mais elle ne laisse plus de `''` en colonne là où `NULL` est juste — les exports `.ics` et les filtres `IS NULL` voyaient une valeur présente mais vide
+- **Aucun `422` sur `null`** pour ces champs ; la validation `RRULE` ne s'applique plus à une valeur vide, qui est une demande d'effacement et non une règle invalide
+- **`recurrence_rule: null` fait cesser la récurrence** : les lignes d'exception déjà posées dans `event_occurrences` sont **conservées**, jamais purgées. Elles deviennent inertes tant que l'événement n'est pas récurrent et redeviennent actives si une `RRULE` est reposée plus tard
+- Règle documentée dans `docs/entrypoints.md` (section « Effacement d'un champ optionnel »)
+
+### Calendrier — vider le lieu ou la description d'une seule occurrence
+
+> Directive `20260729_174500_cmem_web_vers_cmem2_API__effacement-lieu-description-occurrence`
+
+- **Trois états désormais distincts** sur `modified_location` et `modified_description` : `NULL` = l'occurrence ne surcharge pas le champ (hérite du parent), texte = remplace la valeur du parent, `''` = l'occurrence a volontairement vidé le champ. La sémantique est volontairement l'inverse de celle de l'événement, où `NULL` est déjà libre de sens
+- **Écriture** : le `PUT` occurrence passe de `isset()` à `array_key_exists()`, donc un `null` explicite est accepté et normalisé en `''`. Un champ absent continue de ne rien toucher. Même comportement sur `scope=only_this`, `all_future` et `all`
+- **Lecture** : l'expansion testait `!empty()`, ce qui traitait `''` comme « pas de surcharge » — l'occurrence retombait sur le lieu du parent et l'effacement était invisible. Le test devient `!== null`. Même correction sur le lieu affiché dans les notifications courriel
+- Migration `docs/20260804_occurrence_modified_empty_to_null.sql` : les `''` déjà en base relèvent de l'ancienne sémantique et repassent à `NULL` — **à exécuter avant le déploiement du code**
+- Nouveau test `private/tests/test_ics_null_erasure.php` couvrant les deux directives
+
+### `AUTH_TEST_CODE` — code OTP fixe en développement
+
+> Directive `20260728_150000_jdb_vers_cmem2_API__code-otp-fixe-dev-tests`
+
+- **`POST /auth/send-code` accepte un code fixe pour toute adresse** quand `AUTH_TEST_CODE` est défini : aucun courriel envoyé, rate limit contourné, réponse générique inchangée pour ne pas ouvrir d'énumération d'adresses. La suite Playwright de `jdb` peut enfin ouvrir une session administrateur, ce que le flux OTP par courriel rendait impossible à automatiser
+- **Garde-fou** : la constante est forcée à vide hors `APP_ENV=development`, et la présence de la variable hors développement est journalisée en avertissement au premier `send-code`. Un code d'authentification fixe en production donnerait un accès complet à n'importe quel compte à partir de la seule adresse courriel
+- Le compte de test E2E (`OTP_TEST_ACCOUNT_EMAIL`) garde la priorité sur son propre code ; `verify-code` est inchangé
+- Variable documentée en commentaire dans `.env.example`, jamais active par défaut. Nouveau test `private/tests/test_auth_test_code.php`, qui se saute proprement quand la variable est absente
+
+### Traque — socle des rôles de jeu
+
+> Directive `20260605_161757_traque_vers_cmem2_API__table-traque-roles-et-endpoints-admin-gm` (partiel)
+
+- **Table `traque_roles`** (`docs/20260804_traque_roles.sql`) : rôles `gm` et `traque_admin` orthogonaux aux rôles CMEM2, un même compte pouvant être joueur et Maître de Jeu. Unicité sur `(user_id, role)` ; une révocation positionne `revoked_at` sans supprimer la ligne, pour l'audit
+- **Helper `Traque\Helpers\TraqueAuth`** : `requireRole`, `hasRole`, `userRoles`, `grant`, `grantIfAbsent`, `revoke`, `log`. Toute vérification filtre `revoked_at IS NULL` ; un rôle révoqué puis réaccordé réutilise sa ligne plutôt que d'en créer une seconde
+- **Trois endpoints** réservés à `traque_admin` : `POST /traque/admin/roles/grant` (`409` si déjà actif, `422` si rôle inconnu), `DELETE /traque/admin/roles/revoke` (`404` si absent ou déjà révoqué), `GET /traque/admin/roles/log` (journal enrichi des courriels, `limit` par défaut 200, max 500)
+- **Rang de Maître de Jeu au niveau 15** : `POST /traque/players/me/levelup` accorde `gm` automatiquement et retourne `gm_granted`. Le `granted_by` provient de `TRAQUE_SYSTEM_USER_ID` si configuré, sinon du joueur promu — la contrainte de clé étrangère exige un `users.id` existant. Une promotion en échec n'annule jamais la montée de niveau
+- **Hors périmètre pour l'instant** : les endpoints de secteur MJ (`/traque/gm/me`, `/traque/gm/sector`) et le CRUD de contenu (monstres, PNJ, portails, dimensions) supposent cinq tables non définies à ce jour. La directive reste ouverte sur ces points
+- Nouveau test `private/tests/test_traque_roles.php` (gating `401` / `403`)
+
 ## [2.14.0] — 2026-08-04
 
 Version « chiffrement de bout en bout » : les journaux, les tâches et les contacts peuvent désormais être chiffrés côté client, l'API n'en conservant que des octets opaques. Trois directives `cmem_web` livrées, aucune rupture de contrat — tout contenu non chiffré se comporte exactement comme avant.

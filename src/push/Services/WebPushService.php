@@ -102,7 +102,7 @@ class WebPushService
                     'publicKey'  => self::publicKey(),
                     'privateKey' => self::privateKey(),
                 ],
-            ], ['TTL' => self::ttl()], null, self::clientOptions());
+            ], ['TTL' => self::ttl(), 'urgency' => 'high'], null, self::clientOptions());
             $webPush->setReuseVAPIDHeaders(true);
         } catch (\Throwable $e) {
             LogService::error('WebPushService : initialisation impossible', ['error' => $e->getMessage()]);
