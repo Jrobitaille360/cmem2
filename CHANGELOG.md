@@ -9,7 +9,9 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
-Cinq directives en attente traitées : entête `Urgency` manquant sur le push web, effacement explicite des champs texte du calendrier (deux directives `cmem_web`), code OTP fixe en développement pour la suite Playwright de `jdb`, et socle des rôles de jeu Traque.
+## [2.15.0] — 2026-08-11
+
+Six directives en attente traitées : entête `Urgency` manquant sur le push web, effacement explicite des champs texte du calendrier (deux directives `cmem_web`), code OTP fixe en développement pour la suite Playwright de `jdb`, socle des rôles de jeu Traque, et proxy IA (résumé d'agenda).
 
 ### Push web — entête `Urgency: high` pour livraison Android fiable
 
@@ -57,6 +59,19 @@ Cinq directives en attente traitées : entête `Urgency` manquant sur le push we
 - **Rang de Maître de Jeu au niveau 15** : `POST /traque/players/me/levelup` accorde `gm` automatiquement et retourne `gm_granted`. Le `granted_by` provient de `TRAQUE_SYSTEM_USER_ID` si configuré, sinon du joueur promu — la contrainte de clé étrangère exige un `users.id` existant. Une promotion en échec n'annule jamais la montée de niveau
 - **Hors périmètre pour l'instant** : les endpoints de secteur MJ (`/traque/gm/me`, `/traque/gm/sector`) et le CRUD de contenu (monstres, PNJ, portails, dimensions) supposent cinq tables non définies à ce jour. La directive reste ouverte sur ces points
 - Nouveau test `private/tests/test_traque_roles.php` (gating `401` / `403`)
+
+### Proxy IA — `POST /ai/summarize`
+
+> Directive `20260810_140000_cmem_web_vers_cmem2_API__ai-proxy`
+
+- **Nouvel endpoint consommateur du socle `modules-gating`** : résumé d'agenda sur une période, déclenché manuellement par l'usager. Le module `ia` doit être disponible (plan `monthly`/`yearly`/`ami`) et activé (`PATCH /modules/ia`) avant tout appel
+- **Le corps du journal n'est jamais transmis** — seules des métadonnées bornées assemblées côté client (`period`, `items[]` : titre, date, tags, statut) partent vers le modèle, sans `description` ni `notes`
+- **Quota décompté avant l'appel modèle**, jamais après : évite un appel gratuit en cas de course entre requêtes concurrentes, au prix d'un quota consommé même si l'appel échoue ensuite (`502`). Quota déjà à 30/30 → `429 AI_QUOTA_EXCEEDED` sans incrémenter et sans appeler le modèle
+- **Clé Anthropic serveur uniquement** (`ANTHROPIC_API_KEY`), jamais exposée côté client ; modèle configurable par variable d'environnement (`AI_SUMMARIZE_MODEL`) pour migrer sans redéploiement front
+- **Consigne de résumé fixée côté serveur** (`AiSummarizeService::SYSTEM_PROMPT`) — le client ne transmet pas de prompt libre, ce qui évite l'injection de prompt et le détournement du proxy
+- Nouvelle dépendance `anthropic-ai/sdk` (SDK PHP officiel)
+- Nouveau test `private/tests/test_ai_summarize.php` (gating, quota, validation ; le happy path se saute proprement si `ANTHROPIC_API_KEY` est absente)
+- Docs : `docs/ai/GUIDE.md`, `docs/ai/API_AI_ENDPOINTS.json`
 
 ## [2.14.0] — 2026-08-04
 
