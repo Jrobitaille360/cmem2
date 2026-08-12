@@ -14,12 +14,12 @@ Portée : code source uniquement. Domaine métier et schéma DB conservés à 90
 
 - `docs/{module}/GUIDE.md` — un guide par module, qualité inégale
 - `docs/{module}/API_*_ENDPOINTS.json` — endpoints JSON par module, non synchronisés avec le code
-- `docs/v-2-4-1/build_DB-v-2.4.1.sql` — DDL complet v2.4.1
-- `docs/20260508_stripe_idempotency.sql` — migration pendante non intégrée
+- `docs/v-2-15-0/build_DB-v-2.15.0.sql` — DDL complet v2.15.0 (82 tables)
+- Aucune migration pendante dans `docs/` (dernière intégrée : `20260804_traque_roles.sql`, v2.15.0)
 
 ### Améliorations à faire
 
-1. **Synchronisation docs ↔ code** — vérifier chaque GUIDE.md et API_*.json face au code v2.5.0 :
+1. **Synchronisation docs ↔ code** — vérifier chaque GUIDE.md et API_*.json face au code v2.15.0 :
 
    | Module | Fichier doc | À vérifier |
    | - | - | - |
@@ -29,22 +29,24 @@ Portée : code source uniquement. Domaine métier et schéma DB conservés à 90
    | puzzle | `docs/puzzle/API_PUZZLE_ENDPOINTS.json` | Google Play, admin |
    | items | `docs/items/API_ITEMS_ENDPOINTS.json` | Access control |
    | pomo | `docs/pomo/API_POMO_ENDPOINTS_v1_0_0.json` | Statut actuel du module |
+   | contacts | `docs/contacts/API_CONTACTS_ENDPOINTS.json` | CRUD + vCard + CRM (interactions, opportunités) |
+   | projets | `docs/projets/API_PROJETS_ENDPOINTS.json` | Tâches, hiérarchie, export JSON/.ics |
 
 2. **Cartographie DB** — produire `docs/v-3-0-0/SCHEMA_DB.md` :
-   - ERD des 42 tables avec relations FK explicites
+   - ERD des 82 tables avec relations FK explicites
    - Liste des enums implicites (status, role, visibility, billing_period)
    - Colonnes soft-delete par table
 
-3. **Inventaire des 218 clés .env** — créer `docs/v-3-0-0/ENV_REFERENCE.md` :
+3. **Inventaire des ~121 clés .env** — créer `docs/v-3-0-0/ENV_REFERENCE.md` :
    - Regrouper par domaine fonctionnel
    - Marquer les clés obsolètes ou redondantes (cible : réduction à ~80 clés)
 
-4. **Intégrer la migration pendante** dans `docs/v-3-0-0/build_DB-v-3.0.0.sql`
+4. **Vérifier `docs/` racine avant le gel** de `build_DB-v-3.0.0.sql` — s'assurer qu'aucune migration `YYYYMMDD_*.sql` pendante n'a été oubliée entre-temps
 
 ### Conditions de complétion
 
-- [ ] Chaque `API_*.json` reflète exactement les routes implémentées en v2.5.0
-- [ ] `SCHEMA_DB.md` couvre les 42 tables avec relations
+- [ ] Chaque `API_*.json` reflète exactement les routes implémentées en v2.15.0
+- [ ] `SCHEMA_DB.md` couvre les 82 tables avec relations
 - [ ] `ENV_REFERENCE.md` identifie les clés à supprimer
 - [ ] Aucune migration SQL orpheline dans `docs/`
 
@@ -52,7 +54,7 @@ Portée : code source uniquement. Domaine métier et schéma DB conservés à 90
 
 ## Phase 1 — Analyse des entry points
 
-### Inventaire des routes v2.5.0
+### Inventaire des routes v2.15.0
 
 **Auth publique (10 routes)**
 
@@ -173,6 +175,54 @@ Portée : code source uniquement. Domaine métier et schéma DB conservés à 90
 | GET | /stats/groups | → GET /v3/stats/groups |
 | GET | /stats/usage | → GET /v3/stats/usage |
 
+**Contacts + CRM (13 routes)**
+
+| Méthode | URL | Décision v3 |
+| - | - | - |
+| GET | /contacts | → GET /v3/contacts |
+| POST | /contacts | → POST /v3/contacts |
+| POST | /contacts/import | → POST /v3/contacts/import |
+| GET | /contacts/{id} | → GET /v3/contacts/{id} |
+| GET | /contacts/{id}.vcf | → GET /v3/contacts/{id}/vcard (extension d'URL → sous-ressource) |
+| PUT | /contacts/{id} | → PATCH /v3/contacts/{id} (mise à jour partielle — PUT mal nommé, convention #2) |
+| DELETE | /contacts/{id} | → DELETE /v3/contacts/{id} |
+| GET | /contacts/{id}/messages | → GET /v3/contacts/{id}/messages |
+| POST | /contacts/{id}/messages | → POST /v3/contacts/{id}/messages |
+| GET | /contacts/{id}/interactions | → GET /v3/contacts/{id}/interactions |
+| POST | /contacts/{id}/interactions | → POST /v3/contacts/{id}/interactions |
+| DELETE | /contacts/{id}/interactions/{iid} | → DELETE /v3/contacts/{id}/interactions/{iid} |
+| GET | /contacts/{id}/opportunites | → GET /v3/contacts/{id}/opportunities |
+| POST | /contacts/{id}/opportunites | → POST /v3/contacts/{id}/opportunities |
+
+**Opportunités — pipeline CRM (4 routes)**
+
+| Méthode | URL | Décision v3 |
+| - | - | - |
+| GET | /opportunites | → GET /v3/opportunities (board Kanban global) |
+| PUT | /opportunites/{id} | Supprimer — doublon de PATCH (convention #2) |
+| PATCH | /opportunites/{id} | → PATCH /v3/opportunities/{id} |
+| DELETE | /opportunites/{id} | → DELETE /v3/opportunities/{id} |
+
+**Projets — tâches (13 routes) — aplatir le préfixe /projets/**
+
+| Méthode | URL | Décision v3 |
+| - | - | - |
+| GET | /projets/projects | → GET /v3/projects |
+| POST | /projets/projects | → POST /v3/projects |
+| GET | /projets/projects/{id} | → GET /v3/projects/{id} |
+| PATCH | /projets/projects/{id} | → PATCH /v3/projects/{id} |
+| DELETE | /projets/projects/{id} | → DELETE /v3/projects/{id} |
+| GET | /projets/projects/{id}/tasks | → GET /v3/projects/{id}/tasks |
+| POST | /projets/projects/{id}/tasks | → POST /v3/projects/{id}/tasks |
+| GET | /projets/projects/{id}/export.json | → GET /v3/projects/{id}/export?format=json |
+| POST | /projets/projects/{id}/import.json | → POST /v3/projects/{id}/import?format=json (dry-run) |
+| POST | /projets/projects/{id}/import.json/confirm | → PUT /v3/projects/{id}/import?format=json (écriture confirmée) |
+| GET | /projets/projects/{id}/export.ics | → GET /v3/projects/{id}/export?format=ics |
+| GET, PATCH, DELETE | /projets/tasks/{id} | → GET/PATCH/DELETE /v3/tasks/{id} |
+
+> Module `projets` empile aujourd'hui deux segments (`/projets/projects/...`) — le préfixe français `projets`
+> et la ressource anglaise `projects` font doublon. v3 aplatit en `/v3/projects/**` et `/v3/tasks/**` top-level.
+
 **Admin (6 routes) — renommé de /secret-admin/**
 
 | Méthode | URL actuelle | Décision v3 |
@@ -206,6 +256,9 @@ Portée : code source uniquement. Domaine métier et schéma DB conservés à 90
 6. **POST /tags/search → GET /tags?q=** — idempotent, cacheable
 7. **GET /help supprimé** — remplacé par GET /v3/openapi.json
 8. **Nouvelles routes utilitaires** : GET /v3/openapi.json, GET /v3/version
+9. **Extensions dans l'URL supprimées** (`.vcf`, `.json`, `.ics`) — remplacées par `?format=` ou une sous-ressource dédiée
+10. **PUT/PATCH doublons supprimés** — chaque ressource n'expose qu'une seule route de mise à jour partielle (`PATCH`)
+11. **/projets/projects → /projects, /projets/tasks → /tasks** — aplatir le préfixe module redondant
 
 ### Conditions de complétion
 
@@ -224,7 +277,7 @@ Portée : code source uniquement. Domaine métier et schéma DB conservés à 90
 | Routeur | Custom match-based (12 RouteHandlers) | Fragile, pas de paramètres typés |
 | Middleware | BaseRouteHandler + pipeline manuel | Pas PSR-15, pas composable |
 | DI | Aucun — instanciation manuelle | Couplage fort |
-| Config | 218 clés .env brutes | Non typé, non validé à la compilation |
+| Config | ~121 clés .env brutes | Non typé, non validé à la compilation |
 | Logging | LogService custom | Pas PSR-3 |
 | DB Migrations | Fichiers .sql manuels | Pas versionné ni rollbackable |
 | Tests | cURL intégration uniquement | Aucun test unitaire |
@@ -311,6 +364,8 @@ src/
     Billing/                       # Ex-Stripe — agnostique provider
     Stats/
     Admin/                         # Ex-SecretAdmin
+    Contacts/                      # CRUD + vCard + interactions + opportunités
+    Projects/                      # Ex-Projets — tâches, hiérarchie, export JSON/.ics
 
   Plugins/                         # Modules optionnels chargés dynamiquement
     Calendar/                      # Ex-ICS
@@ -462,6 +517,38 @@ index.php                          # Entrypoint (15 lignes max)
 
 - [ ] Tests `test_files.php` et `test_tags.php` passent
 - [ ] Upload > 10 MB ne sature pas la RAM
+
+---
+
+### 3.4 bis Contacts + CRM + Projets
+
+**Actions à poser :**
+
+- `ContactRepository`, `InteractionRepository`, `OpportuniteRepository`, `ProjectRepository`, `TaskRepository`
+- Aplatir `/projets/projects/**` → `/v3/projects/**` et `/projets/tasks/{id}` → `/v3/tasks/{id}`
+- Renommer `/opportunites` → `/v3/opportunities`, `/contacts/{id}/opportunites` → `/v3/contacts/{id}/opportunities`
+- Supprimer les routes à extension d'URL (`{id}.vcf`) — export vCard en sous-ressource `/v3/contacts/{id}/vcard`
+- Unifier PUT/PATCH sur `/contacts/{id}` et `/opportunites/{id}` en une seule route `PATCH`
+- Conserver la logique `max_contacts` (cap plan) et le pipeline CRM (étapes d'opportunité) inchangés
+
+**Enjeux :**
+
+- Import vCard/CSV — valider les gros lots sans bloquer la requête (queue ou traitement par lots)
+- Export `.ics` des tâches de projet doit rester compatible avec le générateur ICS partagé (`src/ics/`)
+- Cascade soft-delete contact → interactions, opportunités, messages liés
+
+**Tests :**
+
+- CRUD contact, import vCard/CSV, export vCard
+- Historique interactions + envoi de courriel
+- Board Kanban opportunités + changement d'étape
+- CRUD projet/tâche, hiérarchie, export JSON round-trip, export `.ics`
+
+**Conditions de complétion :**
+
+- [ ] Tests `test_contacts.php`, `test_contacts_e2e.php`, `test_contacts_messages.php`, `test_contacts_interactions.php`, `test_contacts_opportunites.php` et `test_projets.php` passent
+- [ ] Aucune route avec extension d'URL restante
+- [ ] Aucune route `/projets/projects/**` restante
 
 ---
 
@@ -649,6 +736,7 @@ index.php                          # Entrypoint (15 lignes max)
 | 3.2 — Auth | JWT/OTP/Device tokens migrés | P1 | 3.3–3.7 |
 | 3.3 — Users/Groups | CRUD + permissions | P1 | 3.5, 3.6 |
 | 3.4 — Files/Tags | Upload + search | P2 | 3.7 (items) |
+| 3.4 bis — Contacts/CRM/Projets | Routes aplaties, CRUD + import/export migrés | P2 | 3.11 |
 | 3.5 — Billing | Stripe renommé, idempotence | P2 | 3.11 |
 | 3.6 — Admin | Routes renommées | P2 | 3.11 |
 | 3.7 — Plugins | DI injecté, autoloaders unifiés | P2 | 3.11 |
