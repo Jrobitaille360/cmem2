@@ -26,7 +26,8 @@
             "traque_player_achievements",
             "traque_players",
             "traque_player_bestiary",
-            "traque_push_tokens"
+            "traque_push_tokens",
+            "traque_roles"
         ]
     }
 }

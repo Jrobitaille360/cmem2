@@ -9,6 +9,7 @@ use Traque\Models\CombatSession;
 use Traque\Models\Player;
 use Traque\Services\CombatService;
 use Traque\Services\AchievementService;
+use Traque\Helpers\TraqueAuth;
 
 /**
  * TraqueRouteHandler — toutes les routes /traque/*
@@ -17,7 +18,7 @@ use Traque\Services\AchievementService;
  *
  * Segments :
  *   [0] traque
- *   [1] monsters | combat | players | leaderboard
+ *   [1] monsters | combat | players | leaderboard | admin
  *   [2] nearby | {id} | start | attack | flee | me | create | ''
  *   [3] respawn | journal | achievements | levelup | settings | push-token | bestiary
  */
@@ -115,6 +116,22 @@ class TraqueRouteHandler extends BaseRouteHandler
                 $this->playerMe($user),
 
             // ---------------------------------------------------------------
+            // ADMIN — rôles de jeu (traque_admin requis)
+            // ---------------------------------------------------------------
+
+            // POST /traque/admin/roles/grant
+            ($s1 === 'admin' && $s2 === 'roles' && $s3 === 'grant' && $method === 'POST') =>
+                $this->rolesGrant($user),
+
+            // DELETE /traque/admin/roles/revoke
+            ($s1 === 'admin' && $s2 === 'roles' && $s3 === 'revoke' && $method === 'DELETE') =>
+                $this->rolesRevoke($user),
+
+            // GET /traque/admin/roles/log
+            ($s1 === 'admin' && $s2 === 'roles' && $s3 === 'log' && $method === 'GET') =>
+                $this->rolesLog($user),
+
+            // ---------------------------------------------------------------
             // LEADERBOARD
             // ---------------------------------------------------------------
 
@@ -124,6 +141,78 @@ class TraqueRouteHandler extends BaseRouteHandler
 
             default => Response::error('Route traque non trouvée', null, 404)
         };
+    }
+
+    // =========================================================================
+    // ADMIN — rôles de jeu
+    // =========================================================================
+
+    /** POST /traque/admin/roles/grant — { user_id, role } */
+    private function rolesGrant(array $user): void
+    {
+        if (!TraqueAuth::requireRole((int) $user['user_id'], 'traque_admin')) {
+            return;
+        }
+
+        $input  = Response::getRequestParams();
+        $userId = isset($input['user_id']) ? (int) $input['user_id'] : 0;
+        $role   = (string) ($input['role'] ?? '');
+
+        if ($userId <= 0) {
+            Response::error('user_id requis', null, 422);
+            return;
+        }
+        if (!TraqueAuth::isValidRole($role)) {
+            Response::error('Rôle inconnu : ' . $role, null, 422);
+            return;
+        }
+
+        $result = TraqueAuth::grant($userId, $role, (int) $user['user_id']);
+
+        if ($result['status'] === 'already_active') {
+            Response::error('Rôle déjà actif pour cet utilisateur', null, 409);
+            return;
+        }
+
+        Response::success('role_granted', $result['row'], 201);
+    }
+
+    /** DELETE /traque/admin/roles/revoke — { user_id, role } */
+    private function rolesRevoke(array $user): void
+    {
+        if (!TraqueAuth::requireRole((int) $user['user_id'], 'traque_admin')) {
+            return;
+        }
+
+        $input  = Response::getRequestParams();
+        $userId = isset($input['user_id']) ? (int) $input['user_id'] : 0;
+        $role   = (string) ($input['role'] ?? '');
+
+        if ($userId <= 0 || !TraqueAuth::isValidRole($role)) {
+            Response::error('user_id et role valides requis', null, 422);
+            return;
+        }
+
+        $row = TraqueAuth::revoke($userId, $role);
+
+        if ($row === null) {
+            Response::error('Rôle non trouvé ou déjà révoqué', null, 404);
+            return;
+        }
+
+        Response::success('role_revoked', ['revoked_at' => $row['revoked_at']]);
+    }
+
+    /** GET /traque/admin/roles/log */
+    private function rolesLog(array $user): void
+    {
+        if (!TraqueAuth::requireRole((int) $user['user_id'], 'traque_admin')) {
+            return;
+        }
+
+        $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : 200;
+
+        Response::success('roles_log', TraqueAuth::log($limit));
     }
 
     // =========================================================================
@@ -455,6 +544,22 @@ class TraqueRouteHandler extends BaseRouteHandler
         $achService      = new AchievementService();
         $newAchievements = $achService->checkAfterVictory($playerId, 0, $result['new_level']);
         $result['new_achievements'] = $newAchievements ?: null;
+
+        // Rang de Maître de Jeu au niveau 15 — attribution unique, jamais retirée ici.
+        // granted_by : TRAQUE_SYSTEM_USER_ID si configuré, sinon le joueur lui-même
+        // (la contrainte FK exige un users.id existant).
+        $result['gm_granted'] = false;
+        if ((int) ($result['new_level'] ?? 0) === 15) {
+            $systemUserId = (int) ($_ENV['TRAQUE_SYSTEM_USER_ID'] ?? 0);
+            $grantedBy    = $systemUserId > 0 ? $systemUserId : $playerId;
+
+            try {
+                $result['gm_granted'] = TraqueAuth::grantIfAbsent($playerId, 'gm', $grantedBy);
+            } catch (\Throwable $e) {
+                // Une promotion ratée ne doit pas annuler la montée de niveau
+                $result['gm_granted'] = false;
+            }
+        }
 
         Response::success('level_up', $result);
     }
