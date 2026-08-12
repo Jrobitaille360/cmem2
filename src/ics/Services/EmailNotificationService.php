@@ -573,7 +573,10 @@ class EmailNotificationService
             'title'          => ($occurrence['modified_title']          ?? null) ?: $event['title'],
             'start_datetime' => ($occurrence['modified_start_datetime'] ?? null) ?: $event['start_datetime'],
             'end_datetime'   => ($occurrence['modified_end_datetime']   ?? null) ?: $event['end_datetime'],
-            'location'       => ($occurrence['modified_location']       ?? null) ?: ($event['location'] ?? null),
+            // NULL = pas de surcharge ; '' = lieu volontairement vidé sur cette occurrence
+            'location'       => ($occurrence['modified_location'] ?? null) !== null
+                ? $occurrence['modified_location']
+                : ($event['location'] ?? null),
             'meeting_link'   => $event['meeting_link']   ?? null,
             'description'    => $event['description']    ?? null,
             'timezone'       => $event['timezone']       ?? 'America/Montreal',

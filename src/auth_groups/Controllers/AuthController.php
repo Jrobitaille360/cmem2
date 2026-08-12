@@ -127,13 +127,26 @@ class AuthController
 
         $email = strtolower(trim($input['email']));
 
+        // Variable de dev laissée hors développement : configuration à corriger
+        if (defined('AUTH_TEST_CODE_IGNORED') && AUTH_TEST_CODE_IGNORED) {
+            LogService::warning('AUTH_TEST_CODE défini hors développement — variable ignorée');
+        }
+
+        // Code OTP fixe global (dev seulement) : s'applique à toute adresse.
+        // Inactif hors APP_ENV=development (la constante y est forcée à '').
+        $globalTestCode = defined('AUTH_TEST_CODE') ? AUTH_TEST_CODE : '';
+
         // Compte de test E2E (dev seulement) : code fixe, aucun email envoyé,
         // exempt du rate limit. Inactif si les vars d'env sont absentes (prod).
         $isTestAccount = OTP_TEST_ACCOUNT_EMAIL !== ''
             && OTP_TEST_ACCOUNT_CODE !== ''
             && $email === OTP_TEST_ACCOUNT_EMAIL;
 
-        if (!$isTestAccount && !RateLimitService::check($email, 'send-code')) {
+        // Le compte de test E2E garde son propre code ; sinon AUTH_TEST_CODE prend le relais.
+        $fixedCode    = $isTestAccount ? OTP_TEST_ACCOUNT_CODE : $globalTestCode;
+        $useFixedCode = $fixedCode !== '';
+
+        if (!$useFixedCode && !RateLimitService::check($email, 'send-code')) {
             LogService::warning('Rate limit send-code dépassé', ['email' => $email]);
             LoggingMiddleware::logExit(429);
             Response::error('Trop de demandes de code', [
@@ -143,7 +156,7 @@ class AuthController
             return;
         }
 
-        if (!$isTestAccount) {
+        if (!$useFixedCode) {
             RateLimitService::record($email, 'send-code');
         }
 
@@ -206,10 +219,13 @@ class AuthController
         }
 
         try {
-            if ($isTestAccount) {
+            if ($useFixedCode) {
                 // Code fixe, aucun email envoyé — flux E2E déterministe
-                OtpService::generateAndStore($email, OTP_TEST_ACCOUNT_CODE);
-                LogService::info('Code OTP fixe stocké pour compte de test E2E', ['email' => $email]);
+                OtpService::generateAndStore($email, $fixedCode);
+                LogService::info('Code OTP fixe stocké (dev)', [
+                    'email'  => $email,
+                    'source' => $isTestAccount ? 'OTP_TEST_ACCOUNT_CODE' : 'AUTH_TEST_CODE',
+                ]);
                 LoggingMiddleware::logExit(200);
                 Response::success('Code envoyé', $genericOk);
                 return;

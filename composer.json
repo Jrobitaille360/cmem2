@@ -9,7 +9,9 @@
         "simshaun/recurr": "^5.0",
         "sabre/vobject": "^4.5",
         "mjaschen/phpgeo": "^4.1",
-        "minishlink/web-push": "^9.0"
+        "minishlink/web-push": "^9.0",
+        "anthropic-ai/sdk": "^0.41.0",
+        "guzzlehttp/guzzle": "^7.15.2"
     },
     "require-dev": {
         "phpunit/phpunit": "9.6.33"
@@ -38,6 +40,9 @@
         "serve": "php -S localhost:8080 index.php"
     },
     "config": {
-        "optimize-autoloader": false
+        "optimize-autoloader": false,
+        "allow-plugins": {
+            "php-http/discovery": true
+        }
     }
 }

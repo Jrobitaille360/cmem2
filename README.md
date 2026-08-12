@@ -1,6 +1,6 @@
 ﻿# cmem2 API
 
-![Version](https://img.shields.io/badge/version-2.14.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.15.0-blue.svg)
 ![PHP](https://img.shields.io/badge/PHP-8.0+-purple.svg)
 ![Status](https://img.shields.io/badge/status-production%20ready-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
@@ -36,11 +36,14 @@ cmem2 API fournit :
 - **Contacts** : Pilier Contacts (CRM) — fiches personnes/organisations owner-strict, vCard 4.0, cap `max_contacts`, envoi de courriel, historique d'interactions (appels/notes/rdv/sms)
 - **Projets** : Gestion de projet — tâches, hiérarchie, dépendances (FS/SS/FF/SF), round-trip JSON, export `.ics`
 - **Puzzle** : Puzzle collaboratif — pick/drop de pièces, sessions partagées
-- **Traque** : Jeu type combat/exploration — monstres, biomes OSM, achievements
+- **Traque** : Jeu type combat/exploration — monstres, biomes OSM, achievements, rôles (`gm`, `traque_admin`)
 - **Access** : Contrôle d'accès aux abonnements — croisement Stripe / Playstore
 - **Stripe** : Paiements et abonnements Stripe
 - **Playstore** : Vérification des abonnements Google Play Store
 - **WebDevice** : Gestion des tokens de notification push web
+- **Push** : Notifications Web Push (VAPID) — abonnements par device, préférences par compte, envoi cron
+- **Modules** : Registre de modules activables — gating par plan, toggle usager
+- **IA** : Proxy IA — résumé d'agenda via `POST /ai/summarize`, gating par module `ia`
 
 ## Technologies
 
@@ -381,6 +384,7 @@ Voir [docs/items/GUIDE.md](docs/items/GUIDE.md) pour la référence complète.
 | Pomo | [docs/pomo/API_POMO_ENDPOINTS_v1_0_0.json](docs/pomo/API_POMO_ENDPOINTS_v1_0_0.json) | [docs/pomo/GUIDE.md](docs/pomo/GUIDE.md) |
 | Quiz | [docs/quiz/API_QUIZ_ENDPOINTS_v1_0_0.json](docs/quiz/API_QUIZ_ENDPOINTS_v1_0_0.json) | [docs/quiz/GUIDE.md](docs/quiz/GUIDE.md) |
 | Items | [docs/items/API_ITEMS_ENDPOINTS.json](docs/items/API_ITEMS_ENDPOINTS.json) | [docs/items/GUIDE.md](docs/items/GUIDE.md) |
+| Contacts | [docs/contacts/API_CONTACTS_ENDPOINTS.json](docs/contacts/API_CONTACTS_ENDPOINTS.json) | [docs/contacts/GUIDE.md](docs/contacts/GUIDE.md) |
 | Projets | [docs/projets/API_PROJETS_ENDPOINTS.json](docs/projets/API_PROJETS_ENDPOINTS.json) | — |
 | Puzzle | [docs/puzzle/API_PUZZLE_ENDPOINTS.json](docs/puzzle/API_PUZZLE_ENDPOINTS.json) | [docs/puzzle/GUIDE.md](docs/puzzle/GUIDE.md) |
 | Traque | [docs/traque/API_TRAQUE_ENDPOINTS.json](docs/traque/API_TRAQUE_ENDPOINTS.json) | [docs/traque/GUIDE.md](docs/traque/GUIDE.md) |
@@ -388,6 +392,9 @@ Voir [docs/items/GUIDE.md](docs/items/GUIDE.md) pour la référence complète.
 | Stripe | [docs/stripe/API_STRIPE_ENDPOINTS.json](docs/stripe/API_STRIPE_ENDPOINTS.json) | [docs/stripe/GUIDE.md](docs/stripe/GUIDE.md) |
 | Playstore | [docs/playstore/API_PLAYSTORE_ENDPOINTS.json](docs/playstore/API_PLAYSTORE_ENDPOINTS.json) | [docs/playstore/GUIDE.md](docs/playstore/GUIDE.md) |
 | WebDevice | [docs/webdevice/API_WEBDEVICE_ENDPOINTS.json](docs/webdevice/API_WEBDEVICE_ENDPOINTS.json) | [docs/webdevice/GUIDE.md](docs/webdevice/GUIDE.md) |
+| Push | [docs/push/API_PUSH_ENDPOINTS.json](docs/push/API_PUSH_ENDPOINTS.json) | [docs/push/GUIDE.md](docs/push/GUIDE.md) |
+| Modules | [docs/modules/API_MODULES_ENDPOINTS.json](docs/modules/API_MODULES_ENDPOINTS.json) | [docs/modules/GUIDE.md](docs/modules/GUIDE.md) |
+| IA | [docs/ai/API_AI_ENDPOINTS.json](docs/ai/API_AI_ENDPOINTS.json) | [docs/ai/GUIDE.md](docs/ai/GUIDE.md) |
 
 Migrations : [docs/core/](docs/core/) · Schéma initial : [docs/build_cmem2_DB.sql](docs/build_cmem2_DB.sql)
 
@@ -438,8 +445,12 @@ Chaque module a son propre fichier `private/tests/test_<module>.php` (voir la li
 - [ ] Plugin Quiz Ph3 — Moteur math (mossadal/math-executor)
 - [ ] Plugin Quiz Ph4 — WebSocket Node.js (temps réel)
 - [ ] Plugin Quiz Ph5 — Export CSV
+- [x] Pilier Contacts (CRM) — CRUD, vCard 4.0, interactions, pipeline `/opportunites`
+- [x] Push web (VAPID) — abonnements par device, préférences par compte, envoi cron
+- [x] Registre de modules activables — gating par plan, toggle usager (v2.12.0)
+- [x] Traque — socle des rôles de jeu (`gm`, `traque_admin`) (v2.15.0)
+- [x] Proxy IA — résumé d'agenda (`POST /ai/summarize`) (v2.15.0)
 - [ ] Rate limiting Redis
-- [ ] Notifications push
 
 ## Licence
 
@@ -447,4 +458,4 @@ MIT — voir [LICENSE](LICENSE). Dépendances tierces : [THIRD_PARTY_LICENSES.md
 
 ---
 
-**Version** : 2.14.0 · **Mis à jour** : 2026-08-04 · **Auteur** : [Jrobitaille360](https://github.com/Jrobitaille360)
+**Version** : 2.15.0 · **Mis à jour** : 2026-08-11 · **Auteur** : [Jrobitaille360](https://github.com/Jrobitaille360)

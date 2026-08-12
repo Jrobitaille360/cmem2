@@ -14,6 +14,7 @@ Version 1.0.0 · Base URL : `/traque`
 - [Joueur — profil et actions](#joueur--profil-et-actions)
 - [Journal, achievements, bestiaire](#journal-achievements-bestiaire)
 - [Leaderboard](#leaderboard)
+- [Rôles de jeu](#rôles-de-jeu)
 - [Codes d'erreur](#codes-derreur)
 
 ---
@@ -273,6 +274,34 @@ GET /traque/leaderboard?type=class&value=ranger&limit=20
 | `limit` | optionnel — défaut 20, max 100 |
 
 Réponse `200` : `[ { rank, player_id, display_name, level, xp, class } ]`.
+
+---
+
+## Rôles de jeu
+
+Les rôles Traque (`gm`, `traque_admin`) vivent dans `traque_roles`, indépendamment des rôles
+CMEM2 (`ADMINISTRATEUR` / `UTILISATEUR`). Un même compte peut être joueur et Maître de Jeu.
+Un rôle est actif tant que `revoked_at IS NULL` ; une révocation conserve la ligne pour l'audit.
+
+Le rang de Maître de Jeu (`gm`) est accordé automatiquement à l'atteinte du **niveau 15** :
+la réponse de `POST /traque/players/me/levelup` porte alors `gm_granted: true`.
+
+### POST /traque/admin/roles/grant
+
+Rôle `traque_admin` requis. Corps : `{ "user_id": 42, "role": "gm" }`.
+Réponse `201` avec la ligne créée. `409` si le rôle est déjà actif, `422` si le rôle est inconnu.
+Un rôle révoqué puis réaccordé réutilise sa ligne (contrainte unique sur `user_id` + `role`).
+
+### DELETE /traque/admin/roles/revoke
+
+Rôle `traque_admin` requis. Corps : `{ "user_id": 42, "role": "gm" }`.
+Positionne `revoked_at` et répond `200 { revoked_at }`. `404` si le rôle est absent ou déjà révoqué.
+
+### GET /traque/admin/roles/log
+
+Rôle `traque_admin` requis. Journal complet, révocations comprises, du plus récent au plus ancien.
+Paramètre `limit` optionnel (défaut 200, max 500). Chaque ligne porte `user_email` et
+`granted_by_email`.
 
 ---
 

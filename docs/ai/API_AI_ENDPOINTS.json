@@ -1,0 +1,50 @@
+{
+  "module": {
+    "name": "AI",
+    "version": "1.0.0",
+    "description": "Proxy IA — résumé d'agenda sur une période, déclenché manuellement par l'usager. Directive cmem_web 20260810_140000_ai-proxy.",
+    "generated": "2026-08-11",
+    "base_path": "/ai",
+    "authentication": {
+      "type": "JWT_BEARER",
+      "header": "Authorization: Bearer {jwt_token}"
+    },
+    "notes": "Prérequis : directive modules-gating (table tenant_modules, GET/PATCH /modules). Le client doit activer le module ia via PATCH /modules/ia avant de pouvoir appeler /ai/summarize. Le corps du journal n'est jamais transmis : seules des métadonnées bornées (titres, dates, tags, compteurs) sont envoyées au modèle."
+  },
+  "decisions": {
+    "quota_avant_appel": "Le quota est décompté AVANT l'appel au modèle, jamais après — évite un appel gratuit en cas de course entre requêtes concurrentes. Conséquence acceptée : un quota est consommé même si l'appel modèle échoue ensuite (502).",
+    "cle_serveur": "La clé Anthropic (ANTHROPIC_API_KEY) vit uniquement côté serveur — jamais transmise ni dérivable côté client.",
+    "consigne_fixe": "Le prompt système est fixé côté serveur (AiSummarizeService::SYSTEM_PROMPT). Le client ne transmet pas de prompt libre — évite l'injection de prompt et le détournement du proxy pour un usage hors périmètre.",
+    "modele_configurable": "AI_SUMMARIZE_MODEL (variable d'env) — migration de modèle sans redéploiement front."
+  },
+  "endpoints": {
+    "resume": {
+      "description": "Résumé d'agenda sur une période",
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/ai/summarize",
+          "description": "Génère un résumé court (2-4 phrases) à partir de métadonnées d'agenda assemblées côté client. Aucun champ description/notes/corps de journal n'est accepté.",
+          "auth_required": true,
+          "body": {
+            "app_id": "string — optionnel (défaut 'cmemweb')",
+            "period": "object requis — {start: date, end: date}",
+            "items": "array requis — [{type, title, date|due, tags?, done?}, ...]"
+          },
+          "response": {
+            "summary": "string — résumé généré",
+            "quota": "object — {used:int, limit:int, reset_at:datetime}, quota à jour après décompte"
+          },
+          "status_codes": { "200": "Résumé généré, quota décompté" },
+          "errors": {
+            "401": "JWT absent ou invalide",
+            "403": "errors.code = MODULE_NOT_AVAILABLE — module ia non disponible sur le plan ou non activé par l'usager (PATCH /modules/ia requis)",
+            "422": "period ou items absent",
+            "429": "errors.code = AI_QUOTA_EXCEEDED — quota mensuel atteint, aucun appel modèle déclenché. errors.quota porte l'état",
+            "502": "Erreur du service IA (appel modèle échoué) — le quota reste décompté"
+          }
+        }
+      ]
+    }
+  }
+}

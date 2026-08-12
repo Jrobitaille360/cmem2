@@ -277,6 +277,11 @@ define('TMP_CODE', $_ENV['TMP_CODE'] ?? '');
 // Compte de test E2E à code OTP fixe (dev seulement — vars absentes en prod)
 define('OTP_TEST_ACCOUNT_EMAIL', strtolower(trim($_ENV['OTP_TEST_ACCOUNT_EMAIL'] ?? '')));
 define('OTP_TEST_ACCOUNT_CODE', trim($_ENV['OTP_TEST_ACCOUNT_CODE'] ?? ''));
+// Code OTP fixe pour TOUTE adresse (dev seulement) — ignoré si APP_ENV !== 'development'.
+// send-code : aucun courriel envoyé, code fixe, exempt du rate limit.
+define('AUTH_TEST_CODE', APP_ENV === 'development' ? trim($_ENV['AUTH_TEST_CODE'] ?? '') : '');
+// Trace la présence de la variable hors développement (configuration à corriger)
+define('AUTH_TEST_CODE_IGNORED', APP_ENV !== 'development' && trim($_ENV['AUTH_TEST_CODE'] ?? '') !== '');
 
 // ============================================
 // RESET DE MOT DE PASSE (code par courriel)
@@ -297,6 +302,12 @@ define('EMAIL_VERIFICATION_MAX_ATTEMPTS', (int)($_ENV['EMAIL_VERIFICATION_MAX_AT
 define('EMAIL_VERIFICATION_TEST_CODE', APP_ENV === 'production' ? '' : trim($_ENV['EMAIL_VERIFICATION_TEST_CODE'] ?? ''));
 // Trace la présence de la variable en production (configuration à corriger)
 define('EMAIL_VERIFICATION_TEST_CODE_IGNORED', APP_ENV === 'production' && trim($_ENV['EMAIL_VERIFICATION_TEST_CODE'] ?? '') !== '');
+
+// ============================================
+// PROXY IA — POST /ai/summarize (directive cmem_web ai-proxy)
+// ============================================
+define('ANTHROPIC_API_KEY', $_ENV['ANTHROPIC_API_KEY'] ?? '');
+define('AI_SUMMARIZE_MODEL', $_ENV['AI_SUMMARIZE_MODEL'] ?? 'claude-haiku-4-5');
 
 // ============================================
 // DEVICE TOKENS - Appareils de confiance

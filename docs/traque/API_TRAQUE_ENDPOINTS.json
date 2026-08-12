@@ -445,6 +445,73 @@
         "401": "JWT absent ou expiré",
         "422": "type invalide (attendu: global | biome | class)"
       }
+    },
+    {
+      "method": "POST",
+      "path": "/traque/admin/roles/grant",
+      "description": "Accorde un rôle de jeu Traque (gm | traque_admin). Un rôle révoqué puis réaccordé réutilise sa ligne.",
+      "auth": "JWT Bearer + rôle traque_admin",
+      "body": {
+        "user_id": "int (requis)",
+        "role": "gm | traque_admin (requis)"
+      },
+      "response_201": {
+        "id": 7,
+        "user_id": 42,
+        "role": "gm",
+        "granted_at": "2026-08-04 16:17:57",
+        "granted_by": 1,
+        "revoked_at": null
+      },
+      "errors": {
+        "401": "JWT absent ou expiré",
+        "403": "Rôle traque_admin requis",
+        "409": "Rôle déjà actif pour cet utilisateur",
+        "422": "user_id manquant ou rôle inconnu"
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/traque/admin/roles/revoke",
+      "description": "Révoque un rôle (revoked_at = NOW()). La ligne est conservée pour l'audit.",
+      "auth": "JWT Bearer + rôle traque_admin",
+      "body": {
+        "user_id": "int (requis)",
+        "role": "gm | traque_admin (requis)"
+      },
+      "response_200": {
+        "revoked_at": "2026-08-04 16:20:00"
+      },
+      "errors": {
+        "401": "JWT absent ou expiré",
+        "403": "Rôle traque_admin requis",
+        "404": "Rôle non trouvé ou déjà révoqué",
+        "422": "user_id ou rôle invalide"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/traque/admin/roles/log",
+      "description": "Journal d'attribution des rôles, révoqués compris, du plus récent au plus ancien.",
+      "auth": "JWT Bearer + rôle traque_admin",
+      "query_params": {
+        "limit": "int (optionnel, défaut 200, max 500)"
+      },
+      "response_200": [
+        {
+          "id": 7,
+          "user_id": 42,
+          "user_email": "mj@exemple.com",
+          "role": "gm",
+          "granted_at": "2026-08-04 16:17:57",
+          "granted_by_email": "admin@exemple.com",
+          "revoked_at": null
+        }
+      ],
+      "errors": {
+        "401": "JWT absent ou expiré",
+        "403": "Rôle traque_admin requis"
+      }
     }
   ]
 }
