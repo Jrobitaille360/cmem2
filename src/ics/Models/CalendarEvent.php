@@ -48,6 +48,22 @@ class CalendarEvent extends BaseModel
     public $duration;   // 4.5 — VARCHAR(20), format ISO 8601 (ex: PT1H30M) — exclusif avec end_datetime
     public $uid;        // UID ICS optionnel (RFC 5545 §3.8.4.7) — préservé lors de l'import
 
+    /**
+     * Colonnes à forcer à NULL lors de l'update (effacement explicite).
+     *
+     * `isset($this->x)` ne distingue pas « champ absent » de « null explicite » :
+     * cette liste transporte l'intention d'effacer jusqu'au UPDATE.
+     * Seules les colonnes de NULLABLE_COLUMNS sont acceptées.
+     *
+     * @var string[]
+     */
+    public array $nullFields = [];
+
+    /** Colonnes nullables pouvant être effacées via $nullFields */
+    public const NULLABLE_COLUMNS = [
+        'location', 'description', 'color', 'recurrence_rule',
+    ];
+
     public function __construct() {
         parent::__construct();
     }
@@ -448,10 +464,17 @@ class CalendarEvent extends BaseModel
                 $values[] = $this->duration;
             }
 
+            // Effacements explicites (null) — voir $nullFields
+            foreach (array_unique($this->nullFields) as $column) {
+                if (in_array($column, self::NULLABLE_COLUMNS, true)) {
+                    $fields[] = "{$column} = NULL";
+                }
+            }
+
             if (empty($fields)) {
                 return false;
             }
-            
+
             $fields[] = "updated_at = CURRENT_TIMESTAMP";
             $values[] = $this->id;
             

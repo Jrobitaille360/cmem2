@@ -204,10 +204,11 @@ class EventOccurrence extends BaseModel
         if (!empty($occurrence['modified_title'])) {
             $occurrence['title'] = $occurrence['modified_title'];
         }
-        if (!empty($occurrence['modified_description'])) {
+        // NULL = pas de surcharge (hérite du parent) ; '' = effacement volontaire de l'occurrence
+        if (($occurrence['modified_description'] ?? null) !== null) {
             $occurrence['description'] = $occurrence['modified_description'];
         }
-        if (!empty($occurrence['modified_location'])) {
+        if (($occurrence['modified_location'] ?? null) !== null) {
             $occurrence['location'] = $occurrence['modified_location'];
         }
         if (!empty($occurrence['modified_start_datetime'])) {
@@ -1135,13 +1136,15 @@ class EventOccurrence extends BaseModel
                 $fields[] = 'modified_title = ?';
                 $params[] = $modifications['title'];
             }
-            if (isset($modifications['description'])) {
+            // Champ absent = surcharge inchangée (NULL en base = hérite du parent).
+            // Chaîne vide = effacement explicite ; null est normalisé en ''.
+            if (array_key_exists('description', $modifications)) {
                 $fields[] = 'modified_description = ?';
-                $params[] = $modifications['description'];
+                $params[] = $modifications['description'] ?? '';
             }
-            if (isset($modifications['location'])) {
+            if (array_key_exists('location', $modifications)) {
                 $fields[] = 'modified_location = ?';
-                $params[] = $modifications['location'];
+                $params[] = $modifications['location'] ?? '';
             }
             if (isset($modifications['start_datetime'])) {
                 $fields[] = 'modified_start_datetime = ?';
@@ -1285,13 +1288,15 @@ class EventOccurrence extends BaseModel
                 $fields[] = 'modified_title = ?';
                 $params[] = $modifications['title'];
             }
-            if (isset($modifications['description'])) {
+            // Champ absent = surcharge inchangée (NULL en base = hérite du parent).
+            // Chaîne vide = effacement explicite ; null est normalisé en ''.
+            if (array_key_exists('description', $modifications)) {
                 $fields[] = 'modified_description = ?';
-                $params[] = $modifications['description'];
+                $params[] = $modifications['description'] ?? '';
             }
-            if (isset($modifications['location'])) {
+            if (array_key_exists('location', $modifications)) {
                 $fields[] = 'modified_location = ?';
-                $params[] = $modifications['location'];
+                $params[] = $modifications['location'] ?? '';
             }
             if (isset($modifications['start_datetime'])) {
                 $fields[] = 'modified_start_datetime = ?';
@@ -1374,13 +1379,15 @@ class EventOccurrence extends BaseModel
                 $fields[] = 'modified_title = ?';
                 $params[] = $modifications['title'];
             }
-            if (isset($modifications['description'])) {
+            // Champ absent = surcharge inchangée (NULL en base = hérite du parent).
+            // Chaîne vide = effacement explicite ; null est normalisé en ''.
+            if (array_key_exists('description', $modifications)) {
                 $fields[] = 'modified_description = ?';
-                $params[] = $modifications['description'];
+                $params[] = $modifications['description'] ?? '';
             }
-            if (isset($modifications['location'])) {
+            if (array_key_exists('location', $modifications)) {
                 $fields[] = 'modified_location = ?';
-                $params[] = $modifications['location'];
+                $params[] = $modifications['location'] ?? '';
             }
             if (isset($modifications['start_datetime'])) {
                 $fields[] = 'modified_start_datetime = ?';
@@ -1436,13 +1443,15 @@ class EventOccurrence extends BaseModel
                 $fields[] = 'modified_title = ?';
                 $params[] = $modifications['title'];
             }
-            if (isset($modifications['description'])) {
+            // Champ absent = surcharge inchangée (NULL en base = hérite du parent).
+            // Chaîne vide = effacement explicite ; null est normalisé en ''.
+            if (array_key_exists('description', $modifications)) {
                 $fields[] = 'modified_description = ?';
-                $params[] = $modifications['description'];
+                $params[] = $modifications['description'] ?? '';
             }
-            if (isset($modifications['location'])) {
+            if (array_key_exists('location', $modifications)) {
                 $fields[] = 'modified_location = ?';
-                $params[] = $modifications['location'];
+                $params[] = $modifications['location'] ?? '';
             }
             if (isset($modifications['start_datetime'])) {
                 $fields[] = 'modified_start_datetime = ?';

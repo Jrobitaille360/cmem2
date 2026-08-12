@@ -1343,7 +1343,7 @@ class CalendarController
         }
         
         // Vérifier validité de la récurrence s'il y en a une
-        if (isset($input['recurrence_rule']) && !CalendarEvent::isValidRecurrenceRule($input['recurrence_rule'])) {
+        if (!empty($input['recurrence_rule']) && !CalendarEvent::isValidRecurrenceRule($input['recurrence_rule'])) {
             LogService::warning("Règle de récurrence invalide", [
                 'recurrence_rule' => $input['recurrence_rule']
             ]);
@@ -1392,7 +1392,7 @@ class CalendarController
                 $event->endDatetime = $input['end_datetime'];
                 $updatedFields[] = 'end_datetime';
             }
-            if (isset($input['description'])) {
+            if (isset($input['description']) && $input['description'] !== '') {
                 $event->description = $input['description'];
                 $updatedFields[] = 'description';
             }
@@ -1400,7 +1400,7 @@ class CalendarController
                 $event->allDay = $input['all_day'];
                 $updatedFields[] = 'all_day';
             }
-            if (isset($input['location'])) {
+            if (isset($input['location']) && $input['location'] !== '') {
                 $event->location = $input['location'];
                 $updatedFields[] = 'location';
             }
@@ -1412,13 +1412,32 @@ class CalendarController
                 $event->attendees = $input['attendees'];
                 $updatedFields[] = 'attendees';
             }
-            if (isset($input['recurrence_rule'])) {
+            if (isset($input['recurrence_rule']) && $input['recurrence_rule'] !== '') {
                 $event->recurrenceRule = $input['recurrence_rule'];
                 $updatedFields[] = 'recurrence_rule';
             }
             if (isset($input['status'])) {
                 $event->status = $input['status'];
                 $updatedFields[] = 'status';
+            }
+
+            // Effacement explicite des champs texte nullables.
+            // Contrat : champ absent = inchangé ; null ou chaîne vide = colonne mise à NULL.
+            // La propriété est remise à null pour que le `isset()` du modèle n'écrive pas
+            // la valeur courante chargée par findById() par-dessus l'effacement.
+            $nullableProps = [
+                'location'        => 'location',
+                'description'     => 'description',
+                'color'           => 'color',
+                'recurrence_rule' => 'recurrenceRule',
+            ];
+            foreach ($nullableProps as $column => $property) {
+                if (array_key_exists($column, $input)
+                    && ($input[$column] === null || $input[$column] === '')) {
+                    $event->{$property}  = null;
+                    $event->nullFields[] = $column;
+                    $updatedFields[]     = $column;
+                }
             }
             
             // Nouveaux champs
@@ -1434,7 +1453,7 @@ class CalendarController
                 $event->notifications = $eventValidation['data']['notifications'];
                 $updatedFields[] = 'notifications';
             }
-            if (isset($eventValidation['data']['color'])) {
+            if (isset($eventValidation['data']['color']) && $eventValidation['data']['color'] !== '') {
                 $event->color = $eventValidation['data']['color'];
                 $updatedFields[] = 'color';
             }

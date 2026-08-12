@@ -18,6 +18,7 @@ Chaque module expose sa documentation d'API au format JSON. Ces fichiers décriv
 | [pomo/API_POMO_ENDPOINTS_v1_0_0.json](pomo/API_POMO_ENDPOINTS_v1_0_0.json) | 1 | Plugin Pomodoro — phase 1A seulement : `POST /pomo/engagement` (waitlist/sondage public). Phases 1B/2/3 planifiées. |
 | [push/API_PUSH_ENDPOINTS.json](push/API_PUSH_ENDPOINTS.json) | 5 | Notifications push web (VAPID) : clé publique, subscriptions par appareil, préférences par compte (4 kinds dont `contact_followup`). |
 | [modules/API_MODULES_ENDPOINTS.json](modules/API_MODULES_ENDPOINTS.json) | 2 | Registre de modules activables : gating par plan (`available`), interrupteur usager (`enabled`), quota serveur. |
+| [ai/API_AI_ENDPOINTS.json](ai/API_AI_ENDPOINTS.json) | 1 | Proxy IA — `POST /ai/summarize`, résumé d'agenda. Quota décompté avant l'appel modèle, clé Anthropic serveur seule, consigne fixe (pas de prompt libre). |
 
 ## Guides narratifs par module
 
@@ -40,6 +41,7 @@ Chaque guide complète le JSON avec les flux d'intégration, exemples et codes d
 | [pomo/GUIDE.md](pomo/GUIDE.md) | Engagement public (Ph1A actif) ; support/sync/Stripe = contrat prévisionnel (404). |
 | [push/GUIDE.md](push/GUIDE.md) | Flux d'abonnement Web Push, préférences par compte, sélection des échéances, idempotence, purge sur 410, cron. |
 | [modules/GUIDE.md](modules/GUIDE.md) | Trois états (disponible / activé / quota), mapping plan→modules, rétro-fit des pans livrés, codes d'erreur du gating. |
+| [ai/GUIDE.md](ai/GUIDE.md) | Contrat de confidentialité (métadonnées seulement, jamais de corps de journal), quota avant appel, consigne fixe côté serveur. |
 
 ## Conventions
 
@@ -47,6 +49,30 @@ Chaque guide complète le JSON avec les flux d'intégration, exemples et codes d
 - Routes legacy actives : section `deprecated_routes` avec `replaced_by`.
 - Routes supprimées (404/410) : section `removed_routes`.
 - Les routes `secret-admin` ne sont volontairement pas documentées.
+
+## Effacement d'un champ optionnel
+
+Règle générale sur les `PUT` : **champ absent = inchangé, `null` = effacé**.
+
+`PUT /calendars/{calendar_id}/events/{event_id}` applique ce contrat à `location`,
+`description`, `color` et `recurrence_rule` : la chaîne vide est acceptée et normalisée
+en `NULL` (compatibilité avec les clients existants), et aucun de ces champs ne produit
+de `422` sur `null`.
+
+`recurrence_rule: null` fait cesser la récurrence de l'événement. Les lignes d'exception
+déjà posées dans `event_occurrences` sont **conservées** (jamais purgées) : elles
+deviennent inertes tant que l'événement n'est pas récurrent, et redeviennent actives si
+une `RRULE` est reposée plus tard.
+
+Les **occurrences** suivent une sémantique distincte, car `NULL` y signifie déjà « pas de
+surcharge » : sur `PUT /calendars/{cid}/events/{eid}/occurrences/{date}`, c'est la chaîne
+vide qui efface.
+
+| Valeur envoyée | Événement | Occurrence |
+| - | - | - |
+| champ absent | colonne inchangée | surcharge inchangée |
+| `null` | colonne mise à `NULL` | normalisé en `''` → effacement |
+| `""` | colonne mise à `NULL` | effacement (l'occurrence n'a pas de valeur) |
 
 ## Contenus chiffrés de bout en bout
 
