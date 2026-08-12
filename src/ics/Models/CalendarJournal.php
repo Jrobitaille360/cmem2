@@ -250,6 +250,9 @@ class CalendarJournal extends BaseModel
         if (isset($row['categories']) && is_string($row['categories'])) {
             $row['categories'] = json_decode($row['categories'], true) ?? [];
         }
+        if (isset($row['updated_at'])) {
+            $row['updatedAt'] = \AuthGroups\Utils\DateHelper::toIso8601Utc($row['updated_at']);
+        }
         return $row;
     }
 }

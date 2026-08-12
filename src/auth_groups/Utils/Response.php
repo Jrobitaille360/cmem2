@@ -30,20 +30,24 @@ class Response {
     /**
      * Envoyer une réponse JSON d'erreur
      */
-    public static function error($message = 'Error', $errors = null, $status = 400) {
+    public static function error($message = 'Error', $errors = null, $status = 400, $data = null) {
         http_response_code($status);
         header('Content-Type: application/json');
-        
+
         $response = [
             'success' => false,
             'message' => $message,
             'timestamp' => date('Y-m-d H:i:s')
         ];
-        
+
         if ($errors !== null) {
             $response['errors'] = $errors;
         }
-        
+
+        if ($data !== null) {
+            $response['data'] = $data;
+        }
+
         echo json_encode($response, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
         exit;
     }

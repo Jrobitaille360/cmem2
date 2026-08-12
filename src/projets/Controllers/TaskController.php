@@ -151,6 +151,11 @@ class TaskController
         $project = $this->ownedProjectForTask($user, $row);
         if (!$project) { return; }
 
+        \AuthGroups\Utils\ConditionalRequest::enforce(
+            $row['updated_at'] ?? null,
+            fn() => ['task' => $this->model->findTaskById($id)]
+        );
+
         $data = Response::getRequestParams();
         if (array_key_exists('title', $data) && trim((string) $data['title']) === '') {
             Response::error('title ne peut pas être vide', null, 422);

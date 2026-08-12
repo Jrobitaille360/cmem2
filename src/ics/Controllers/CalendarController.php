@@ -1376,7 +1376,12 @@ class CalendarController
             Response::error('Événement non trouvé', null, 404);
             return;
         }
-        
+
+        \AuthGroups\Utils\ConditionalRequest::enforce(
+            $existingEvent['updated_at'] ?? null,
+            fn() => $event->getEventById($eventId)
+        );
+
         try {
             // Mettre à jour les propriétés de l'instance
             $updatedFields = [];
@@ -1512,8 +1517,8 @@ class CalendarController
                 throw new \Exception("Échec de la mise à jour");
             }
             
-            // Récupérer les données mises à jour
-            $updatedEvent = $event->findById($eventId);
+            // Récupérer les données mises à jour (décodées : categories/attachments/… + updatedAt)
+            $updatedEvent = $event->getEventById($eventId);
 
             // Replanifier les notifications email si le champ `notifications` était fourni (§1.2 spec)
             if (in_array('notifications', $updatedFields, true) && $updatedEvent) {

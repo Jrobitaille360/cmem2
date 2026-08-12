@@ -9,6 +9,17 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased 2026-08-12 08:15]
 
+### Versioning optimiste — `updatedAt` + `If-Unmodified-Since` sur events/todos/journals/tasks
+
+> Directive `20260812_113000_cmem_web_vers_cmem2_API__offline-sync-versioning`
+
+- **`updatedAt` (ISO 8601 UTC) ajouté aux réponses `GET`/`PUT` des journaux** — absent jusqu'ici, contrairement à ce que la directive présumait pour les événements et les tâches
+- **`updatedAt` camelCase ISO 8601 UTC ajouté aux événements et aux tâches calendrier (VTODO)**, en plus de `updated_at` existant — la clé camelCase n'existait en réalité pas côté événements/todos malgré la documentation client qui la présumait déjà présente
+- **`updatedAt` des tâches de projet reformaté en vrai ISO 8601 UTC** (`...T...Z`) — la clé camelCase existait déjà mais portait le format brut MySQL (`Y-m-d H:i:s`), inutilisable tel quel pour une comparaison de versions côté client
+- **Header `If-Unmodified-Since` accepté sur `PUT /calendars/{id}/events/{id}`, `PUT /calendars/{id}/todos/{id}`, `PUT /calendars/{id}/journals/{id}` et `PATCH /projets/tasks/{id}`** — comparaison par instant UTC (`strtotime`, pas de correspondance de chaîne exacte), header absent = comportement inchangé pour tout appelant existant
+- **Mismatch → `409 Conflict`**, corps `data.current` avec l'état serveur complet (mêmes clés que le `GET` de la même ressource), aucune écriture appliquée dans ce cas
+- Bug latent corrigé au passage : `CalendarController::updateEvent()` construisait sa réponse via `CalendarEvent::findById()` (brut, `BaseModel`) au lieu de `getEventById()` — `categories`/`attachments`/`attendees`/`notifications` repartaient en JSON brut non décodé au lieu de tableaux, incohérent avec la réponse `GET`
+
 ### Proxy IA — incident post-déploiement v2.15.0 résolu
 
 - **`ANTHROPIC_API_KEY` absente de l'environnement dev** : jamais ajoutée au `.env` serveur lors du déploiement de `POST /ai/summarize` (v2.15.0). Le SDK partait sans entête `x-api-key`, Anthropic répondait `401 authentication_error`, capturé et renvoyé en `502 Erreur du service IA`

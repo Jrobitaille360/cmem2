@@ -110,10 +110,14 @@
           "path": "/projets/tasks/{id}",
           "description": "Mettre à jour une tâche (champs partiels du contrat). Rejette (422) si cycle introduit.",
           "auth_required": true,
-          "response": { "task": "object" },
+          "headers": {
+            "If-Unmodified-Since": "string ISO 8601 UTC (optional) - versioning optimiste (directive 20260812_113000). Absent = comportement inchangé. Doit valoir exactement le task.updatedAt reçu au dernier GET/PATCH ; sinon 409."
+          },
+          "response": { "task": "object — updatedAt en ISO 8601 UTC" },
           "errors": {
             "401": "JWT absent", "403": "Non propriétaire", "404": "Tâche introuvable",
-            "422": "title vide, référence invalide, ou cycle arbre/DAG"
+            "422": "title vide, référence invalide, ou cycle arbre/DAG",
+            "409": "Conflit de version (If-Unmodified-Since ne correspond pas à task.updatedAt en base) - corps: { data: { current: { task: <tâche complète> } } }"
           }
         },
         {

@@ -241,8 +241,10 @@ class CalendarEvent extends BaseModel
             $row['attendees'] = json_decode($row['attendees'], true) ?? [];
         if (isset($row['notifications']) && is_string($row['notifications']))
             $row['notifications'] = json_decode($row['notifications'], true) ?? [];
+        if (isset($row['updated_at']))
+            $row['updatedAt'] = \AuthGroups\Utils\DateHelper::toIso8601Utc($row['updated_at']);
         return $row;
-    }  
+    }
 
     /**
      * Récupère tous les événements d'un calendrier.

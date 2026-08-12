@@ -221,6 +221,9 @@ class TodoController
             return;
         }
 
+        $existing = $this->todoModel->getById($todoId);
+        \AuthGroups\Utils\ConditionalRequest::enforce($existing['updated_at'] ?? null, fn() => $existing);
+
         try {
             $todo     = new CalendarTodo();
             $todo->id = $todoId;

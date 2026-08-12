@@ -189,6 +189,9 @@ class JournalController
             return;
         }
 
+        $existing = $this->journalModel->getById($journalId);
+        \AuthGroups\Utils\ConditionalRequest::enforce($existing['updated_at'] ?? null, fn() => $existing);
+
         try {
             $journal     = new CalendarJournal();
             $journal->id = $journalId;

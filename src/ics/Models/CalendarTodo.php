@@ -288,6 +288,9 @@ class CalendarTodo extends BaseModel
         if (isset($row['percent_complete'])) {
             $row['percent_complete'] = (int) $row['percent_complete'];
         }
+        if (isset($row['updated_at'])) {
+            $row['updatedAt'] = \AuthGroups\Utils\DateHelper::toIso8601Utc($row['updated_at']);
+        }
         return $row;
     }
 }

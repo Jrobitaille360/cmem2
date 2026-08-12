@@ -260,7 +260,7 @@ class Task extends BaseModel
             'allDay'             => (bool) $row['all_day'],
             'completedAt'        => $row['completed'],
             'createdAt'          => $row['created_at'],
-            'updatedAt'          => $row['updated_at'],
+            'updatedAt'          => \AuthGroups\Utils\DateHelper::toIso8601Utc($row['updated_at']),
             'sequence'           => (int) $row['sequence'],
             'parentId'           => $row['parent_id'] !== null ? (int) $row['parent_id'] : null,
             'dependsOn'          => $dependsOn,
