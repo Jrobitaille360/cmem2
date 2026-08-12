@@ -18,7 +18,7 @@
     "defaut_sans_ligne": "L'absence de ligne dans tenant_modules n'est pas une erreur : elle signifie l'état par défaut. projet/contacts/crm/ged → enabled=true ; ia/caldav/booking/push_avance → enabled=false. GET /modules ne crée aucune ligne ; seul PATCH écrit.",
     "portee": "owner_id uniquement en v1. La colonne group_id existe en base (unicité + CHECK XOR) pour préparer le plan équipe, mais n'est pas servie par l'API.",
     "quota_ged": "Reporté. Le cap max_storage_mb de CmemPlans n'est pas enforcé ; ged renvoie quota=null. L'indicateur de stockage du front reste purement indicatif.",
-    "quota_ia": "30 appels/mois sur monthly, yearly et ami ; 0 sur free (module non disponible). Décompte serveur uniquement (TenantModule::incrementQuota), appelé par les endpoints consommateurs — directive ai-proxy à venir. Au dépassement, l'endpoint consommateur répond 429.",
+    "quota_ia": "30 appels/mois sur monthly, yearly et ami ; 0 sur free (module non disponible). Décompte serveur uniquement (TenantModule::incrementQuota), appelé par POST /ai/summarize (docs/ai/API_AI_ENDPOINTS.json). Au dépassement, l'endpoint répond 429 AI_QUOTA_EXCEEDED.",
     "desactivation": "Éteindre un module coupe l'accès, jamais le contenu. Aucune donnée n'est supprimée ; réactiver rend les données telles quelles."
   },
   "endpoints": {

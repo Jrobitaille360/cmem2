@@ -109,8 +109,8 @@ rend les données telles quelles. Le test `test_modules.php` §6 le vérifie sur
 
 Le décompte est serveur, jamais client. `TenantModule::incrementQuota()` incrémente
 `quota_used` et remet le compteur à 1 quand `quota_reset_at` est échu (période = mois calendaire,
-`CmemModules::nextQuotaReset()`). Les endpoints consommateurs — module IA, directive `ai-proxy` à
-venir — appellent ce mécanisme et répondent `429` au dépassement.
+`CmemModules::nextQuotaReset()`). Les endpoints consommateurs — module IA, voir
+`docs/ai/GUIDE.md` — appellent ce mécanisme et répondent `429` au dépassement.
 
 `GET /modules` n'expose que la lecture : `used` / `limit` / `reset_at`.
 
