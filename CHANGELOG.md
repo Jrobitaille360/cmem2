@@ -7,7 +7,13 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased]
+## [Unreleased 2026-08-12 08:15]
+
+### Proxy IA — incident post-déploiement v2.15.0 résolu
+
+- **`ANTHROPIC_API_KEY` absente de l'environnement dev** : jamais ajoutée au `.env` serveur lors du déploiement de `POST /ai/summarize` (v2.15.0). Le SDK partait sans entête `x-api-key`, Anthropic répondait `401 authentication_error`, capturé et renvoyé en `502 Erreur du service IA`
+- **Extension PHP native `psr` (v1.2.0) de l'hébergement cPanel (`alt-php83`) entrait en conflit avec `anthropic-ai/sdk`** : elle préenregistre `Psr\Http\Message\ResponseInterface` avec une signature non typée, ce qui empêchait `vendor/psr/http-message` 2.0 (typé) d'être chargé et provoquait une erreur fatale de déclaration (`Anthropic\Core\Concerns\ResponseProxy::withStatus`) — invisible en local et dans les tests gating, déclenchée seulement par un appel modèle réel. Résolu en désactivant l'extension `psr` dans le sélecteur PHP 83 de cPanel (compte entier, dev et prod)
+- Aucun changement de code — correctifs d'environnement uniquement (`.env` dev, configuration PHP cPanel)
 
 ## [2.15.0] — 2026-08-11
 
