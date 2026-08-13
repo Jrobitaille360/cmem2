@@ -1,6 +1,6 @@
 # Guide — Module Stripe (v2.7.0)
 
-Version 1.1.0 · Base URL : `/v2`
+Version 1.2.0 · Base URL : `/v2`
 
 > Référence complète : [API_STRIPE_ENDPOINTS.json](API_STRIPE_ENDPOINTS.json)
 
@@ -12,6 +12,7 @@ Version 1.1.0 · Base URL : `/v2`
 - [Webhook Stripe](#webhook-stripe)
 - [Abonnements Stripe](#abonnements-stripe)
 - [Plan effectif cmem (/auth/me)](#plan-effectif-cmem-authme)
+- [Plan équipe (abonnement de groupe)](#plan-equipe-abonnement-de-groupe)
 - [URLs de redirection](#urls-de-redirection)
 - [Mapping plateforme](#mapping-plateforme)
 - [Routes dépréciées](#routes-dépréciées)
@@ -30,7 +31,9 @@ Ce module gère les abonnements Stripe pour les plateformes web et Windows.
 - `GET /v2/subscriptions/stripe/status` — statut de l'abonnement
 - `DELETE /v2/subscriptions/stripe` — annule à la fin de la période en cours
 
-Chaque abonnement est lié à `(user_id, app_id)`. L'identifiant Stripe est l'email du compte.
+Chaque abonnement est lié à `(user_id, app_id)` — ou à `(group_id, app_id)` depuis le plan équipe
+(2026-08-13, voir [Plan équipe](#plan-equipe-abonnement-de-groupe)). L'identifiant Stripe est
+l'email du compte (ou de l'admin qui initie le checkout pour un groupe).
 
 ---
 
@@ -58,7 +61,8 @@ son paiement. Stripe enverra un webhook `checkout.session.completed` à l'issue.
 | Champ | Type | Requis | Description |
 | - | - | - | - |
 | `app_id` | string | oui | Identifiant de l'application (ex. `puzzle`) |
-| `plan` | string | oui | `monthly` ou `yearly` |
+| `plan` | string | oui | `monthly` ou `yearly` (sans `group_id`) ; `team` obligatoire si `group_id` fourni |
+| `group_id` | int | non | Plan équipe — rattache l'abonnement au **groupe** plutôt qu'à l'usager. Requiert `role=admin` du groupe. Voir [Plan équipe](#plan-equipe-abonnement-de-groupe) |
 
 **Réponse 200 :**
 
@@ -77,8 +81,9 @@ son paiement. Stripe enverra un webhook `checkout.session.completed` à l'issue.
 | Code | Cause |
 | - | - |
 | 401 | JWT absent ou invalide |
-| 422 | `app_id` ou `plan` manquant, `plan` invalide (doit être `monthly` ou `yearly`) |
-| 500 | Clé Stripe non configurée ou erreur API Stripe |
+| 403 | `group_id` fourni et l'usager n'est pas admin du groupe — `errors: { code: "GROUP_ADMIN_REQUIRED" }` |
+| 422 | `app_id` ou `plan` manquant, `plan` invalide (`monthly`/`yearly` sans `group_id`, `team` obligatoire avec `group_id`) |
+| 500 | Clé/prix Stripe non configuré ou erreur API Stripe |
 
 **Notes client :** Rediriger l'utilisateur vers `checkout_url`. Après paiement, Stripe redirige
 vers `https://journauxdebord.com/{app_id}/subscription/success?session_id={CHECKOUT_SESSION_ID}`.
@@ -94,6 +99,7 @@ Crée une session Stripe Billing Portal permettant à l'utilisateur de gérer so
 | Champ | Type | Requis | Description |
 | - | - | - | - |
 | `app_id` | string | oui | Identifiant de l'application |
+| `group_id` | int | non | Plan équipe — gère l'abonnement du **groupe**. Requiert `role=admin` du groupe |
 
 **Réponse 200 :**
 
@@ -111,7 +117,8 @@ Crée une session Stripe Billing Portal permettant à l'utilisateur de gérer so
 | Code | Cause |
 | - | - |
 | 401 | JWT absent ou invalide |
-| 404 | Aucun `stripe_customer_id` en base pour cet utilisateur + `app_id` |
+| 403 | `group_id` fourni et l'usager n'est pas admin du groupe — `errors: { code: "GROUP_ADMIN_REQUIRED" }` |
+| 404 | Aucun `stripe_customer_id` en base pour cet utilisateur/groupe + `app_id` |
 | 422 | `app_id` manquant |
 | 500 | Erreur API Stripe |
 
@@ -165,9 +172,11 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 
 ### GET /v2/subscriptions/stripe/status
 
-Retourne le statut de l'abonnement Stripe pour `(user_id, app_id)`.
+Retourne le statut de l'abonnement Stripe pour `(user_id, app_id)` — ou pour
+`(group_id, app_id)` si `group_id` est fourni (plan équipe). Lecture seule : simple appartenance
+au groupe suffit, `role=admin` non requis.
 
-**Query params :** `app_id` (requis)
+**Query params :** `app_id` (requis), `group_id` (non, plan équipe — requiert d'être membre du groupe, sinon `403 GROUP_MEMBERSHIP_REQUIRED`)
 
 **Réponse 200 — aucun abonnement :**
 
@@ -228,15 +237,17 @@ Retourne le statut de l'abonnement Stripe pour `(user_id, app_id)`.
 ### DELETE /v2/subscriptions/stripe
 
 Annule l'abonnement Stripe à la fin de la période en cours (`cancel_at_period_end = true`
-via l'API Stripe). L'accès reste actif jusqu'à `expires_at`.
+via l'API Stripe). L'accès reste actif jusqu'à `expires_at`. `group_id` optionnel (plan équipe) :
+annule l'abonnement du **groupe**, réservé aux admins — même délai de grâce que l'individuel.
 
-**Body :** `app_id` (requis)
+**Body :** `app_id` (requis), `group_id` (non, plan équipe — requiert `role=admin` du groupe)
 
 **Erreurs :**
 
 | Code | Cause |
 | - | - |
 | 401 | JWT absent ou invalide |
+| 403 | `group_id` fourni et l'usager n'est pas admin du groupe — `errors: { code: "GROUP_ADMIN_REQUIRED" }` |
 | 422 | `app_id` manquant ou aucun abonnement Stripe actif |
 | 500 | Erreur API Stripe |
 
@@ -264,17 +275,56 @@ via l'API Stripe). L'accès reste actif jusqu'à `expires_at`.
 }
 ```
 
-Ordre de résolution (priorité décroissante) :
+Depuis le plan équipe (2026-08-13), le plan effectif est le **meilleur** entre le plan perso de
+l'usager et celui de chacun de ses groupes actifs — `source` peut aussi valoir `"group"`, avec un
+champ `group_id` en plus :
 
-1. **`stripe_subscriptions`** actif pour `app_id='cmem'` (`status` ∈ `trialing`/`active`/`past_due`) → `source: "stripe"`, `code` = `plan` (`monthly`/`yearly`).
+```json
+"plan": {
+  "code": "team",
+  "source": "group",
+  "status": "active",
+  "group_id": 42,
+  "features": { "...": "mêmes caps que monthly/yearly" }
+}
+```
+
+Ordre de résolution — perso d'abord, puis comparaison avec chaque groupe actif via un classement
+interne (`free` < `monthly`=`yearly` < `team` < `ami`) :
+
+1. **`stripe_subscriptions`** actif pour `app_id='cmem'`/`'cmemweb'` (`status` ∈ `trialing`/`active`/`past_due`) → `source: "stripe"`, `code` = `plan` (`monthly`/`yearly`).
 2. **`users.cmem_plan_override`** (override manuel, ex. `'ami'`, posé par un admin) → `source: "override"`.
 3. Par défaut → `code: "free"`, `source: "default"`.
+4. Pour chaque **groupe actif** dont l'usager est membre, l'abonnement `stripe_subscriptions`
+   du groupe (`group_id`) est comparé au meilleur candidat trouvé jusque-là ; s'il est de rang
+   supérieur → `source: "group"`, `code` = plan du groupe, `group_id` renseigné.
 
-Un abonnement Stripe actif gagne toujours sur l'override — cas limite non tranché côté produit
-(à confirmer avec `cmem_web` si un jour un override doit primer sur un abonnement actif).
+Égalité de rang : le plan perso gagne sur un plan de groupe ; entre deux groupes à égalité, le
+plus petit `group_id` gagne (déterministe). Quitter un groupe (`POST /groups/{id}/leave`) ou en
+être retiré fait retomber le plan effectif **immédiatement** (résolution live, pas de cache) —
+sans perte des données existantes.
 
 Caps par plan : config statique `src/stripe/Config/CmemPlans.php` (pas de table DB). Règle
 verrouillée : `max_journals = max_tasks / 2`.
+
+---
+
+## Plan equipe (abonnement de groupe)
+
+Directive `20260813_143000_cmem_web_vers_cmem2_API__plan-equipe.md`. Un groupe peut porter son
+propre abonnement Stripe (tier **`team`**, mensuel seulement en v1) au lieu de facturer chaque
+membre individuellement. Même principe XOR que `tenant_modules` sur la table
+`stripe_subscriptions` : exactement un des deux porteurs par ligne (`user_id` **ou** `group_id`).
+
+- **Initier/gérer l'abonnement** (`checkout`, `portal`, `cancel`) : réservé aux membres
+  `role=admin` du groupe (ou rôle système `ADMINISTRATEUR`+) — sinon `403 GROUP_ADMIN_REQUIRED`.
+- **Consulter le statut** (`GET status`) : ouvert à tout membre du groupe.
+- **Prix** : `STRIPE_PRICE_CMEMWEB_TEAM`, placeholder **15 $ CAD/mois** (provisoire, documenté
+  dans `docs/PLAN_plan-equipe.md`). Aucun plafond de sièges appliqué côté serveur en v1.
+- **Modules de groupe** : `GET/PATCH /groups/{id}/modules[/{key}]` — voir
+  [docs/modules/GUIDE.md](../modules/GUIDE.md).
+- **Annulation** : même délai de grâce que l'individuel (`cancel_at_period_end`, accès jusqu'à
+  `expires_at`).
 
 ---
 

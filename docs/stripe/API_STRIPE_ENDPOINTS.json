@@ -1,9 +1,9 @@
 {
   "api": {
     "name": "Stripe Module",
-    "version": "1.1.0",
-    "description": "Abonnements Stripe pour plateformes web et Windows. Multi-app via app_id. Introduit en v2.7.0 — remplace /subscription/* et /stripe/webhook.",
-    "generated": "2026-05-27",
+    "version": "1.2.0",
+    "description": "Abonnements Stripe pour plateformes web et Windows. Multi-app via app_id. Introduit en v2.7.0 — remplace /subscription/* et /stripe/webhook. Depuis le plan équipe (2026-08-13), un abonnement peut aussi être porté par un groupe (group_id).",
+    "generated": "2026-08-13",
     "base_url": "/v2",
     "authentication": {
       "jwt": {
@@ -27,16 +27,18 @@
           "method": "POST",
           "path": "/v2/billing/checkout",
           "auth_required": true,
-          "description": "Crée une session Stripe Checkout. Retourne une URL de paiement. Après paiement, Stripe déclenche checkout.session.completed vers /v2/billing/webhook.",
+          "description": "Crée une session Stripe Checkout. Retourne une URL de paiement. Après paiement, Stripe déclenche checkout.session.completed vers /v2/billing/webhook. group_id optionnel (plan équipe, 2026-08-13) : rattache l'abonnement au GROUPE plutôt qu'à l'usager courant — réservé aux admins du groupe.",
           "body": {
             "app_id": "string (required) — identifiant de l'application",
-            "plan": "string (required) — 'monthly' | 'yearly'"
+            "plan": "string (required) — 'monthly' | 'yearly' sans group_id ; 'team' obligatoire si group_id fourni",
+            "group_id": "int (optional) — id du groupe. Si fourni, l'abonnement est porté par le groupe (pas par l'usager). Requiert role=admin du groupe (ou rôle système ADMINISTRATEUR+)."
           },
           "responses": {
             "200": "{ success: true, data: { checkout_url: string, session_id: string } }",
             "401": "JWT absent ou invalide",
-            "422": "app_id ou plan manquant | plan invalide (doit être monthly ou yearly)",
-            "500": "Clé Stripe non configurée ou erreur API Stripe"
+            "403": "group_id fourni et l'usager n'est pas admin du groupe — { errors: { code: 'GROUP_ADMIN_REQUIRED' } }",
+            "422": "app_id ou plan manquant | plan invalide (monthly/yearly sans group_id, team obligatoire avec group_id)",
+            "500": "Clé/prix Stripe non configuré ou erreur API Stripe"
           },
           "client_notes": "Rediriger l'utilisateur vers checkout_url. Après paiement : https://journauxdebord.com/{app_id}/subscription/success?session_id={id}. En cas d'annulation : https://journauxdebord.com/{app_id}/subscription/cancel. Ces pages doivent exister dans le frontend."
         },
@@ -44,14 +46,16 @@
           "method": "POST",
           "path": "/v2/billing/portal",
           "auth_required": true,
-          "description": "Crée une session Stripe Billing Portal. Nécessite qu'un stripe_customer_id existe pour (user_id, app_id). Retour après gestion : https://journauxdebord.com/{app_id}/subscription/manage-return.",
+          "description": "Crée une session Stripe Billing Portal. Nécessite qu'un stripe_customer_id existe pour (user_id, app_id) ou (group_id, app_id). Retour après gestion : https://journauxdebord.com/{app_id}/subscription/manage-return. group_id optionnel (plan équipe) : réservé aux admins du groupe.",
           "body": {
-            "app_id": "string (required)"
+            "app_id": "string (required)",
+            "group_id": "int (optional) — requiert role=admin du groupe"
           },
           "responses": {
             "200": "{ success: true, data: { portal_url: string } }",
             "401": "JWT absent ou invalide",
-            "404": "Aucun stripe_customer_id en base pour cet utilisateur + app_id",
+            "403": "group_id fourni et l'usager n'est pas admin du groupe — { errors: { code: 'GROUP_ADMIN_REQUIRED' } }",
+            "404": "Aucun stripe_customer_id en base pour cet utilisateur/groupe + app_id",
             "422": "app_id manquant",
             "500": "Erreur API Stripe"
           }
@@ -88,15 +92,17 @@
           "method": "GET",
           "path": "/v2/subscriptions/stripe/status",
           "auth_required": true,
-          "description": "Retourne le statut de l'abonnement Stripe le plus récent pour (user_id, app_id).",
+          "description": "Retourne le statut de l'abonnement Stripe le plus récent pour (user_id, app_id), ou pour (group_id, app_id) si group_id est fourni (plan équipe). Lecture seule : simple appartenance au groupe suffit, admin non requis.",
           "query_params": {
-            "app_id": "string (required)"
+            "app_id": "string (required)",
+            "group_id": "int (optional) — statut de l'abonnement du GROUPE plutôt que de l'usager. Requiert d'être membre du groupe."
           },
           "responses": {
             "200_trialing": "{ success: true, data: { is_premium: true,  status: 'trialing', expires_at: datetime, plan: string, is_trial: true,  trial_end: datetime, cancel_at_period_end: bool, provider: 'stripe' } }",
             "200_active":   "{ success: true, data: { is_premium: true,  status: 'active',   expires_at: datetime, plan: string, is_trial: false, trial_end: null,     cancel_at_period_end: bool, provider: 'stripe' } }",
             "200_none":     "{ success: true, data: { is_premium: false, status: null,        expires_at: null,     plan: null,   is_trial: false, trial_end: null,     cancel_at_period_end: false, provider: 'stripe' } }",
             "401": "JWT absent ou invalide",
+            "403": "group_id fourni et l'usager n'est pas membre du groupe — { errors: { code: 'GROUP_MEMBERSHIP_REQUIRED' } }",
             "422": "app_id manquant"
           },
           "status_values": ["trialing", "active", "past_due", "cancelled", "null"]
@@ -105,13 +111,15 @@
           "method": "DELETE",
           "path": "/v2/subscriptions/stripe",
           "auth_required": true,
-          "description": "Annule l'abonnement Stripe à la fin de la période en cours (cancel_at_period_end=true). L'accès reste actif jusqu'à expires_at.",
+          "description": "Annule l'abonnement Stripe à la fin de la période en cours (cancel_at_period_end=true). L'accès reste actif jusqu'à expires_at. group_id optionnel (plan équipe) : annule l'abonnement du GROUPE, réservé aux admins du groupe — même délai de grâce que l'individuel.",
           "body": {
-            "app_id": "string (required)"
+            "app_id": "string (required)",
+            "group_id": "int (optional) — requiert role=admin du groupe"
           },
           "responses": {
             "200": "{ success: true, message: 'Abonnement Stripe annulé (fin de période)' }",
             "401": "JWT absent ou invalide",
+            "403": "group_id fourni et l'usager n'est pas admin du groupe — { errors: { code: 'GROUP_ADMIN_REQUIRED' } }",
             "422": "app_id manquant | aucun abonnement Stripe actif",
             "500": "Erreur API Stripe"
           }
@@ -125,6 +133,11 @@
     "cancel": "https://journauxdebord.com/{app_id}/subscription/cancel",
     "manage_return": "https://journauxdebord.com/{app_id}/subscription/manage-return",
     "frontend_note": "Ces trois routes doivent exister dans le frontend (jdb). Voir directive 20260527_110753_cmem2_API_vers_jdb__pages-stripe-subscription.md."
+  },
+  "team_plan": {
+    "description": "Plan équipe (directive plan-equipe 20260813) — un groupe peut porter son propre abonnement Stripe (tier 'team', mensuel seulement en v1, STRIPE_PRICE_CMEMWEB_TEAM, prix provisoire 15$ CAD/mois). Un membre hérite du meilleur plan entre le sien et celui de chacun de ses groupes actifs : voir GET /auth/me → data.user.plan { code, source: 'stripe'|'override'|'default'|'group', group_id? }. Quitter le groupe fait retomber immédiatement le plan effectif, sans perte de données.",
+    "seats_cap": "Aucun plafond de sièges appliqué côté serveur en v1 — le prix est informatif seulement.",
+    "modules": "GET/PATCH /groups/{id}/modules[/{key}] — voir docs/modules/API_MODULES_ENDPOINTS.json."
   },
   "access_model": {
     "description": "Un abonnement Stripe actif déverrouille les plateformes web et Windows uniquement.",

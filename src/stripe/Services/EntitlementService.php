@@ -2,6 +2,7 @@
 
 namespace Stripe\Services;
 
+use AuthGroups\Models\Group;
 use AuthGroups\Models\User;
 use Stripe\Config\CmemPlans;
 use Stripe\Models\StripeSubscription;
@@ -49,7 +50,40 @@ class EntitlementService
         return null;
     }
 
+    /**
+     * Plan effectif = meilleur de (plan perso, plan de chaque groupe actif dont l'usager est
+     * membre) — directive plan-equipe 20260813_143000. Le plan perso se résout d'abord comme
+     * avant (stripe > override > free) ; les groupes actifs sont ensuite comparés via
+     * CmemPlans::rank(). Égalité de rang : le perso gagne sur un groupe ; entre deux groupes,
+     * le plus petit group_id gagne (déterministe).
+     */
     public static function getEffectivePlanForCmem(int $userId, ?string $planOverride): array
+    {
+        $personal = self::resolvePersonalPlan($userId, $planOverride);
+        $best     = $personal;
+
+        $groupIds = (new Group())->getActiveGroupIdsByUserId($userId);
+        foreach ($groupIds as $groupId) {
+            $sub = (new StripeSubscription())->findByGroupAndApps($groupId, self::CMEM_APP_IDS);
+            if (!$sub || !in_array($sub['status'], self::ACTIVE_STATUSES, true)) {
+                continue;
+            }
+
+            if (CmemPlans::rank($sub['plan']) > CmemPlans::rank($best['code'])) {
+                $best = [
+                    'code'     => $sub['plan'],
+                    'source'   => 'group',
+                    'status'   => $sub['status'],
+                    'group_id' => $groupId,
+                    'features' => CmemPlans::get($sub['plan']),
+                ];
+            }
+        }
+
+        return $best;
+    }
+
+    private static function resolvePersonalPlan(int $userId, ?string $planOverride): array
     {
         $sub = (new StripeSubscription())->findByUserAndApps($userId, self::CMEM_APP_IDS);
 
@@ -69,6 +103,33 @@ class EntitlementService
                 'source'   => 'override',
                 'status'   => null,
                 'features' => CmemPlans::get($planOverride),
+            ];
+        }
+
+        return [
+            'code'     => 'free',
+            'source'   => 'default',
+            'status'   => null,
+            'features' => CmemPlans::get('free'),
+        ];
+    }
+
+    /**
+     * Plan effectif d'un GROUPE — pas de fusion avec les membres, juste l'abonnement propre
+     * du groupe ou 'free'. Utilisé par GroupModuleController pour le gating des modules
+     * de groupe.
+     */
+    public static function getEffectivePlanForGroup(int $groupId): array
+    {
+        $sub = (new StripeSubscription())->findByGroupAndApps($groupId, self::CMEM_APP_IDS);
+
+        if ($sub && in_array($sub['status'], self::ACTIVE_STATUSES, true)) {
+            $code = $sub['plan'];
+            return [
+                'code'     => $code,
+                'source'   => 'stripe',
+                'status'   => $sub['status'],
+                'features' => CmemPlans::get($code),
             ];
         }
 

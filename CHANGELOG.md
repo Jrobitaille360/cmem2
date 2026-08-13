@@ -7,6 +7,22 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-08-13 17:15]
+
+### Plan équipe — facturation Stripe portée par un groupe + modules de groupe
+
+> Directive `20260813_143000_cmem_web_vers_cmem2_API__plan-equipe.md`
+
+- **Nouveau tier `team`** (mensuel seulement en v1, `STRIPE_PRICE_CMEMWEB_TEAM`, prix provisoire 15 $ CAD/mois) — un groupe peut désormais porter son propre abonnement Stripe au lieu de facturer chaque membre individuellement
+- **Migration `stripe_subscriptions`** (`docs/20260813_group_billing.sql`) : `group_id` nullable + FK `groups(id)` ON DELETE CASCADE, CHECK XOR avec `user_id` (même principe que `tenant_modules`), `user_id` rendu nullable, nouvelle clé unique `uq_group_app (group_id, app_id)` coexistant avec `uq_user_app`
+- **`POST /v2/billing/checkout` / `portal` et `DELETE /v2/subscriptions/stripe`** acceptent un `group_id` optionnel — réservé aux membres `role=admin` du groupe (ou rôle système `ADMINISTRATEUR`+), sinon `403 GROUP_ADMIN_REQUIRED`. `GET /v2/subscriptions/stripe/status` accepte aussi `group_id`, en lecture seule pour tout membre
+- **Webhooks Stripe routés par `metadata.owner_type`** (`user`/`group`) — le tier `team` (mensuel uniquement) n'est plus réécrasé en `monthly` par la déduction d'intervalle de `customer.subscription.updated`
+- **Plan effectif = meilleur de (plan perso, plan de chaque groupe actif)** — `EntitlementService::getEffectivePlanForCmem()` compare via un nouveau classement `CmemPlans::rank()` (`free` < `monthly`=`yearly` < `team` < `ami`). `GET /auth/me` → `data.user.plan` expose `source: "group"` et `group_id` quand un groupe l'emporte. Quitter le groupe fait retomber le plan effectif immédiatement (résolution live, sans perte de données)
+- **`GET/PATCH /groups/{id}/modules[/{key}]`** — sert enfin `tenant_modules.group_id` (posé en juillet par la directive `modules-gating` sans être exploité). Lecture ouverte à tout membre, écriture réservée aux admins ; plan résolu via le nouvel `EntitlementService::getEffectivePlanForGroup()` (abonnement propre du groupe, sans fusion avec les membres)
+- **`GET /modules` (personnel) fusionne perso ∪ groupes actifs** — `available` suit le meilleur plan effectif, `enabled` est un OR logique (activé quelque part = activé). Forme de réponse inchangée, aucune régression sur l'existant (`test_modules.php`, `test_stripe_v2.php`, `test_groups.php`, `test_ai_summarize.php` toujours verts)
+- Nouveaux tests : `test_stripe_group_billing.php`, `test_group_modules.php`, `test_plan_effectif_groupe.php`
+- Docs mises à jour : `stripe/GUIDE.md`, `stripe/API_STRIPE_ENDPOINTS.json`, `modules/GUIDE.md`, `modules/API_MODULES_ENDPOINTS.json`, `core/API_ENDPOINTS.json`, `entrypoints.md`, `.env.example`
+
 ## [Unreleased 2026-08-12 08:15]
 
 ### Versioning optimiste — `updatedAt` + `If-Unmodified-Since` sur events/todos/journals/tasks

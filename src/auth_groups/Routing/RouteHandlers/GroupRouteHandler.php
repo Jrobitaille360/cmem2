@@ -5,17 +5,20 @@ namespace AuthGroups\Routing\RouteHandlers;
 use AuthGroups\Routing\BaseRouteHandler;
 use AuthGroups\Controllers\GroupController;
 use AuthGroups\Controllers\GroupMemberController;
+use AuthGroups\Controllers\GroupModuleController;
 use AuthGroups\Utils\Response;
 
-class GroupRouteHandler extends BaseRouteHandler 
+class GroupRouteHandler extends BaseRouteHandler
 {
     private GroupController $controller;
     private GroupMemberController $memberController;
-    
+    private GroupModuleController $moduleController;
+
     public function __construct($authService) {
         parent::__construct($authService);
         $this->controller = new GroupController();
         $this->memberController = new GroupMemberController();
+        $this->moduleController = new GroupModuleController();
     }
     
     protected function getSupportedControllers(): array {
@@ -67,9 +70,19 @@ class GroupRouteHandler extends BaseRouteHandler
                     $this->controller->leave($groupId, $user['user_id'])),
 
             // GET /groups/{id}/members
-            (isset($segments[2]) && $segments[2] === 'members' && $method === 'GET') => 
-                $this->validateIdAndCall($action, fn($groupId) => 
+            (isset($segments[2]) && $segments[2] === 'members' && $method === 'GET') =>
+                $this->validateIdAndCall($action, fn($groupId) =>
                     $this->memberController->getMembers($groupId, $user['user_id'], $user['role'])),
+
+            // GET /groups/{id}/modules — plan équipe (directive 20260813_143000)
+            (isset($segments[2]) && $segments[2] === 'modules' && $method === 'GET' && !isset($segments[3])) =>
+                $this->validateIdAndCall($action, fn($groupId) =>
+                    $this->moduleController->index($groupId, $user['user_id'])),
+
+            // PATCH /groups/{id}/modules/{key}
+            (isset($segments[2]) && $segments[2] === 'modules' && $method === 'PATCH' && isset($segments[3])) =>
+                $this->validateIdAndCall($action, fn($groupId) =>
+                    $this->moduleController->update($groupId, $user['user_id'], $user['role'], $segments[3])),
 
             // POST /groups/{group_id}/members/{user_id}
             (isset($segments[2]) && $segments[2] === 'members' && $method === 'POST' 

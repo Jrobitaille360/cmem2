@@ -13,11 +13,17 @@ class StripeService
     // Checkout
     // -----------------------------------------------------------------------
 
+    /**
+     * $groupId non-null → abonnement porté par le groupe (plan équipe, directive 20260813_143000) :
+     * le customer/l'abonnement Stripe sont rattachés au groupe, pas à $userId (l'admin qui initie
+     * le checkout). $userId/$userEmail restent utilisés pour créer le customer Stripe la 1ère fois.
+     */
     public static function createCheckoutSession(
-        int    $userId,
-        string $appId,
-        string $userEmail,
-        string $plan
+        int     $userId,
+        string  $appId,
+        string  $userEmail,
+        string  $plan,
+        ?int    $groupId = null
     ): array {
         $priceConst = 'STRIPE_PRICE_' . strtoupper($appId) . '_' . strtoupper($plan);
         $priceId    = defined($priceConst) ? constant($priceConst) : '';
@@ -26,17 +32,23 @@ class StripeService
             throw new \RuntimeException("{$priceConst} non configuré");
         }
 
-        $customerId = self::getOrCreateCustomer($userId, $appId, $userEmail);
+        $metadata = $groupId
+            ? ['owner_type' => 'group', 'group_id' => (string) $groupId, 'app_id' => $appId]
+            : ['owner_type' => 'user',  'user_id'  => (string) $userId,  'app_id' => $appId];
+
+        $customerId = $groupId
+            ? self::getOrCreateCustomerForGroup($groupId, $appId, $userEmail)
+            : self::getOrCreateCustomer($userId, $appId, $userEmail);
 
         $params = http_build_query([
             'customer'             => $customerId,
             'mode'                 => 'subscription',
             'payment_method_types' => ['card'],
             'line_items'           => [['price' => $priceId, 'quantity' => 1]],
-            'metadata'             => ['user_id' => (string) $userId, 'app_id' => $appId],
+            'metadata'             => $metadata,
             'subscription_data'    => [
                 'trial_period_days' => 7,
-                'metadata'          => ['user_id' => (string) $userId, 'app_id' => $appId],
+                'metadata'          => $metadata,
             ],
             'success_url'          => 'https://journauxdebord.com/' . $appId . '/subscription/success?session_id={CHECKOUT_SESSION_ID}',
             'cancel_url'           => 'https://journauxdebord.com/' . $appId . '/subscription/cancel',
@@ -62,6 +74,23 @@ class StripeService
         $params   = http_build_query([
             'email'    => $userEmail,
             'metadata' => ['user_id' => (string) $userId, 'app_id' => $appId],
+        ]);
+        $customer = self::request('POST', '/v1/customers', $params);
+        return $customer['id'];
+    }
+
+    /** Customer Stripe rattaché au groupe — $adminEmail sert uniquement à la création initiale. */
+    public static function getOrCreateCustomerForGroup(int $groupId, string $appId, string $adminEmail): string
+    {
+        $model    = new StripeSubscription();
+        $existing = $model->findStripeCustomerByGroupAndApp($groupId, $appId);
+        if ($existing) {
+            return $existing;
+        }
+
+        $params   = http_build_query([
+            'email'    => $adminEmail,
+            'metadata' => ['group_id' => (string) $groupId, 'app_id' => $appId],
         ]);
         $customer = self::request('POST', '/v1/customers', $params);
         return $customer['id'];
@@ -164,20 +193,48 @@ class StripeService
 
     public static function handleCheckoutCompleted(array $session): void
     {
-        $userId = (int) ($session['client_reference_id'] ?? 0);
-        $appId  = $session['metadata']['app_id'] ?? null;
-        $subId  = $session['subscription'] ?? null;
-        $custId = $session['customer']     ?? null;
+        $ownerType = $session['metadata']['owner_type'] ?? 'user';
+        $appId     = $session['metadata']['app_id'] ?? null;
+        $subId     = $session['subscription'] ?? null;
+        $custId    = $session['customer']     ?? null;
 
-        if (!$userId || !$subId) {
+        if (!$subId || !$appId) {
+            if (!$appId) {
+                LogService::error('Stripe checkout.session.completed — metadata.app_id manquant, événement ignoré', [
+                    'sub_id' => $subId,
+                ]);
+            }
             return;
         }
 
-        if (!$appId) {
-            LogService::error('Stripe checkout.session.completed — metadata.app_id manquant, événement ignoré', [
-                'user_id' => $userId,
-                'sub_id'  => $subId,
+        if ($ownerType === 'group') {
+            $groupId = (int) ($session['metadata']['group_id'] ?? 0);
+            if (!$groupId) {
+                return;
+            }
+
+            (new StripeSubscription())->upsert([
+                'group_id'                => $groupId,
+                'app_id'                  => $appId,
+                'stripe_customer_id'      => $custId,
+                'stripe_subscription_id'  => $subId,
+                'plan'                    => 'team',
+                'status'                  => 'trialing',
+                'is_trial'                => 1,
+                'trial_end'               => date('Y-m-d H:i:s', strtotime('+7 days')),
+                'expires_at'              => date('Y-m-d H:i:s', strtotime('+7 days')),
             ]);
+
+            LogService::info('Stripe checkout.session.completed (groupe)', [
+                'group_id' => $groupId,
+                'sub_id'   => $subId,
+                'app_id'   => $appId,
+            ]);
+            return;
+        }
+
+        $userId = (int) ($session['client_reference_id'] ?? 0);
+        if (!$userId) {
             return;
         }
 
@@ -211,12 +268,21 @@ class StripeService
         $expiresAt = !empty($sub['current_period_end'])
             ? date('Y-m-d H:i:s', $sub['current_period_end'])
             : null;
-        $interval = $sub['items']['data'][0]['price']['recurring']['interval'] ?? 'month';
-        $plan     = ($interval === 'year') ? 'yearly' : 'monthly';
 
-        $userId = (int) ($sub['metadata']['user_id'] ?? 0);
-        $appId  = $sub['metadata']['app_id']  ?? null;
-        $custId = $sub['customer']            ?? null;
+        $ownerType = $sub['metadata']['owner_type'] ?? 'user';
+        // Le tier 'team' n'a qu'un intervalle mensuel en v1 : ne pas le laisser retomber sur
+        // 'monthly' via la déduction d'intervalle ci-dessous (qui ne connaît que les tiers perso).
+        if ($ownerType === 'group') {
+            $plan = 'team';
+        } else {
+            $interval = $sub['items']['data'][0]['price']['recurring']['interval'] ?? 'month';
+            $plan     = ($interval === 'year') ? 'yearly' : 'monthly';
+        }
+
+        $userId  = (int) ($sub['metadata']['user_id']  ?? 0);
+        $groupId = (int) ($sub['metadata']['group_id'] ?? 0);
+        $appId   = $sub['metadata']['app_id']  ?? null;
+        $custId  = $sub['customer']            ?? null;
 
         $isPremiumStatus = in_array($status, ['trialing', 'active', 'past_due'], true);
         $dbStatus = $isPremiumStatus ? $status : 'expired';
@@ -234,7 +300,14 @@ class StripeService
             'plan'      => $plan,
         ];
 
-        if ($userId && $appId) {
+        if ($ownerType === 'group' && $groupId && $appId) {
+            $model->upsert(array_merge($fields, [
+                'group_id'                => $groupId,
+                'app_id'                  => $appId,
+                'stripe_customer_id'      => $custId,
+                'stripe_subscription_id'  => $subId,
+            ]));
+        } elseif ($userId && $appId) {
             $model->upsert(array_merge($fields, [
                 'user_id'                => $userId,
                 'app_id'                 => $appId,

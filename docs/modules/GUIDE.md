@@ -30,7 +30,7 @@ clé exige une migration de l'enum **et** une mise à jour de `CmemModules::KEYS
 
 ## Mapping plan → modules
 
-| `module_key` | `free` | `monthly` / `yearly` | `ami` | `enabled` par défaut | Quota |
+| `module_key` | `free` | `monthly` / `yearly` / `team` | `ami` | `enabled` par défaut | Quota |
 | - | - | - | - | - | - |
 | `projet` | disponible | disponible | disponible | `true` | — |
 | `contacts` | disponible | disponible | disponible | `true` | — |
@@ -40,6 +40,8 @@ clé exige une migration de l'enum **et** une mise à jour de `CmemModules::KEYS
 | `caldav` | non | non | disponible | `false` | — |
 | `booking` | non | non | disponible | `false` | — |
 | `push_avance` | non | non | disponible | `false` | — |
+
+`team` (plan équipe, groupe) a le même mapping que `monthly`/`yearly`.
 
 **Calibrage du rétro-fit** (acté avec `cmem_web` le 2026-07-27) : les quatre pans déjà en
 production restent disponibles sur **tous** les plans, y compris Gratuit. Pas de clause
@@ -117,19 +119,48 @@ Le décompte est serveur, jamais client. `TenantModule::incrementQuota()` incré
 Le quota de stockage `ged` est **reporté** : le cap `max_storage_mb` de `CmemPlans` n'est pas
 enforcé, `ged` renvoie `quota: null`.
 
-## Portée groupe
+## Portée groupe — plan équipe
 
-`tenant_modules.group_id` existe en base (unicité `(group_id, module_key)` + CHECK XOR avec
-`owner_id`) pour préparer le plan équipe, mais **n'est pas servie** par l'API en v1 : tous les
-appels portent sur `owner_id`.
+Directive `20260813_143000` (plan-equipe). `tenant_modules.group_id` (unicité
+`(group_id, module_key)` + CHECK XOR avec `owner_id`) est servi par deux mécanismes :
+
+1. **`GET /modules` fusionne** perso ∪ tous les groupes actifs de l'usager : `available` suit le
+   meilleur plan effectif (perso ou groupe, `EntitlementService::getEffectivePlanForCmem`),
+   `enabled` est un **OR logique** (activé quelque part = activé). La forme de la réponse ne
+   change pas — pas de champ `source` par module. `quota` reste porté uniquement par la ligne
+   perso en v1 (pas de quota de groupe).
+2. **`GET/PATCH /groups/{id}/modules[/{key}]`** — vue et administration dédiées d'un groupe. Le
+   plan suit l'abonnement propre du groupe (`EntitlementService::getEffectivePlanForGroup`), sans
+   fusion avec les membres.
+
+### `GET /groups/{id}/modules`
+
+Ouvert à tout **membre** du groupe. Même forme que `GET /modules`, avec `plan` = plan effectif du
+groupe (`free` par défaut si aucun abonnement).
+
+```json
+{ "success": true, "data": { "plan": "team", "modules": [ /* mêmes 8 clés */ ] } }
+```
+
+Erreurs : `401` (JWT absent), `403 GROUP_MEMBERSHIP_REQUIRED` (non-membre).
+
+### `PATCH /groups/{id}/modules/{key}`
+
+Réservé aux **admins du groupe** (`role=admin`, ou rôle système `ADMINISTRATEUR`+). Mêmes règles
+et codes d'erreur que `PATCH /modules/{key}` (`UNKNOWN_MODULE_KEY`, `VALIDATION_ERROR`,
+`MODULE_NOT_AVAILABLE`), plus `403 GROUP_ADMIN_REQUIRED` pour un membre non-admin. UPSERT sur
+`(group_id, module_key)`.
 
 ## Fichiers
 
 | Rôle | Fichier |
 | - | - |
 | Enum, mapping, quotas | `src/stripe/Config/CmemModules.php` |
+| Plans + classement | `src/stripe/Config/CmemPlans.php` |
 | Accès table | `src/auth_groups/Models/TenantModule.php` |
-| Endpoints | `src/auth_groups/Controllers/ModuleController.php` |
-| Routage | `src/auth_groups/Routing/RouteHandlers/ModuleRouteHandler.php` |
-| Migration | `docs/20260727_tenant_modules.sql` |
-| Tests | `private/tests/test_modules.php` |
+| Endpoints (perso) | `src/auth_groups/Controllers/ModuleController.php` |
+| Endpoints (groupe) | `src/auth_groups/Controllers/GroupModuleController.php` |
+| Plan effectif (perso + groupe) | `src/stripe/Services/EntitlementService.php` |
+| Routage | `src/auth_groups/Routing/RouteHandlers/ModuleRouteHandler.php`, `GroupRouteHandler.php` |
+| Migrations | `docs/20260727_tenant_modules.sql`, `docs/20260813_group_billing.sql` |
+| Tests | `private/tests/test_modules.php`, `test_group_modules.php`, `test_plan_effectif_groupe.php` |

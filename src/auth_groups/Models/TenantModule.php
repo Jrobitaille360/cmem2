@@ -12,7 +12,8 @@ use PDO;
  * (voir Stripe\Config\CmemModules::isEnabledByDefault). Une ligne n'est créée
  * qu'au premier PATCH — GET /modules ne backfille rien.
  *
- * `group_id` existe en base pour préparer le plan équipe, mais n'est pas servi en v1.
+ * `group_id` sert le plan équipe (directive 20260813_143000) : mêmes garanties XOR/UPSERT
+ * que `owner_id`, sur les méthodes *ByGroup ci-dessous.
  */
 class TenantModule extends BaseModel
 {
@@ -61,6 +62,45 @@ class TenantModule extends BaseModel
         $stmt->execute([$appId, $ownerId, $moduleKey, $enabled ? 1 : 0]);
 
         return $this->findByOwnerAndKey($ownerId, $moduleKey) ?? [];
+    }
+
+    /** Lignes du groupe, indexées par module_key. */
+    public function findAllByGroup(int $groupId): array
+    {
+        $stmt = $this->getDb()->prepare(
+            "SELECT * FROM {$this->table} WHERE group_id = ?"
+        );
+        $stmt->execute([$groupId]);
+
+        $out = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $out[$row['module_key']] = $row;
+        }
+        return $out;
+    }
+
+    public function findByGroupAndKey(int $groupId, string $moduleKey): ?array
+    {
+        $stmt = $this->getDb()->prepare(
+            "SELECT * FROM {$this->table} WHERE group_id = ? AND module_key = ?"
+        );
+        $stmt->execute([$groupId, $moduleKey]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    /** Même UPSERT que setEnabled(), keyed sur (group_id, module_key). */
+    public function setEnabledForGroup(int $groupId, string $appId, string $moduleKey, bool $enabled): array
+    {
+        $stmt = $this->getDb()->prepare(
+            "INSERT INTO {$this->table} (app_id, group_id, module_key, enabled)
+             VALUES (?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE
+                 enabled = VALUES(enabled),
+                 app_id  = VALUES(app_id)"
+        );
+        $stmt->execute([$appId, $groupId, $moduleKey, $enabled ? 1 : 0]);
+
+        return $this->findByGroupAndKey($groupId, $moduleKey) ?? [];
     }
 
     /**

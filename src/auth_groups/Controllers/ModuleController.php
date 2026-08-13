@@ -2,6 +2,7 @@
 
 namespace AuthGroups\Controllers;
 
+use AuthGroups\Models\Group;
 use AuthGroups\Models\TenantModule;
 use AuthGroups\Models\User;
 use AuthGroups\Utils\Response;
@@ -42,13 +43,18 @@ class ModuleController
         return EntitlementService::getEffectivePlanForCmem($userId, $override)['code'];
     }
 
-    /** Contrat d'un module pour le front : available / enabled / quota. */
-    private function toContract(string $key, string $planCode, ?array $row): array
+    /**
+     * Contrat d'un module pour le front : available / enabled / quota.
+     * $groupEnabled : au moins un groupe actif de l'usager a activé ce module (fusion
+     * GET /modules — directive plan-equipe 20260813_143000, OR logique décision §3).
+     */
+    private function toContract(string $key, string $planCode, ?array $row, bool $groupEnabled = false): array
     {
         $available = CmemModules::isAvailable($planCode, $key);
-        $enabled   = $row !== null
+        $personalEnabled = $row !== null
             ? ((int) $row['enabled'] === 1)
             : CmemModules::isEnabledByDefault($key);
+        $enabled = $personalEnabled || $groupEnabled;
 
         $quota = null;
         if (CmemModules::hasQuota($key)) {
@@ -70,16 +76,29 @@ class ModuleController
         ];
     }
 
-    /** GET /modules — état des 8 modules pour l'usager du JWT. Ne crée aucune ligne. */
+    /**
+     * GET /modules — état des 8 modules pour l'usager du JWT, fusionné avec ses groupes
+     * actifs (union perso ∪ groupe(s) — directive plan-equipe 20260813_143000, décision §2).
+     * Ne crée aucune ligne.
+     */
     public function index(array $user): void
     {
         $userId = (int) $user['user_id'];
         $plan   = $this->planCode($userId);
         $rows   = $this->model->findAllByOwner($userId);
 
+        $groupEnabledKeys = [];
+        foreach ((new Group())->getActiveGroupIdsByUserId($userId) as $groupId) {
+            foreach ($this->model->findAllByGroup($groupId) as $key => $row) {
+                if ((int) $row['enabled'] === 1) {
+                    $groupEnabledKeys[$key] = true;
+                }
+            }
+        }
+
         $modules = [];
         foreach (CmemModules::KEYS as $key) {
-            $modules[] = $this->toContract($key, $plan, $rows[$key] ?? null);
+            $modules[] = $this->toContract($key, $plan, $rows[$key] ?? null, isset($groupEnabledKeys[$key]));
         }
 
         Response::success('Modules récupérés', ['plan' => $plan, 'modules' => $modules]);

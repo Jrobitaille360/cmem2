@@ -987,6 +987,28 @@
             "role": "string (required, in: admin|moderator|member)"
           },
           "response": "{ group_id: integer, user_id: integer }"
+        },
+        {
+          "method": "GET",
+          "path": "/groups/{id}/modules",
+          "description": "Plan équipe (directive 20260813_143000) — état des modules du GROUPE. Lecture ouverte à tout membre. Détail complet : modules/API_MODULES_ENDPOINTS.json.",
+          "params": {
+            "id": "integer (required)"
+          },
+          "response": "{ plan: string, modules: [{ key, available, enabled, quota }] }"
+        },
+        {
+          "method": "PATCH",
+          "path": "/groups/{id}/modules/{key}",
+          "description": "Plan équipe — active/désactive un module au niveau du groupe. Réservé aux admins du groupe. Détail complet : modules/API_MODULES_ENDPOINTS.json.",
+          "params": {
+            "id": "integer (required)",
+            "key": "string (required, in: projet|contacts|crm|ged|ia|caldav|booking|push_avance)"
+          },
+          "body": {
+            "enabled": "bool (required)"
+          },
+          "response": "{ module: { key, available, enabled, quota } }"
         }
       ]
     },

@@ -33,6 +33,7 @@ php private/tests/test_entrypoints.php
 php private/tests/test_files.php
 php private/tests/test_files_accessibility.php
 php private/tests/test_files_types.php
+php private/tests/test_group_modules.php
 php private/tests/test_groups.php
 php private/tests/test_ics_email_notifications.php
 php private/tests/test_ics_freebusy_recurrence.php
@@ -53,6 +54,7 @@ php private/tests/test_links_ged.php
 php private/tests/test_maintenance.php
 php private/tests/test_modules.php
 php private/tests/test_password_reset.php
+php private/tests/test_plan_effectif_groupe.php
 php private/tests/test_plans.php
 php private/tests/test_playstore.php
 php private/tests/test_pomo.php
@@ -68,6 +70,7 @@ php private/tests/test_quiz2.php
 php private/tests/test_quiz3.php
 php private/tests/test_secret_admin.php
 php private/tests/test_stats.php
+php private/tests/test_stripe_group_billing.php
 php private/tests/test_stripe_v2.php
 php private/tests/test_stripe_webhooks.php
 php private/tests/test_subscriptions.php

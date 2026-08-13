@@ -29,6 +29,7 @@ class CmemModules
         'free'    => ['projet', 'contacts', 'crm', 'ged'],
         'monthly' => ['projet', 'contacts', 'crm', 'ged', 'ia'],
         'yearly'  => ['projet', 'contacts', 'crm', 'ged', 'ia'],
+        'team'    => ['projet', 'contacts', 'crm', 'ged', 'ia'],
         'ami'     => self::KEYS,
     ];
 
@@ -41,6 +42,7 @@ class CmemModules
             'free'    => 0,
             'monthly' => 30,
             'yearly'  => 30,
+            'team'    => 30,
             'ami'     => 30,
         ],
     ];

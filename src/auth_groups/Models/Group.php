@@ -172,6 +172,28 @@ class Group extends BaseModel
     /**
      * Récupérer les groupes d'un utilisateur
      */
+    /**
+     * Liste légère des id de groupes actifs dont l'usager est membre (memberships et groupes
+     * non supprimés). Utilisé par la résolution du plan effectif (EntitlementService) et la
+     * fusion GET /modules — pas de jointure/colonnes superflues sur ce chemin chaud.
+     */
+    public function getActiveGroupIdsByUserId(int $userId): array
+    {
+        $stmt = $this->getDb()->prepare(
+            "SELECT g.id
+               FROM {$this->table} g
+               INNER JOIN group_members gm ON gm.group_id = g.id
+              WHERE gm.user_id = :user_id
+                AND g.deleted_at IS NULL
+                AND gm.deleted_at IS NULL
+              ORDER BY g.id ASC"
+        );
+        $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN, 0));
+    }
+
     public function getByUserId($userId, $limit = 10, $offset = 0)
     {
         $query = "SELECT 

@@ -7,9 +7,11 @@ use Stripe\Services\StripeService;
 
 class StripeSubscriptionService
 {
-    public static function getStatus(int $userId, string $appId): array
+    public static function getStatus(int $userId, string $appId, ?int $groupId = null): array
     {
-        $row = (new StripeSubscription())->findByUserAndApp($userId, $appId);
+        $row = $groupId
+            ? (new StripeSubscription())->findByGroupAndApp($groupId, $appId)
+            : (new StripeSubscription())->findByUserAndApp($userId, $appId);
 
         if (!$row) {
             return [
@@ -38,9 +40,10 @@ class StripeSubscriptionService
         ];
     }
 
-    public static function cancel(int $userId, string $appId): void
+    public static function cancel(int $userId, string $appId, ?int $groupId = null): void
     {
-        $row = (new StripeSubscription())->findByUserAndApp($userId, $appId);
+        $model = new StripeSubscription();
+        $row   = $groupId ? $model->findByGroupAndApp($groupId, $appId) : $model->findByUserAndApp($userId, $appId);
 
         if (!$row) {
             throw new \RuntimeException('Aucun abonnement Stripe actif');
@@ -48,6 +51,8 @@ class StripeSubscriptionService
 
         if (!empty($row['stripe_subscription_id'])) {
             StripeService::cancelSubscription($row['stripe_subscription_id']);
+        } elseif ($groupId) {
+            (new StripeSubscription())->updateByGroupAndApp($groupId, $appId, ['cancel_at_period_end' => 1]);
         } else {
             (new StripeSubscription())->updateByUserAndApp($userId, $appId, ['cancel_at_period_end' => 1]);
         }

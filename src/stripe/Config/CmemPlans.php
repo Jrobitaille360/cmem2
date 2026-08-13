@@ -41,6 +41,16 @@ class CmemPlans
             'max_group_members'  => 50,
             'max_contacts'      => 2000,
         ],
+        'team' => [
+            'max_calendars'      => 25,
+            'max_journals'       => 2500,
+            'max_tasks'          => 5000,
+            'max_devices'        => 5,
+            'max_storage_mb'     => 2000,
+            'max_groups'         => 10,
+            'max_group_members'  => 50,
+            'max_contacts'      => 2000,
+        ],
         'ami' => [
             'max_calendars'      => 25,
             'max_journals'       => 2500,
@@ -51,6 +61,18 @@ class CmemPlans
             'max_group_members'  => 50,
             'max_contacts'      => 2000,
         ],
+    ];
+
+    /**
+     * Classement des plans pour la résolution du meilleur plan effectif (perso vs groupes actifs,
+     * directive plan-equipe 20260813). Un plan absent vaut le rang de 'free'.
+     */
+    private const RANK = [
+        'free'    => 0,
+        'monthly' => 1,
+        'yearly'  => 1,
+        'team'    => 2,
+        'ami'     => 3,
     ];
 
     public static function get(string $plan): array
@@ -70,5 +92,10 @@ class CmemPlans
     public static function overridableCodes(): array
     {
         return ['ami'];
+    }
+
+    public static function rank(string $plan): int
+    {
+        return self::RANK[$plan] ?? self::RANK['free'];
     }
 }
