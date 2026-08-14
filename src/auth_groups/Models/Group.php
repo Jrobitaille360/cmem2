@@ -283,6 +283,25 @@ class Group extends BaseModel
     }
 
     /**
+     * Vérifier si deux utilisateurs partagent au moins un groupe actif (groupe quelconque)
+     */
+    public function shareAnyGroup($userIdA, $userIdB): bool
+    {
+        $query = "SELECT COUNT(*) as count FROM group_members gm1
+                 INNER JOIN group_members gm2 ON gm2.group_id = gm1.group_id
+                 WHERE gm1.user_id = :user_a AND gm2.user_id = :user_b
+                   AND gm1.deleted_at IS NULL AND gm2.deleted_at IS NULL";
+
+        $stmt = $this->getDb()->prepare($query);
+        $stmt->bindParam(':user_a', $userIdA, PDO::PARAM_INT);
+        $stmt->bindParam(':user_b', $userIdB, PDO::PARAM_INT);
+        $stmt->execute();
+
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result['count'] > 0;
+    }
+
+    /**
      * Obtenir le rôle d'un utilisateur dans un groupe
      */
     public function getMemberRole($groupId, $userId)

@@ -25,19 +25,23 @@ class CalendarRouteHandler extends BaseRouteHandler
     }
     
     protected function getSupportedControllers(): array {
-        return ['calendars'];
+        return ['calendars', 'freebusy'];
     }
-    
+
     protected function handleRoute(array $request): void {
         $action = $request['action'];
         $method = $request['method'];
         $id = $request['id'];
         $user = $request['user'];
         $segments = $request['segments'];
-        
+
         match(true) {
+            // GET /freebusy?members=&start=&end=&app_id= - Free/busy multi-membres
+            ($request['controller'] === 'freebusy' && $action === '' && $method === 'GET') =>
+                $this->controller->getMultiMemberFreeBusy((int)$user['user_id']),
+
             // POST /calendars - Créer un calendrier
-            ($action === '' && $method === 'POST') => 
+            ($action === '' && $method === 'POST') =>
                 $this->controller->createCalendar($user['user_id']),
                 
             // GET /calendars - Lister les calendriers de l'utilisateur

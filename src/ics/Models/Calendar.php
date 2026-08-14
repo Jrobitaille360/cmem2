@@ -123,6 +123,20 @@ class Calendar extends BaseModel
         return (int) $stmt->fetchColumn();
     }
 
+    /**
+     * Retourne les ids des calendriers dont l'utilisateur est PROPRIÉTAIRE uniquement
+     * (exclut public/partagés — usage : agrégation free/busy multi-membres, où le busy
+     * d'un calendrier emprunté doit rester attribué à son vrai propriétaire).
+     */
+    public function getOwnedCalendarIds($userId): array
+    {
+        $stmt = $this->getDb()->prepare(
+            "SELECT id FROM calendars WHERE user_id = ? AND deleted_at IS NULL"
+        );
+        $stmt->execute([$userId]);
+        return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    }
+
     public function getUserCalendars($userId): array
     {
         $stmt = $this->getDb()->prepare("

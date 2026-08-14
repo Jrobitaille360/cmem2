@@ -9,6 +9,18 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+### Ajouté
+
+- **`GET /freebusy?members=&start=&end=&app_id=cmemweb`** — free/busy multi-membres pour la
+  planification de réunions au sein d'un groupe (directive
+  `20260810_140100_cmem_web_vers_cmem2_API__freebusy-multi-membres`). Requiert un groupe partagé
+  entre l'appelant et chaque `user_id` demandé (403 `FREEBUSY_MEMBER_FORBIDDEN` sinon, requête
+  entière refusée) ; agrège uniquement les calendriers dont le membre est **propriétaire**
+  (jamais un calendrier emprunté/partagé) ; réutilise le moteur d'expansion de récurrence déjà
+  corrigé de l'endpoint mono-calendrier ; réponse groupée par `user_id`, uniquement `start`/`end`
+  par créneau (aucune fuite de `summary`/`location`/`calendar_id`) ; limite de 20 `members` par
+  appel (422 au-delà)
+
 ## [2.16.1] — 2026-08-14
 
 ### Suite de tests — couverture complète du runner + corrections

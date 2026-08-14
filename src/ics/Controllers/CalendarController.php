@@ -2443,5 +2443,113 @@ class CalendarController
         }
     }
 
+    // ----------------------------------------------------------------
+    // GET /freebusy?members=&start=&end=&app_id= — free/busy multi-membres
+    // Directive : 20260810_140100_cmem_web_vers_cmem2_API__freebusy-multi-membres
+    // ----------------------------------------------------------------
+    private const FREEBUSY_MAX_MEMBERS = 20;
+
+    /**
+     * Fusionne les créneaux occupés de plusieurs membres d'un groupe, groupés par user_id.
+     * Aucun détail d'événement ne traverse la frontière usager : uniquement start/end.
+     */
+    public function getMultiMemberFreeBusy(int $requesterId): void
+    {
+        LoggingMiddleware::logEntry();
+        $input = Response::getRequestParams();
+
+        $appId = trim((string)($input['app_id'] ?? ''));
+        if ($appId !== 'cmemweb') {
+            LoggingMiddleware::logExit(422);
+            Response::error('app_id invalide ou manquant', ['app_id' => 'Doit être "cmemweb"'], 422);
+            return;
+        }
+
+        $validation = Validator::validate($input, [
+            'members' => 'required|string',
+            'start'   => 'required|date_or_datetime',
+            'end'     => 'required|date_or_datetime',
+        ]);
+
+        if (!$validation['valid']) {
+            LoggingMiddleware::logExit(400);
+            Response::error('Paramètres members, start et end requis', $validation['errors'], 400);
+            return;
+        }
+
+        $memberIds = [];
+        foreach (explode(',', $input['members']) as $rawId) {
+            $rawId = trim($rawId);
+            if ($rawId === '' || !ctype_digit($rawId)) {
+                LoggingMiddleware::logExit(422);
+                Response::error('members doit être une liste d\'identifiants numériques séparés par virgule', null, 422);
+                return;
+            }
+            $memberIds[(int)$rawId] = true;
+        }
+        $memberIds = array_keys($memberIds);
+
+        if (count($memberIds) > self::FREEBUSY_MAX_MEMBERS) {
+            LoggingMiddleware::logExit(422);
+            Response::error(
+                'Trop de members demandés (max ' . self::FREEBUSY_MAX_MEMBERS . ')',
+                ['members' => count($memberIds)],
+                422
+            );
+            return;
+        }
+
+        $group = new Group();
+        foreach ($memberIds as $memberId) {
+            if ($memberId !== $requesterId && !$group->shareAnyGroup($requesterId, $memberId)) {
+                LoggingMiddleware::logExit(403);
+                Response::error(
+                    'Accès refusé au free/busy d\'un ou plusieurs membres demandés.',
+                    ['code' => 'FREEBUSY_MEMBER_FORBIDDEN', 'user_id' => $memberId],
+                    403
+                );
+                return;
+            }
+        }
+
+        try {
+            $start = date('Y-m-d H:i:s', strtotime($input['start']));
+            $endRaw = \ICS\Models\EventOccurrence::endOfDayIfDateOnly($input['end']);
+            $end   = date('Y-m-d H:i:s', strtotime($endRaw));
+
+            if ($end <= $start) {
+                LoggingMiddleware::logExit(400);
+                Response::error('La date de fin doit être postérieure à la date de début', null, 400);
+                return;
+            }
+
+            $cal = new Calendar();
+            $members = [];
+            foreach ($memberIds as $memberId) {
+                $busy = [];
+                $calendarIds = $cal->getOwnedCalendarIds($memberId);
+                foreach ($calendarIds as $calendarId) {
+                    $opaqueEvents = \ICS\Models\EventOccurrence::getExpandedOpaqueByCalendarId($calendarId, $start, $end);
+                    foreach ($opaqueEvents as $e) {
+                        $busy[] = ['start' => $e['start_datetime'], 'end' => $e['end_datetime']];
+                    }
+                }
+                usort($busy, fn($a, $b) => strcmp($a['start'], $b['start']));
+                $members[] = ['user_id' => $memberId, 'busy' => $busy];
+            }
+
+            LoggingMiddleware::logExit(200);
+            Response::success('Disponibilités récupérées', [
+                'start'   => $start,
+                'end'     => $end,
+                'members' => $members,
+            ]);
+        } catch (\Exception $e) {
+            LogService::error('Erreur freebusy multi-membres', ['exception' => $e->getMessage()]);
+            LoggingMiddleware::logExit(500);
+            Response::error('Erreur lors du calcul des disponibilités', null, 500);
+        }
+    }
+
 }
 
