@@ -61,6 +61,26 @@ final class JsonRoundTrip
         return ['aCreer' => $aCreer, 'aMettreAJour' => $aMettreAJour, 'orphelins' => $orphelins];
     }
 
+    /**
+     * Diff champ par champ entre la tâche existante (contrat §6) et la ligne importée.
+     * Ignore id/createdAt/updatedAt (gérés serveur) ; ne compare que les champs
+     * présents dans $importe (un payload partiel n'accuse pas les champs absents).
+     * @return array<int, array{champ: string, avant: mixed, apres: mixed}>
+     */
+    public function diffChamps(array $existant, array $importe): array
+    {
+        $ignores = ['id', 'createdAt', 'updatedAt'];
+        $champs = [];
+        foreach ($importe as $champ => $apres) {
+            if (in_array($champ, $ignores, true)) { continue; }
+            $avant = $existant[$champ] ?? null;
+            if ($avant !== $apres) {
+                $champs[] = ['champ' => $champ, 'avant' => $avant, 'apres' => $apres];
+            }
+        }
+        return $champs;
+    }
+
     /** Validation applicative minimale d'une tâche (statut, priorité, %, title). */
     private function valider(array $t): void
     {

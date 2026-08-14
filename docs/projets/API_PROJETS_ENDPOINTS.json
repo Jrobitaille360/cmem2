@@ -147,7 +147,24 @@
           "description": "Dry-run : calcule et renvoie le diff SANS écrire en base",
           "auth_required": true,
           "body": "objet export.json (project, tasks[], schemaVersion)",
-          "response": { "aCreer": "array", "aMettreAJour": "array", "orphelins": "array — tâches cmem2 absentes du fichier, jamais supprimées" },
+          "response": {
+            "aCreer": "array — tâches importées (id tmp-*), objets complets contrat §6",
+            "aMettreAJour": "array<{id: integer, champs: array<{champ: string, avant: mixed, apres: mixed}>}> — une entrée par tâche importée dont l'id correspond à une tâche existante ; champs liste uniquement les propriétés (contrat §6, hors id/createdAt/updatedAt) présentes dans la tâche importée et dont la valeur diffère de la tâche cmem2 actuelle ; champs vide si aucune différence détectée",
+            "orphelins": "array — tâches cmem2 absentes du fichier importé, objets complets contrat §6, jamais supprimées"
+          },
+          "example_response": {
+            "aCreer": [{ "id": "tmp-1", "title": "Nouvelle tâche hors ligne" }],
+            "aMettreAJour": [
+              {
+                "id": 42,
+                "champs": [
+                  { "champ": "title", "avant": "Ancien titre", "apres": "Nouveau titre" },
+                  { "champ": "due", "avant": "2026-08-01 17:00:00", "apres": "2026-08-15 17:00:00" }
+                ]
+              }
+            ],
+            "orphelins": [{ "id": 7, "title": "Tâche retirée du fichier" }]
+          },
           "errors": { "401": "JWT absent", "403": "Non propriétaire", "404": "Projet introuvable", "422": "schemaVersion incompatible ou payload invalide" }
         },
         {

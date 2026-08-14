@@ -21,6 +21,15 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
   par créneau (aucune fuite de `summary`/`location`/`calendar_id`) ; limite de 20 `members` par
   appel (422 au-delà)
 
+### Modifié
+
+- **`POST /projets/projects/{id}/import.json`** (dry-run) — `aMettreAJour[]` expose maintenant un
+  diff champ par champ par tâche : `{ id, champs: [{ champ, avant, apres }] }` au lieu de la tâche
+  cible telle quelle (directive `20260814_125604_cmem_web_vers_cmem2_API__import-diff-shape`).
+  `champs` ne compare que les propriétés (contrat §6, hors `id`/`createdAt`/`updatedAt`) présentes
+  dans la tâche importée ; vide si aucune différence. `import.json/confirm` inchangé (toujours les
+  compteurs `aCreer`/`aMettreAJour`/`orphelins`, applique toujours la tâche complète).
+
 ## [2.16.1] — 2026-08-14
 
 ### Suite de tests — couverture complète du runner + corrections

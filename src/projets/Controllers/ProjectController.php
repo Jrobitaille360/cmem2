@@ -142,13 +142,25 @@ class ProjectController
         $payload = Response::getRequestParams();
         $taskModel = new Task();
         $roundTrip = new JsonRoundTrip();
+        $tachesCmem2 = $taskModel->findByProject($id);
 
         try {
-            $diff = $roundTrip->planifier($payload, $taskModel->findByProject($id));
+            $diff = $roundTrip->planifier($payload, $tachesCmem2);
         } catch (\RuntimeException $e) {
             Response::error($e->getMessage(), null, 422);
             return;
         }
+
+        $existantsParId = [];
+        foreach ($tachesCmem2 as $t) { $existantsParId[$t['id']] = $t; }
+        $diff['aMettreAJour'] = array_map(
+            fn($r) => [
+                'id'     => (int) $r['id'],
+                'champs' => $roundTrip->diffChamps($existantsParId[(int) $r['id']] ?? [], $r),
+            ],
+            $diff['aMettreAJour']
+        );
+
         Response::success('Diff calculé', $diff);
     }
 
