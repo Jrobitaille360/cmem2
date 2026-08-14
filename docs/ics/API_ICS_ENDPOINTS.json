@@ -544,6 +544,91 @@
         }
       ]
     },
+    "time_sessions": {
+      "description": "Suivi du temps par tâche — sessions start/stop (directive D3, 20260814_143000). Un seul minuteur actif à la fois par usager, tous calendriers/tâches confondus.",
+      "base_path": "/calendars/{id}/todos/{todoId}/time-sessions et /time-sessions",
+      "auth_required": true,
+      "chiffrement_e2e": {
+        "principe": "Même convention que title/description des VTODO : note est en clair par défaut, ou base64 opaque si enc_alg est renseigné. Le serveur ne transforme jamais note.",
+        "enc_alg": "string ou null (optional, max 32) - Algorithme, ex. AES-GCM-256. null = note en clair",
+        "enc_iv": "string ou null (optional, max 32) - Vecteur d'initialisation base64. null = note en clair"
+      },
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/calendars/{id}/todos/{todoId}/time-sessions/start",
+          "description": "Démarrer une session de temps sur une tâche. Accès requis : même permission que GET .../todos/{todoId} (lecture du calendrier), pas nécessairement propriétaire de la tâche.",
+          "params": { "id": "integer (required)", "todoId": "integer (required)" },
+          "body": {
+            "note": "string (optional, max 2000) - Note libre, ou base64 opaque si enc_alg est renseigné",
+            "enc_alg": "string (optional, max 32) - voir chiffrement_e2e",
+            "enc_iv": "string (optional, max 32) - voir chiffrement_e2e"
+          },
+          "response": "{ session: { id, todo_id, user_id, started_at, ended_at: null, note, enc_alg, enc_iv } }",
+          "errors": {
+            "404": "Calendrier ou tâche non trouvé / accès non autorisé",
+            "409": "ACTIVE_SESSION_EXISTS - une session est déjà en cours pour cet usager (errors.active_session_id)"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/calendars/{id}/todos/{todoId}/time-sessions",
+          "description": "Lister les sessions de temps d'une tâche, triées started_at DESC.",
+          "params": { "id": "integer (required)", "todoId": "integer (required)" },
+          "response": "{ sessions: Array, count: integer }",
+          "errors": { "404": "Calendrier ou tâche non trouvé / accès non autorisé" }
+        },
+        {
+          "method": "GET",
+          "path": "/time-sessions/active",
+          "description": "Session en cours de l'usager du JWT, si existante (resynchronisation UI après reload/reconnexion).",
+          "response": "{ session: Object|null }"
+        },
+        {
+          "method": "PATCH",
+          "path": "/time-sessions/{id}/stop",
+          "description": "Arrêter une session en cours (pose ended_at). Réservé au propriétaire de la session.",
+          "params": { "id": "integer (required)" },
+          "response": "{ session: Object }",
+          "errors": {
+            "403": "Accès non autorisé (pas le propriétaire de la session)",
+            "404": "Session non trouvée",
+            "409": "SESSION_ALREADY_STOPPED - cette session est déjà arrêtée"
+          }
+        },
+        {
+          "method": "PUT | PATCH",
+          "path": "/time-sessions/{id}",
+          "description": "Correction manuelle d'une session (started_at, ended_at, note). Réservé au propriétaire de la session.",
+          "params": { "id": "integer (required)" },
+          "body": {
+            "started_at": "date ou datetime (optional)",
+            "ended_at": "date, datetime ou null (optional) - null réouvre la session (doit rester la seule active pour l'usager)",
+            "note": "string (optional, max 2000)",
+            "enc_alg": "string ou null (optional, max 32) - null remet la note en clair ; omettre le champ la laisse inchangée",
+            "enc_iv": "string ou null (optional, max 32) - null remet la note en clair ; omettre le champ la laisse inchangée"
+          },
+          "response": "{ session: Object }",
+          "errors": {
+            "400": "ended_at antérieur à started_at",
+            "403": "Accès non autorisé",
+            "404": "Session non trouvée",
+            "409": "ACTIVE_SESSION_EXISTS - remise à ended_at=null en conflit avec une autre session active"
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/time-sessions/{id}",
+          "description": "Supprimer définitivement une session (hard delete, pas de corbeille). Réservé au propriétaire de la session.",
+          "params": { "id": "integer (required)" },
+          "response": "{ }",
+          "errors": {
+            "403": "Accès non autorisé",
+            "404": "Session non trouvée"
+          }
+        }
+      ]
+    },
     "tags": {
       "description": "Étiquettes (tags) scopées par calendrier, partagées entre membres, appliquées via categories[] sur events/todos/journals — directive 20260715_090000_cmem_web_vers_cmem2_API__tags-par-calendrier.md",
       "base_path": "/calendars/{id}/tags",

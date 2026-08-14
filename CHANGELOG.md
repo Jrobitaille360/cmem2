@@ -9,8 +9,21 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+## [2.17.0] — 2026-08-14
+
 ### Ajouté
 
+- **Suivi du temps par tâche — sessions start/stop** (table `time_sessions`, directive
+  `20260814_143000_cmem_web_vers_cmem2_API__time-tracking-sessions`, D3) —
+  `POST /calendars/{id}/todos/{todoId}/time-sessions/start`,
+  `GET /calendars/{id}/todos/{todoId}/time-sessions`, `GET /time-sessions/active`,
+  `PATCH /time-sessions/{id}/stop`, `PUT|PATCH /time-sessions/{id}`,
+  `DELETE /time-sessions/{id}`. Un seul minuteur actif à la fois par usager, contrainte posée en
+  base (index `UNIQUE` sur colonne générée, pas seulement applicative) — `409
+  ACTIVE_SESSION_EXISTS` explicite sinon. `note` suit la convention e2e des tâches
+  (`enc_alg`/`enc_iv`, opaque). Démarrer/lister une session suit la permission de lecture du
+  calendrier ; arrêter/modifier/supprimer est réservé au propriétaire de la session. Aucun gating
+  `tenant_modules` (même régime que les tâches elles-mêmes). Pas de corbeille (hard delete).
 - **`GET /freebusy?members=&start=&end=&app_id=cmemweb`** — free/busy multi-membres pour la
   planification de réunions au sein d'un groupe (directive
   `20260810_140100_cmem_web_vers_cmem2_API__freebusy-multi-membres`). Requiert un groupe partagé

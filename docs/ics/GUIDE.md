@@ -14,6 +14,7 @@ Version 2.0.0 · Base URL : `/calendars` (REST) · `/caldav` (CalDAV)
 - [Endpoints — Événements](#endpoints--événements)
 - [Endpoints — Récurrence](#endpoints--récurrence)
 - [Endpoints — Tâches (VTODO)](#endpoints--tâches-vtodo)
+- [Endpoints — Sessions de temps](#endpoints--sessions-de-temps)
 - [Endpoints — Journaux (VJOURNAL)](#endpoints--journaux-vjournal)
 - [Endpoints — Étiquettes (Tags)](#endpoints--étiquettes-tags)
 - [Endpoints — Disponibilités (VFREEBUSY)](#endpoints--disponibilités-vfreebusy)
@@ -354,6 +355,63 @@ Les rappels push d'une tâche chiffrée affichent un libellé générique
 L'export `.ics` restitue la valeur stockée telle quelle : pour une tâche chiffrée, `SUMMARY`
 contient donc le base64. L'échappement RFC 5545 et le pliage à 75 octets sont réversibles, le
 blob se reconstitue à l'octet près après dépliage.
+
+---
+
+## Endpoints — Sessions de temps
+
+> Directive `20260814_143000_cmem_web_vers_cmem2_API__time-tracking-sessions` (D3)
+
+Suivi du temps passé sur une tâche sous forme de sessions start/stop (pas un compteur cumulé).
+**Un seul minuteur actif à la fois par usager**, tous calendriers et tâches confondus — la
+contrainte est appliquée en base (index `UNIQUE` sur une colonne générée), pas seulement côté
+application.
+
+| Méthode | Endpoint | Description |
+| --- | --- | --- |
+| POST | `/calendars/{id}/todos/{todoId}/time-sessions/start` | Démarrer une session |
+| GET | `/calendars/{id}/todos/{todoId}/time-sessions` | Lister les sessions d'une tâche |
+| GET | `/time-sessions/active` | Session en cours de l'usager, si existante |
+| PATCH | `/time-sessions/{id}/stop` | Arrêter une session en cours |
+| PUT \| PATCH | `/time-sessions/{id}` | Correction manuelle (`started_at`/`ended_at`/`note`) |
+| DELETE | `/time-sessions/{id}` | Supprimer (hard delete — pas de corbeille) |
+
+### Autorisation
+
+Démarrer une session ou lister celles d'une tâche demande la même permission que
+`GET .../todos/{id}` (accès en lecture au calendrier — pas nécessairement propriétaire de la
+tâche, cohérent avec un calendrier partagé). Arrêter, modifier ou supprimer une session est
+réservé au **propriétaire de la session** (celui qui l'a démarrée), indépendamment du
+propriétaire de la tâche.
+
+### Champs
+
+| Champ | Type | Description |
+| --- | --- | --- |
+| `todo_id` | integer | Tâche rattachée |
+| `started_at` | datetime | Début, posé serveur à la création |
+| `ended_at` | datetime \| null | `null` = session en cours |
+| `note` | string, max 2 000 | En clair, ou base64 opaque si `enc_alg` est renseigné |
+| `enc_alg` | string, max 32 | Algorithme de chiffrement client. `null` = note en clair |
+| `enc_iv` | string, max 32 | Vecteur d'initialisation base64 |
+
+Le total de temps par tâche n'est pas agrégé côté serveur (calcul client à partir de la liste des
+sessions) — pas de demande en ce sens à ce jour. Aucun gating `tenant_modules` : le module suit le
+même régime que les tâches elles-mêmes (fonctionnalité socle, tous plans).
+
+### Chiffrement de la note
+
+Même convention que `title`/`description` des VTODO : chiffrement intégral côté client, le
+serveur ne transforme jamais `note`. `null` explicite remet la note en clair ; omettre le champ
+la laisse inchangée.
+
+### Codes d'erreur spécifiques
+
+| Code | Situation |
+| --- | --- |
+| `409 ACTIVE_SESSION_EXISTS` | `start` alors qu'une session est déjà en cours (`errors.active_session_id`) ; ou `PATCH` qui remettrait `ended_at` à `null` en conflit avec une autre session active |
+| `409 SESSION_ALREADY_STOPPED` | `stop` sur une session déjà arrêtée |
+| `400` | `PATCH` avec `ended_at` antérieur à `started_at` |
 
 ---
 

@@ -48,6 +48,12 @@ class CalendarPlugin extends AbstractPlugin
                 }
                 return $this->routeHandler;
             },
+            'time-sessions' => function($authService) {
+                if ($this->routeHandler === null) {
+                    $this->routeHandler = new CalendarRouteHandler($authService);
+                }
+                return $this->routeHandler;
+            },
             'caldav' => function($authService) {
                 if ($this->caldavRouteHandler === null) {
                     $this->caldavRouteHandler = new CalDAVRouteHandler($authService);

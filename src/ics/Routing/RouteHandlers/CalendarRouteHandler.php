@@ -7,6 +7,7 @@ use ICS\Controllers\CalendarController;
 use ICS\Controllers\TodoController;
 use ICS\Controllers\JournalController;
 use ICS\Controllers\TagController;
+use ICS\Controllers\TimeSessionController;
 use AuthGroups\Utils\Response;
 
 class CalendarRouteHandler extends BaseRouteHandler
@@ -15,6 +16,7 @@ class CalendarRouteHandler extends BaseRouteHandler
     private TodoController $todoController;
     private JournalController $journalController;
     private TagController $tagController;
+    private TimeSessionController $timeSessionController;
 
     public function __construct($authService) {
         parent::__construct($authService);
@@ -22,10 +24,11 @@ class CalendarRouteHandler extends BaseRouteHandler
         $this->todoController    = new TodoController();
         $this->journalController = new JournalController();
         $this->tagController      = new TagController();
+        $this->timeSessionController = new TimeSessionController();
     }
-    
+
     protected function getSupportedControllers(): array {
-        return ['calendars', 'freebusy'];
+        return ['calendars', 'freebusy', 'time-sessions'];
     }
 
     protected function handleRoute(array $request): void {
@@ -49,11 +52,11 @@ class CalendarRouteHandler extends BaseRouteHandler
                 $this->controller->getUserCalendars($user['user_id']),
                                
             // PUT /calendars/{id} - Mettre à jour un calendrier
-            ($action && ctype_digit($action) && !isset($segments[2]) && $method === 'PUT') => 
+            ($request['controller'] === 'calendars' && $action && ctype_digit($action) && !isset($segments[2]) && $method === 'PUT') =>
                 $this->controller->updateCalendar((int)$action, $user['user_id']),
-                
+
             // DELETE /calendars/{id} - Supprimer un calendrier (soft delete)
-            ($action && ctype_digit($action) && !isset($segments[2]) && $method === 'DELETE') => 
+            ($request['controller'] === 'calendars' && $action && ctype_digit($action) && !isset($segments[2]) && $method === 'DELETE') =>
                 $this->controller->deleteCalendar((int)$action, $user['user_id']),
                 
             // DELETE /calendars/{id}/hard - Supprimer définitivement un calendrier
@@ -174,6 +177,31 @@ class CalendarRouteHandler extends BaseRouteHandler
             // DELETE /calendars/{id}/todos/{todoId}
             ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'todos' && isset($segments[3]) && ctype_digit($segments[3]) && !isset($segments[4]) && $method === 'DELETE') =>
                 $this->todoController->deleteTodo((int)$action, (int)$segments[3], $user['user_id']),
+
+            // ── Sessions de temps — Directive D3 (2026-08-14) ──────────────
+            // POST /calendars/{id}/todos/{todoId}/time-sessions/start
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'todos' && isset($segments[3]) && ctype_digit($segments[3]) && isset($segments[4]) && $segments[4] === 'time-sessions' && isset($segments[5]) && $segments[5] === 'start' && $method === 'POST') =>
+                $this->timeSessionController->startSession((int)$action, (int)$segments[3], $user['user_id']),
+
+            // GET /calendars/{id}/todos/{todoId}/time-sessions
+            ($action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'todos' && isset($segments[3]) && ctype_digit($segments[3]) && isset($segments[4]) && $segments[4] === 'time-sessions' && !isset($segments[5]) && $method === 'GET') =>
+                $this->timeSessionController->getSessionsForTodo((int)$action, (int)$segments[3], $user['user_id']),
+
+            // GET /time-sessions/active
+            ($request['controller'] === 'time-sessions' && $action === 'active' && !isset($segments[2]) && $method === 'GET') =>
+                $this->timeSessionController->getActiveSession($user['user_id']),
+
+            // PATCH /time-sessions/{id}/stop
+            ($request['controller'] === 'time-sessions' && $action && ctype_digit($action) && isset($segments[2]) && $segments[2] === 'stop' && $method === 'PATCH') =>
+                $this->timeSessionController->stopSession((int)$action, $user['user_id']),
+
+            // PUT|PATCH /time-sessions/{id}
+            ($request['controller'] === 'time-sessions' && $action && ctype_digit($action) && !isset($segments[2]) && in_array($method, ['PUT', 'PATCH'], true)) =>
+                $this->timeSessionController->updateSession((int)$action, $user['user_id']),
+
+            // DELETE /time-sessions/{id}
+            ($request['controller'] === 'time-sessions' && $action && ctype_digit($action) && !isset($segments[2]) && $method === 'DELETE') =>
+                $this->timeSessionController->deleteSession((int)$action, $user['user_id']),
 
             // ── Journals — Phase 5.2 ──────────────────────────────────────
             // POST /calendars/{id}/journals
