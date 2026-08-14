@@ -7,6 +7,15 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-08-13 21:30]
+
+### Fix — `STRIPE_PRICE_CMEMWEB_TEAM` jamais défini côté PHP
+
+> Directive `20260813_151500_cmem_web_vers_cmem2_API__stripe-price-team-dev.md`
+
+- **Bug corrigé** : `environment.php` définissait `STRIPE_PRICE_CMEMWEB_MONTHLY`/`_YEARLY` mais pas `_TEAM` — `POST /v2/billing/checkout` avec `plan=team` échouait toujours en `500 STRIPE_PRICE_CMEMWEB_TEAM non configuré`, même une fois la variable renseignée dans `.env` (la constante PHP n'existait tout simplement pas)
+- Prix Stripe test déjà provisionné côté `dev-cmem2` (`price_1U45jDHVE9dtvgofLz5Qp78o`, 15 $ CAD/mois) — vérifié valide et actif, réutilisé tel quel
+
 ## [Unreleased 2026-08-13 17:15]
 
 ### Plan équipe — facturation Stripe portée par un groupe + modules de groupe

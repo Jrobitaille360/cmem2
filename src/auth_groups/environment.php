@@ -425,3 +425,7 @@ if (!defined('STRIPE_PRICE_CMEMWEB_MONTHLY')) {
 if (!defined('STRIPE_PRICE_CMEMWEB_YEARLY')) {
     define('STRIPE_PRICE_CMEMWEB_YEARLY',  $_ENV['STRIPE_PRICE_CMEMWEB_YEARLY']  ?? '');
 }
+// Plan Équipe (groupe) — directive plan-equipe 20260813
+if (!defined('STRIPE_PRICE_CMEMWEB_TEAM')) {
+    define('STRIPE_PRICE_CMEMWEB_TEAM',    $_ENV['STRIPE_PRICE_CMEMWEB_TEAM']    ?? '');
+}
