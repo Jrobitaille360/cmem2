@@ -27,9 +27,9 @@ class CmemModules
     /** Modules disponibles par plan. 'ami' = tout. */
     private const AVAILABLE = [
         'free'    => ['projet', 'contacts', 'crm', 'ged'],
-        'monthly' => ['projet', 'contacts', 'crm', 'ged', 'ia'],
-        'yearly'  => ['projet', 'contacts', 'crm', 'ged', 'ia'],
-        'team'    => ['projet', 'contacts', 'crm', 'ged', 'ia'],
+        'monthly' => ['projet', 'contacts', 'crm', 'ged', 'ia', 'booking'],
+        'yearly'  => ['projet', 'contacts', 'crm', 'ged', 'ia', 'booking'],
+        'team'    => ['projet', 'contacts', 'crm', 'ged', 'ia', 'booking'],
         'ami'     => self::KEYS,
     ];
 

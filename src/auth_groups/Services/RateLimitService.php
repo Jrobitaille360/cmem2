@@ -23,20 +23,22 @@ class RateLimitService
     /**
      * Vérifie si le couple (email, IP) a dépassé la limite pour un endpoint.
      *
-     * @param  string $email
-     * @param  string $endpoint  'login' | 'send-code'
-     * @return bool   true = sous la limite (requête autorisée)
-     *                false = limite dépassée → retourner 429
+     * @param  string   $email
+     * @param  string   $endpoint      'login' | 'send-code' | tout autre nom de bucket (VARCHAR(20))
+     * @param  int|null $maxOverride    Seuil spécifique à ce endpoint, sinon RATE_LIMIT_AUTH_MAX_ATTEMPTS
+     * @param  int|null $windowOverride Fenêtre (minutes) spécifique, sinon RATE_LIMIT_AUTH_WINDOW_MINUTES
+     * @return bool     true = sous la limite (requête autorisée)
+     *                  false = limite dépassée → retourner 429
      */
-    public static function check(string $email, string $endpoint): bool
+    public static function check(string $email, string $endpoint, ?int $maxOverride = null, ?int $windowOverride = null): bool
     {
         if (!ENABLE_RATE_LIMITING) {
             return true;
         }
 
         $ip      = self::getClientIp();
-        $max     = defined('RATE_LIMIT_AUTH_MAX_ATTEMPTS')    ? RATE_LIMIT_AUTH_MAX_ATTEMPTS    : 5;
-        $window  = defined('RATE_LIMIT_AUTH_WINDOW_MINUTES')  ? RATE_LIMIT_AUTH_WINDOW_MINUTES  : 10;
+        $max     = $maxOverride    ?? (defined('RATE_LIMIT_AUTH_MAX_ATTEMPTS')    ? RATE_LIMIT_AUTH_MAX_ATTEMPTS    : 5);
+        $window  = $windowOverride ?? (defined('RATE_LIMIT_AUTH_WINDOW_MINUTES')  ? RATE_LIMIT_AUTH_WINDOW_MINUTES  : 10);
 
         $db   = Database::getInstance()->getConnection();
         $stmt = $db->prepare(
@@ -125,13 +127,15 @@ class RateLimitService
     }
 
     // -----------------------------------------------------------------------
-    // Helper privé
+    // Helper
     // -----------------------------------------------------------------------
 
     /**
      * Retourne l'adresse IP réelle du client (supporte les proxies via X-Forwarded-For).
+     * Public : sert aussi de clé d'identification pour les endpoints publics anonymes
+     * (ex. booking) qui n'ont pas d'email à passer à check()/record().
      */
-    private static function getClientIp(): string
+    public static function getClientIp(): string
     {
         if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
             // Prendre la première IP de la chaîne (IP du client original)

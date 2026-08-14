@@ -1,6 +1,6 @@
 ﻿# cmem2 API
 
-![Version](https://img.shields.io/badge/version-2.15.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.16.0-blue.svg)
 ![PHP](https://img.shields.io/badge/PHP-8.0+-purple.svg)
 ![Status](https://img.shields.io/badge/status-production%20ready-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
@@ -35,6 +35,7 @@ cmem2 API fournit :
 - **Items** : Gestionnaire générique d'items (private/public/share), catégories JSON, partages utilisateurs
 - **Contacts** : Pilier Contacts (CRM) — fiches personnes/organisations owner-strict, vCard 4.0, cap `max_contacts`, envoi de courriel, historique d'interactions (appels/notes/rdv/sms)
 - **Projets** : Gestion de projet — tâches, hiérarchie, dépendances (FS/SS/FF/SF), round-trip JSON, export `.ics`
+- **Booking** : Réservation publique par lien — page hôte sans authentification, zones matérialisées, réservation atomique, annulation par jeton
 - **Puzzle** : Puzzle collaboratif — pick/drop de pièces, sessions partagées
 - **Traque** : Jeu type combat/exploration — monstres, biomes OSM, achievements, rôles (`gm`, `traque_admin`)
 - **Access** : Contrôle d'accès aux abonnements — croisement Stripe / Playstore
@@ -366,6 +367,18 @@ Voir [docs/quiz/GUIDE.md](docs/quiz/GUIDE.md) pour la référence complète.
 
 Voir [docs/items/GUIDE.md](docs/items/GUIDE.md) pour la référence complète.
 
+### Booking
+
+| Méthode | Endpoint | Description | Auth |
+| --- | --- | --- | --- |
+| GET/PUT/DELETE | `/booking/page` | Configuration de la page de réservation de l'hôte | JWT |
+| GET | `/booking/public/{slug}` | Nom d'affichage, durée, fuseau de l'hôte | Non |
+| GET | `/booking/public/{slug}/slots` | Zones libres dans une plage (max 60 jours) | Non |
+| POST | `/booking/public/{slug}/book` | Réserver une zone (atomique) | Non |
+| POST | `/booking/public/cancel/{token}` | Annuler par lien à jeton | Non |
+
+Voir [docs/booking/GUIDE.md](docs/booking/GUIDE.md) pour la référence complète.
+
 ### Public
 
 | Méthode | Endpoint | Description |
@@ -386,6 +399,7 @@ Voir [docs/items/GUIDE.md](docs/items/GUIDE.md) pour la référence complète.
 | Items | [docs/items/API_ITEMS_ENDPOINTS.json](docs/items/API_ITEMS_ENDPOINTS.json) | [docs/items/GUIDE.md](docs/items/GUIDE.md) |
 | Contacts | [docs/contacts/API_CONTACTS_ENDPOINTS.json](docs/contacts/API_CONTACTS_ENDPOINTS.json) | [docs/contacts/GUIDE.md](docs/contacts/GUIDE.md) |
 | Projets | [docs/projets/API_PROJETS_ENDPOINTS.json](docs/projets/API_PROJETS_ENDPOINTS.json) | — |
+| Booking | [docs/booking/API_BOOKING_ENDPOINTS.json](docs/booking/API_BOOKING_ENDPOINTS.json) | [docs/booking/GUIDE.md](docs/booking/GUIDE.md) |
 | Puzzle | [docs/puzzle/API_PUZZLE_ENDPOINTS.json](docs/puzzle/API_PUZZLE_ENDPOINTS.json) | [docs/puzzle/GUIDE.md](docs/puzzle/GUIDE.md) |
 | Traque | [docs/traque/API_TRAQUE_ENDPOINTS.json](docs/traque/API_TRAQUE_ENDPOINTS.json) | [docs/traque/GUIDE.md](docs/traque/GUIDE.md) |
 | Access | [docs/access/API_ACCESS_ENDPOINTS.json](docs/access/API_ACCESS_ENDPOINTS.json) | [docs/access/GUIDE.md](docs/access/GUIDE.md) |
@@ -450,6 +464,8 @@ Chaque module a son propre fichier `private/tests/test_<module>.php` (voir la li
 - [x] Registre de modules activables — gating par plan, toggle usager (v2.12.0)
 - [x] Traque — socle des rôles de jeu (`gm`, `traque_admin`) (v2.15.0)
 - [x] Proxy IA — résumé d'agenda (`POST /ai/summarize`) (v2.15.0)
+- [x] Plan équipe — facturation Stripe portée par un groupe + modules de groupe (v2.16.0)
+- [x] Plugin Booking — réservation publique par lien, zones matérialisées (v2.16.0)
 - [ ] Rate limiting Redis
 
 ## Licence
@@ -458,4 +474,4 @@ MIT — voir [LICENSE](LICENSE). Dépendances tierces : [THIRD_PARTY_LICENSES.md
 
 ---
 
-**Version** : 2.15.0 · **Mis à jour** : 2026-08-11 · **Auteur** : [Jrobitaille360](https://github.com/Jrobitaille360)
+**Version** : 2.16.0 · **Mis à jour** : 2026-08-14 · **Auteur** : [Jrobitaille360](https://github.com/Jrobitaille360)

@@ -1,0 +1,236 @@
+{
+  "api": {
+    "name": "Booking API",
+    "version": "1.0.0",
+    "description": "Réservation publique — page de créneaux hôte, zones matérialisées, annulation par lien à jeton. Module gated par plan (tenant_modules.booking).",
+    "generated": "2026-08-13",
+    "base_url": "/booking",
+    "authentication": {
+      "types": ["JWT", "NONE"],
+      "description": "GET/PUT/DELETE /booking/page requièrent Authorization: Bearer <jwt_token> (hôte). Les 4 routes /booking/public/* sont sans authentification."
+    },
+    "notes": [
+      "Gating par plan : tenant_modules.booking disponible sur monthly/yearly/team/ami, pas free (Stripe\\Config\\CmemModules::AVAILABLE)",
+      "app_id : défaut serveur 'puzzle' comme le reste de l'API, cmem_web transmet toujours 'cmemweb'",
+      "GET /booking/public/{slug} retourne un 404 BOOKING_UNAVAILABLE identique que la page soit inexistante, inactive, ou que le plan de l'hôte ait été rétrogradé — anti-énumération de slug volontaire",
+      "Réservation atomique : POST /booking/public/{slug}/book fait un UPDATE ... WHERE reserved = 0 — pas de revérification applicative, la course entre deux invités se règle par la contrainte SQL",
+      "Rate-limit par IP (clé RateLimitService), pas par email — endpoints publics anonymes"
+    ]
+  },
+  "endpoints": {
+    "authenticated": {
+      "description": "Configuration hôte de la page de réservation",
+      "base_path": "/booking",
+      "auth_required": true,
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/booking/page",
+          "description": "Configuration courante de la page de l'usager authentifié.",
+          "query": {
+            "app_id": "string (optional) — défaut serveur 'puzzle'"
+          },
+          "response_success": {
+            "http_status": 200,
+            "body": { "success": true, "data": { "page": "object — voir schéma booking_pages" } }
+          },
+          "errors": {
+            "404": "BOOKING_PAGE_NOT_FOUND — aucune page configurée pour cet usager"
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/booking/page",
+          "description": "Upsert de la configuration. Valide calendar_id (appartenance), slug (format + unicité par app_id), availability_windows. Déclenche la régénération des zones (Booking\\Services\\BookingSlotService::regenerate) : supprime les zones non réservées futures, régénère sur horizon_days, exclut les chevauchements avec le calendrier de l'hôte. Les zones réservées ne sont jamais touchées.",
+          "body": {
+            "app_id": "string (optional) — défaut serveur 'puzzle'",
+            "calendar_id": "integer (required) — doit appartenir à l'usager authentifié",
+            "slug": "string (required) — format [a-z0-9-]+, unique par app_id (y compris pages désactivées)",
+            "duration_minutes": "integer (required) — > 0",
+            "buffer_before_minutes": "integer (optional) — défaut 0, élargit la fenêtre de conflit calendrier (pas d'espacement entre créneaux générés)",
+            "buffer_after_minutes": "integer (optional) — défaut 0, idem après le créneau",
+            "timezone": "string (required) — identifiant IANA (incluant alias historiques, DateTimeZone::ALL_WITH_BC)",
+            "horizon_days": "integer (optional) — défaut 30, plafond 90",
+            "availability_windows": "array (required) — [{weekday: 0-6 (0=dimanche, convention Date.getDay() JS), start: 'HH:MM', end: 'HH:MM', start < end}]",
+            "event_title_template": "string (optional) — défaut 'Rendez-vous : {guest_name}', seul placeholder supporté",
+            "active": "boolean (optional) — true exige booking.available = true sur le plan de l'hôte, sinon 403"
+          },
+          "response_success": {
+            "http_status": "200 (mise à jour) | 201 (première création)",
+            "body": { "success": true, "data": { "page": "object — voir schéma booking_pages" } }
+          },
+          "errors": {
+            "403": "MODULE_NOT_AVAILABLE (active=true sur plan non éligible) | CALENDAR_NOT_OWNED",
+            "409": "SLUG_TAKEN — slug déjà utilisé par une autre page du même app_id",
+            "422": "Erreur de validation — corps : {success: false, errors: {champ: message}}"
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/booking/page",
+          "description": "Désactive la page et supprime les zones non réservées. Les zones déjà réservées et leurs événements liés restent intacts.",
+          "query": {
+            "app_id": "string (optional) — défaut serveur 'puzzle'"
+          },
+          "response_success": {
+            "http_status": 200,
+            "body": { "success": true, "message": "Page de réservation désactivée" }
+          },
+          "errors": {
+            "404": "BOOKING_PAGE_NOT_FOUND"
+          }
+        }
+      ]
+    },
+    "public": {
+      "description": "Endpoints publics — page de réservation invité, sans authentification",
+      "base_path": "/booking/public",
+      "auth_required": false,
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/booking/public/{slug}",
+          "description": "Nom d'affichage de l'hôte, durée du créneau, fuseau horaire.",
+          "query": {
+            "app_id": "string (optional) — défaut serveur 'puzzle'"
+          },
+          "response_success": {
+            "http_status": 200,
+            "body": {
+              "success": true,
+              "data": {
+                "host_name": "string",
+                "duration_minutes": "integer",
+                "timezone": "string"
+              }
+            }
+          },
+          "errors": {
+            "404": "BOOKING_UNAVAILABLE — page inexistante, inactive, ou plan de l'hôte ne couvrant plus booking (3 causes indiscernables, volontaire)"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/booking/public/{slug}/slots",
+          "description": "Zones libres (reserved=false) dans la plage demandée, en UTC. Rate-limit : 20 req/min par IP.",
+          "query": {
+            "app_id": "string (optional) — défaut serveur 'puzzle'",
+            "from": "datetime (required) — borne inférieure",
+            "to": "datetime (required) — borne supérieure, plage max 60 jours"
+          },
+          "response_success": {
+            "http_status": 200,
+            "body": {
+              "success": true,
+              "data": {
+                "duration_minutes": "integer",
+                "timezone": "string",
+                "slots": [
+                  { "id": "integer", "start_datetime": "string (ISO 8601 UTC, ex. 2026-08-20T13:00:00Z)", "end_datetime": "string (ISO 8601 UTC)" }
+                ]
+              }
+            }
+          },
+          "errors": {
+            "404": "BOOKING_UNAVAILABLE",
+            "422": "INVALID_RANGE (from/to manquants ou invalides) | RANGE_TOO_WIDE (> 60 jours)",
+            "429": "RATE_LIMITED"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/booking/public/{slug}/book",
+          "description": "Réservation atomique d'une zone. Crée l'événement dans le calendrier de l'hôte, génère un cancel_token, envoie un courriel de confirmation avec le lien d'annulation. Rate-limit : 5 req/min par IP.",
+          "query": {
+            "app_id": "string (optional) — défaut serveur 'puzzle'"
+          },
+          "body": {
+            "slot_id": "integer (required)",
+            "guest_name": "string (required)",
+            "guest_email": "string (required) — email valide",
+            "guest_timezone": "string (required) — identifiant IANA"
+          },
+          "response_success": {
+            "http_status": 200,
+            "body": {
+              "success": true,
+              "data": {
+                "cancel_token": "string",
+                "event_id": "integer",
+                "start_datetime": "string (ISO 8601 UTC)",
+                "end_datetime": "string (ISO 8601 UTC)"
+              }
+            }
+          },
+          "errors": {
+            "404": "BOOKING_UNAVAILABLE",
+            "409": "SLOT_TAKEN — zone déjà réservée entretemps (0 ligne affectée par l'UPDATE atomique)",
+            "422": "Erreur de validation | SLOT_INVALID (slot_id inexistant ou n'appartenant pas à ce slug)",
+            "429": "RATE_LIMITED",
+            "500": "Échec de création de l'événement — la zone est automatiquement libérée (rollback)"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/booking/public/cancel/{token}",
+          "description": "Libère la zone (reserved=false, champs invité + cancel_token vidés), passe l'événement à status=cancelled. Idempotent : rejouer l'appel avec un jeton déjà utilisé retourne 404 sans effet de bord. Rate-limit : 5 req/min par IP.",
+          "response_success": {
+            "http_status": 200,
+            "body": { "success": true, "message": "Réservation annulée" }
+          },
+          "errors": {
+            "404": "CANCEL_TOKEN_INVALID — jeton inconnu ou déjà utilisé",
+            "429": "RATE_LIMITED"
+          }
+        }
+      ]
+    }
+  },
+  "db_tables": {
+    "booking_pages": {
+      "description": "Une ligne par hôte (unique owner_id+app_id, unique app_id+slug)",
+      "columns": {
+        "id": "INT AUTO_INCREMENT PRIMARY KEY",
+        "owner_id": "INT NOT NULL",
+        "app_id": "VARCHAR(64) NOT NULL DEFAULT 'puzzle'",
+        "calendar_id": "INT NOT NULL — FK calendars.id",
+        "slug": "VARCHAR(128) NOT NULL",
+        "duration_minutes": "SMALLINT NOT NULL",
+        "buffer_before_minutes": "SMALLINT NOT NULL DEFAULT 0",
+        "buffer_after_minutes": "SMALLINT NOT NULL DEFAULT 0",
+        "timezone": "VARCHAR(64) NOT NULL",
+        "horizon_days": "SMALLINT NOT NULL DEFAULT 30 — CHECK <= 90",
+        "availability_windows": "LONGTEXT (JSON) NOT NULL",
+        "event_title_template": "VARCHAR(255) NOT NULL DEFAULT 'Rendez-vous : {guest_name}'",
+        "active": "TINYINT(1) NOT NULL DEFAULT 0",
+        "created_at": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
+        "updated_at": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+      },
+      "indexes": [
+        "UNIQUE KEY (owner_id, app_id)",
+        "UNIQUE KEY (app_id, slug)",
+        "KEY (calendar_id)"
+      ]
+    },
+    "booking_slots": {
+      "description": "Une ligne par créneau généré — zones matérialisées à l'avance",
+      "columns": {
+        "id": "INT AUTO_INCREMENT PRIMARY KEY",
+        "booking_page_id": "INT NOT NULL — FK booking_pages.id ON DELETE CASCADE",
+        "start_datetime": "DATETIME NOT NULL — UTC",
+        "end_datetime": "DATETIME NOT NULL — UTC",
+        "reserved": "TINYINT(1) NOT NULL DEFAULT 0",
+        "guest_name": "VARCHAR(255) NULL",
+        "guest_email": "VARCHAR(255) NULL",
+        "guest_timezone": "VARCHAR(64) NULL",
+        "event_id": "INT NULL — FK calendar_events.id ON DELETE SET NULL",
+        "cancel_token": "VARCHAR(64) NULL UNIQUE",
+        "created_at": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP"
+      },
+      "indexes": [
+        "UNIQUE KEY (cancel_token)",
+        "KEY (booking_page_id, reserved, start_datetime)"
+      ]
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+    "name": "Booking",
+    "version": "1.0.0",
+    "description": "Réservation publique — page de créneaux hôte, zones matérialisées, annulation par lien",
+    "author": "CMEM Team",
+    "namespace": "Booking",
+    "main_class": "Booking\\BookingPlugin",
+    "min_cmem_version": "2.15.0",
+    "status": "active",
+    "dependencies": {
+        "cmem2_core": ">=2.15.0"
+    },
+    "routes": {
+        "prefix": "/booking",
+        "public_routes": [
+            "/booking/public/{slug}",
+            "/booking/public/{slug}/slots",
+            "/booking/public/{slug}/book",
+            "/booking/public/cancel/{token}"
+        ],
+        "auth_routes": [
+            "/booking/page"
+        ]
+    }
+}

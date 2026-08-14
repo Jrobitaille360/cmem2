@@ -70,7 +70,7 @@ générique multi-app, sans notion de plan cmem — il n'est **pas** le porteur 
 
 ### Phase 1 — Schéma + config (bloquant, nécessite confirmation avant migration)
 
-- **Actions** : `docs/20260813_group_billing.sql` (ALTER `stripe_subscriptions` : `group_id`
+- **Actions** : `docs/v-2-16-0/20260813_group_billing.sql` (ALTER `stripe_subscriptions` : `group_id`
   nullable, XOR, `uq_group_app`) ; `CmemPlans::RANK`/`rank()` + tier `team` ; `CmemModules`
   `AVAILABLE['team']`/`QUOTAS['ia']['team']`.
 - **Enjeux** : migration sur table de production existante (contrainte CHECK MySQL 8+, clé unique

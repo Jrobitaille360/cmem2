@@ -1159,6 +1159,25 @@ class EmailService {
     }
     
     /**
+     * Confirmation de réservation publique (module booking) — inclut le lien d'annulation.
+     * Directive 20260813_163000_cmem_web_vers_cmem2_API__booking-public.md.
+     */
+    public function sendBookingConfirmation($email, $guestName, $hostName, $startLocal, $endLocal, $timezone, $cancelUrl) {
+        $subject = "Confirmation de réservation avec {$hostName}";
+
+        $body = $this->buildBookingConfirmationTemplate([
+            'guestName' => $guestName,
+            'hostName'  => $hostName,
+            'startLocal' => $startLocal,
+            'endLocal'   => $endLocal,
+            'timezone'   => $timezone,
+            'cancelUrl'  => $cancelUrl,
+        ]);
+
+        return $this->sendEmail($email, $subject, $body, true);
+    }
+
+    /**
      * Vérifier si les emails peuvent être envoyés (API opérationnelle)
      */
     public function canSendEmails() {
@@ -1273,6 +1292,48 @@ class EmailService {
         </html>";
     }
     
+    /**
+     * Template pour confirmation de réservation publique (module booking)
+     */
+    private function buildBookingConfirmationTemplate($data) {
+        return "
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset='UTF-8'>
+            <title>Confirmation de réservation</title>
+            <style>
+                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                .header { background-color: #4CAF50; color: white; padding: 20px; text-align: center; }
+                .content { padding: 20px; background-color: #f9f9f9; }
+                .booking-info { background: #e8f5e9; border-left: 4px solid #4CAF50; padding: 15px; margin: 15px 0; }
+                .button { display: inline-block; background-color: #d32f2f; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 15px 0; }
+            </style>
+        </head>
+        <body>
+            <div class='container'>
+                <div class='header'>
+                    <h1>✅ Réservation confirmée</h1>
+                </div>
+                <div class='content'>
+                    <h2>Bonjour {$data['guestName']},</h2>
+                    <p>Votre rendez-vous avec {$data['hostName']} est confirmé :</p>
+                    <div class='booking-info'>
+                        <strong>Début :</strong> {$data['startLocal']}<br>
+                        <strong>Fin :</strong> {$data['endLocal']}<br>
+                        <strong>Fuseau horaire :</strong> {$data['timezone']}
+                    </div>
+                    <p>Besoin d'annuler ?</p>
+                    <p style='text-align: center;'>
+                        <a href='{$data['cancelUrl']}' class='button'>Annuler la réservation</a>
+                    </p>
+                </div>
+            </div>
+        </body>
+        </html>";
+    }
+
     /**
      * Template pour email d'inscription avec API key gratuite et invitation plans
      */

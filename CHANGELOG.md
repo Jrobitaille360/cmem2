@@ -7,7 +7,32 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-08-13 21:30]
+## [Unreleased]
+
+## [2.16.0] — 2026-08-14
+
+Nouveau module `booking` (réservation publique par lien), plan équipe (facturation Stripe de
+groupe + modules de groupe) et son correctif de prix Stripe `team`, versioning optimiste
+(`updatedAt` + `If-Unmodified-Since`) sur events/todos/journals/tasks, et résolution d'un incident
+post-déploiement v2.15.0 sur le proxy IA. Déployé sur dev-cmem2 et prod, migrations appliquées sur
+les deux bases, cron `booking_regenerate.php` installé sur le crontab prod.
+
+### Nouveau module `booking` — réservation publique par lien
+
+> Directive `20260813_163000_cmem_web_vers_cmem2_API__booking-public.md`
+
+- **Nouveau plugin `src/booking/`** — un hôte (plan payant) publie une page de réservation sans authentification ; un invité externe réserve un créneau, l'événement apparaît directement dans son calendrier. Un seul type de créneau par hôte, réservation auto-confirmée, annulation par lien à jeton sans compte invité
+- **Migration `docs/v-2-16-0/20260813_booking_public.sql`** : `booking_pages` (config hôte, unique `owner_id+app_id` et `app_id+slug`) et `booking_slots` (zones matérialisées à l'avance, unique `cancel_token`)
+- **Zones matérialisées, pas de freebusy à la volée** — `Booking\Services\BookingSlotService::regenerate()` génère les créneaux depuis `availability_windows`/`duration_minutes` sur `horizon_days`, exclut les chevauchements avec le calendrier de l'hôte (récurrence expansée), préserve toujours les zones déjà réservées. Réservation = `UPDATE booking_slots SET reserved=1 ... WHERE reserved=0` — la course entre deux invités se règle par la contrainte SQL, jamais par une revérification applicative (vérifié par test de concurrence : un seul `200`, l'autre `409 SLOT_TAKEN`)
+- **Module `booking` (`tenant_modules`)** passe de `ami` seul à disponible sur `monthly`/`yearly`/`team`/`ami` (`free` exclu), même patron que `ia`
+- **`GET/PUT/DELETE /booking/page`** (hôte, JWT) — validations `calendar_id` (appartenance), `slug` (format + unicité), `availability_windows`. `DELETE` désactive et purge les zones non réservées, conserve intactes les zones déjà réservées et leurs événements
+- **`GET /booking/public/{slug}[/slots]`, `POST /booking/public/{slug}/book`, `POST /booking/public/cancel/{token}`** — sans authentification. `404 BOOKING_UNAVAILABLE` volontairement identique pour page inexistante / inactive / plan rétrogradé (anti-énumération de slug). `/slots` plafonné à 60 jours par appel
+- **Courriel de confirmation** avec lien d'annulation (`EmailService::sendBookingConfirmation`, nouveau) — nouvelle variable `CMEMWEB_APP_URL` (`.env`/`.env.example`/`.env.dev.online`/`.env.prod`)
+- **Rate-limit par IP** sur les 3 routes publiques (20/min `slots`, 5/min `book`/`cancel`) — `RateLimitService::check()/record()` acceptent désormais des seuils par endpoint (`$maxOverride`/`$windowOverride`, rétrocompatible)
+- **Cron quotidien** `src/cron/booking_regenerate.php` — roule l'horizon d'un jour, resynchronise les zones non réservées de chaque page active contre le calendrier courant. Installé sur le crontab prod (`0 4 * * *`), pas sur dev (aucune page active en continu), voir `docs/cron.md`
+- Nouveau test : `test_booking.php` (55/55) — gating, CRUD hôte, génération de zones (vérifiée manuellement avec un calendrier réel), lecture publique, réservation/conflit/annulation/idempotence, rate-limit
+- Docs : `docs/booking/GUIDE.md`, `docs/booking/API_BOOKING_ENDPOINTS.json`, `docs/modules/GUIDE.md` (mapping + note cas particulier `booking_pages.active`)
+- Plan détaillé : `docs/v-2-16-0/PLAN_booking-public.md` / `docs/v-2-16-0/PLAN_booking-public_implantation.md`
 
 ### Fix — `STRIPE_PRICE_CMEMWEB_TEAM` jamais défini côté PHP
 
@@ -16,14 +41,12 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - **Bug corrigé** : `environment.php` définissait `STRIPE_PRICE_CMEMWEB_MONTHLY`/`_YEARLY` mais pas `_TEAM` — `POST /v2/billing/checkout` avec `plan=team` échouait toujours en `500 STRIPE_PRICE_CMEMWEB_TEAM non configuré`, même une fois la variable renseignée dans `.env` (la constante PHP n'existait tout simplement pas)
 - Prix Stripe test déjà provisionné côté `dev-cmem2` (`price_1U45jDHVE9dtvgofLz5Qp78o`, 15 $ CAD/mois) — vérifié valide et actif, réutilisé tel quel
 
-## [Unreleased 2026-08-13 17:15]
-
 ### Plan équipe — facturation Stripe portée par un groupe + modules de groupe
 
 > Directive `20260813_143000_cmem_web_vers_cmem2_API__plan-equipe.md`
 
 - **Nouveau tier `team`** (mensuel seulement en v1, `STRIPE_PRICE_CMEMWEB_TEAM`, prix provisoire 15 $ CAD/mois) — un groupe peut désormais porter son propre abonnement Stripe au lieu de facturer chaque membre individuellement
-- **Migration `stripe_subscriptions`** (`docs/20260813_group_billing.sql`) : `group_id` nullable + FK `groups(id)` ON DELETE CASCADE, CHECK XOR avec `user_id` (même principe que `tenant_modules`), `user_id` rendu nullable, nouvelle clé unique `uq_group_app (group_id, app_id)` coexistant avec `uq_user_app`
+- **Migration `stripe_subscriptions`** (`docs/v-2-16-0/20260813_group_billing.sql`) : `group_id` nullable + FK `groups(id)` ON DELETE CASCADE, CHECK XOR avec `user_id` (même principe que `tenant_modules`), `user_id` rendu nullable, nouvelle clé unique `uq_group_app (group_id, app_id)` coexistant avec `uq_user_app`
 - **`POST /v2/billing/checkout` / `portal` et `DELETE /v2/subscriptions/stripe`** acceptent un `group_id` optionnel — réservé aux membres `role=admin` du groupe (ou rôle système `ADMINISTRATEUR`+), sinon `403 GROUP_ADMIN_REQUIRED`. `GET /v2/subscriptions/stripe/status` accepte aussi `group_id`, en lecture seule pour tout membre
 - **Webhooks Stripe routés par `metadata.owner_type`** (`user`/`group`) — le tier `team` (mensuel uniquement) n'est plus réécrasé en `monthly` par la déduction d'intervalle de `customer.subscription.updated`
 - **Plan effectif = meilleur de (plan perso, plan de chaque groupe actif)** — `EntitlementService::getEffectivePlanForCmem()` compare via un nouveau classement `CmemPlans::rank()` (`free` < `monthly`=`yearly` < `team` < `ami`). `GET /auth/me` → `data.user.plan` expose `source: "group"` et `group_id` quand un groupe l'emporte. Quitter le groupe fait retomber le plan effectif immédiatement (résolution live, sans perte de données)
@@ -31,8 +54,6 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - **`GET /modules` (personnel) fusionne perso ∪ groupes actifs** — `available` suit le meilleur plan effectif, `enabled` est un OR logique (activé quelque part = activé). Forme de réponse inchangée, aucune régression sur l'existant (`test_modules.php`, `test_stripe_v2.php`, `test_groups.php`, `test_ai_summarize.php` toujours verts)
 - Nouveaux tests : `test_stripe_group_billing.php`, `test_group_modules.php`, `test_plan_effectif_groupe.php`
 - Docs mises à jour : `stripe/GUIDE.md`, `stripe/API_STRIPE_ENDPOINTS.json`, `modules/GUIDE.md`, `modules/API_MODULES_ENDPOINTS.json`, `core/API_ENDPOINTS.json`, `entrypoints.md`, `.env.example`
-
-## [Unreleased 2026-08-12 08:15]
 
 ### Versioning optimiste — `updatedAt` + `If-Unmodified-Since` sur events/todos/journals/tasks
 

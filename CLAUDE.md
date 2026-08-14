@@ -21,6 +21,7 @@ php private/tests/test_account_deletion.php
 php private/tests/test_ai_summarize.php
 php private/tests/test_auth_otp.php
 php private/tests/test_auth_test_code.php
+php private/tests/test_booking.php
 php private/tests/test_calendars.php
 php private/tests/test_contacts.php
 php private/tests/test_contacts_e2e.php
@@ -125,6 +126,7 @@ src/<module>/
 | `src/items/` | `Items\` | Generic item manager — private / public / shared |
 | `src/contacts/` | `Contacts\` | Contacts pillar — CRUD `/contacts`, vCard 4.0 import/export, `max_contacts` cap, CRM interactions and `/opportunites` pipeline |
 | `src/projets/` | `Projets\` | Project management — tasks, hierarchy, dependencies, JSON round-trip, .ics export |
+| `src/booking/` | `Booking\` | Public booking — host slot page, materialized zones, token-based cancellation |
 | `src/pomo/` | `Pomo\` | Engagement waitlist and support forms |
 | `src/puzzle/` | `Puzzle\` | Collaborative puzzle with pick/drop mechanics |
 | `src/access/` | `Access\` | Subscription access control (Stripe + Playstore cross-check) |

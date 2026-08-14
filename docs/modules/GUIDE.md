@@ -38,10 +38,16 @@ clé exige une migration de l'enum **et** une mise à jour de `CmemModules::KEYS
 | `ged` | disponible | disponible | disponible | `true` | — |
 | `ia` | non | disponible | disponible | `false` | 30 appels/mois |
 | `caldav` | non | non | disponible | `false` | — |
-| `booking` | non | non | disponible | `false` | — |
+| `booking` | non | disponible | disponible | `false` | — |
 | `push_avance` | non | non | disponible | `false` | — |
 
 `team` (plan équipe, groupe) a le même mapping que `monthly`/`yearly`.
+
+**Cas particulier `booking`** : `tenant_modules.enabled` pour cette clé n'est pas consulté par le
+module — le vrai interrupteur est `booking_pages.active` (`PUT /booking/page`), qui vérifie
+directement `CmemModules::isAvailable`. `GET/PATCH /modules/booking` reste fonctionnel (registre
+générique) mais n'a aucun effet sur la page de réservation elle-même. Voir
+[docs/booking/GUIDE.md](../booking/GUIDE.md).
 
 **Calibrage du rétro-fit** (acté avec `cmem_web` le 2026-07-27) : les quatre pans déjà en
 production restent disponibles sur **tous** les plans, y compris Gratuit. Pas de clause
@@ -75,7 +81,7 @@ ancien plan dit le contraire — la perte du droit éteint l'accès sans détrui
       { "key": "ia",       "available": true,  "enabled": false,
         "quota": { "used": 0, "limit": 30, "reset_at": "2026-08-01 00:00:00" } },
       { "key": "caldav",   "available": false, "enabled": false, "quota": null },
-      { "key": "booking",  "available": false, "enabled": false, "quota": null },
+      { "key": "booking",  "available": true,  "enabled": false, "quota": null },
       { "key": "push_avance", "available": false, "enabled": false, "quota": null }
     ]
   }
@@ -162,5 +168,5 @@ et codes d'erreur que `PATCH /modules/{key}` (`UNKNOWN_MODULE_KEY`, `VALIDATION_
 | Endpoints (groupe) | `src/auth_groups/Controllers/GroupModuleController.php` |
 | Plan effectif (perso + groupe) | `src/stripe/Services/EntitlementService.php` |
 | Routage | `src/auth_groups/Routing/RouteHandlers/ModuleRouteHandler.php`, `GroupRouteHandler.php` |
-| Migrations | `docs/20260727_tenant_modules.sql`, `docs/20260813_group_billing.sql` |
+| Migrations | `docs/20260727_tenant_modules.sql`, `docs/v-2-16-0/20260813_group_billing.sql` |
 | Tests | `private/tests/test_modules.php`, `test_group_modules.php`, `test_plan_effectif_groupe.php` |

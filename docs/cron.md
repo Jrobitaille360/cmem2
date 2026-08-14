@@ -24,6 +24,27 @@ Snapshot du crontab serveur (`lmdkhdg5@15.235.14.237:27`), relevé le 2026-07-15
   n'est pas un cron cmem2_API géré via `src/cron/maintenance.php`, à ne pas confondre.
 - Référence complète du script maintenance : `src/cron/maintenance.php` (en-tête du fichier).
 
+## Roulement d'horizon booking (réservation publique)
+
+`src/cron/booking_regenerate.php` — pour chaque `booking_pages.active = 1`, régénère les zones
+non réservées futures sur l'horizon configuré (même moteur que `PUT /booking/page`) et resynchronise
+contre le calendrier courant de l'hôte. Les zones réservées ne sont jamais touchées.
+
+**Installée sur le crontab prod le 2026-08-14** :
+
+```cron
+0 4 * * * /usr/local/bin/php /home/lmdkhdg5/cmem2.journauxdebord.com/src/cron/booking_regenerate.php >> /home/lmdkhdg5/logs/booking-$(date +\%Y-\%m-\%d).log 2>&1
+```
+
+Pas d'entrée sur dev-cmem2 — aucune page de réservation active n'y tourne en continu, la
+régénération manuelle (`PUT /booking/page`) suffit pour les tests.
+
+Exécution manuelle (vérification) :
+
+```bash
+php src/cron/booking_regenerate.php
+```
+
 ## Purge des comptes supprimés (Loi 25)
 
 L'effacement physique des comptes au-delà du délai de grâce (`ACCOUNT_PURGE_GRACE_DAYS`, 30 jours)
