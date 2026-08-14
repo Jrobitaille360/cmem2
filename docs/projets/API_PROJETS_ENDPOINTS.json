@@ -111,7 +111,7 @@
           "description": "Mettre à jour une tâche (champs partiels du contrat). Rejette (422) si cycle introduit.",
           "auth_required": true,
           "headers": {
-            "If-Unmodified-Since": "string ISO 8601 UTC (optional) - versioning optimiste (directive 20260812_113000). Absent = comportement inchangé. Doit valoir exactement le task.updatedAt reçu au dernier GET/PATCH ; sinon 409."
+            "If-Unmodified-Since": "string ISO 8601 UTC (optional) - versioning optimiste (directive 20260812_113000). Absent = comportement inchangé. Doit valoir exactement le task.updatedAt reçu au dernier GET/PATCH ; sinon 409. LIMITE CONNUE : comparaison à la seconde (updated_at MySQL sans fraction) - deux écritures sur la même ressource dans la même seconde UTC ne sont pas détectées comme conflit. Non bloquant pour le rejeu de file offline (séparé par un aller-retour réseau) ; risque théorique seulement en cas d'écriture concurrente vraie de deux appareils dans la même seconde. Voir docs/PLAN_concurrence-updated-at-microsecondes.md."
           },
           "response": { "task": "object — updatedAt en ISO 8601 UTC" },
           "errors": {

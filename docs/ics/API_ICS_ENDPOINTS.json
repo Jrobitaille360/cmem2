@@ -277,7 +277,7 @@
             "duration": "string (optional) - durée ISO 8601 (Phase 4)"
           },
           "headers": {
-            "If-Unmodified-Since": "string ISO 8601 UTC (optional) - versioning optimiste (directive 20260812_113000). Absent = comportement inchangé. Doit valoir exactement le updatedAt reçu au dernier GET/PUT ; sinon 409."
+            "If-Unmodified-Since": "string ISO 8601 UTC (optional) - versioning optimiste (directive 20260812_113000). Absent = comportement inchangé. Doit valoir exactement le updatedAt reçu au dernier GET/PUT ; sinon 409. LIMITE CONNUE : comparaison à la seconde (updated_at MySQL sans fraction) - deux écritures sur la même ressource dans la même seconde UTC ne sont pas détectées comme conflit. Non bloquant pour le rejeu de file offline (séparé par un aller-retour réseau) ; risque théorique seulement en cas d'écriture concurrente vraie de deux appareils dans la même seconde. Voir docs/PLAN_concurrence-updated-at-microsecondes.md."
           },
           "response": "Événement mis à jour (inclut updatedAt, ISO 8601 UTC)",
           "errors": { "409": "Conflit de version (If-Unmodified-Since ne correspond pas à updatedAt en base) - corps: { data: { current: <événement complet> } }" }
@@ -502,7 +502,7 @@
             "recurrence_rule": "string (optional) - Règle de récurrence RRULE valide (RFC 5545 §3.8.5.4)"
           },
           "headers": {
-            "If-Unmodified-Since": "string ISO 8601 UTC (optional) - versioning optimiste (directive 20260812_113000). Absent = comportement inchangé. Doit valoir exactement le updatedAt reçu au dernier GET/PUT ; sinon 409."
+            "If-Unmodified-Since": "string ISO 8601 UTC (optional) - versioning optimiste (directive 20260812_113000). Absent = comportement inchangé. Doit valoir exactement le updatedAt reçu au dernier GET/PUT ; sinon 409. LIMITE CONNUE : comparaison à la seconde (updated_at MySQL sans fraction) - deux écritures sur la même ressource dans la même seconde UTC ne sont pas détectées comme conflit. Non bloquant pour le rejeu de file offline (séparé par un aller-retour réseau) ; risque théorique seulement en cas d'écriture concurrente vraie de deux appareils dans la même seconde. Voir docs/PLAN_concurrence-updated-at-microsecondes.md."
           },
           "response": "Todo object mis à jour (inclut updatedAt, ISO 8601 UTC)",
           "errors": {
@@ -668,7 +668,7 @@
             "related_to": "string ou null (optional, max 255) - UID du journal parent ; null retire le lien"
           },
           "headers": {
-            "If-Unmodified-Since": "string ISO 8601 UTC (optional) - versioning optimiste (directive 20260812_113000). Absent = comportement inchangé. Doit valoir exactement le updatedAt reçu au dernier GET/PUT ; sinon 409."
+            "If-Unmodified-Since": "string ISO 8601 UTC (optional) - versioning optimiste (directive 20260812_113000). Absent = comportement inchangé. Doit valoir exactement le updatedAt reçu au dernier GET/PUT ; sinon 409. LIMITE CONNUE : comparaison à la seconde (updated_at MySQL sans fraction) - deux écritures sur la même ressource dans la même seconde UTC ne sont pas détectées comme conflit. Non bloquant pour le rejeu de file offline (séparé par un aller-retour réseau) ; risque théorique seulement en cas d'écriture concurrente vraie de deux appareils dans la même seconde. Voir docs/PLAN_concurrence-updated-at-microsecondes.md."
           },
           "response": "Journal object mis à jour (inclut updatedAt, ISO 8601 UTC)",
           "errors": {

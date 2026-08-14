@@ -9,6 +9,56 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+## [2.16.1] — 2026-08-14
+
+### Suite de tests — couverture complète du runner + corrections
+
+- **`private/tests/run_all_tests.php` listait 52 fichiers alors que 63 existent** — 11 suites
+  n'avaient jamais tourné dans `run_all_tests.php` (`test_contacts_opportunites`,
+  `test_entrypoints`, `test_files_accessibility`, `test_ics_generator_uid_dtstamp`,
+  `test_ics_occurrences_end_date_bound`, `test_link_device_e2e`, `test_links_ged`,
+  `test_puzzle_backup`, `test_quiz2`, `test_quiz3`, `test_stripe_webhooks`). Toutes ajoutées ;
+  suite complète : **2999/3005 (99,80 %)**
+- **`test_stripe_webhooks.php`** corrigé sur 3 points, tous des bugs du fichier de test
+  lui-même (pas de régression API) : URL `/stripe/webhook` (legacy, 404 depuis v2.7.0) →
+  `/v2/billing/webhook` ; `CURLOPT_SSL_VERIFYPEER` activé par erreur (incohérent avec le reste
+  de la suite, cassait sur environnement sans CA bundle configuré) ; requête SQL sur la table
+  legacy `subscriptions`/`stripe_sub_id` (supprimée) → `stripe_subscriptions`/
+  `stripe_subscription_id`
+- **`test_puzzle_backup.php` / `test_link_device_e2e.php`** suspendus dans le runner — testent
+  `puzzle/auth/register-device`, retiré (410 Gone) au profit de `/v2/devices/*` +
+  `/v2/subscriptions/*` (même traitement que `test_puzzle_share.php`)
+- **3 échecs restants connus, sans lien avec le code applicatif** : `test_calendars.php` /
+  `test_projets.php` — collision `updatedAt` quand deux écritures sur la même ressource
+  tombent dans la même seconde UTC (résolution du type MySQL `TIMESTAMP`) ; voir
+  `docs/PLAN_concurrence-updated-at-microsecondes.md` (Option C retenue : documenté, aucune
+  migration — risque théorique, sans lien avec le rejeu de file offline réel)
+- **4 échecs restants dans `test_stripe_webhooks.php`, intentionnels (TDD Spec-First)** :
+  `body.received`/`body.skipped` et `is_premium` testent des champs jamais implémentés côté
+  `BillingController::webhook()` / table `stripe_subscriptions` — marqueurs de fonctionnalité
+  en attente, pas des régressions
+
+### Documentation — limite connue sur `If-Unmodified-Since`
+
+- **`docs/ics/API_ICS_ENDPOINTS.json` et `docs/projets/API_PROJETS_ENDPOINTS.json`** : la garde
+  de versioning optimiste (directive `20260812_113000`) compare `updatedAt` à la seconde près
+  (colonnes MySQL `TIMESTAMP`/`DATETIME` sans fraction) — deux écritures sur la même ressource
+  dans la même seconde UTC ne sont pas détectées comme conflit. Décision documentée plutôt que
+  migrée : le scénario réel (rejeu de file offline) sépare toujours les écritures par un
+  aller-retour réseau, jamais par moins d'une seconde
+
+### Environnement dev-cmem2
+
+- **`AUTH_TEST_CODE=654321` ajouté** à `.env` (dev-cmem2) et au template de déploiement
+  `private/utilitaires/.env.dev.online` — absent depuis l'introduction de la fonctionnalité
+  (v2.15.0), seul `TMP_CODE` (force la valeur du code, sans contourner le rate limit) était
+  présent, ce qui faisait échouer `test_auth_test_code.php` (rate limit atteint après 5 appels
+  malgré le code fixe actif)
+- **Fixture `support@journauxdebord.com` (compte de test partagé) marquée `email_verified=1`**
+  en base dev — restait à `0`, faisait échouer `test_users.php` 21.4 (`send-code` sur email
+  existant non vérifié → `403 EMAIL_NOT_VERIFIED`, comportement de gating intentionnel mais
+  postérieur à la création de ce compte)
+
 ## [2.16.0] — 2026-08-14
 
 Nouveau module `booking` (réservation publique par lien), plan équipe (facturation Stripe de
