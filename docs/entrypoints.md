@@ -50,6 +50,30 @@ Chaque guide complète le JSON avec les flux d'intégration, exemples et codes d
 - Routes supprimées (404/410) : section `removed_routes`.
 - Les routes `secret-admin` ne sont volontairement pas documentées.
 
+## Enveloppe de réponse commune
+
+Toutes les routes cmem2 (hors téléchargements de fichiers/ICS) répondent en JSON avec
+la même enveloppe, produite par `AuthGroups\Utils\Response` (`success()`, `error()`,
+`paginated()`) :
+
+```json
+{
+  "success": true,
+  "message": "...",
+  "timestamp": "2026-08-17 12:34:56",
+  "data": {}
+}
+```
+
+- `success` (bool) — toujours présent.
+- `message` (string) — toujours présent.
+- `timestamp` (string `Y-m-d H:i:s`, heure serveur) — toujours présent.
+- `data` — présent sur succès quand une charge utile existe (absent sinon, jamais `null` à la racine).
+- `errors` — présent sur échec quand des détails de validation existent (`success: false`).
+- Pagination (`paginated()`) : mêmes clés + `pagination` (`current_page`, `per_page`, `total`, `total_pages`, `has_next`, `has_prev`).
+
+Codes HTTP standards : 200, 201, 401, 403, 404, 409, 422, 429.
+
 ## Effacement d'un champ optionnel
 
 Règle générale sur les `PUT` : **champ absent = inchangé, `null` = effacé**.

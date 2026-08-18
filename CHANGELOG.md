@@ -7,7 +7,14 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased]
+## [Unreleased 2026-08-18]
+
+### Documenté
+
+- **`docs/entrypoints.md`** — section « Enveloppe de réponse commune » : documente
+  explicitement le contrat `{ success, message, timestamp, data|errors }` produit par
+  `AuthGroups\Utils\Response` (`success()`, `error()`, `paginated()`), commun à toutes les
+  routes cmem2.
 
 ## [2.17.0] — 2026-08-14
 
