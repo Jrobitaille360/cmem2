@@ -8,7 +8,7 @@ use PDO;
 /**
  * Model Opportunite — table `opportunite`
  *
- * CRM pipeline (directive cmem_web 20260724_154618, Phase G-D). Voir docs/contacts/GUIDE.md.
+ * CRM pipeline (directive cmem_web 20260724_154618, Phase G-D). Voir docs/docs-api/contacts/GUIDE.md.
  *
  * Portée : owner-strict — user_id est le PROPRIÉTAIRE de la fiche contact rattachée.
  * Soft-delete via `supprime_le` ; la suppression d'un contact masque ses opportunités.

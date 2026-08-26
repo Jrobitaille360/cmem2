@@ -16,7 +16,7 @@
     "notes": [
       "Les routes /v2/devices/windows/* sont strictement identiques aux routes /v2/devices/web/* — les deux plateformes partagent la table web_devices.",
       "Le device_token obtenu sert d'Authorization Bearer pour les routes /v2/puzzle/* (au même titre qu'un token Android).",
-      "Les abonnements web/Windows passent par Stripe : voir docs/stripe/API_STRIPE_ENDPOINTS.json et GET /v2/access/status (JWT)."
+      "Les abonnements web/Windows passent par Stripe : voir docs/docs-api/stripe/API_STRIPE_ENDPOINTS.json et GET /v2/access/status (JWT)."
     ]
   },
   "endpoints": {
@@ -116,6 +116,6 @@
   "access_model": {
     "description": "L'accès premium web/Windows est géré via Stripe.",
     "web_windows_check": "GET /v2/access/status?app_id={app_id} — JWT",
-    "subscribe": "POST /v2/billing/checkout — JWT (voir docs/stripe/API_STRIPE_ENDPOINTS.json)"
+    "subscribe": "POST /v2/billing/checkout — JWT (voir docs/docs-api/stripe/API_STRIPE_ENDPOINTS.json)"
   }
 }

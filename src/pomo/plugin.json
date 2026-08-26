@@ -30,6 +30,6 @@
             "003_pomo_sync.sql",
             "004_pomo_subscriptions.sql"
         ],
-        "migrations_path": "docs/pomo/migrations/"
+        "migrations_path": "docs/docs-api/pomo/migrations/"
     }
 }

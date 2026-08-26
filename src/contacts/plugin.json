@@ -19,6 +19,6 @@
     },
     "database": {
         "migrations": [],
-        "migrations_path": "docs/contacts/migrations/"
+        "migrations_path": "docs/docs-api/contacts/migrations/"
     }
 }

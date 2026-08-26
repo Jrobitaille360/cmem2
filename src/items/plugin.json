@@ -26,6 +26,6 @@
         "migrations": [
             "001_items_base.sql"
         ],
-        "migrations_path": "docs/items/migrations/"
+        "migrations_path": "docs/docs-api/items/migrations/"
     }
 }

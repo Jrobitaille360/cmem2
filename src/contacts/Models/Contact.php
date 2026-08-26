@@ -8,7 +8,7 @@ use PDO;
 /**
  * Model Contact — table `contacts`
  *
- * Pilier Contacts (directive cmem_web 20260723_084409). Voir docs/contacts/GUIDE.md.
+ * Pilier Contacts (directive cmem_web 20260723_084409). Voir docs/docs-api/contacts/GUIDE.md.
  *
  * Portée : owner-strict — user_id est le PROPRIÉTAIRE de la fiche, pas un compte lié.
  * Soft-delete via `supprime_le` ; les lectures excluent toujours les fiches supprimées.

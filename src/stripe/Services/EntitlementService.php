@@ -10,7 +10,7 @@ use Stripe\Models\StripeSubscription;
 /**
  * Résolution du plan effectif cmem — phase 7a.
  * Ordre de priorité : stripe_subscriptions actif (tenant cmem) > users.cmem_plan_override > 'free'.
- * Tenant cmem = app_id 'cmemweb' (primaire) + 'cmem' (alias legacy, voir docs/stripe/TENANT_CMEMWEB.md).
+ * Tenant cmem = app_id 'cmemweb' (primaire) + 'cmem' (alias legacy, voir docs/docs-api/stripe/TENANT_CMEMWEB.md).
  */
 class EntitlementService
 {

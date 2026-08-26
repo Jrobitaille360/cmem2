@@ -331,7 +331,7 @@ est supprimé.
 ## GED — documents rattachés (Phase G-E)
 
 Directive cmem_web `20260724_154619`. **Aucune nouvelle mécanique** : les documents rattachés
-sont des liens `/links` (voir `docs/links/GUIDE.md`) dont l'enum de types accepte désormais
+sont des liens `/links` (voir `docs/docs-api/links/GUIDE.md`) dont l'enum de types accepte désormais
 `file`, `contact`, `interaction` et `opportunite`.
 
 Rattacher un fichier à une fiche :
@@ -386,7 +386,7 @@ interaction : un « rappeler dans 7 jours » est un préréglage côté client.
 Le cron `contact_followup` balaie **deux** sources : les relances de fiche et les échéances
 `opportunite.date_cloture_prevue`. Pas de 5e `kind` — le payload `data` porte
 `entity: "contact" | "opportunite"` pour savoir quelle vue ouvrir. Le corps reste générique :
-ni le nom du contact ni le motif n'y figurent. Détails : `docs/push/GUIDE.md`.
+ni le nom du contact ni le motif n'y figurent. Détails : `docs/docs-api/push/GUIDE.md`.
 
 ## Partage (réservé P1)
 

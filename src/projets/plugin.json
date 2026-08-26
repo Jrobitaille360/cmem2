@@ -19,6 +19,6 @@
     },
     "database": {
         "migrations": [],
-        "migrations_path": "docs/projets/migrations/"
+        "migrations_path": "docs/docs-api/projets/migrations/"
     }
 }

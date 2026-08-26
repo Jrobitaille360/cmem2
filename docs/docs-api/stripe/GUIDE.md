@@ -322,7 +322,7 @@ membre individuellement. Même principe XOR que `tenant_modules` sur la table
 - **Prix** : `STRIPE_PRICE_CMEMWEB_TEAM`, placeholder **15 $ CAD/mois** (provisoire, documenté
   dans `docs/PLAN_plan-equipe.md`). Aucun plafond de sièges appliqué côté serveur en v1.
 - **Modules de groupe** : `GET/PATCH /groups/{id}/modules[/{key}]` — voir
-  [docs/modules/GUIDE.md](../modules/GUIDE.md).
+  [docs/docs-api/modules/GUIDE.md](../modules/GUIDE.md).
 - **Annulation** : même délai de grâce que l'individuel (`cancel_at_period_end`, accès jusqu'à
   `expires_at`).
 

@@ -10,8 +10,8 @@ dans un même process de test — pas un cas d'usage client réel. Migration DB 
 jugée disproportionnée pour un risque théorique ; réévaluer si un vrai cas de perte de
 données est rapporté.
 
-Limite documentée dans `docs/ics/API_ICS_ENDPOINTS.json` (events/todos/journals) et
-`docs/projets/API_PROJETS_ENDPOINTS.json` (tâches), sur le header `If-Unmodified-Since`
+Limite documentée dans `docs/docs-api/ics/API_ICS_ENDPOINTS.json` (events/todos/journals) et
+`docs/docs-api/projets/API_PROJETS_ENDPOINTS.json` (tâches), sur le header `If-Unmodified-Since`
 des quatre routes concernées.
 
 ## Contexte
@@ -96,7 +96,7 @@ Note : `projets` tâches et `calendar` todos partagent la **même table physique
 
 ### Option C — Ne rien changer, documenter la limite
 
-- Ajouter une note dans `docs/ics/GUIDE.md` / `docs/projets/GUIDE.md` : la garde
+- Ajouter une note dans `docs/docs-api/ics/GUIDE.md` / `docs/docs-api/projets/GUIDE.md` : la garde
   `If-Unmodified-Since` ne détecte pas deux écritures survenues dans la même seconde
   UTC. Acceptable si le flux réel (rejeu de file offline après reconnexion réseau) ne
   produit jamais deux écritures à moins d'une seconde d'écart en pratique — à confirmer

@@ -458,4 +458,4 @@ Appliquée automatiquement après chaque téléchargement :
 - [x] `src/cron/backup/cleanup_logs.php`
 - [x] `src/cron/backup/cleanup_backups.php`
 - [x] `src/cron/backup/run_all.php`
-- [ ] `docs/cron/GUIDE_backup_system.md`
+- [ ] `docs/docs-api/cron/GUIDE_backup_system.md`

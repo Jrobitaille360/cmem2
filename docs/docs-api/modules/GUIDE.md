@@ -47,7 +47,7 @@ clé exige une migration de l'enum **et** une mise à jour de `CmemModules::KEYS
 module — le vrai interrupteur est `booking_pages.active` (`PUT /booking/page`), qui vérifie
 directement `CmemModules::isAvailable`. `GET/PATCH /modules/booking` reste fonctionnel (registre
 générique) mais n'a aucun effet sur la page de réservation elle-même. Voir
-[docs/booking/GUIDE.md](../booking/GUIDE.md).
+[docs/docs-api/booking/GUIDE.md](../booking/GUIDE.md).
 
 **Calibrage du rétro-fit** (acté avec `cmem_web` le 2026-07-27) : les quatre pans déjà en
 production restent disponibles sur **tous** les plans, y compris Gratuit. Pas de clause
@@ -118,7 +118,7 @@ rend les données telles quelles. Le test `test_modules.php` §6 le vérifie sur
 Le décompte est serveur, jamais client. `TenantModule::incrementQuota()` incrémente
 `quota_used` et remet le compteur à 1 quand `quota_reset_at` est échu (période = mois calendaire,
 `CmemModules::nextQuotaReset()`). Les endpoints consommateurs — module IA, voir
-`docs/ai/GUIDE.md` — appellent ce mécanisme et répondent `429` au dépassement.
+`docs/docs-api/ai/GUIDE.md` — appellent ce mécanisme et répondent `429` au dépassement.
 
 `GET /modules` n'expose que la lecture : `used` / `limit` / `reset_at`.
 

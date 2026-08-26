@@ -12,7 +12,7 @@
  *
  * Crontab suggérée : toutes les 5 minutes.
  * Ligne exacte (le motif « slash 5 » ne peut pas figurer dans ce commentaire) :
- * voir docs/push/GUIDE.md § Cron.
+ * voir docs/docs-api/push/GUIDE.md § Cron.
  *
  * Options :
  *   --dry-run   liste les échéances sans envoyer et sans écrire au journal d'idempotence

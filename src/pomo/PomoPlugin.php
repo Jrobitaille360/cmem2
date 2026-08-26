@@ -12,7 +12,7 @@ class PomoPlugin extends AbstractPlugin
     {
         PluginManager::getInstance()->registerPluginRoutes('pomo', $this->getRouteHandlers());
 
-        $this->runMigrations(__DIR__ . '/../../docs/pomo/migrations/');
+        $this->runMigrations(__DIR__ . '/../../docs/docs-api/pomo/migrations/');
 
     }
 

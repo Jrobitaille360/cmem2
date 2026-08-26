@@ -319,7 +319,7 @@ Authorization: Bearer eyJhbGci...
 | POST | `/calendars/import` | Import ICS (upsert par UID) | JWT |
 | * | `/caldav/*` | Protocole CalDAV complet | JWT |
 
-Voir [docs/ics/GUIDE.md](docs/ics/GUIDE.md) pour la référence complète.
+Voir [docs/docs-api/ics/GUIDE.md](docs/docs-api/ics/GUIDE.md) pour la référence complète.
 
 ### Pomo
 
@@ -329,7 +329,7 @@ Voir [docs/ics/GUIDE.md](docs/ics/GUIDE.md) pour la référence complète.
 | POST | `/pomo/support` | Formulaire de support | JWT |
 | POST | `/pomo/stripe/webhook` | Webhook Stripe (Ph3) | Signature Stripe |
 
-Voir [docs/pomo/GUIDE.md](docs/pomo/GUIDE.md) pour la référence complète.
+Voir [docs/docs-api/pomo/GUIDE.md](docs/docs-api/pomo/GUIDE.md) pour la référence complète.
 
 ### Quiz
 
@@ -347,7 +347,7 @@ Voir [docs/pomo/GUIDE.md](docs/pomo/GUIDE.md) pour la référence complète.
 | GET | `/quiz/sessions/{sid}/results` | Résultats finaux | JWT |
 | GET | `/quiz/history` | Historique des sessions | JWT |
 
-Voir [docs/quiz/GUIDE.md](docs/quiz/GUIDE.md) pour la référence complète.
+Voir [docs/docs-api/quiz/GUIDE.md](docs/docs-api/quiz/GUIDE.md) pour la référence complète.
 
 ### Items
 
@@ -365,7 +365,7 @@ Voir [docs/quiz/GUIDE.md](docs/quiz/GUIDE.md) pour la référence complète.
 | GET/POST | `/items/{id}/shares` | Lister / ajouter des invités | JWT |
 | PUT/DELETE | `/items/{id}/shares/{user_id}` | Modifier / retirer un invité (owner/admin) | JWT |
 
-Voir [docs/items/GUIDE.md](docs/items/GUIDE.md) pour la référence complète.
+Voir [docs/docs-api/items/GUIDE.md](docs/docs-api/items/GUIDE.md) pour la référence complète.
 
 ### Booking
 
@@ -377,7 +377,7 @@ Voir [docs/items/GUIDE.md](docs/items/GUIDE.md) pour la référence complète.
 | POST | `/booking/public/{slug}/book` | Réserver une zone (atomique) | Non |
 | POST | `/booking/public/cancel/{token}` | Annuler par lien à jeton | Non |
 
-Voir [docs/booking/GUIDE.md](docs/booking/GUIDE.md) pour la référence complète.
+Voir [docs/docs-api/booking/GUIDE.md](docs/docs-api/booking/GUIDE.md) pour la référence complète.
 
 ### Public
 
@@ -392,25 +392,25 @@ Voir [docs/booking/GUIDE.md](docs/booking/GUIDE.md) pour la référence complèt
 
 | Module | Référence JSON | Guide |
 | --- | --- | --- |
-| Core (auth_groups) | [docs/core/API_ENDPOINTS.json](docs/core/API_ENDPOINTS.json) | [docs/core/GUIDE.md](docs/core/GUIDE.md) |
-| ICS / CalDAV | [docs/ics/API_ICS_ENDPOINTS.json](docs/ics/API_ICS_ENDPOINTS.json) | [docs/ics/GUIDE.md](docs/ics/GUIDE.md) |
-| Pomo | [docs/pomo/API_POMO_ENDPOINTS_v1_0_0.json](docs/pomo/API_POMO_ENDPOINTS_v1_0_0.json) | [docs/pomo/GUIDE.md](docs/pomo/GUIDE.md) |
-| Quiz | [docs/quiz/API_QUIZ_ENDPOINTS_v1_0_0.json](docs/quiz/API_QUIZ_ENDPOINTS_v1_0_0.json) | [docs/quiz/GUIDE.md](docs/quiz/GUIDE.md) |
-| Items | [docs/items/API_ITEMS_ENDPOINTS.json](docs/items/API_ITEMS_ENDPOINTS.json) | [docs/items/GUIDE.md](docs/items/GUIDE.md) |
-| Contacts | [docs/contacts/API_CONTACTS_ENDPOINTS.json](docs/contacts/API_CONTACTS_ENDPOINTS.json) | [docs/contacts/GUIDE.md](docs/contacts/GUIDE.md) |
-| Projets | [docs/projets/API_PROJETS_ENDPOINTS.json](docs/projets/API_PROJETS_ENDPOINTS.json) | — |
-| Booking | [docs/booking/API_BOOKING_ENDPOINTS.json](docs/booking/API_BOOKING_ENDPOINTS.json) | [docs/booking/GUIDE.md](docs/booking/GUIDE.md) |
-| Puzzle | [docs/puzzle/API_PUZZLE_ENDPOINTS.json](docs/puzzle/API_PUZZLE_ENDPOINTS.json) | [docs/puzzle/GUIDE.md](docs/puzzle/GUIDE.md) |
-| Traque | [docs/traque/API_TRAQUE_ENDPOINTS.json](docs/traque/API_TRAQUE_ENDPOINTS.json) | [docs/traque/GUIDE.md](docs/traque/GUIDE.md) |
-| Access | [docs/access/API_ACCESS_ENDPOINTS.json](docs/access/API_ACCESS_ENDPOINTS.json) | [docs/access/GUIDE.md](docs/access/GUIDE.md) |
-| Stripe | [docs/stripe/API_STRIPE_ENDPOINTS.json](docs/stripe/API_STRIPE_ENDPOINTS.json) | [docs/stripe/GUIDE.md](docs/stripe/GUIDE.md) |
-| Playstore | [docs/playstore/API_PLAYSTORE_ENDPOINTS.json](docs/playstore/API_PLAYSTORE_ENDPOINTS.json) | [docs/playstore/GUIDE.md](docs/playstore/GUIDE.md) |
-| WebDevice | [docs/webdevice/API_WEBDEVICE_ENDPOINTS.json](docs/webdevice/API_WEBDEVICE_ENDPOINTS.json) | [docs/webdevice/GUIDE.md](docs/webdevice/GUIDE.md) |
-| Push | [docs/push/API_PUSH_ENDPOINTS.json](docs/push/API_PUSH_ENDPOINTS.json) | [docs/push/GUIDE.md](docs/push/GUIDE.md) |
-| Modules | [docs/modules/API_MODULES_ENDPOINTS.json](docs/modules/API_MODULES_ENDPOINTS.json) | [docs/modules/GUIDE.md](docs/modules/GUIDE.md) |
-| IA | [docs/ai/API_AI_ENDPOINTS.json](docs/ai/API_AI_ENDPOINTS.json) | [docs/ai/GUIDE.md](docs/ai/GUIDE.md) |
+| Core (auth_groups) | [docs/docs-api/core/API_ENDPOINTS.json](docs/docs-api/core/API_ENDPOINTS.json) | [docs/docs-api/core/GUIDE.md](docs/docs-api/core/GUIDE.md) |
+| ICS / CalDAV | [docs/docs-api/ics/API_ICS_ENDPOINTS.json](docs/docs-api/ics/API_ICS_ENDPOINTS.json) | [docs/docs-api/ics/GUIDE.md](docs/docs-api/ics/GUIDE.md) |
+| Pomo | [docs/docs-api/pomo/API_POMO_ENDPOINTS_v1_0_0.json](docs/docs-api/pomo/API_POMO_ENDPOINTS_v1_0_0.json) | [docs/docs-api/pomo/GUIDE.md](docs/docs-api/pomo/GUIDE.md) |
+| Quiz | [docs/docs-api/quiz/API_QUIZ_ENDPOINTS_v1_0_0.json](docs/docs-api/quiz/API_QUIZ_ENDPOINTS_v1_0_0.json) | [docs/docs-api/quiz/GUIDE.md](docs/docs-api/quiz/GUIDE.md) |
+| Items | [docs/docs-api/items/API_ITEMS_ENDPOINTS.json](docs/docs-api/items/API_ITEMS_ENDPOINTS.json) | [docs/docs-api/items/GUIDE.md](docs/docs-api/items/GUIDE.md) |
+| Contacts | [docs/docs-api/contacts/API_CONTACTS_ENDPOINTS.json](docs/docs-api/contacts/API_CONTACTS_ENDPOINTS.json) | [docs/docs-api/contacts/GUIDE.md](docs/docs-api/contacts/GUIDE.md) |
+| Projets | [docs/docs-api/projets/API_PROJETS_ENDPOINTS.json](docs/docs-api/projets/API_PROJETS_ENDPOINTS.json) | — |
+| Booking | [docs/docs-api/booking/API_BOOKING_ENDPOINTS.json](docs/docs-api/booking/API_BOOKING_ENDPOINTS.json) | [docs/docs-api/booking/GUIDE.md](docs/docs-api/booking/GUIDE.md) |
+| Puzzle | [docs/docs-api/puzzle/API_PUZZLE_ENDPOINTS.json](docs/docs-api/puzzle/API_PUZZLE_ENDPOINTS.json) | [docs/docs-api/puzzle/GUIDE.md](docs/docs-api/puzzle/GUIDE.md) |
+| Traque | [docs/docs-api/traque/API_TRAQUE_ENDPOINTS.json](docs/docs-api/traque/API_TRAQUE_ENDPOINTS.json) | [docs/docs-api/traque/GUIDE.md](docs/docs-api/traque/GUIDE.md) |
+| Access | [docs/docs-api/access/API_ACCESS_ENDPOINTS.json](docs/docs-api/access/API_ACCESS_ENDPOINTS.json) | [docs/docs-api/access/GUIDE.md](docs/docs-api/access/GUIDE.md) |
+| Stripe | [docs/docs-api/stripe/API_STRIPE_ENDPOINTS.json](docs/docs-api/stripe/API_STRIPE_ENDPOINTS.json) | [docs/docs-api/stripe/GUIDE.md](docs/docs-api/stripe/GUIDE.md) |
+| Playstore | [docs/docs-api/playstore/API_PLAYSTORE_ENDPOINTS.json](docs/docs-api/playstore/API_PLAYSTORE_ENDPOINTS.json) | [docs/docs-api/playstore/GUIDE.md](docs/docs-api/playstore/GUIDE.md) |
+| WebDevice | [docs/docs-api/webdevice/API_WEBDEVICE_ENDPOINTS.json](docs/docs-api/webdevice/API_WEBDEVICE_ENDPOINTS.json) | [docs/docs-api/webdevice/GUIDE.md](docs/docs-api/webdevice/GUIDE.md) |
+| Push | [docs/docs-api/push/API_PUSH_ENDPOINTS.json](docs/docs-api/push/API_PUSH_ENDPOINTS.json) | [docs/docs-api/push/GUIDE.md](docs/docs-api/push/GUIDE.md) |
+| Modules | [docs/docs-api/modules/API_MODULES_ENDPOINTS.json](docs/docs-api/modules/API_MODULES_ENDPOINTS.json) | [docs/docs-api/modules/GUIDE.md](docs/docs-api/modules/GUIDE.md) |
+| IA | [docs/docs-api/ai/API_AI_ENDPOINTS.json](docs/docs-api/ai/API_AI_ENDPOINTS.json) | [docs/docs-api/ai/GUIDE.md](docs/docs-api/ai/GUIDE.md) |
 
-Migrations : [docs/core/](docs/core/) · Schéma initial : [docs/build_cmem2_DB.sql](docs/build_cmem2_DB.sql)
+Migrations : [docs/docs-api/core/](docs/docs-api/core/) · Schéma initial : [docs/build_cmem2_DB.sql](docs/build_cmem2_DB.sql)
 
 ## Tests
 

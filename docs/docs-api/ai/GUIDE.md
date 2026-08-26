@@ -7,7 +7,7 @@ manuellement par l'usager. Endpoint consommateur du socle `modules-gating`.
 
 Le module `ia` doit être **disponible** (plan `monthly`/`yearly`/`ami`) et **activé**
 (`PATCH /modules/ia { "enabled": true }`) avant tout appel à `/ai/summarize`. Voir
-`docs/modules/GUIDE.md`.
+`docs/docs-api/modules/GUIDE.md`.
 
 ## Le contrat de confidentialité
 

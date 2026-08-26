@@ -418,7 +418,7 @@ if (!defined('STRIPE_PRICE_CMEM_MONTHLY')) {
 if (!defined('STRIPE_PRICE_CMEM_YEARLY')) {
     define('STRIPE_PRICE_CMEM_YEARLY',    $_ENV['STRIPE_PRICE_CMEM_YEARLY']    ?? '');
 }
-// Tenant cmemweb (client cmem_web) — mêmes prix que CMEM (voir docs/stripe/TENANT_CMEMWEB.md)
+// Tenant cmemweb (client cmem_web) — mêmes prix que CMEM (voir docs/docs-api/stripe/TENANT_CMEMWEB.md)
 if (!defined('STRIPE_PRICE_CMEMWEB_MONTHLY')) {
     define('STRIPE_PRICE_CMEMWEB_MONTHLY', $_ENV['STRIPE_PRICE_CMEMWEB_MONTHLY'] ?? '');
 }

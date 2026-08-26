@@ -10,7 +10,7 @@ use PDO;
  * Liens croisés polymorphes entre entités
  * (event|task|journal|project|project_task|file|contact|interaction|opportunite).
  * Directive cmem_web B2 (20260722_141845), étendue à la GED par 20260724_154619 (Phase G-E).
- * Voir docs/links/GUIDE.md.
+ * Voir docs/docs-api/links/GUIDE.md.
  *
  * Portée : owner-strict. Un lien n'est permis qu'entre entités dont le propriétaire == owner_id.
  * Un seul enregistrement (src → dst) par paire logique ; le sens inverse est le même lien.

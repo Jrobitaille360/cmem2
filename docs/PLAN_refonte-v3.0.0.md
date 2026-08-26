@@ -23,14 +23,14 @@ Portée : code source uniquement. Domaine métier et schéma DB conservés à 90
 
    | Module | Fichier doc | À vérifier |
    | - | - | - |
-   | core | `docs/core/API_ENDPOINTS.json` | 110+ routes totales |
-   | ics | `docs/ics/API_ICS_ENDPOINTS.json` | Routes CalDAV (PROPFIND, REPORT) |
-   | quiz | `docs/quiz/API_QUIZ_ENDPOINTS_v1_0_0.json` | Sessions/participants |
-   | puzzle | `docs/puzzle/API_PUZZLE_ENDPOINTS.json` | Google Play, admin |
-   | items | `docs/items/API_ITEMS_ENDPOINTS.json` | Access control |
-   | pomo | `docs/pomo/API_POMO_ENDPOINTS_v1_0_0.json` | Statut actuel du module |
-   | contacts | `docs/contacts/API_CONTACTS_ENDPOINTS.json` | CRUD + vCard + CRM (interactions, opportunités) |
-   | projets | `docs/projets/API_PROJETS_ENDPOINTS.json` | Tâches, hiérarchie, export JSON/.ics |
+   | core | `docs/docs-api/core/API_ENDPOINTS.json` | 110+ routes totales |
+   | ics | `docs/docs-api/ics/API_ICS_ENDPOINTS.json` | Routes CalDAV (PROPFIND, REPORT) |
+   | quiz | `docs/docs-api/quiz/API_QUIZ_ENDPOINTS_v1_0_0.json` | Sessions/participants |
+   | puzzle | `docs/docs-api/puzzle/API_PUZZLE_ENDPOINTS.json` | Google Play, admin |
+   | items | `docs/docs-api/items/API_ITEMS_ENDPOINTS.json` | Access control |
+   | pomo | `docs/docs-api/pomo/API_POMO_ENDPOINTS_v1_0_0.json` | Statut actuel du module |
+   | contacts | `docs/docs-api/contacts/API_CONTACTS_ENDPOINTS.json` | CRUD + vCard + CRM (interactions, opportunités) |
+   | projets | `docs/docs-api/projets/API_PROJETS_ENDPOINTS.json` | Tâches, hiérarchie, export JSON/.ics |
 
 2. **Cartographie DB** — produire `docs/v-3-0-0/SCHEMA_DB.md` :
    - ERD des 82 tables avec relations FK explicites
