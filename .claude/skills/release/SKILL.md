@@ -93,6 +93,16 @@ Remplir `docs\v-X-Y-Z\RELEASE_NOTES.md` (notes publiques, langage client).
 
 Déplacer tout `PLAN_*.md` associé à la release dans `docs\v-X-Y-Z\`.
 
+### 5e — Archiver dossier version précédente
+
+Transférer le dossier `docs\v-X-Y-Z\` (version précédente, avant bump) dans
+`docs\versions-old\`. Ne jamais toucher aux dossiers déjà présents dans
+`versions-old\`.
+
+```powershell
+Move-Item docs\v-<ancienne-version> docs\versions-old\
+```
+
 ## Étape 6 — README.md
 
 Mettre à jour le badge de version et la date à la racine du projet.
