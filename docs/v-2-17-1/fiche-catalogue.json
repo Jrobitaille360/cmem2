@@ -1,0 +1,42 @@
+{
+  "slug": "cmem2-api",
+  "name": "cmem2 API",
+  "short_description": "API REST modulaire pour la plateforme Memories v2. Authentification JWT, calendriers CalDAV, quiz interactifs, items génériques, abonnements Stripe/Play Store, jeu de gamification et plus.",
+  "features": [
+    "Authentification JWT HS256 (15 jours) + OTP par courriel",
+    "Gestion d'utilisateurs, groupes, fichiers, tags et webhooks",
+    "Rôles UTILISATEUR / ADMINISTRATEUR / SUPERADMINISTRATEUR avec matrice d'autorité",
+    "Calendriers iCalendar/CalDAV — récurrences RRULE, partage (utilisateur, courriel ou groupe), étiquettes par calendrier, corbeille récupérable, expansion d'occurrences à la demande",
+    "Quiz interactifs en temps réel — sessions, scoring dégressif, leaderboard, étiquettes de questions",
+    "Gestionnaire générique d'items (private / public / share) avec catégories JSON",
+    "Puzzle collaboratif — pick/drop de pièces en temps réel, sessions partagées",
+    "Traque — jeu de gamification géolocalisée (combat, biomes OSM, succès)",
+    "Abonnements Stripe et vérification Google Play Store avec contrôle d'accès croisé",
+    "Gestion des tokens de notification push web",
+    "Waitlist et formulaires de soutien (plugin Pomo)",
+    "Documentation JSON des endpoints exposée publiquement (GET /entrypoints)",
+    "Architecture modulaire par plugins — activation par .env",
+    "Anti-brute-force, rate limiting 60 req/min configurable"
+  ],
+  "url_web": "https://cmem2.journauxdebord.com",
+  "url_playstore": null,
+  "url_windows": null,
+  "url_docs": null,
+  "version": "2.17.1",
+  "logo_url": "https://cmem2.journauxdebord.com/uploads/files/69f3c270dc527_1777582704.png",
+  "order": 5,
+  "extra_fields": [
+    {
+      "key": "language",
+      "value": "PHP 8.0+"
+    },
+    {
+      "key": "database",
+      "value": "MySQL / MariaDB"
+    },
+    {
+      "key": "auth",
+      "value": "JWT HS256 + OTP"
+    }
+  ]
+}
