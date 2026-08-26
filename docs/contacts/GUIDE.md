@@ -39,6 +39,8 @@ Les colonnes et les clés JSON restent en français : elles forment le contrat a
 | GET | `/contacts/{id}` | Fiche complète |
 | PUT | `/contacts/{id}` | Mise à jour partielle (PATCH équivalent) |
 | DELETE | `/contacts/{id}` | Soft-delete |
+| GET | `/contacts/deleted` | Corbeille — fiches soft-supprimées, paginé (`?page=&limit=`) |
+| POST | `/contacts/{id}/restore` | Restauration, fenêtre de 30 jours |
 | GET | `/contacts/{id}.vcf` | Export vCard 4.0 (`text/vcard`) |
 | POST | `/contacts/import` | Import vCard ou CSV |
 | POST | `/contacts/{id}/messages` | Envoi courriel + journalisation |
@@ -58,6 +60,16 @@ jamais interrogé.
 `?categorie=` filtre sur une valeur de `categories[]`.
 `?favori=1` limite aux favoris.
 `?limit=` (1..500) et `?offset=` paginent ; `total` renvoie le nombre avant pagination.
+
+### Corbeille et restauration
+
+`DELETE /contacts/{id}` renseigne `supprime_le` (soft-delete) — la fiche disparaît des lectures
+normales mais reste en base. `GET /contacts/deleted` (paginé `?page=&limit=`, défaut 20/page,
+max 100) liste les fiches du propriétaire supprimées dans les 30 derniers jours
+(`Contact::RESTORE_RETENTION_DAYS`), triées par date de suppression décroissante.
+`POST /contacts/{id}/restore` annule le soft-delete dans cette même fenêtre ; passé 30 jours ou
+sur une fiche non supprimée, la route renvoie `404`. Au-delà de la fenêtre, seule la purge RGPD
+existante s'applique — pas de restauration possible.
 
 ## Champs répétables
 

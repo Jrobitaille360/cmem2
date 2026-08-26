@@ -198,4 +198,58 @@ class TaskController
         $this->model->softDeleteTask($id);
         Response::success('Tâche supprimée', null, 204);
     }
+
+    // ---------------------------------------------------------------
+    // GET /projets/projects/{id}/tasks/deleted — corbeille du projet
+    // ---------------------------------------------------------------
+    public function listDeleted(array $user, int $projectId): void
+    {
+        LoggingMiddleware::logEntry();
+        $project = $this->projectModel->findProjectById($projectId);
+        if (!$project) {
+            Response::error('Projet non trouvé', null, 404);
+            return;
+        }
+        if ((int) $project['user_id'] !== (int) $user['user_id']) {
+            Response::error('Accès non autorisé', null, 403);
+            return;
+        }
+
+        $pagination = Response::getPaginationParams();
+        $tasks = $this->model->getDeletedByProject($projectId, $pagination['page'], $pagination['limit']);
+        Response::success('Tâches supprimées récupérées', [
+            'tasks' => $tasks,
+            'count' => count($tasks),
+            'page'  => $pagination['page'],
+            'limit' => $pagination['limit'],
+        ]);
+    }
+
+    // ---------------------------------------------------------------
+    // POST /projets/tasks/{id}/restore
+    // ---------------------------------------------------------------
+    public function restore(array $user, int $id): void
+    {
+        LoggingMiddleware::logEntry();
+
+        $row = $this->model->findRawByIdAnyState($id);
+        if (!$row) {
+            Response::error('Tâche non trouvée', null, 404);
+            return;
+        }
+        $project = $this->ownedProjectForTask($user, $row);
+        if (!$project) { return; }
+
+        if (empty($row['deleted_at'])) {
+            Response::error('Cette tâche n\'est pas supprimée', null, 404);
+            return;
+        }
+        if (strtotime($row['deleted_at']) < strtotime('-' . Task::RESTORE_RETENTION_DAYS . ' days')) {
+            Response::error('Fenêtre de restauration expirée', null, 404);
+            return;
+        }
+
+        $this->model->restoreTask($id);
+        Response::success('Tâche restaurée avec succès', ['task' => $this->model->findTaskById($id)]);
+    }
 }

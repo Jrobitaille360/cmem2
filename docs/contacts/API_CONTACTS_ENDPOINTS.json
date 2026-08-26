@@ -9,7 +9,7 @@
       "type": "JWT_BEARER",
       "header": "Authorization: Bearer {jwt_token}"
     },
-    "notes": "Portée owner-strict : user_id est le PROPRIÉTAIRE de la fiche, pas un compte lié — un contact n'est pas forcément un utilisateur de l'app. Multi-tenant via app_id (défaut serveur 'puzzle', 'cmemweb' pour cmem_web) : app_id doit être transmis en création ET en lecture de liste, sinon la liste renvoie le tenant par défaut. Suppression = soft-delete (supprime_le), purge par le cron RGPD existant. Les colonnes/clés JSON sont en français ; les noms de tables suivent la convention du dépôt (contacts, contact_shares)."
+    "notes": "Portée owner-strict : user_id est le PROPRIÉTAIRE de la fiche, pas un compte lié — un contact n'est pas forcément un utilisateur de l'app. Multi-tenant via app_id (défaut serveur 'puzzle', 'cmemweb' pour cmem_web) : app_id doit être transmis en création ET en lecture de liste, sinon la liste renvoie le tenant par défaut. Suppression = soft-delete (supprime_le) ; GET /contacts/deleted + POST /contacts/{id}/restore permettent de lister/restaurer une fiche dans les 30 jours suivant la suppression (Contact::RESTORE_RETENTION_DAYS), passé quoi seule la purge RGPD existante s'applique. Les colonnes/clés JSON sont en français ; les noms de tables suivent la convention du dépôt (contacts, contact_shares)."
   },
   "renommages_directive": {
     "contacts_max": "max_contacts — aligné sur max_calendars / max_journals / max_tasks",
@@ -143,6 +143,37 @@
             "401": "JWT absent ou invalide",
             "403": "La fiche appartient à un autre propriétaire",
             "404": "Fiche inexistante ou déjà supprimée"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/contacts/deleted?page={page}&limit={limit}",
+          "description": "Corbeille : liste paginée des fiches soft-supprimées du propriétaire, dans la fenêtre de restauration (30 jours), triées par date de suppression décroissante.",
+          "auth_required": true,
+          "query": {
+            "page": "int — optionnel, défaut 1",
+            "limit": "int — optionnel, défaut 20, max 100"
+          },
+          "response": {
+            "contacts": "Contact[]",
+            "count": "int",
+            "page": "int",
+            "limit": "int"
+          },
+          "status_codes": { "200": "Corbeille récupérée" },
+          "errors": { "401": "JWT absent ou invalide" }
+        },
+        {
+          "method": "POST",
+          "path": "/contacts/{id}/restore",
+          "description": "Annule le soft-delete d'une fiche, dans la fenêtre de 30 jours suivant la suppression (Contact::RESTORE_RETENTION_DAYS).",
+          "auth_required": true,
+          "response": { "contact": "Contact" },
+          "status_codes": { "200": "Contact restauré" },
+          "errors": {
+            "401": "JWT absent ou invalide",
+            "403": "La fiche appartient à un autre propriétaire",
+            "404": "Fiche inexistante, pas supprimée, ou fenêtre de restauration expirée"
           }
         }
       ]

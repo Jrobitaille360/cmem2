@@ -7,6 +7,29 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
+## [Unreleased 2026-08-25]
+
+### Ajouté
+
+- **Corbeille (soft-delete + restauration) pour contacts et projets** (directive cmem_web,
+  task cmemweb #192) — aligne contacts et projets sur le contrat déjà en place pour
+  événements/todos/journaux : `GET /contacts/deleted`, `POST /contacts/{id}/restore`,
+  `GET /projets/projects/deleted`, `POST /projets/projects/{id}/restore`,
+  `GET /projets/projects/{id}/tasks/deleted`, `POST /projets/tasks/{id}/restore`. Fenêtre de
+  restauration de 30 jours (`Contact::RESTORE_RETENTION_DAYS`, `Project::RESTORE_RETENTION_DAYS`,
+  `Task::RESTORE_RETENTION_DAYS`), corbeille paginée triée par date de suppression décroissante.
+  Voir `docs/contacts/GUIDE.md#corbeille-et-restauration`,
+  `docs/contacts/API_CONTACTS_ENDPOINTS.json`, `docs/projets/API_PROJETS_ENDPOINTS.json`.
+
+### Modifié
+
+- **`DELETE /projets/projects/{id}` passe de suppression physique à soft-delete**
+  (`projects.deleted_at`, colonne jusqu'ici jamais écrite malgré son existence). Les tâches du
+  projet (`calendar_todos.project_id`) et son calendrier caché ne sont plus cascade-supprimés :
+  ils restent intacts en base et réapparaissent tels quels si le projet est restauré. Seuls les
+  liens croisés du projet lui-même (`Link::purge('project', id)`) sont purgés à la suppression,
+  comme avant.
+
 ## [Unreleased 2026-08-18]
 
 ### Documenté

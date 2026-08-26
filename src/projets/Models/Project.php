@@ -17,6 +17,9 @@ class Project extends BaseModel
 {
     protected $table = 'projects';
 
+    /** Fenêtre de restauration après soft-delete (jours) — aligné sur CalendarTodo::RESTORE_RETENTION_DAYS. */
+    public const RESTORE_RETENTION_DAYS = 30;
+
     public $id;
     public $user_id;
     public $calendar_id;
@@ -83,24 +86,60 @@ class Project extends BaseModel
     }
 
     /**
-     * Suppression physique — cascade sur calendar_todos.project_id, task_dependencies
-     * et le calendrier caché associé (FK ON DELETE CASCADE, §4).
+     * Soft-delete — le projet, ses tâches (calendar_todos.project_id) et son calendrier
+     * caché restent intacts en base ; seul le projet devient invisible (deleted_at),
+     * jusqu'à restauration ou purge ultérieure. Les tâches ne sont pas touchées : elles
+     * réapparaissent telles quelles si le projet est restauré.
      */
     public function deleteProject(int $id): bool
     {
-        $project = $this->findProjectById($id);
-        if (!$project) { return false; }
-
-        // Cascade liens (directive B2) : la suppression du projet FK-cascade ses tâches
-        // (calendar_todos.project_id) en DB, hors PHP — purger leurs liens ici, avant le DELETE.
-        $taskStmt = $this->getDb()->prepare('SELECT id FROM calendar_todos WHERE project_id = ?');
-        $taskStmt->execute([$id]);
-        foreach ($taskStmt->fetchAll(PDO::FETCH_COLUMN) as $taskId) {
-            \AuthGroups\Models\Link::purgeTodo((int) $taskId);
+        $stmt = $this->getDb()->prepare(
+            'UPDATE projects SET deleted_at = NOW() WHERE id = ? AND deleted_at IS NULL'
+        );
+        $stmt->execute([$id]);
+        $ok = $stmt->rowCount() > 0;
+        if ($ok) {
+            \AuthGroups\Models\Link::purge('project', $id);
         }
-        \AuthGroups\Models\Link::purge('project', $id);
+        return $ok;
+    }
 
-        $stmt = $this->getDb()->prepare('DELETE FROM projects WHERE id = ?');
+    /** Projet dans n'importe quel état (actif ou soft-supprimé) — sert à la restauration. */
+    public function findRawByIdAnyState(int $id): ?array
+    {
+        $stmt = $this->getDb()->prepare('SELECT * FROM projects WHERE id = ?');
+        $stmt->execute([$id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    /**
+     * Projets soft-supprimés du propriétaire, dans la fenêtre de restauration.
+     * @return array<int,array>
+     */
+    public function getDeletedByUser(int $userId, int $page = 1, int $limit = 20): array
+    {
+        $offset = ($page - 1) * $limit;
+        $stmt = $this->getDb()->prepare(
+            'SELECT * FROM projects
+              WHERE user_id = ? AND deleted_at IS NOT NULL
+                AND deleted_at >= NOW() - INTERVAL ' . self::RESTORE_RETENTION_DAYS . ' DAY
+              ORDER BY deleted_at DESC
+              LIMIT ? OFFSET ?'
+        );
+        $stmt->bindValue(1, $userId, PDO::PARAM_INT);
+        $stmt->bindValue(2, $limit, PDO::PARAM_INT);
+        $stmt->bindValue(3, $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    /** Annule le soft-delete d'un projet. */
+    public function restoreProject(int $id): bool
+    {
+        $stmt = $this->getDb()->prepare(
+            'UPDATE projects SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL'
+        );
         $stmt->execute([$id]);
         return $stmt->rowCount() > 0;
     }

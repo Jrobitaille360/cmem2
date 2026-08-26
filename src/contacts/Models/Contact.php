@@ -30,6 +30,9 @@ class Contact extends BaseModel
     /** Borne de enc_payload — au-delà, 400 explicite plutôt qu'une troncature MEDIUMTEXT. */
     public const ENC_PAYLOAD_MAX = 16000000;
 
+    /** Fenêtre de restauration après soft-delete (jours) — aligné sur CalendarTodo::RESTORE_RETENTION_DAYS. */
+    public const RESTORE_RETENTION_DAYS = 30;
+
     /** Champs scalaires acceptés en création/mise à jour. */
     public const SCALAR_FIELDS = ['prenom', 'nom', 'organisation', 'fonction', 'notes',
                                   'anniversaire', 'photo_file_id', 'favori', 'partage_scope',
@@ -124,6 +127,46 @@ class Contact extends BaseModel
             'contacts' => array_map([$this, 'hydrate'], $rows),
             'total'    => $total,
         ];
+    }
+
+    /** Fiche dans n'importe quel état (active ou soft-supprimée) — sert à la restauration. */
+    public function findRawByIdAnyState(int $id): ?array
+    {
+        $stmt = $this->getDb()->prepare("SELECT * FROM contacts WHERE id = ? LIMIT 1");
+        $stmt->execute([$id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ? $this->hydrate($row) : null;
+    }
+
+    /**
+     * Fiches soft-supprimées du propriétaire, dans la fenêtre de restauration.
+     * @return array<int,array>
+     */
+    public function getDeletedByOwner(int $userId, int $page = 1, int $limit = 20): array
+    {
+        $offset = ($page - 1) * $limit;
+        $stmt = $this->getDb()->prepare(
+            "SELECT * FROM contacts
+              WHERE user_id = ? AND supprime_le IS NOT NULL
+                AND supprime_le >= NOW() - INTERVAL " . self::RESTORE_RETENTION_DAYS . " DAY
+              ORDER BY supprime_le DESC
+              LIMIT ? OFFSET ?"
+        );
+        $stmt->bindValue(1, $userId, PDO::PARAM_INT);
+        $stmt->bindValue(2, $limit, PDO::PARAM_INT);
+        $stmt->bindValue(3, $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        return array_map([$this, 'hydrate'], $stmt->fetchAll(PDO::FETCH_ASSOC) ?: []);
+    }
+
+    /** Annule le soft-delete d'une fiche. */
+    public function restoreContact(int $id): bool
+    {
+        $stmt = $this->getDb()->prepare(
+            "UPDATE contacts SET supprime_le = NULL WHERE id = ? AND supprime_le IS NOT NULL"
+        );
+        $stmt->execute([$id]);
+        return $stmt->rowCount() > 0;
     }
 
     /** Nombre de fiches actives — base du contrôle de quota max_contacts. */

@@ -6,6 +6,8 @@ Chaque module expose sa documentation d'API au format JSON. Ces fichiers décriv
 | - | - | - |
 | [core/API_ENDPOINTS.json](core/API_ENDPOINTS.json) | 96 | API cœur : auth JWT/OTP, users, groups (dont `/groups/{id}/modules` — plan équipe), files, tags, stats, plans, métadonnées de clé e2e (`/users/me/e2e-key`), suppression de compte et restauration. Document de référence transmis aux clients. |
 | [ics/API_ICS_ENDPOINTS.json](ics/API_ICS_ENDPOINTS.json) | 49 | Calendriers ICS/CalDAV : événements, occurrences, todos, journaux, partage, notifications email, sessions de temps par tâche. |
+| [contacts/API_CONTACTS_ENDPOINTS.json](contacts/API_CONTACTS_ENDPOINTS.json) | 19 | Pilier Contacts : fiches personnes/organisations, vCard 4.0 import/export, cap `max_contacts`, chiffrement de bout en bout, CRM (interactions, `/opportunites`), corbeille (`/contacts/deleted` + restore). |
+| [projets/API_PROJETS_ENDPOINTS.json](projets/API_PROJETS_ENDPOINTS.json) | 18 | Gestion de projet : tâches, hiérarchie/dépendances (DAG), round-trip JSON, export `.ics` VEVENT, corbeille projets et tâches (`/deleted` + restore). |
 | [items/API_ITEMS_ENDPOINTS.json](items/API_ITEMS_ENDPOINTS.json) | 13 | Gestionnaire d'items génériques — privé / public / partagé, catégories, permissions par utilisateur. |
 | [quiz/API_QUIZ_ENDPOINTS_v1_0_0.json](quiz/API_QUIZ_ENDPOINTS_v1_0_0.json) | 17 | Quiz temps réel : CRUD quiz/questions, sessions animateur (JWT) et participants (participant_token). |
 | [puzzle/API_PUZZLE_ENDPOINTS.json](puzzle/API_PUZZLE_ENDPOINTS.json) | 20 | Plugin puzzle : carrousel, thèmes, livraison d'images, backup en ligne, casse-têtes partagés (pick/drop). Auth device_token. |

@@ -18,6 +18,9 @@ class Task extends BaseModel
 {
     protected $table = 'calendar_todos';
 
+    /** Fenêtre de restauration après soft-delete (jours) — aligné sur CalendarTodo::RESTORE_RETENTION_DAYS. */
+    public const RESTORE_RETENTION_DAYS = 30;
+
     public $id;
 
     public function create() { throw new \RuntimeException('Utiliser createTask()'); }
@@ -58,6 +61,54 @@ class Task extends BaseModel
             fn($row) => $this->rowToContract($row, $depsByTask[$row['id']] ?? []),
             $rows
         );
+    }
+
+    /** Tâche dans n'importe quel état (active ou soft-supprimée) — sert à la restauration. */
+    public function findRawByIdAnyState(int $id): ?array
+    {
+        $stmt = $this->getDb()->prepare('SELECT * FROM calendar_todos WHERE id = ?');
+        $stmt->execute([$id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
+    /**
+     * Tâches soft-supprimées du projet, dans la fenêtre de restauration.
+     * @return array<int,array> tâches au format contrat §6
+     */
+    public function getDeletedByProject(int $projectId, int $page = 1, int $limit = 20): array
+    {
+        $offset = ($page - 1) * $limit;
+        $stmt = $this->getDb()->prepare(
+            'SELECT * FROM calendar_todos
+              WHERE project_id = ? AND deleted_at IS NOT NULL
+                AND deleted_at >= NOW() - INTERVAL ' . self::RESTORE_RETENTION_DAYS . ' DAY
+              ORDER BY deleted_at DESC
+              LIMIT ? OFFSET ?'
+        );
+        $stmt->bindValue(1, $projectId, PDO::PARAM_INT);
+        $stmt->bindValue(2, $limit, PDO::PARAM_INT);
+        $stmt->bindValue(3, $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $ids = array_column($rows, 'id');
+        $depsByTask = $this->findDependenciesForTasks($ids);
+
+        return array_map(
+            fn($row) => $this->rowToContract($row, $depsByTask[$row['id']] ?? []),
+            $rows
+        );
+    }
+
+    /** Annule le soft-delete d'une tâche. */
+    public function restoreTask(int $id): bool
+    {
+        $stmt = $this->getDb()->prepare(
+            'UPDATE calendar_todos SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL'
+        );
+        $stmt->execute([$id]);
+        return $stmt->rowCount() > 0;
     }
 
     public function taskExistsInProject(int $taskId, int $projectId): bool

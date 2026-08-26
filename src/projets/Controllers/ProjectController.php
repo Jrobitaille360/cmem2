@@ -116,6 +116,56 @@ class ProjectController
     }
 
     // ---------------------------------------------------------------
+    // GET /projets/projects/deleted — corbeille du propriétaire
+    // ---------------------------------------------------------------
+    public function listDeleted(array $user): void
+    {
+        LoggingMiddleware::logEntry();
+        $pagination = Response::getPaginationParams();
+        $projects = $this->model->getDeletedByUser(
+            (int) $user['user_id'],
+            $pagination['page'],
+            $pagination['limit']
+        );
+        Response::success('Projets supprimés récupérés', [
+            'projects' => array_map([$this, 'toContract'], $projects),
+            'count'    => count($projects),
+            'page'     => $pagination['page'],
+            'limit'    => $pagination['limit'],
+        ]);
+    }
+
+    // ---------------------------------------------------------------
+    // POST /projets/projects/{id}/restore
+    // ---------------------------------------------------------------
+    public function restore(array $user, int $id): void
+    {
+        LoggingMiddleware::logEntry();
+
+        $project = $this->model->findRawByIdAnyState($id);
+        if (!$project) {
+            Response::error('Projet non trouvé', null, 404);
+            return;
+        }
+        if ((int) $project['user_id'] !== (int) $user['user_id']) {
+            Response::error('Accès non autorisé', null, 403);
+            return;
+        }
+        if (empty($project['deleted_at'])) {
+            Response::error('Ce projet n\'est pas supprimé', null, 404);
+            return;
+        }
+        if (strtotime($project['deleted_at']) < strtotime('-' . Project::RESTORE_RETENTION_DAYS . ' days')) {
+            Response::error('Fenêtre de restauration expirée', null, 404);
+            return;
+        }
+
+        $this->model->restoreProject($id);
+        $restored = $this->model->findProjectById($id);
+        Response::success('Projet restauré avec succès', ['project' => $this->toContract($restored)]);
+    }
+
+    // ---------------------------------------------------------------
     // GET /projets/projects/{id}/export.json
     // ---------------------------------------------------------------
     public function exportJson(array $user, int $id): void

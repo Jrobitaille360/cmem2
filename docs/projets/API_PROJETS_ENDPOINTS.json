@@ -52,10 +52,26 @@
         {
           "method": "DELETE",
           "path": "/projets/projects/{id}",
-          "description": "Supprimer un projet (physique — cascade sur tâches, dépendances et calendrier caché)",
+          "description": "Soft-delete (Project::deleted_at). Le projet, ses tâches et son calendrier caché restent intacts en base ; le projet devient invisible jusqu'à restauration ou purge ultérieure.",
           "auth_required": true,
           "response": "204 No Content",
           "errors": { "401": "JWT absent", "403": "Non propriétaire", "404": "Projet introuvable" }
+        },
+        {
+          "method": "GET",
+          "path": "/projets/projects/deleted?page={page}&limit={limit}",
+          "description": "Corbeille : liste paginée des projets soft-supprimés du propriétaire, dans la fenêtre de restauration (30 jours), triés par date de suppression décroissante.",
+          "auth_required": true,
+          "response": { "projects": "array", "count": "integer", "page": "integer", "limit": "integer" },
+          "errors": { "401": "JWT absent" }
+        },
+        {
+          "method": "POST",
+          "path": "/projets/projects/{id}/restore",
+          "description": "Annule le soft-delete d'un projet, dans la fenêtre de 30 jours suivant la suppression (Project::RESTORE_RETENTION_DAYS). Les tâches n'ayant jamais été touchées, elles réapparaissent telles quelles.",
+          "auth_required": true,
+          "response": { "project": "object" },
+          "errors": { "401": "JWT absent", "403": "Non propriétaire", "404": "Projet introuvable, pas supprimé, ou fenêtre de restauration expirée" }
         }
       ]
     },
@@ -127,6 +143,22 @@
           "auth_required": true,
           "response": "204 No Content",
           "errors": { "401": "JWT absent", "403": "Non propriétaire", "404": "Tâche introuvable" }
+        },
+        {
+          "method": "GET",
+          "path": "/projets/projects/{id}/tasks/deleted?page={page}&limit={limit}",
+          "description": "Corbeille : liste paginée des tâches soft-supprimées du projet, dans la fenêtre de restauration (30 jours), triées par date de suppression décroissante.",
+          "auth_required": true,
+          "response": { "tasks": "array", "count": "integer", "page": "integer", "limit": "integer" },
+          "errors": { "401": "JWT absent", "403": "Non propriétaire", "404": "Projet introuvable" }
+        },
+        {
+          "method": "POST",
+          "path": "/projets/tasks/{id}/restore",
+          "description": "Annule le soft-delete d'une tâche, dans la fenêtre de 30 jours suivant la suppression (Task::RESTORE_RETENTION_DAYS).",
+          "auth_required": true,
+          "response": { "task": "object" },
+          "errors": { "401": "JWT absent", "403": "Non propriétaire", "404": "Tâche introuvable, pas supprimée, ou fenêtre de restauration expirée" }
         }
       ]
     },

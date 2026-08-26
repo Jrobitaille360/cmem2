@@ -12,17 +12,21 @@ use Projets\Controllers\TaskController;
  *
  *   GET    /projets/projects                              → list
  *   POST   /projets/projects                               → create
+ *   GET    /projets/projects/deleted                        → corbeille projets (paginé)
  *   GET    /projets/projects/{id}                          → show
  *   PATCH  /projets/projects/{id}                          → update
- *   DELETE /projets/projects/{id}                          → delete
+ *   DELETE /projets/projects/{id}                          → delete (soft-delete)
+ *   POST   /projets/projects/{id}/restore                   → restauration (fenêtre 30 jours)
  *   GET    /projets/projects/{id}/tasks                     → tasks list
  *   POST   /projets/projects/{id}/tasks                     → task create
+ *   GET    /projets/projects/{id}/tasks/deleted              → corbeille tâches du projet (paginé)
  *   GET    /projets/projects/{id}/export.json                → export JSON
  *   POST   /projets/projects/{id}/import.json                → diff (dry-run)
  *   POST   /projets/projects/{id}/import.json/confirm        → écriture confirmée
  *   GET    /projets/projects/{id}/export.ics                 → export .ics VEVENT
  *   PATCH  /projets/tasks/{id}                               → task update
- *   DELETE /projets/tasks/{id}                               → task delete
+ *   DELETE /projets/tasks/{id}                               → task delete (soft-delete)
+ *   POST   /projets/tasks/{id}/restore                       → restauration (fenêtre 30 jours)
  *
  * Toutes les routes exigent un JWT valide.
  */
@@ -46,7 +50,7 @@ class ProjetsRouteHandler extends BaseRouteHandler
         $s4 = $segs[4] ?? ''; // 'confirm'
 
         // -------------------------------------------------
-        // /projets/tasks/{id}
+        // /projets/tasks/{id}[/restore]
         // -------------------------------------------------
         if ($s1 === 'tasks') {
             if (!is_numeric($s2)) {
@@ -54,6 +58,20 @@ class ProjetsRouteHandler extends BaseRouteHandler
                 return;
             }
             $taskId = (int) $s2;
+
+            if ($s3 === 'restore') {
+                if ($method !== 'POST') {
+                    Response::error('Méthode non autorisée', null, 405);
+                    return;
+                }
+                (new TaskController())->restore($user, $taskId);
+                return;
+            }
+            if ($s3 !== '') {
+                Response::error('Endpoint non trouvé', null, 404);
+                return;
+            }
+
             match ($method) {
                 'GET'    => (new TaskController())->show($user, $taskId),
                 'PATCH'  => (new TaskController())->update($user, $taskId),
@@ -80,6 +98,18 @@ class ProjetsRouteHandler extends BaseRouteHandler
             return;
         }
 
+        // -------------------------------------------------
+        // /projets/projects/deleted
+        // -------------------------------------------------
+        if ($s2 === 'deleted') {
+            if ($method !== 'GET') {
+                Response::error('Méthode non autorisée', null, 405);
+                return;
+            }
+            (new ProjectController())->listDeleted($user);
+            return;
+        }
+
         if (!is_numeric($s2)) {
             Response::error('project id doit être numérique', null, 400);
             return;
@@ -97,8 +127,30 @@ class ProjetsRouteHandler extends BaseRouteHandler
             return;
         }
 
-        // /projets/projects/{id}/tasks
+        // /projets/projects/{id}/restore
+        if ($s3 === 'restore') {
+            if ($method !== 'POST') {
+                Response::error('Méthode non autorisée', null, 405);
+                return;
+            }
+            (new ProjectController())->restore($user, $projectId);
+            return;
+        }
+
+        // /projets/projects/{id}/tasks[/deleted]
         if ($s3 === 'tasks') {
+            if ($s4 === 'deleted') {
+                if ($method !== 'GET') {
+                    Response::error('Méthode non autorisée', null, 405);
+                    return;
+                }
+                (new TaskController())->listDeleted($user, $projectId);
+                return;
+            }
+            if ($s4 !== '') {
+                Response::error('Endpoint non trouvé', null, 404);
+                return;
+            }
             match ($method) {
                 'GET'  => (new TaskController())->list($user, $projectId),
                 'POST' => (new TaskController())->create($user, $projectId),

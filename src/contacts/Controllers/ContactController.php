@@ -401,6 +401,61 @@ class ContactController
     }
 
     // ---------------------------------------------------------------
+    // GET /contacts/deleted — corbeille du propriétaire
+    // ---------------------------------------------------------------
+    public function listDeleted(array $user): void
+    {
+        LoggingMiddleware::logEntry();
+        $pagination = Response::getPaginationParams();
+        $contacts = $this->model->getDeletedByOwner(
+            (int) $user['user_id'],
+            $pagination['page'],
+            $pagination['limit']
+        );
+        Response::success('Contacts supprimés récupérés', [
+            'contacts' => array_map([$this, 'toContract'], $contacts),
+            'count'    => count($contacts),
+            'page'     => $pagination['page'],
+            'limit'    => $pagination['limit'],
+        ]);
+    }
+
+    // ---------------------------------------------------------------
+    // POST /contacts/{id}/restore
+    // ---------------------------------------------------------------
+    public function restore(array $user, int $id): void
+    {
+        LoggingMiddleware::logEntry();
+
+        $contact = $this->model->findRawByIdAnyState($id);
+        if (!$contact) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Contact non trouvé', null, 404);
+            return;
+        }
+        if ((int) $contact['user_id'] !== (int) $user['user_id']) {
+            LoggingMiddleware::logExit(403);
+            Response::error('Accès non autorisé', null, 403);
+            return;
+        }
+        if (empty($contact['supprime_le'])) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Cette fiche n\'est pas supprimée', null, 404);
+            return;
+        }
+        if (strtotime($contact['supprime_le']) < strtotime('-' . Contact::RESTORE_RETENTION_DAYS . ' days')) {
+            LoggingMiddleware::logExit(404);
+            Response::error('Fenêtre de restauration expirée', null, 404);
+            return;
+        }
+
+        $this->model->restoreContact($id);
+        $restored = $this->model->findContactById($id);
+        LoggingMiddleware::logExit(200);
+        Response::success('Contact restauré avec succès', ['contact' => $this->toContract($restored)]);
+    }
+
+    // ---------------------------------------------------------------
     // POST /contacts/{id}/messages  — envoi courriel + journalisation
     // ---------------------------------------------------------------
     public function sendMessage(array $user, int $id): void

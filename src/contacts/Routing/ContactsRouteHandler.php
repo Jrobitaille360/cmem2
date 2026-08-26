@@ -13,10 +13,12 @@ use Contacts\Controllers\OpportuniteController;
  *   GET    /contacts             → liste (filtres ?q= ?categorie= ?favori= ?limit= ?offset=)
  *   POST   /contacts             → création (cap max_contacts)
  *   POST   /contacts/import      → import vCard ou CSV
+ *   GET    /contacts/deleted     → corbeille (fiches soft-supprimées, paginé)
  *   GET    /contacts/{id}        → fiche complète
  *   GET    /contacts/{id}.vcf    → export vCard 4.0
  *   PUT    /contacts/{id}        → mise à jour partielle
  *   DELETE /contacts/{id}        → soft-delete
+ *   POST   /contacts/{id}/restore → restauration (fenêtre de 30 jours)
  *   GET    /contacts/{id}/messages          → historique courriels
  *   POST   /contacts/{id}/messages          → envoi courriel
  *   GET    /contacts/{id}/interactions      → historique CRM unifié (filtres ?type= ?limit= ?offset=)
@@ -68,6 +70,18 @@ class ContactsRouteHandler extends BaseRouteHandler
         }
 
         // -------------------------------------------------
+        // /contacts/deleted
+        // -------------------------------------------------
+        if ($s1 === 'deleted') {
+            if ($method !== 'GET') {
+                Response::error('Méthode non autorisée', null, 405);
+                return;
+            }
+            (new ContactController())->listDeleted($user);
+            return;
+        }
+
+        // -------------------------------------------------
         // /contacts/{id}.vcf
         // -------------------------------------------------
         if (preg_match('/^(\d+)\.vcf$/', $s1, $m)) {
@@ -89,9 +103,21 @@ class ContactsRouteHandler extends BaseRouteHandler
         $contactId = (int) $s1;
 
         // -------------------------------------------------
-        // /contacts/{id}/messages  — envoi courriel + historique
+        // /contacts/{id}/restore
         // -------------------------------------------------
         $s2 = $segs[2] ?? '';
+        if ($s2 === 'restore') {
+            if ($method !== 'POST') {
+                Response::error('Méthode non autorisée', null, 405);
+                return;
+            }
+            (new ContactController())->restore($user, $contactId);
+            return;
+        }
+
+        // -------------------------------------------------
+        // /contacts/{id}/messages  — envoi courriel + historique
+        // -------------------------------------------------
         if ($s2 === 'messages') {
             match ($method) {
                 'POST' => (new ContactController())->sendMessage($user, $contactId),
