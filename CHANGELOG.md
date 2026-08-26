@@ -9,6 +9,8 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+## [2.17.2] — 2026-08-26
+
 ### Corrigé
 
 - **Lien d'invitation groupe pointait vers le domaine API (GET) au lieu du frontend (POST)**
