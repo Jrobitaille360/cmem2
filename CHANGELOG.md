@@ -7,7 +7,9 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased 2026-08-25]
+## [Unreleased]
+
+## [2.17.1] — 2026-08-25
 
 ### Ajouté
 
