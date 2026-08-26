@@ -521,9 +521,11 @@ class Group extends BaseModel
                 return ['success' => false, 'error' => 'Failed to create invitation'];
             }
 
-            // Générer l'URL d'invitation
-            $baseUrl = $_ENV['APP_URL'] ?? 'http://localhost/cmem1_API';
-            $inviteUrl = "{$baseUrl}/groups/join?email={$email}&role={$role}&code={$invitationToken}";
+            // Générer l'URL d'invitation (domaine client web, pas l'API)
+            $baseUrl = rtrim((string) ($_ENV['CMEMWEB_APP_URL'] ?? ''), '/');
+            $inviteUrl = $baseUrl !== ''
+                ? "{$baseUrl}/groups/join?email={$email}&role={$role}&code={$invitationToken}"
+                : "/groups/join?email={$email}&role={$role}&code={$invitationToken}";
 
             // Envoyer l'email d'invitation (optionnel)
             try

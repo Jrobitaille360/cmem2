@@ -9,6 +9,16 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+### Corrigé
+
+- **Lien d'invitation groupe pointait vers le domaine API (GET) au lieu du frontend (POST)**
+  (directive cmem_web, task cmemweb #195) — `Group::inviteUser` construisait `invite_url` avec
+  `APP_URL` (domaine API) au lieu de `CMEMWEB_APP_URL` (domaine cmem_web), causant un clic sur
+  `GET /groups/join` qui ne matche aucune route publique (`/groups/join` n'est public qu'en
+  POST) → 401 « Utilisateur non authentifié » trompeur. `invite_url` pointe maintenant sur
+  `{CMEMWEB_APP_URL}/groups/join?email=...&role=...&code=...` ; le frontend consommera ces
+  query params pour faire lui-même le POST.
+
 ## [2.17.1] — 2026-08-25
 
 ### Ajouté
