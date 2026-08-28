@@ -7,7 +7,20 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ---
 
-## [Unreleased]
+## [Unreleased 2026-08-27 20:55]
+
+### Ajouté
+
+- **Push : préférence opt-in `show_entity_detail` — titre réel de l'entité au lieu du
+  générique** (directive cmem_web, task cmemweb #199) — par kind, défaut `false`
+  (comportement générique inchangé). Réglé à `true` : `title` devient le titre réel
+  (titre événement/tâche, nom contact, titre opportunité) au lieu du générique
+  `PUSH_GENERIC_TITLE` ; `body` reste toujours le texte générique par délai — seul
+  `title` porte le détail. `GET`/`PUT /push/preferences` exposent le nouveau champ.
+  Migration `docs/20260828_push_show_entity_detail.sql` (colonne `notification_prefs.
+  show_entity_detail`). Voir `docs/docs-api/push/GUIDE.md#show_entity_detail`,
+  `docs/docs-api/push/API_PUSH_ENDPOINTS.json`. Toggle front (cmem_web,
+  `NotificationSettings.tsx`) hors scope — à venir séparément.
 
 ## [2.17.2] — 2026-08-26
 

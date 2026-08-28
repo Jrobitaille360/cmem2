@@ -1,8 +1,9 @@
 # Guide — Notifications push web (module `push`)
 
-Web Push (RFC 8030) signé VAPID (RFC 8292). Le serveur pousse un rappel générique vers
-chaque appareil abonné ; le détail de l'entité n'apparaît qu'après ouverture de
-l'application.
+Web Push (RFC 8030) signé VAPID (RFC 8292). Par défaut, le serveur pousse un rappel générique
+vers chaque appareil abonné ; le détail de l'entité n'apparaît qu'après ouverture de
+l'application. Opt-in par kind (`show_entity_detail`) : le titre du push peut porter le titre
+réel de l'entité — voir § Préférences.
 
 Directive d'origine : `cmem_web` 20260726_140426.
 
@@ -76,6 +77,14 @@ opportunité de même id échéant le même jour s'annuleraient mutuellement.
 
 Par défaut, un `kind` jamais réglé est renvoyé avec `enabled = false` : le push est
 **opt-in**.
+
+### `show_entity_detail` — titre réel de l'entité (task cmem #199)
+
+Par kind, opt-in, **défaut `false`** : le `title` du push reste générique (`PUSH_GENERIC_TITLE`).
+Réglé à `true`, `title` devient le titre réel de l'entité — titre événement/tâche, nom
+contact, titre opportunité — au lieu du générique. `body` reste **toujours** le texte
+générique par délai (« dans 15 minutes », etc.), même quand `show_entity_detail = true` :
+seul `title` porte le détail.
 
 ## Sélection des échéances
 

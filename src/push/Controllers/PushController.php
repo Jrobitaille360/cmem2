@@ -211,11 +211,12 @@ class PushController
             }
 
             $validated[$kind] = [
-                'kind'         => $kind,
-                'lead_minutes' => $lead,
-                'quiet_from'   => $quietFrom,
-                'quiet_to'     => $quietTo,
-                'enabled'      => (bool) ($pref['enabled'] ?? false),
+                'kind'                => $kind,
+                'lead_minutes'        => $lead,
+                'quiet_from'          => $quietFrom,
+                'quiet_to'            => $quietTo,
+                'enabled'             => (bool) ($pref['enabled'] ?? false),
+                'show_entity_detail'  => (bool) ($pref['show_entity_detail'] ?? false),
             ];
         }
 
@@ -234,7 +235,8 @@ class PushController
                 $pref['lead_minutes'],
                 $pref['quiet_from'],
                 $pref['quiet_to'],
-                $pref['enabled']
+                $pref['enabled'],
+                $pref['show_entity_detail']
             );
         }
 

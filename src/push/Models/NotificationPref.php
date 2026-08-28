@@ -53,11 +53,12 @@ class NotificationPref extends BaseModel
             $out[] = isset($persisted[$kind])
                 ? self::toContract($persisted[$kind])
                 : [
-                    'kind'         => $kind,
-                    'lead_minutes' => self::DEFAULT_LEAD,
-                    'quiet_from'   => null,
-                    'quiet_to'     => null,
-                    'enabled'      => false,
+                    'kind'                => $kind,
+                    'lead_minutes'        => self::DEFAULT_LEAD,
+                    'quiet_from'          => null,
+                    'quiet_to'            => null,
+                    'enabled'             => false,
+                    'show_entity_detail'  => false,
                 ];
         }
         return $out;
@@ -70,19 +71,24 @@ class NotificationPref extends BaseModel
         int     $leadMinutes,
         ?string $quietFrom,
         ?string $quietTo,
-        bool    $enabled
+        bool    $enabled,
+        bool    $showEntityDetail = false
     ): void {
         $stmt = $this->getDb()->prepare(
             "INSERT INTO {$this->table}
-                 (app_id, owner_id, kind, lead_minutes, quiet_from, quiet_to, enabled)
-             VALUES (?, ?, ?, ?, ?, ?, ?)
+                 (app_id, owner_id, kind, lead_minutes, quiet_from, quiet_to, enabled, show_entity_detail)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE
-                 lead_minutes = VALUES(lead_minutes),
-                 quiet_from   = VALUES(quiet_from),
-                 quiet_to     = VALUES(quiet_to),
-                 enabled      = VALUES(enabled)"
+                 lead_minutes       = VALUES(lead_minutes),
+                 quiet_from         = VALUES(quiet_from),
+                 quiet_to           = VALUES(quiet_to),
+                 enabled            = VALUES(enabled),
+                 show_entity_detail = VALUES(show_entity_detail)"
         );
-        $stmt->execute([$appId, $ownerId, $kind, $leadMinutes, $quietFrom, $quietTo, $enabled ? 1 : 0]);
+        $stmt->execute([
+            $appId, $ownerId, $kind, $leadMinutes, $quietFrom, $quietTo,
+            $enabled ? 1 : 0, $showEntityDetail ? 1 : 0,
+        ]);
     }
 
     /** Préférences actives d'un usager, tous app_id confondus, indexées par kind. */
@@ -103,11 +109,12 @@ class NotificationPref extends BaseModel
     public static function toContract(array $row): array
     {
         return [
-            'kind'         => $row['kind'],
-            'lead_minutes' => (int) $row['lead_minutes'],
-            'quiet_from'   => $row['quiet_from'] !== null ? substr($row['quiet_from'], 0, 5) : null,
-            'quiet_to'     => $row['quiet_to'] !== null ? substr($row['quiet_to'], 0, 5) : null,
-            'enabled'      => (bool) $row['enabled'],
+            'kind'                => $row['kind'],
+            'lead_minutes'        => (int) $row['lead_minutes'],
+            'quiet_from'          => $row['quiet_from'] !== null ? substr($row['quiet_from'], 0, 5) : null,
+            'quiet_to'            => $row['quiet_to'] !== null ? substr($row['quiet_to'], 0, 5) : null,
+            'enabled'             => (bool) $row['enabled'],
+            'show_entity_detail'  => (bool) ($row['show_entity_detail'] ?? false),
         ];
     }
 }

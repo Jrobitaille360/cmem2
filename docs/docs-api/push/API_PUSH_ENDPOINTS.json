@@ -15,7 +15,7 @@
     "portee_preferences": "PAR COMPTE. notification_prefs est unique sur (owner_id, app_id, kind). Un compte = un jeu de 4 préférences ; tous ses appareils reçoivent le même envoi. Seule portée compatible avec l'exigence « une échéance = un envoi logique » de la directive.",
     "kinds": "event | task_due | recurring | contact_followup — l'énumération est complète dès la première migration.",
     "lead_minutes": "Valeurs acceptées : 5, 15, 60, 1440. Toute autre valeur → 422.",
-    "confidentialite": "Le corps de la notification est générique (PUSH_GENERIC_TITLE + libellé par kind). Aucun titre d'événement, de tâche ou d'opportunité n'y figure ; seuls data.type et data.id permettent d'ouvrir la bonne fiche.",
+    "confidentialite": "Par défaut, le corps de la notification est générique (PUSH_GENERIC_TITLE + libellé par kind) : aucun titre d'événement, de tâche ou d'opportunité n'y figure ; seuls data.type et data.id permettent d'ouvrir la bonne fiche. Opt-in par kind (show_entity_detail=true, défaut false) : le title devient le titre réel de l'entité (titre événement/tâche, nom contact, titre opportunité) — le body reste toujours le texte générique par délai, jamais le détail.",
     "fuseau_usager": "La table users n'a pas de colonne timezone : le fuseau retenu est celui du premier calendrier de l'usager, sinon America/Montreal."
   },
   "endpoints": {
@@ -104,7 +104,7 @@
           "query": { "app_id": "string — optionnel, défaut 'puzzle'" },
           "response": {
             "scope": "string — toujours 'account'",
-            "preferences": "[{ kind, lead_minutes, quiet_from, quiet_to, enabled }]"
+            "preferences": "[{ kind, lead_minutes, quiet_from, quiet_to, enabled, show_entity_detail }]"
           },
           "status_codes": { "200": "Préférences retournées" },
           "errors": { "401": "JWT absent ou invalide" }
@@ -116,11 +116,11 @@
           "auth_required": true,
           "body": {
             "app_id": "string — optionnel, défaut 'puzzle'",
-            "preferences": "[{ kind: 'event'|'task_due'|'recurring'|'contact_followup', lead_minutes: 5|15|60|1440, enabled: bool, quiet_from?: 'HH:MM', quiet_to?: 'HH:MM' }]"
+            "preferences": "[{ kind: 'event'|'task_due'|'recurring'|'contact_followup', lead_minutes: 5|15|60|1440, enabled: bool, quiet_from?: 'HH:MM', quiet_to?: 'HH:MM', show_entity_detail?: bool }]"
           },
           "response": {
             "scope": "string — toujours 'account'",
-            "preferences": "[{ kind, lead_minutes, quiet_from, quiet_to, enabled }] — les 4 kinds après mise à jour"
+            "preferences": "[{ kind, lead_minutes, quiet_from, quiet_to, enabled, show_entity_detail }] — les 4 kinds après mise à jour"
           },
           "status_codes": { "200": "Préférences persistées" },
           "errors": {
@@ -133,7 +133,7 @@
   },
   "payload_push": {
     "description": "Corps chiffré transporté jusqu'au service worker (aes128gcm)",
-    "exemple": {
+    "exemple_defaut": {
       "title": "Rappel",
       "body": "Vous avez un événement dans 15 minutes.",
       "data": {
@@ -142,6 +142,15 @@
         "occurrence": "2026-07-27T09:00:00+00:00"
       }
     },
-    "regle": "data.type vaut le kind ('event', 'task_due', 'recurring', 'contact_followup') et data.id l'identifiant de l'entité. Aucun titre d'entité n'est transmis."
+    "exemple_show_entity_detail": {
+      "title": "Réunion client 15h",
+      "body": "Vous avez un événement dans 15 minutes.",
+      "data": {
+        "type": "event",
+        "id": 1234,
+        "occurrence": "2026-07-27T09:00:00+00:00"
+      }
+    },
+    "regle": "data.type vaut le kind ('event', 'task_due', 'recurring', 'contact_followup') et data.id l'identifiant de l'entité. Par défaut (show_entity_detail=false) aucun titre d'entité n'est transmis. Avec show_entity_detail=true pour ce kind, title devient le titre réel de l'entité — body reste toujours le texte générique par délai."
   }
 }

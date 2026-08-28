@@ -99,13 +99,16 @@ class DueScanner
                     $data['entity'] = $item['entity'];
                 }
 
+                $showDetail = (bool) ($pref['show_entity_detail'] ?? false);
+                $realTitle  = $item['title'] ?? '';
+
                 $due[] = [
                     'kind'           => $kind,
                     'entity_id'      => $item['entity_id'],
                     'occurrence_key' => $item['occurrence_key'],
                     'fire_at'        => $item['fire_at']->format('Y-m-d H:i:s'),
                     'app_id'         => $appId,
-                    'title'          => WebPushService::genericTitle(),
+                    'title'          => ($showDetail && $realTitle !== '') ? $realTitle : WebPushService::genericTitle(),
                     'body'           => self::genericBody($kind, $lead),
                     'data'           => $data,
                 ];
@@ -202,7 +205,7 @@ class DueScanner
     private function scanEvents(int $ownerId): array
     {
         $stmt = $this->db->prepare(
-            "SELECT id, start_datetime, timezone
+            "SELECT id, title, start_datetime, timezone
                FROM calendar_events
               WHERE user_id = ?
                 AND deleted_at IS NULL
@@ -224,6 +227,7 @@ class DueScanner
                 'occurrence_key' => '-',
                 'fire_at'        => $fireAt,
                 'occurrence_iso' => $fireAt->format('c'),
+                'title'          => (string) $row['title'],
             ];
         }
         return $out;
@@ -236,7 +240,8 @@ class DueScanner
             "SELECT o.event_id,
                     o.occurrence_date,
                     COALESCE(o.modified_start_datetime, o.start_datetime) AS start_datetime,
-                    e.timezone
+                    e.timezone,
+                    e.title
                FROM event_occurrences o
                JOIN calendar_events e ON e.id = o.event_id
               WHERE e.user_id = ?
@@ -260,6 +265,7 @@ class DueScanner
                 'occurrence_key' => (string) $row['occurrence_date'],
                 'fire_at'        => $fireAt,
                 'occurrence_iso' => $fireAt->format('c'),
+                'title'          => (string) $row['title'],
             ];
         }
         return $out;
@@ -269,7 +275,7 @@ class DueScanner
     private function scanTodos(int $ownerId): array
     {
         $stmt = $this->db->prepare(
-            "SELECT id, due, timezone
+            "SELECT id, title, due, timezone
                FROM calendar_todos
               WHERE user_id = ?
                 AND deleted_at IS NULL
@@ -290,6 +296,7 @@ class DueScanner
                 'occurrence_key' => '-',
                 'fire_at'        => $fireAt,
                 'occurrence_iso' => $fireAt->format('c'),
+                'title'          => (string) $row['title'],
             ];
         }
         return $out;
@@ -308,7 +315,7 @@ class DueScanner
     {
         try {
             $stmt = $this->db->prepare(
-                "SELECT id, date_relance
+                "SELECT id, prenom, nom, date_relance
                    FROM contacts
                   WHERE user_id = ?
                     AND supprime_le IS NULL
@@ -336,6 +343,7 @@ class DueScanner
                 'occurrence_key' => 'relance:' . $row['date_relance'],
                 'fire_at'        => $fireAt,
                 'occurrence_iso' => $fireAt->format('c'),
+                'title'          => trim($row['prenom'] . ' ' . $row['nom']),
             ];
         }
         return $out;
@@ -350,7 +358,7 @@ class DueScanner
     {
         try {
             $stmt = $this->db->prepare(
-                "SELECT id, date_cloture_prevue
+                "SELECT id, titre, date_cloture_prevue
                    FROM opportunite
                   WHERE user_id = ?
                     AND supprime_le IS NULL
@@ -378,6 +386,7 @@ class DueScanner
                 'occurrence_key' => (string) $row['date_cloture_prevue'],
                 'fire_at'        => $fireAt,
                 'occurrence_iso' => $fireAt->format('c'),
+                'title'          => (string) $row['titre'],
             ];
         }
         return $out;
