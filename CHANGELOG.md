@@ -9,6 +9,19 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+## [2.17.5] — 2026-09-02
+
+### Corrigé
+
+- **Webhook Stripe (`POST v2/billing/webhook`)** : réponse JSON expose désormais
+  `data.received=true` (événement de type inconnu, no-op AC8) et `data.skipped=true`
+  (rejeu d'un `event.id` déjà traité, idempotence AC5) — comportement déjà en place côté
+  serveur (`stripe_processed_events`), seule l'exposition dans la réponse manquait.
+- **`stripe_subscriptions.is_premium`** : nouvelle colonne générée (`STORED`, dérivée de
+  `status IN ('trialing','active','past_due')`) — `customer.subscription.updated`/`.deleted`
+  reflètent maintenant l'état premium sans logique applicative dupliquée. Migration
+  `docs/v-2-17-5/20260901_stripe_subscriptions_is_premium.sql`.
+
 ## [2.17.4] — 2026-09-02
 
 ### Modifié
