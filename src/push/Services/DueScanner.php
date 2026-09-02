@@ -109,7 +109,7 @@ class DueScanner
                     'fire_at'        => $item['fire_at']->format('Y-m-d H:i:s'),
                     'app_id'         => $appId,
                     'title'          => ($showDetail && $realTitle !== '') ? $realTitle : WebPushService::genericTitle(),
-                    'body'           => self::genericBody($kind, $lead),
+                    'body'           => $this->buildDetailedBody($kind, $item, $userTz) ?? self::genericBody($kind, $lead),
                     'data'           => $data,
                 ];
             }
@@ -205,7 +205,7 @@ class DueScanner
     private function scanEvents(int $ownerId): array
     {
         $stmt = $this->db->prepare(
-            "SELECT id, title, start_datetime, timezone
+            "SELECT id, title, start_datetime, end_datetime, all_day, timezone
                FROM calendar_events
               WHERE user_id = ?
                 AND deleted_at IS NULL
@@ -228,6 +228,10 @@ class DueScanner
                 'fire_at'        => $fireAt,
                 'occurrence_iso' => $fireAt->format('c'),
                 'title'          => (string) $row['title'],
+                'start_datetime' => (string) $row['start_datetime'],
+                'end_datetime'   => (string) $row['end_datetime'],
+                'all_day'        => (bool) $row['all_day'],
+                'timezone'       => $row['timezone'] ?: 'America/Montreal',
             ];
         }
         return $out;
@@ -240,6 +244,8 @@ class DueScanner
             "SELECT o.event_id,
                     o.occurrence_date,
                     COALESCE(o.modified_start_datetime, o.start_datetime) AS start_datetime,
+                    COALESCE(o.modified_end_datetime, o.end_datetime) AS end_datetime,
+                    e.all_day,
                     e.timezone,
                     e.title
                FROM event_occurrences o
@@ -266,6 +272,10 @@ class DueScanner
                 'fire_at'        => $fireAt,
                 'occurrence_iso' => $fireAt->format('c'),
                 'title'          => (string) $row['title'],
+                'start_datetime' => (string) $row['start_datetime'],
+                'end_datetime'   => (string) $row['end_datetime'],
+                'all_day'        => (bool) $row['all_day'],
+                'timezone'       => $row['timezone'] ?: 'America/Montreal',
             ];
         }
         return $out;
@@ -275,7 +285,7 @@ class DueScanner
     private function scanTodos(int $ownerId): array
     {
         $stmt = $this->db->prepare(
-            "SELECT id, title, due, timezone
+            "SELECT id, title, due, is_all_day, timezone
                FROM calendar_todos
               WHERE user_id = ?
                 AND deleted_at IS NULL
@@ -297,6 +307,7 @@ class DueScanner
                 'fire_at'        => $fireAt,
                 'occurrence_iso' => $fireAt->format('c'),
                 'title'          => (string) $row['title'],
+                'all_day'        => (bool) $row['is_all_day'],
             ];
         }
         return $out;
@@ -390,6 +401,72 @@ class DueScanner
             ];
         }
         return $out;
+    }
+
+    // ------------------------------------------------------------------
+    // Corps détaillé — date/heure réelle de l'élément (directive cmem_web #210)
+    // ------------------------------------------------------------------
+
+    /** Abréviations françaises des mois (RFC — pas d'extension intl requise). */
+    private const MOIS_ABBR = [
+        1 => 'janv.', 2 => 'févr.', 3 => 'mars', 4 => 'avr.', 5 => 'mai', 6 => 'juin',
+        7 => 'juil.', 8 => 'août', 9 => 'sept.', 10 => 'oct.', 11 => 'nov.', 12 => 'déc.',
+    ];
+
+    /** @param array{fire_at:DateTimeImmutable,all_day?:bool,start_datetime?:string,end_datetime?:string,timezone?:string} $item */
+    private function buildDetailedBody(string $kind, array $item, string $userTz): ?string
+    {
+        return match ($kind) {
+            'event', 'recurring' => $this->buildEventBody($item, $userTz),
+            'task_due'           => $this->buildTaskDueBody($item, $userTz),
+            default              => null,
+        };
+    }
+
+    private function buildEventBody(array $item, string $userTz): ?string
+    {
+        if (!empty($item['all_day'])) {
+            $startDate = new DateTimeImmutable(substr((string) $item['start_datetime'], 0, 10));
+            $endDate   = new DateTimeImmutable(substr((string) $item['end_datetime'], 0, 10));
+
+            return $startDate->format('Y-m-d') === $endDate->format('Y-m-d')
+                ? self::formatDateFr($startDate)
+                : self::formatDateFr($startDate) . ' - ' . self::formatDateFr($endDate);
+        }
+
+        $endUtc = $this->toUtc((string) $item['end_datetime'], $item['timezone'] ?: 'America/Montreal');
+        if ($endUtc === null) {
+            return null;
+        }
+
+        $tzZone = new DateTimeZone($userTz);
+        $start  = $item['fire_at']->setTimezone($tzZone);
+        $end    = $endUtc->setTimezone($tzZone);
+
+        return self::formatTimeFr($start) . ' - ' . self::formatTimeFr($end);
+    }
+
+    private function buildTaskDueBody(array $item, string $userTz): ?string
+    {
+        $due = $item['fire_at']->setTimezone(new DateTimeZone($userTz));
+
+        return !empty($item['all_day'])
+            ? self::formatDateFr($due)
+            : self::formatDateFr($due) . ' ' . self::formatTimeFr($due);
+    }
+
+    private static function formatDateFr(\DateTimeInterface $d): string
+    {
+        $texte = $d->format('j') . ' ' . self::MOIS_ABBR[(int) $d->format('n')];
+        if ((int) $d->format('Y') !== (int) date('Y')) {
+            $texte .= ' ' . $d->format('Y');
+        }
+        return $texte;
+    }
+
+    private static function formatTimeFr(\DateTimeInterface $d): string
+    {
+        return $d->format('G') . 'h' . $d->format('i');
     }
 
     // ------------------------------------------------------------------

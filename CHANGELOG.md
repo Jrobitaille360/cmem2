@@ -9,6 +9,16 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+### Modifié
+
+- **Push : corps des rappels `event`/`recurring`/`task_due` — date/heure réelle au lieu de
+  « dans X minutes »** (directive cmem_web #210, task cmemweb #215). Événement ponctuel :
+  heure début - fin (ex. `14h30 - 15h00`). Événement journée entière ou multi-jours : date à
+  date (ex. `3 sept. - 5 sept.`, ou une seule date si un seul jour). Tâche échue : date/heure
+  d'échéance (heure si non journée entière, sinon date seule). Formaté dans le fuseau du
+  compte (`users.timezone`). `contact_followup` inchangé (texte générique). `DueScanner::
+  buildDetailedBody()`/`buildEventBody()`/`buildTaskDueBody()`.
+
 ## [2.17.3] — 2026-08-28
 
 ### Ajouté
