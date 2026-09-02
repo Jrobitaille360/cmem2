@@ -36,7 +36,7 @@ Le service worker reçoit :
 ```json
 {
   "title": "Rappel",
-  "body": "Vous avez un événement dans 15 minutes.",
+  "body": "14h30 - 15h00",
   "data": { "type": "event", "id": 1234, "occurrence": "2026-07-27T09:00:00+00:00" }
 }
 ```
@@ -82,9 +82,25 @@ Par défaut, un `kind` jamais réglé est renvoyé avec `enabled = false` : le p
 
 Par kind, opt-in, **défaut `false`** : le `title` du push reste générique (`PUSH_GENERIC_TITLE`).
 Réglé à `true`, `title` devient le titre réel de l'entité — titre événement/tâche, nom
-contact, titre opportunité — au lieu du générique. `body` reste **toujours** le texte
-générique par délai (« dans 15 minutes », etc.), même quand `show_entity_detail = true` :
-seul `title` porte le détail.
+contact, titre opportunité — au lieu du générique. `body` est indépendant de ce réglage :
+voir § Corps du rappel — date/heure réelle.
+
+## Corps du rappel — date/heure réelle (task cmem #215)
+
+Depuis v2.17.4, le `body` des kinds `event`, `recurring` et `task_due` affiche la
+date/heure réelle de l'élément, dans le fuseau du compte (`users.timezone`), plutôt que le
+délai générique :
+
+| Cas | Exemple de `body` |
+| - | - |
+| Événement ponctuel (pas journée entière) | `14h30 - 15h00` |
+| Événement journée entière, un seul jour | `3 sept.` |
+| Événement journée entière ou multi-jours | `3 sept. - 5 sept.` |
+| Tâche échue, avec heure | `3 sept. 14h05` |
+| Tâche échue, journée entière | `3 sept.` |
+
+L'année n'est ajoutée que si elle diffère de l'année courante. `contact_followup` conserve
+le texte générique par délai (« dans 1 jour(s) », etc.) — non concerné par ce changement.
 
 ## Sélection des échéances
 

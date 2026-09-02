@@ -9,6 +9,8 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+## [2.17.4] — 2026-09-02
+
 ### Modifié
 
 - **Push : corps des rappels `event`/`recurring`/`task_due` — date/heure réelle au lieu de
@@ -17,7 +19,9 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
   date (ex. `3 sept. - 5 sept.`, ou une seule date si un seul jour). Tâche échue : date/heure
   d'échéance (heure si non journée entière, sinon date seule). Formaté dans le fuseau du
   compte (`users.timezone`). `contact_followup` inchangé (texte générique). `DueScanner::
-  buildDetailedBody()`/`buildEventBody()`/`buildTaskDueBody()`.
+  buildDetailedBody()`/`buildEventBody()`/`buildTaskDueBody()`. Voir
+  `docs/docs-api/push/GUIDE.md#corps-du-rappel--dateheure-réelle-task-cmem-215`,
+  `docs/docs-api/push/API_PUSH_ENDPOINTS.json`.
 
 ## [2.17.3] — 2026-08-28
 
