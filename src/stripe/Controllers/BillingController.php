@@ -136,7 +136,7 @@ class BillingController
 
         if (StripeService::isEventProcessed($event['id'])) {
             LoggingMiddleware::logExit(200);
-            Response::success('Déjà traité');
+            Response::success('Déjà traité', ['skipped' => true]);
             return;
         }
 
@@ -163,6 +163,6 @@ class BillingController
         StripeService::markEventProcessed($event['id'], $event['type']);
 
         LoggingMiddleware::logExit(200);
-        Response::success('Événement traité');
+        Response::success('Événement traité', ['received' => true]);
     }
 }
