@@ -19,6 +19,7 @@ Run a single module:
 php private/tests/test_access.php
 php private/tests/test_account_deletion.php
 php private/tests/test_ai_summarize.php
+php private/tests/test_ai_budget.php
 php private/tests/test_auth_otp.php
 php private/tests/test_auth_test_code.php
 php private/tests/test_booking.php

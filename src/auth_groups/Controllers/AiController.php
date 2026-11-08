@@ -9,6 +9,7 @@ use AuthGroups\Services\LogService;
 use AuthGroups\Middleware\LoggingMiddleware;
 use AuthGroups\Utils\Response;
 use AuthGroups\Utils\Validator;
+use Access\Services\AiBudgetService;
 use Stripe\Config\CmemModules;
 use Stripe\Services\EntitlementService;
 use Throwable;
@@ -16,9 +17,13 @@ use Throwable;
 /**
  * Proxy IA — POST /ai/summarize. Directive cmem_web 20260810_140000_ai-proxy.
  *
- * Le quota est décompté AVANT l'appel au modèle (jamais après) : ça évite un appel
- * gratuit en cas de course entre deux requêtes concurrentes, au prix d'un quota
- * consommé même si l'appel modèle échoue ensuite — comportement voulu par la directive.
+ * Budget IA en dollars (plan accès sur approbation, Phase 1) : le coût maximal estimé est
+ * réservé AVANT l'appel au modèle (anti-course entre requêtes concurrentes), puis ajusté
+ * au coût réel ; ramené à 0 si l'appel modèle échoue. Remplace l'ancien quota en nombre
+ * d'appels (tenant_modules.quota_used), plus utilisé pour le module ia.
+ *
+ *   POST /ai/summarize → résumé d'agenda
+ *   GET  /ai/usage     → dépense du mois / budget / remise à zéro
  */
 class AiController
 {
@@ -31,30 +36,11 @@ class AiController
         $this->model = new TenantModule();
     }
 
-    private function appId(array $params): string
-    {
-        $appId = trim((string) ($params['app_id'] ?? ''));
-        return $appId !== '' ? $appId : 'cmemweb';
-    }
-
     private function planCode(int $userId): string
     {
         $userData = (new User())->findById($userId);
         $override = $userData['cmem_plan_override'] ?? null;
         return EntitlementService::getEffectivePlanForCmem($userId, $override)['code'];
-    }
-
-    /** Quota "used" effectif pour la période en cours (0 si la période précédente est échue). */
-    private function effectiveUsed(?array $row): int
-    {
-        if ($row === null) {
-            return 0;
-        }
-        $resetAt = $row['quota_reset_at'] ?? null;
-        if ($resetAt === null || strtotime($resetAt) <= time()) {
-            return 0;
-        }
-        return (int) ($row['quota_used'] ?? 0);
     }
 
     public function summarize(array $user): void
@@ -74,7 +60,6 @@ class AiController
         }
 
         $userId = (int) $user['user_id'];
-        $appId  = $this->appId($input);
         $plan   = $this->planCode($userId);
 
         $row       = $this->model->findByOwnerAndKey($userId, self::MODULE_KEY);
@@ -90,30 +75,36 @@ class AiController
             return;
         }
 
-        $limit = CmemModules::quotaLimit($plan, self::MODULE_KEY);
-        $used  = $this->effectiveUsed($row);
+        // Budget IA en dollars — réservation au coût maximal avant l'appel modèle (voir AiBudgetService).
+        $budgetService = new AiBudgetService();
+        $reservation   = $budgetService->reserve(
+            $userId,
+            AI_SUMMARIZE_MODEL,
+            AiSummarizeService::estimateInputTokens((array) $input['period'], (array) $input['items']),
+            AI_SUMMARIZE_MAX_TOKENS
+        );
 
-        if ($limit !== null && $used >= $limit) {
+        if (!$reservation['ok']) {
             LoggingMiddleware::logExit(429);
-            Response::error('Quota mensuel du module IA atteint.', [
-                'code'  => 'AI_QUOTA_EXCEEDED',
-                'quota' => [
-                    'used'     => $used,
-                    'limit'    => $limit,
-                    'reset_at' => $row['quota_reset_at'] ?? CmemModules::nextQuotaReset(),
+            Response::error(
+                $reservation['scope'] === 'global'
+                    ? "Budget IA global du mois atteint : l'IA est suspendue jusqu'à la remise à zéro."
+                    : 'Budget IA mensuel atteint.',
+                [
+                    'code'   => 'AI_BUDGET_EXCEEDED',
+                    'scope'  => $reservation['scope'],
+                    'budget' => $reservation['budget'],
                 ],
-            ], 429);
+                429
+            );
             return;
         }
-
-        // Décompte avant l'appel modèle — voir note de classe.
-        $newUsed = $this->model->incrementQuota($userId, $appId, self::MODULE_KEY, CmemModules::nextQuotaReset());
-        $updatedRow = $this->model->findByOwnerAndKey($userId, self::MODULE_KEY);
 
         try {
             $result = AiSummarizeService::summarize($input['period'], $input['items']);
         } catch (Throwable $e) {
-            LogService::error('Échec appel modèle IA (quota déjà décompté)', [
+            $budgetService->settle($reservation['usage_id'], AI_SUMMARIZE_MODEL, 0, 0);
+            LogService::error('Échec appel modèle IA (réservation annulée)', [
                 'owner_id' => $userId,
                 'error'    => $e->getMessage(),
             ]);
@@ -122,20 +113,34 @@ class AiController
             return;
         }
 
+        $budgetService->settle(
+            $reservation['usage_id'],
+            AI_SUMMARIZE_MODEL,
+            (int) ($result['input_tokens'] ?? 0),
+            (int) ($result['output_tokens'] ?? 0)
+        );
+
         LogService::info('Résumé IA généré', [
             'owner_id'      => $userId,
             'model'         => AI_SUMMARIZE_MODEL,
+            'input_tokens'  => $result['input_tokens'],
             'output_tokens' => $result['output_tokens'],
         ]);
 
         LoggingMiddleware::logExit(200);
         Response::success('Résumé généré', [
             'summary' => $result['summary'],
-            'quota'   => [
-                'used'     => $newUsed,
-                'limit'    => $limit,
-                'reset_at' => $updatedRow['quota_reset_at'] ?? CmemModules::nextQuotaReset(),
-            ],
+            'budget'  => $budgetService->usage($userId),
+        ]);
+    }
+
+    /** GET /ai/usage — dépense du mois, budget personnel, date de remise à zéro. */
+    public function usage(array $user): void
+    {
+        LoggingMiddleware::logEntry();
+        LoggingMiddleware::logExit(200);
+        Response::success('Budget IA', [
+            'budget' => (new AiBudgetService())->usage((int) $user['user_id']),
         ]);
     }
 }

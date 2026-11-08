@@ -2,6 +2,7 @@
 
 namespace AuthGroups\Controllers;
 
+use Access\Services\AiBudgetService;
 use AuthGroups\Models\Group;
 use AuthGroups\Models\TenantModule;
 use AuthGroups\Models\User;
@@ -44,11 +45,11 @@ class ModuleController
     }
 
     /**
-     * Contrat d'un module pour le front : available / enabled / quota.
+     * Contrat d'un module pour le front : available / enabled / quota (+ budget pour ia).
      * $groupEnabled : au moins un groupe actif de l'usager a activé ce module (fusion
      * GET /modules — directive plan-equipe 20260813_143000, OR logique décision §3).
      */
-    private function toContract(string $key, string $planCode, ?array $row, bool $groupEnabled = false): array
+    private function toContract(string $key, string $planCode, ?array $row, bool $groupEnabled = false, ?array $aiBudget = null): array
     {
         $available = CmemModules::isAvailable($planCode, $key);
         $personalEnabled = $row !== null
@@ -56,8 +57,9 @@ class ModuleController
             : CmemModules::isEnabledByDefault($key);
         $enabled = $personalEnabled || $groupEnabled;
 
+        // ia : budget en dollars (AiBudgetService) à la place de l'ancien quota en nombre d'appels.
         $quota = null;
-        if (CmemModules::hasQuota($key)) {
+        if ($key !== 'ia' && CmemModules::hasQuota($key)) {
             $resetAt = $row['quota_reset_at'] ?? null;
             $quota = [
                 'used'     => (int) ($row['quota_used'] ?? 0),
@@ -66,7 +68,7 @@ class ModuleController
             ];
         }
 
-        return [
+        $contract = [
             'key'       => $key,
             'available' => $available,
             // Un module non disponible n'est jamais présenté comme actif, même si une
@@ -74,6 +76,10 @@ class ModuleController
             'enabled'   => $available && $enabled,
             'quota'     => $quota,
         ];
+        if ($key === 'ia') {
+            $contract['budget'] = $aiBudget;
+        }
+        return $contract;
     }
 
     /**
@@ -96,9 +102,10 @@ class ModuleController
             }
         }
 
-        $modules = [];
+        $aiBudget = (new AiBudgetService())->usage($userId);
+        $modules  = [];
         foreach (CmemModules::KEYS as $key) {
-            $modules[] = $this->toContract($key, $plan, $rows[$key] ?? null, isset($groupEnabledKeys[$key]));
+            $modules[] = $this->toContract($key, $plan, $rows[$key] ?? null, isset($groupEnabledKeys[$key]), $aiBudget);
         }
 
         Response::success('Modules récupérés', ['plan' => $plan, 'modules' => $modules]);
@@ -135,6 +142,7 @@ class ModuleController
         // Désactiver ne touche à aucune donnée métier : seul l'accès est coupé.
         $row = $this->model->setEnabled($userId, $this->appId($input), $key, $input['enabled']);
 
-        Response::success('Module mis à jour', ['module' => $this->toContract($key, $plan, $row)]);
+        $aiBudget = $key === 'ia' ? (new AiBudgetService())->usage($userId) : null;
+        Response::success('Module mis à jour', ['module' => $this->toContract($key, $plan, $row, false, $aiBudget)]);
     }
 }

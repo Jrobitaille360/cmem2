@@ -22,7 +22,7 @@ Chaque module expose sa documentation d'API au format JSON. Ces fichiers décriv
 | [pomo/API_POMO_ENDPOINTS_v1_0_0.json](docs-api/pomo/API_POMO_ENDPOINTS_v1_0_0.json) | 1 | Plugin Pomodoro — phase 1A seulement : `POST /pomo/engagement` (waitlist/sondage public). Phases 1B/2/3 planifiées. |
 | [push/API_PUSH_ENDPOINTS.json](docs-api/push/API_PUSH_ENDPOINTS.json) | 5 | Notifications push web (VAPID) : clé publique, subscriptions par appareil, préférences par compte (4 kinds dont `contact_followup`). |
 | [modules/API_MODULES_ENDPOINTS.json](docs-api/modules/API_MODULES_ENDPOINTS.json) | 4 | Registre de modules activables : gating par plan (`available`), interrupteur usager (`enabled`), quota serveur. Plan équipe : `GET/PATCH /groups/{id}/modules[/{key}]`, fusionnés dans `GET /modules`. |
-| [ai/API_AI_ENDPOINTS.json](docs-api/ai/API_AI_ENDPOINTS.json) | 1 | Proxy IA — `POST /ai/summarize`, résumé d'agenda. Quota décompté avant l'appel modèle, clé Anthropic serveur seule, consigne fixe (pas de prompt libre). |
+| [ai/API_AI_ENDPOINTS.json](docs-api/ai/API_AI_ENDPOINTS.json) | 2 | Proxy IA — `POST /ai/summarize` (résumé d'agenda), `GET /ai/usage`. Budget mensuel en dollars réservé avant l'appel modèle, clé Anthropic serveur seule, consigne fixe (pas de prompt libre). |
 
 ## Guides narratifs par module
 

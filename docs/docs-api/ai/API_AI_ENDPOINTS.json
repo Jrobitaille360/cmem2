@@ -1,21 +1,24 @@
 {
   "module": {
     "name": "AI",
-    "version": "1.0.0",
-    "description": "Proxy IA — résumé d'agenda sur une période, déclenché manuellement par l'usager. Directive cmem_web 20260810_140000_ai-proxy.",
-    "generated": "2026-08-11",
+    "version": "2.0.0",
+    "description": "Proxy IA — résumé d'agenda sur une période, déclenché manuellement par l'usager, plafonné par un budget mensuel en dollars. Directive cmem_web 20260810_140000_ai-proxy ; budget : plan accès sur approbation, Phase 1.",
+    "generated": "2026-11-08",
     "base_path": "/ai",
     "authentication": {
       "type": "JWT_BEARER",
       "header": "Authorization: Bearer {jwt_token}"
     },
-    "notes": "Prérequis : directive modules-gating (table tenant_modules, GET/PATCH /modules). Le client doit activer le module ia via PATCH /modules/ia avant de pouvoir appeler /ai/summarize. Le corps du journal n'est jamais transmis : seules des métadonnées bornées (titres, dates, tags, compteurs) sont envoyées au modèle."
+    "notes": "Prérequis : directive modules-gating (table tenant_modules, GET/PATCH /modules). Le client doit activer le module ia via PATCH /modules/ia avant de pouvoir appeler /ai/summarize. Le corps du journal n'est jamais transmis : seules des métadonnées bornées (titres, dates, tags, compteurs) sont envoyées au modèle. BREAKING 2026-11-08 : l'ancien quota en nombre d'appels (data.quota, 429 AI_QUOTA_EXCEEDED) est remplacé par le budget en dollars (data.budget, 429 AI_BUDGET_EXCEEDED)."
   },
   "decisions": {
-    "quota_avant_appel": "Le quota est décompté AVANT l'appel au modèle, jamais après — évite un appel gratuit en cas de course entre requêtes concurrentes. Conséquence acceptée : un quota est consommé même si l'appel modèle échoue ensuite (502).",
+    "budget_dollars": "Chaque appel est compté en dollars (table ai_usage, tarifs par modèle dans src/access/Config/AiPricing.php). Budget personnel mensuel : users.ai_budget_usd_monthly, NULL = AI_DEFAULT_BUDGET_USD (10 $). S'applique aussi aux administrateurs.",
+    "plafond_global": "AI_GLOBAL_BUDGET_USD_MONTHLY (30 $) : somme du mois de tous les usagers. Atteint → l'IA est coupée pour tout le monde jusqu'à la remise à zéro (errors.scope = global).",
+    "reservation_avant_appel": "Le coût MAXIMAL estimé (entrée majorée + max_tokens) est réservé dans ai_usage AVANT l'appel au modèle, sous verrou nommé — deux requêtes concurrentes ne peuvent pas passer ensemble sous le plafond. Après l'appel, la ligne est ajustée au coût réel ; ramenée à 0 si l'appel modèle échoue (502, non facturé).",
+    "remise_a_zero": "Le 1er de chaque mois à 00:00 (heure du serveur de base de données) : seules les lignes ai_usage du mois courant comptent.",
     "cle_serveur": "La clé Anthropic (ANTHROPIC_API_KEY) vit uniquement côté serveur — jamais transmise ni dérivable côté client.",
     "consigne_fixe": "Le prompt système est fixé côté serveur (AiSummarizeService::SYSTEM_PROMPT). Le client ne transmet pas de prompt libre — évite l'injection de prompt et le détournement du proxy pour un usage hors périmètre.",
-    "modele_configurable": "AI_SUMMARIZE_MODEL (variable d'env) — migration de modèle sans redéploiement front."
+    "modele_configurable": "AI_SUMMARIZE_MODEL (défaut claude-haiku-5-5, réflexion désactivée) et AI_SUMMARIZE_MAX_TOKENS (défaut 512) — variables d'env, migration de modèle sans redéploiement front."
   },
   "endpoints": {
     "resume": {
@@ -33,16 +36,32 @@
           },
           "response": {
             "summary": "string — résumé généré",
-            "quota": "object — {used:int, limit:int, reset_at:datetime}, quota à jour après décompte"
+            "budget": "object — {spent_usd:float, limit_usd:float, reset_at:datetime}, dépense du mois après l'appel"
           },
-          "status_codes": { "200": "Résumé généré, quota décompté" },
+          "status_codes": { "200": "Résumé généré, coût réel enregistré" },
           "errors": {
             "401": "JWT absent ou invalide",
             "403": "errors.code = MODULE_NOT_AVAILABLE — module ia non disponible sur le plan ou non activé par l'usager (PATCH /modules/ia requis)",
             "422": "period ou items absent",
-            "429": "errors.code = AI_QUOTA_EXCEEDED — quota mensuel atteint, aucun appel modèle déclenché. errors.quota porte l'état",
-            "502": "Erreur du service IA (appel modèle échoué) — le quota reste décompté"
+            "429": "errors.code = AI_BUDGET_EXCEEDED — budget atteint, aucun appel modèle déclenché. errors.scope = user (budget personnel) | global (plafond du serveur). errors.budget porte l'état {spent_usd, limit_usd, reset_at}",
+            "502": "Erreur du service IA (appel modèle échoué) — réservation ramenée à 0, rien n'est facturé"
           }
+        }
+      ]
+    },
+    "budget": {
+      "description": "Lecture du budget IA de l'usager",
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/ai/usage",
+          "description": "Dépense IA du mois courant, budget personnel et date de remise à zéro. À afficher avant tout appel.",
+          "auth_required": true,
+          "response": {
+            "budget": "object — {spent_usd:float, limit_usd:float, reset_at:datetime}"
+          },
+          "status_codes": { "200": "Budget retourné" },
+          "errors": { "401": "JWT absent ou invalide" }
         }
       ]
     }

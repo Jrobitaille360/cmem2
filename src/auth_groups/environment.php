@@ -307,7 +307,13 @@ define('EMAIL_VERIFICATION_TEST_CODE_IGNORED', APP_ENV === 'production' && trim(
 // PROXY IA — POST /ai/summarize (directive cmem_web ai-proxy)
 // ============================================
 define('ANTHROPIC_API_KEY', $_ENV['ANTHROPIC_API_KEY'] ?? '');
-define('AI_SUMMARIZE_MODEL', $_ENV['AI_SUMMARIZE_MODEL'] ?? 'claude-haiku-4-5');
+// Haiku 5.5 : modèle le moins cher (0.10 $ / 0.50 $ par M tokens) — tarifs dans src/access/Config/AiPricing.php
+define('AI_SUMMARIZE_MODEL', $_ENV['AI_SUMMARIZE_MODEL'] ?? 'claude-haiku-5-5');
+// Plafond de sortie d'un résumé (2 à 4 phrases ≈ 150 tokens) ; borne aussi l'estimation pré-appel du budget
+define('AI_SUMMARIZE_MAX_TOKENS', (int)($_ENV['AI_SUMMARIZE_MAX_TOKENS'] ?? 512));
+// Budget IA mensuel en dollars — par personne (admin inclus, NULL en base = ce défaut) et global serveur
+define('AI_DEFAULT_BUDGET_USD', (float)($_ENV['AI_DEFAULT_BUDGET_USD'] ?? 10));
+define('AI_GLOBAL_BUDGET_USD_MONTHLY', (float)($_ENV['AI_GLOBAL_BUDGET_USD_MONTHLY'] ?? 30));
 
 // ============================================
 // DEVICE TOKENS - Appareils de confiance
