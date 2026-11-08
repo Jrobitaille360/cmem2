@@ -1,5 +1,9 @@
 # PLAN — Précision microseconde sur `updated_at` (events / todos / journals)
 
+> **STATUT : CLOS (archivé 2026-11-08).** Option C livrée en v2.16.1 (limite
+> documentée dans les `API_*_ENDPOINTS.json`). À rouvrir seulement si un vrai cas
+> de perte de données est rapporté.
+
 ## Décision (2026-08-14)
 
 **Option C retenue — documenter la limite, aucune migration.** Analyse du risque réel :

@@ -467,6 +467,7 @@ Chaque module a son propre fichier `private/tests/test_<module>.php` (voir la li
 - [x] Plan équipe — facturation Stripe portée par un groupe + modules de groupe (v2.16.0)
 - [x] Plugin Booking — réservation publique par lien, zones matérialisées (v2.16.0)
 - [x] Suivi du temps par tâche — sessions start/stop, un seul minuteur actif par usager (v2.17.0)
+- [ ] Accès sur approbation — fin de la commercialisation : invitations + approbation, modules cochés par personne, budget IA en $, caps à 3 niveaux, retrait Stripe/Play Store ([plan](docs/PLAN_acces-sur-approbation.md))
 - [ ] Rate limiting Redis
 
 ## Licence

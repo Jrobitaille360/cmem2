@@ -6,6 +6,14 @@ Refonte complète de la base de code à partir de zéro. Architecture moderne (P
 
 Portée : code source uniquement. Domaine métier et schéma DB conservés à 90 %.
 
+> **Révision 2026-11-08 — fin de la commercialisation.** Plus de paiement ni
+> d'abonnement : accès sur approbation, modules cochés par personne, budget IA
+> en dollars. Voir [PLAN_acces-sur-approbation.md](PLAN_acces-sur-approbation.md),
+> à livrer **en v2.x avant** cette refonte. Les sections Facturation,
+> Abonnements, Plans et Stripe ci-dessous sont remplacées par le module
+> `Access`. Le reste du plan (inventaire v2.15.0) est à resynchroniser avec le
+> code au démarrage de la Phase 0.
+
 ---
 
 ## Phase 0 — Révision de la documentation de l'état actuel
@@ -143,28 +151,22 @@ Portée : code source uniquement. Domaine métier et schéma DB conservés à 90
 | POST | /files/{id}/restore | → POST /v3/files/{id}/restore |
 | GET | /files/{id}/versions | → GET /v3/files/{id}/versions |
 
-**Facturation (8 routes) — renommé de /stripe/**
+**Facturation, plans, abonnements — supprimés (révision 2026-11-08)**
 
-| Méthode | URL actuelle | Décision v3 |
+Les routes `/plans`, `/stripe/*`, `/subscriptions/*`, `/v2/billing/*`,
+`/v2/subscriptions/*` (Stripe et Play Store) sont retirées en v2.x par
+[PLAN_acces-sur-approbation.md](PLAN_acces-sur-approbation.md) — aucune
+n'est reprise en v3.
+
+**Accès (nouveau — issu de PLAN_acces-sur-approbation)**
+
+| Méthode | URL v2.x | Décision v3 |
 | - | - | - |
-| GET | /plans | → GET /v3/plans (public) |
-| GET | /plans/{id} | → GET /v3/plans/{id} |
-| POST | /plans | → POST /v3/plans (admin) |
-| POST | /plans/{id} | → PATCH /v3/plans/{id} (admin) |
-| DELETE | /plans/{id} | → DELETE /v3/plans/{id} (admin) |
-| POST | /stripe/checkout | → POST /v3/billing/checkout |
-| POST | /stripe/portal | → POST /v3/billing/portal |
-| POST | /stripe/webhook | → POST /v3/billing/webhook |
-
-**Abonnements (5 routes)**
-
-| Méthode | URL | Décision v3 |
-| - | - | - |
-| GET | /subscriptions | → GET /v3/subscriptions |
-| POST | /subscriptions/{plan_id} | → POST /v3/subscriptions |
-| POST | /subscriptions/{sub_id}/upgrade | → PUT /v3/subscriptions/{id} |
-| DELETE | /subscriptions/{sub_id} | → DELETE /v3/subscriptions/{id} |
-| GET | /subscriptions/{sub_id}/billing | → GET /v3/subscriptions/{id}/invoices |
+| GET, POST, DELETE | /admin/invitations | → /v3/admin/invitations |
+| POST | /admin/users/{id}/approve, /suspend | → PATCH /v3/admin/users/{id} (`access_status`) |
+| GET, PUT | /admin/users/{id}/modules | → GET/PUT /v3/admin/users/{id}/modules |
+| GET | /modules | → GET /v3/users/me/modules |
+| GET | /ai/usage | → GET /v3/users/me/ai-usage |
 
 **Stats (4 routes)**
 
@@ -250,7 +252,7 @@ Portée : code source uniquement. Domaine métier et schéma DB conservés à 90
 
 1. **Préfixe /v3/** sur toutes les routes API (sauf CalDAV — protocole)
 2. **HTTP sémantique** — POST=créer, PUT=remplacer, PATCH=modifier, DELETE=supprimer
-3. **/stripe/ → /billing/** — agnostique du provider
+3. **Aucune route de facturation** — accès sur approbation (révision 2026-11-08, remplace « /stripe/ → /billing/ »)
 4. **/secret-admin/ → /admin/** — naming standard
 5. **/auth/me → /users/me** — évite la duplication de profil
 6. **POST /tags/search → GET /tags?q=** — idempotent, cacheable
@@ -297,8 +299,7 @@ Portée : code source uniquement. Domaine métier et schéma DB conservés à 90
     "robmorgan/phinx": "^0.16",
     "phpmailer/phpmailer": "^6.10",
     "simshaun/recurr": "^5.0",
-    "sabre/vobject": "^4.5",
-    "stripe/stripe-php": "^13.0"
+    "sabre/vobject": "^4.5"
   },
   "require-dev": {
     "phpunit/phpunit": "^11.0",
@@ -359,9 +360,7 @@ src/
     Groups/
     Files/
     Tags/
-    Plans/
-    Subscriptions/
-    Billing/                       # Ex-Stripe — agnostique provider
+    Access/                        # Approbation, invitations, modules cochés, budget IA
     Stats/
     Admin/                         # Ex-SecretAdmin
     Contacts/                      # CRUD + vCard + interactions + opportunités
@@ -529,7 +528,7 @@ index.php                          # Entrypoint (15 lignes max)
 - Renommer `/opportunites` → `/v3/opportunities`, `/contacts/{id}/opportunites` → `/v3/contacts/{id}/opportunities`
 - Supprimer les routes à extension d'URL (`{id}.vcf`) — export vCard en sous-ressource `/v3/contacts/{id}/vcard`
 - Unifier PUT/PATCH sur `/contacts/{id}` et `/opportunites/{id}` en une seule route `PATCH`
-- Conserver la logique `max_contacts` (cap plan) et le pipeline CRM (étapes d'opportunité) inchangés
+- Conserver la logique `max_contacts` (cap de la grille par défaut — plus de plans) et le pipeline CRM (étapes d'opportunité) inchangés
 
 **Enjeux :**
 
@@ -552,32 +551,33 @@ index.php                          # Entrypoint (15 lignes max)
 
 ---
 
-### 3.5 Plans + Abonnements + Facturation
+### 3.5 Accès (approbation, modules, budget IA)
+
+Prérequis : [PLAN_acces-sur-approbation.md](PLAN_acces-sur-approbation.md)
+livré en v2.x (Stripe et Play Store déjà retirés). Ici, simple portage.
 
 **Actions à poser :**
 
-- Renommer module Stripe → Billing dans routes et code
-- `BillingService` isole Stripe derrière une interface
-- Séparer les routes publiques (`/v3/plans`) des routes admin
-- Webhook Stripe — vérification signature dans `BillingMiddleware` (pas dans le controller)
-- Mettre à jour les clés .env : `STRIPE_*` restent, routes deviennent `/v3/billing/`
+- Porter `src/access/` vers `src/Modules/Access/` (Repositories injectés)
+- `AccessMiddleware` PSR-15 — garde `ACCOUNT_PENDING` / `ACCOUNT_SUSPENDED`
+  et disponibilité des modules, appliquée avant les Actions
+- `AiBudgetService` injecté dans les Actions IA (contrôle avant appel,
+  coût réel après)
 
 **Enjeux :**
 
-- Idempotence des webhooks Stripe (migration `20260508_stripe_idempotency.sql` à intégrer)
-- Si le provider change un jour, seul `BillingService` est touché
+- La garde d'accès doit couvrir 100 % des routes métier (middleware, pas
+  par Action)
 
 **Tests :**
 
-- Création abonnement → status `active`
-- Upgrade plan → nouveau `stripe_price_id` actif
-- Webhook `invoice.payment_failed` → status `past_due`
-- Replay du même webhook → pas de doublon (idempotence)
+- Tests d'approbation, de modules et de budget IA de la v2.x passent
+  avec les URLs v3
 
 **Conditions de complétion :**
 
-- [ ] Tests `test_subscriptions.php` et `test_stripe_webhooks.php` passent
-- [ ] Migration idempotence intégrée dans build_DB-v-3.0.0.sql
+- [ ] Aucune Action métier sans passage par `AccessMiddleware`
+- [ ] Budget IA appliqué à tous, admin compris
 
 ---
 
@@ -643,7 +643,7 @@ index.php                          # Entrypoint (15 lignes max)
 - Intégrer Phinx : `vendor/bin/phinx init`
 - Créer `db/migrations/` avec une migration par groupe de changements
 - Migration initiale = `build_DB-v-2.4.1.sql` comme baseline
-- Migration 001 = `20260508_stripe_idempotency.sql`
+- Baseline à recaler sur le dernier `build_DB` v2.x (après retrait des tables Stripe / Play Store)
 - Créer `docs/v-3-0-0/build_DB-v-3.0.0.sql` comme DDL complet
 - Supprimer les fichiers `*.sql` de `docs/` racine après intégration
 
@@ -691,7 +691,7 @@ index.php                          # Entrypoint (15 lignes max)
 - Intégrer `zircote/swagger-php` ^5.x — vérifier support OAS 3.2.0 ; si insuffisant, écrire la spec YAML manuellement et valider via `spectral lint`
 - Ajouter attributs `#[OA\...]` sur chaque Action (ou annotations YAML directes si swagger-php limité sur 3.2)
 - Exploiter les features OAS 3.2.0 :
-  - `webhooks` top-level — documenter `POST /v3/billing/webhook` (Stripe) sous `webhooks:`
+  - `webhooks` top-level — plus de webhook Stripe ; à utiliser seulement si un webhook entrant réapparaît
   - JSON Schema 2020-12 complet — remplacer `nullable: true` par `type: [T, "null"]` (array de types)
   - `pathItem` réutilisable via `$ref` dans `components/pathItems` pour les routes admin partagées
 - Maintenir `docs/openapi.yaml` (YAML préféré à JSON pour lisibilité et diff Git)
@@ -710,7 +710,6 @@ index.php                          # Entrypoint (15 lignes max)
 
 - [ ] `spectral lint docs/openapi.yaml` → 0 erreur, 0 warning sur ruleset OAS
 - [ ] `GET /v3/openapi.yaml` retourne une spec valide OAS 3.2.0
-- [ ] Webhooks Stripe documentés sous `webhooks:` top-level (pas sous `paths:`)
 - [ ] Aucune propriété `nullable` dans la spec (toutes migrées vers array de types JSON Schema 2020-12)
 - [ ] Anciens `API_*_ENDPOINTS.json` supprimés
 
@@ -737,7 +736,7 @@ index.php                          # Entrypoint (15 lignes max)
 | 3.3 — Users/Groups | CRUD + permissions | P1 | 3.5, 3.6 |
 | 3.4 — Files/Tags | Upload + search | P2 | 3.7 (items) |
 | 3.4 bis — Contacts/CRM/Projets | Routes aplaties, CRUD + import/export migrés | P2 | 3.11 |
-| 3.5 — Billing | Stripe renommé, idempotence | P2 | 3.11 |
+| 3.5 — Accès | Approbation, modules, budget IA portés | P2 | 3.11 |
 | 3.6 — Admin | Routes renommées | P2 | 3.11 |
 | 3.7 — Plugins | DI injecté, autoloaders unifiés | P2 | 3.11 |
 | 3.8 — Migrations | Phinx opérationnel | P1 | 3.11 |

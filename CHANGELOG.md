@@ -9,6 +9,25 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+## [Unreleased 2026-11-08 — plan accès sur approbation]
+
+### Documentation
+
+- **Nouvelle direction : fin de la commercialisation** — nouveau
+  `docs/PLAN_acces-sur-approbation.md` : accès réservé aux personnes approuvées
+  (invitations par courriel + inscription libre en attente d'approbation, toutes apps),
+  modules cochés par personne (un membre de groupe hérite des modules du propriétaire),
+  budget IA mensuel en dollars (10 $/personne par défaut, admin compris, plafond global
+  30 $), caps de ressources à trois niveaux (défaut / groupe / utilisateur), retrait
+  complet de Stripe et Play Store. Aucun code modifié à ce stade.
+- `docs/PLAN_refonte-v3.0.0.md` révisé : facturation, plans et abonnements remplacés par
+  un module `Access` ; `stripe/stripe-php` retiré des dépendances cibles.
+- Archivés dans `docs/archives/` : `PLAN_mise-de-cote-paiement.md` et
+  `PLAN_paiement-externe-securise.md` (Paddle, abandonné — jamais intégré),
+  `PLAN_concurrence-updated-at-microsecondes.md` (clos, option C livrée en v2.16.1),
+  `api subscriptions.txt` (notes Play Store obsolètes).
+- `README.md` : ligne de roadmap pour l'accès sur approbation.
+
 ## [2.17.6] — 2026-11-08
 
 ### Corrigé
