@@ -123,3 +123,46 @@ sont structurées et validées (courriels, téléphones, adresses), donc un blob
 pas. Le client place le JSON chiffré de ces champs dans `enc_payload` (`MEDIUMTEXT`, borne
 16 000 000 caractères, dépassement → `400`) et laisse `prenom` / `nom` / `categories` en clair
 pour préserver le tri, la pagination et la recherche serveur.
+
+## Tâches de projet — contrat et import JSON
+
+Référence : [projets/API_PROJETS_ENDPOINTS.json](projets/API_PROJETS_ENDPOINTS.json).
+Constat du 2026-11-08 (directives #234 et #235).
+
+### Champs de tâche
+
+`POST /projets/projects/{id}/tasks` (création) et `PATCH /projets/tasks/{id}` (champs partiels).
+Le projet est porté par l'URL : aucun champ `project` dans le corps.
+
+| Champ | Type / borne | Validation |
+| - | - | - |
+| `title` | string, `VARCHAR(2000)` | requis à la création, non vide en `PATCH` (`422`) |
+| `description` | string markdown, `MEDIUMTEXT` (~16 Mo) | aucune borne applicative, stocké tel quel |
+| `status` | `NEEDS-ACTION`, `IN-PROCESS`, `COMPLETED`, `CANCELLED` | enum SQL |
+| `priority` | entier 0-9 (RFC 5545, 0 = indéfini, 1 = haute) | `0..9` à l'import JSON |
+| `percentComplete` | entier 0-100 | `0..100` à l'import JSON |
+| `categories` | tableau de chaînes | stocké en JSON |
+| `parentId` | id d'une tâche du **même projet** | `422` sinon, cycle → `422` |
+| `dependsOn` | `[{taskId, type, lagDays}]`, `type` ∈ `FS`, `SS`, `FF`, `SF` | voir ci-dessous |
+
+### Dépendances `dependsOn`
+
+- Une tâche peut dépendre d'une tâche créée juste avant (l'id réel est connu) : passer
+  `dependsOn` à la création, ou l'ajouter ensuite par `PATCH` (remplace la liste entière).
+- `taskId` inexistant, tâche d'un autre utilisateur ou tâche d'un **autre projet** du même
+  utilisateur → `422 dependsOn[].taskId inexistant ou hors-projet`.
+- Cycle (dépendances ou hiérarchie) → `422`, transaction annulée, rien écrit.
+
+### Import en lot `POST /projets/projects/{id}/import.json[/confirm]`
+
+- Identité : un `id` existant dans le projet cible = **mise à jour** (aller-retour export →
+  import). Tout autre `id` — texte (`tmp-1`, `API-01`) ou numérique absent du projet
+  (`9101`) — est un id temporaire : la tâche est **créée**, jamais d'upsert par l'id du fichier.
+- `parentId` et `dependsOn[].taskId` sont remappés vers les nouveaux id réels, que l'id
+  temporaire soit numérique ou texte (`9101` et `"9101"` sont la même clé).
+- `422` au dry-run comme au confirm : id en double dans le fichier, `dependsOn` non objet
+  (`[9101]`), `type` hors `FS|SS|FF|SF`, `lagDays` non entier, référence ni dans le fichier
+  ni dans le projet cible.
+- Le dry-run expose `liens` (`[{de, vers, type}]`, `type: parent` pour la hiérarchie) et
+  `doublonsTitre` (titres à créer déjà présents dans le projet — un réimport recrée les tâches).
+- Le confirm est transactionnel (tout ou rien) ; les orphelines sont comptées, jamais supprimées.

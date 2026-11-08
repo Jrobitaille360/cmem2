@@ -9,6 +9,28 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+### Corrigé
+
+- **Import JSON de projet (`POST /projets/projects/{id}/import.json[/confirm]`) — id
+  numériques temporaires** (directive #235, constat #234) : un `id` numérique absent du
+  projet cible (ex. `9101`) est désormais remappé comme un id texte — ses `dependsOn` et
+  `parentId` étaient auparavant perdus sans erreur (ou l'import échouait sur une contrainte
+  FK quand un id `"9103"` texte pointait vers un parent `9101` entier). `9101` et `"9101"`
+  sont la même clé. Un id existant dans le projet reste une mise à jour (aller-retour inchangé).
+- **Validation de l'import JSON** : `422` (dry-run et confirm, rien écrit) si `dependsOn`
+  n'est pas un tableau d'objets `{taskId, type, lagDays}` (ex. `[9101]`), si `type` est hors
+  `FS|SS|FF|SF`, si `lagDays` n'est pas entier, si un id est en double dans le fichier, ou si
+  `parentId` / `dependsOn[].taskId` ne pointe ni vers une tâche du fichier ni vers une tâche du
+  projet cible (autre projet, autre utilisateur, inexistant).
+
+### Ajouté
+
+- **Dry-run d'import JSON** : `liens` (`[{de, vers, type}]`, `type: parent` pour la
+  hiérarchie) et `doublonsTitre` (titres à créer déjà présents dans le projet — signale un
+  réimport). Le confirm renvoie aussi `liens` (nombre de liens écrits).
+- **`docs/entrypoints.md`** : section « Tâches de projet — contrat et import JSON » (champs,
+  bornes, validation `dependsOn`, sémantique de l'import en lot).
+
 ## [2.17.5] — 2026-09-02
 
 ### Corrigé

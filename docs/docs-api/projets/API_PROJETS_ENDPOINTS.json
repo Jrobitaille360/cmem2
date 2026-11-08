@@ -93,7 +93,7 @@
           "auth_required": true,
           "body": {
             "title": "string — requis",
-            "description": "string — optionnel",
+            "description": "string — optionnel, markdown libre (MEDIUMTEXT, ~16 Mo, aucune borne applicative)",
             "dtstart": "datetime UTC — optionnel",
             "due": "datetime UTC ou date (allDay) — optionnel",
             "allDay": "bool — défaut false",
@@ -176,13 +176,15 @@
         {
           "method": "POST",
           "path": "/projets/projects/{id}/import.json",
-          "description": "Dry-run : calcule et renvoie le diff SANS écrire en base",
+          "description": "Dry-run : calcule et renvoie le diff SANS écrire en base. Identité : un id (entier ou chaîne numérique) existant dans le projet cible = mise à jour ; tout autre id (texte « tmp-1 », « API-01 », ou numérique absent du projet, ex. 9101) = id temporaire, tâche créée et remappée. Validation (422) : id en double dans le fichier ; dependsOn non tableau ou entrée non objet {taskId, type, lagDays} (ex. [9101]) ; type hors FS|SS|FF|SF ; lagDays non entier ; parentId ou dependsOn[].taskId ne pointant ni vers une tâche du fichier ni vers une tâche du projet cible (autre projet, autre utilisateur, inexistant).",
           "auth_required": true,
           "body": "objet export.json (project, tasks[], schemaVersion)",
           "response": {
-            "aCreer": "array — tâches importées (id tmp-*), objets complets contrat §6",
+            "aCreer": "array — tâches importées dont l'id est temporaire (texte ou numérique absent du projet), objets tels que reçus",
             "aMettreAJour": "array<{id: integer, champs: array<{champ: string, avant: mixed, apres: mixed}>}> — une entrée par tâche importée dont l'id correspond à une tâche existante ; champs liste uniquement les propriétés (contrat §6, hors id/createdAt/updatedAt) présentes dans la tâche importée et dont la valeur diffère de la tâche cmem2 actuelle ; champs vide si aucune différence détectée",
-            "orphelins": "array — tâches cmem2 absentes du fichier importé, objets complets contrat §6, jamais supprimées"
+            "orphelins": "array — tâches cmem2 absentes du fichier importé, objets complets contrat §6, jamais supprimées",
+            "liens": "array<{de: id fichier, vers: id fichier ou id cmem2, type: FS|SS|FF|SF|parent}> — liens résolus qui seront écrits (dependsOn et parentId), ids tels qu'écrits dans le fichier",
+            "doublonsTitre": "array<string> — titres des tâches à créer qui existent déjà dans le projet (comparaison sans casse ni espaces de bord) ; avertissement seulement, l'import n'est pas bloqué — typiquement un réimport d'un fichier à id temporaires"
           },
           "example_response": {
             "aCreer": [{ "id": "tmp-1", "title": "Nouvelle tâche hors ligne" }],
@@ -195,18 +197,20 @@
                 ]
               }
             ],
-            "orphelins": [{ "id": 7, "title": "Tâche retirée du fichier" }]
+            "orphelins": [{ "id": 7, "title": "Tâche retirée du fichier" }],
+            "liens": [{ "de": "tmp-1", "vers": 42, "type": "FS" }],
+            "doublonsTitre": []
           },
-          "errors": { "401": "JWT absent", "403": "Non propriétaire", "404": "Projet introuvable", "422": "schemaVersion incompatible ou payload invalide" }
+          "errors": { "401": "JWT absent", "403": "Non propriétaire", "404": "Projet introuvable", "422": "schemaVersion incompatible, payload invalide, dependsOn mal formé, ou référence hors fichier/projet cible" }
         },
         {
           "method": "POST",
           "path": "/projets/projects/{id}/import.json/confirm",
-          "description": "Applique la fusion upsert (même payload que le dry-run) dans une transaction : INSERT des tâches tmp-*, résolution des ids temporaires en 2e passe, validation arbre/DAG avant commit. Rollback complet si cycle détecté.",
+          "description": "Applique la fusion (même payload et mêmes validations que le dry-run) dans une transaction, tout ou rien : INSERT des tâches à id temporaire (texte ou numérique absent du projet) — jamais d'upsert par id du fichier hors projet —, remappage des parentId et dependsOn[].taskId en 2e passe, mise à jour des tâches existantes, validation arbre/DAG avant commit. Rollback complet sur toute erreur. Un réimport d'un fichier à id temporaires recrée les tâches : vérifier doublonsTitre au dry-run.",
           "auth_required": true,
           "body": "objet export.json (project, tasks[], schemaVersion)",
-          "response": { "aCreer": "integer", "aMettreAJour": "integer", "orphelins": "integer" },
-          "errors": { "401": "JWT absent", "403": "Non propriétaire", "404": "Projet introuvable", "422": "schemaVersion incompatible, payload invalide, ou cycle introduit (rien écrit)" }
+          "response": { "aCreer": "integer", "aMettreAJour": "integer", "orphelins": "integer", "liens": "integer — liens écrits (dependsOn + parentId)" },
+          "errors": { "401": "JWT absent", "403": "Non propriétaire", "404": "Projet introuvable", "422": "schemaVersion incompatible, payload invalide, dependsOn mal formé, référence hors fichier/projet cible, ou cycle introduit (rien écrit)" }
         }
       ]
     },

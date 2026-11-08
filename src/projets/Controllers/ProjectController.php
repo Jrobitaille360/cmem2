@@ -257,19 +257,21 @@ class ProjectController
                     'categories'         => $row['categories'] ?? null,
                     'rappelMinutesAvant' => $row['rappelMinutesAvant'] ?? null,
                 ]);
-                if (is_string($tmpId)) { $tmpToReal[$tmpId] = $newId; }
+                // Clé normalisée : id temporaire texte OU numérique absent du projet (directive #235)
+                $cle = JsonRoundTrip::cle($tmpId);
+                if ($cle !== null) { $tmpToReal[$cle] = $newId; }
             }
 
             // Passe 2 — mise à jour, en résolvant les références temporaires
+            // (planifier() a déjà garanti que chaque référence est dans le fichier ou le projet)
             $resolve = function ($ref) use ($tmpToReal) {
-                if ($ref === null) { return null; }
-                if (is_string($ref) && isset($tmpToReal[$ref])) { return $tmpToReal[$ref]; }
-                return (int) $ref;
+                $cle = JsonRoundTrip::cle($ref);
+                if ($cle === null) { return null; }
+                return $tmpToReal[$cle] ?? (int) $cle;
             };
 
             foreach ($diff['aCreer'] as $row) {
-                $tmpId = $row['id'] ?? null;
-                $realId = is_string($tmpId) ? ($tmpToReal[$tmpId] ?? null) : null;
+                $realId = $tmpToReal[JsonRoundTrip::cle($row['id'] ?? null) ?? ''] ?? null;
                 if ($realId === null) { continue; }
                 $deps = array_map(fn($d) => ['taskId' => $resolve($d['taskId']), 'type' => $d['type'] ?? 'FS', 'lagDays' => $d['lagDays'] ?? 0], $row['dependsOn'] ?? []);
                 $taskModel->updateTask($realId, [
@@ -302,6 +304,7 @@ class ProjectController
             'aCreer'       => count($diff['aCreer']),
             'aMettreAJour' => count($diff['aMettreAJour']),
             'orphelins'    => count($diff['orphelins']),
+            'liens'        => count($diff['liens']),
         ]);
     }
 
