@@ -9,6 +9,8 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+## [2.17.6] — 2026-11-08
+
 ### Corrigé
 
 - **Import JSON de projet (`POST /projets/projects/{id}/import.json[/confirm]`) — id
