@@ -164,7 +164,7 @@ All settings live in a single `.env` file (see `.env.example` for the full 170+ 
 - Namespaces: PascalCase matching module name (e.g., `AuthGroups\Controllers\UserController`)
 - Methods: camelCase; DB columns: snake_case
 - SQL via PDO with prepared statements — no ORM
-- API docs per module: `docs/<module>/GUIDE.md` and `docs/<module>/API_*_ENDPOINTS.json`
+- API docs per module: `docs/docs-api/<module>/GUIDE.md` and `docs/docs-api/<module>/API_*_ENDPOINTS.json`, indexed in `docs/entrypoints.md` (keep the index in sync)
 - Version history: `CHANGELOG.md`; project roadmap: `docs/PLAN_GLOBAL_CMEM2.md`
 
 ## SQL migrations

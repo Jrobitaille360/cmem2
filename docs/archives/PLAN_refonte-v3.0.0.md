@@ -1,5 +1,10 @@
 # Plan de refonte — v3.0.0
 
+> **ARCHIVÉ (2026-11-08).** Converti en tâches cmemweb : tâche principale
+> #311 (projet cmem 7), décisions et phases en sous-tâches #312–#404,
+> actions en sous-sous-tâches #313–#408 (tag `refonte-v3`). Le suivi se fait
+> dans cmem ; ce fichier reste la référence détaillée (inventaire des routes).
+
 ## Objectif
 
 Refonte complète de la base de code à partir de zéro. Architecture moderne (PSR-7/11/15, DI, OpenAPI), conventions REST strictes, versioning d'URL, et documentation comme source de vérité.
@@ -8,7 +13,7 @@ Portée : code source uniquement. Domaine métier et schéma DB conservés à 90
 
 > **Révision 2026-11-08 — fin de la commercialisation.** Plus de paiement ni
 > d'abonnement : accès sur approbation, modules cochés par personne, budget IA
-> en dollars. Voir [PLAN_acces-sur-approbation.md](archives/PLAN_acces-sur-approbation.md),
+> en dollars. Voir [PLAN_acces-sur-approbation.md](PLAN_acces-sur-approbation.md),
 > à livrer **en v2.x avant** cette refonte. Les sections Facturation,
 > Abonnements, Plans et Stripe ci-dessous sont remplacées par le module
 > `Access`. Le reste du plan (inventaire v2.15.0) est à resynchroniser avec le
@@ -17,6 +22,8 @@ Portée : code source uniquement. Domaine métier et schéma DB conservés à 90
 ---
 
 ## Phase 0 — Révision de la documentation de l'état actuel
+
+> Tâche cmem **#320** — actions en sous-tâches #321–#325.
 
 ### Ce qui est en place
 
@@ -61,6 +68,8 @@ Portée : code source uniquement. Domaine métier et schéma DB conservés à 90
 ---
 
 ## Phase 1 — Analyse des entry points
+
+> Tâche cmem **#326** — actions en sous-tâches #327–#332.
 
 ### Inventaire des routes v2.15.0
 
@@ -155,7 +164,7 @@ Portée : code source uniquement. Domaine métier et schéma DB conservés à 90
 
 Les routes `/plans`, `/stripe/*`, `/subscriptions/*`, `/v2/billing/*`,
 `/v2/subscriptions/*` (Stripe et Play Store) sont retirées en v2.x par
-[PLAN_acces-sur-approbation.md](archives/PLAN_acces-sur-approbation.md) — aucune
+[PLAN_acces-sur-approbation.md](PLAN_acces-sur-approbation.md) — aucune
 n'est reprise en v3.
 
 **Accès (nouveau — issu de PLAN_acces-sur-approbation)**
@@ -271,6 +280,8 @@ n'est reprise en v3.
 ---
 
 ## Phase 2 — Architecture cible
+
+> Tâche cmem **#333** — actions en sous-tâches #334–#336.
 
 ### Ce qui est en place
 
@@ -400,7 +411,11 @@ index.php                          # Entrypoint (15 lignes max)
 
 ## Phase 3 — Implantation par sous-système
 
+> Pas de tâche propre : chaque sous-phase 3.x est une sous-tâche directe de #311.
+
 ### 3.1 Bootstrap + DI + Routeur
+
+> Tâche cmem **#337** — actions en sous-tâches #338–#344.
 
 **Actions à poser :**
 
@@ -434,6 +449,8 @@ index.php                          # Entrypoint (15 lignes max)
 
 ### 3.2 Auth (JWT + OTP + Device Token)
 
+> Tâche cmem **#345** — actions en sous-tâches #346–#350.
+
 **Actions à poser :**
 
 - Migrer `JwtService`, `OtpService`, `DeviceTokenService` dans `src/Core/Auth/`
@@ -465,6 +482,8 @@ index.php                          # Entrypoint (15 lignes max)
 
 ### 3.3 Utilisateurs + Groupes
 
+> Tâche cmem **#351** — actions en sous-tâches #352–#357.
+
 **Actions à poser :**
 
 - Créer `UserRepository`, `GroupRepository` (injectables)
@@ -494,6 +513,8 @@ index.php                          # Entrypoint (15 lignes max)
 
 ### 3.4 Fichiers + Tags
 
+> Tâche cmem **#358** — actions en sous-tâches #359–#362.
+
 **Actions à poser :**
 
 - `FileRepository` + `TagRepository`
@@ -520,6 +541,8 @@ index.php                          # Entrypoint (15 lignes max)
 ---
 
 ### 3.4 bis Contacts + CRM + Projets
+
+> Tâche cmem **#363** — actions en sous-tâches #364–#369.
 
 **Actions à poser :**
 
@@ -553,7 +576,9 @@ index.php                          # Entrypoint (15 lignes max)
 
 ### 3.5 Accès (approbation, modules, budget IA)
 
-Prérequis : [PLAN_acces-sur-approbation.md](archives/PLAN_acces-sur-approbation.md)
+> Tâche cmem **#370** — actions en sous-tâches #371–#373.
+
+Prérequis : [PLAN_acces-sur-approbation.md](PLAN_acces-sur-approbation.md)
 livré en v2.x (Stripe et Play Store déjà retirés). Ici, simple portage.
 
 **Actions à poser :**
@@ -583,6 +608,8 @@ livré en v2.x (Stripe et Play Store déjà retirés). Ici, simple portage.
 
 ### 3.6 Admin
 
+> Tâche cmem **#374** — actions en sous-tâches #375–#377.
+
 **Actions à poser :**
 
 - Renommer routes `/secret-admin/` → `/admin/`
@@ -608,6 +635,8 @@ livré en v2.x (Stripe et Play Store déjà retirés). Ici, simple portage.
 ---
 
 ### 3.7 Plugins (ICS, Quiz, Items, Puzzle, Pomo/Waitlist)
+
+> Tâche cmem **#378** — actions en sous-tâches #379–#384.
 
 **Actions à poser :**
 
@@ -638,6 +667,8 @@ livré en v2.x (Stripe et Play Store déjà retirés). Ici, simple portage.
 
 ### 3.8 Migrations DB (Phinx)
 
+> Tâche cmem **#385** — actions en sous-tâches #386–#390.
+
 **Actions à poser :**
 
 - Intégrer Phinx : `vendor/bin/phinx init`
@@ -662,6 +693,8 @@ livré en v2.x (Stripe et Play Store déjà retirés). Ici, simple portage.
 
 ### 3.9 Tests
 
+> Tâche cmem **#391** — actions en sous-tâches #392–#395.
+
 **Actions à poser :**
 
 - Conserver les tests cURL existants (intégration) — adapter les URLs (/v3/*)
@@ -683,6 +716,8 @@ livré en v2.x (Stripe et Play Store déjà retirés). Ici, simple portage.
 ---
 
 ### 3.10 Documentation OpenAPI 3.2.0
+
+> Tâche cmem **#396** — actions en sous-tâches #397–#403.
 
 **Cible :** [OAS 3.2.0](https://spec.openapis.org/oas/v3.2.0.html)
 
@@ -717,6 +752,8 @@ livré en v2.x (Stripe et Play Store déjà retirés). Ici, simple portage.
 
 ### 3.11 Release v3.0.0
 
+> Tâche cmem **#404** — actions en sous-tâches #405–#408.
+
 - Suivre la procédure globale `ancrer version 3.0.0`
 - `docs/v-3-0-0/3.0.0_CLIENT.md` — liste des breaking changes (nouvelles URLs, PATCH vs POST)
 - `docs/v-3-0-0/3.0.0_PRODUCTION.md` — checklist : migrations Phinx, .env réduit, cron
@@ -726,27 +763,29 @@ livré en v2.x (Stripe et Play Store déjà retirés). Ici, simple portage.
 
 ## Récapitulatif des phases
 
-| Phase | Livrable principal | Priorité | Bloquant pour |
-| - | - | - | - |
-| 0 — Docs état actuel | Docs synchronized + ERD | P0 | Phase 1 |
-| 1 — Entry points | Table routes v2→v3 approuvée | P0 | Phase 3 |
-| 2 — Architecture cible | composer.json + structure dossiers | P1 | Phase 3 |
-| 3.1 — Bootstrap | Kernel + DI + Router opérationnels | P1 | Tout le reste |
-| 3.2 — Auth | JWT/OTP/Device tokens migrés | P1 | 3.3–3.7 |
-| 3.3 — Users/Groups | CRUD + permissions | P1 | 3.5, 3.6 |
-| 3.4 — Files/Tags | Upload + search | P2 | 3.7 (items) |
-| 3.4 bis — Contacts/CRM/Projets | Routes aplaties, CRUD + import/export migrés | P2 | 3.11 |
-| 3.5 — Accès | Approbation, modules, budget IA portés | P2 | 3.11 |
-| 3.6 — Admin | Routes renommées | P2 | 3.11 |
-| 3.7 — Plugins | DI injecté, autoloaders unifiés | P2 | 3.11 |
-| 3.8 — Migrations | Phinx opérationnel | P1 | 3.11 |
-| 3.9 — Tests | 0 échec, PHPStan P6 | P1 | 3.11 |
-| 3.10 — OpenAPI 3.2.0 | Spec OAS 3.2.0, /v3/openapi.yaml, Spectral 0 erreur | P2 | 3.11 |
-| 3.11 — Release | Tag v3.0.0, guides de migration | P3 | — |
+| Phase | Tâche | Livrable principal | Priorité | Bloquant pour |
+| - | - | - | - | - |
+| 0 — Docs état actuel | #320 | Docs synchronized + ERD | P0 | Phase 1 |
+| 1 — Entry points | #326 | Table routes v2→v3 approuvée | P0 | Phase 3 |
+| 2 — Architecture cible | #333 | composer.json + structure dossiers | P1 | Phase 3 |
+| 3.1 — Bootstrap | #337 | Kernel + DI + Router opérationnels | P1 | Tout le reste |
+| 3.2 — Auth | #345 | JWT/OTP/Device tokens migrés | P1 | 3.3–3.7 |
+| 3.3 — Users/Groups | #351 | CRUD + permissions | P1 | 3.5, 3.6 |
+| 3.4 — Files/Tags | #358 | Upload + search | P2 | 3.7 (items) |
+| 3.4 bis — Contacts/CRM/Projets | #363 | Routes aplaties, CRUD + import/export migrés | P2 | 3.11 |
+| 3.5 — Accès | #370 | Approbation, modules, budget IA portés | P2 | 3.11 |
+| 3.6 — Admin | #374 | Routes renommées | P2 | 3.11 |
+| 3.7 — Plugins | #378 | DI injecté, autoloaders unifiés | P2 | 3.11 |
+| 3.8 — Migrations | #385 | Phinx opérationnel | P1 | 3.11 |
+| 3.9 — Tests | #391 | 0 échec, PHPStan P6 | P1 | 3.11 |
+| 3.10 — OpenAPI 3.2.0 | #396 | Spec OAS 3.2.0, /v3/openapi.yaml, Spectral 0 erreur | P2 | 3.11 |
+| 3.11 — Release | #404 | Tag v3.0.0, guides de migration | P3 | — |
 
 ---
 
 ## Décisions à confirmer avant de coder
+
+> Tâche cmem **#312** — actions en sous-tâches #313–#319.
 
 Approuver ou modifier avant le démarrage de la Phase 2 :
 

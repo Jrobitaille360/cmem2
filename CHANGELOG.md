@@ -30,6 +30,13 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - `PLAN_acces-sur-approbation.md` converti en tâches cmemweb (principale #269, phases
   #270–#308 en sous-tâches, actions en sous-sous-tâches) puis archivé dans
   `docs/archives/` ; liens mis à jour (`README.md`, `PLAN_refonte-v3.0.0.md`).
+- `PLAN_refonte-v3.0.0.md` converti en tâches cmemweb (principale #311, décisions et
+  phases #312–#404 en sous-tâches, actions en sous-sous-tâches, tag `refonte-v3`),
+  annoté avec les ids de tâches puis archivé dans `docs/archives/`.
+- `docs/entrypoints.md` : liens réparés (préfixe `docs-api/` manquant depuis le
+  déplacement des docs de modules) ; ajout de `links` et `booking` (JSON + guides),
+  `contacts/GUIDE.md` et d'une section Exploitation (cron). `CLAUDE.md` : chemin des docs
+  de modules corrigé (`docs/docs-api/<module>/`).
 
 ## [2.17.6] — 2026-11-08
 
