@@ -8,7 +8,7 @@ Portée : code source uniquement. Domaine métier et schéma DB conservés à 90
 
 > **Révision 2026-11-08 — fin de la commercialisation.** Plus de paiement ni
 > d'abonnement : accès sur approbation, modules cochés par personne, budget IA
-> en dollars. Voir [PLAN_acces-sur-approbation.md](PLAN_acces-sur-approbation.md),
+> en dollars. Voir [PLAN_acces-sur-approbation.md](archives/PLAN_acces-sur-approbation.md),
 > à livrer **en v2.x avant** cette refonte. Les sections Facturation,
 > Abonnements, Plans et Stripe ci-dessous sont remplacées par le module
 > `Access`. Le reste du plan (inventaire v2.15.0) est à resynchroniser avec le
@@ -155,7 +155,7 @@ Portée : code source uniquement. Domaine métier et schéma DB conservés à 90
 
 Les routes `/plans`, `/stripe/*`, `/subscriptions/*`, `/v2/billing/*`,
 `/v2/subscriptions/*` (Stripe et Play Store) sont retirées en v2.x par
-[PLAN_acces-sur-approbation.md](PLAN_acces-sur-approbation.md) — aucune
+[PLAN_acces-sur-approbation.md](archives/PLAN_acces-sur-approbation.md) — aucune
 n'est reprise en v3.
 
 **Accès (nouveau — issu de PLAN_acces-sur-approbation)**
@@ -553,7 +553,7 @@ index.php                          # Entrypoint (15 lignes max)
 
 ### 3.5 Accès (approbation, modules, budget IA)
 
-Prérequis : [PLAN_acces-sur-approbation.md](PLAN_acces-sur-approbation.md)
+Prérequis : [PLAN_acces-sur-approbation.md](archives/PLAN_acces-sur-approbation.md)
 livré en v2.x (Stripe et Play Store déjà retirés). Ici, simple portage.
 
 **Actions à poser :**

@@ -4,7 +4,7 @@ Date : 2026-09-23
 
 > **STATUT : ABANDONNÉ (2026-11-08).** Fin de la commercialisation :
 > plus aucun paiement, accès réservé aux personnes approuvées. Voir
-> [PLAN_acces-sur-approbation.md](../PLAN_acces-sur-approbation.md). Paddle
+> [PLAN_acces-sur-approbation.md](PLAN_acces-sur-approbation.md). Paddle
 > n'a jamais été intégré (aucun code). Document conservé comme
 > historique (comparatif fournisseurs).
 

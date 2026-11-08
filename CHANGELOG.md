@@ -27,6 +27,9 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
   `PLAN_concurrence-updated-at-microsecondes.md` (clos, option C livrée en v2.16.1),
   `api subscriptions.txt` (notes Play Store obsolètes).
 - `README.md` : ligne de roadmap pour l'accès sur approbation.
+- `PLAN_acces-sur-approbation.md` converti en tâches cmemweb (principale #269, phases
+  #270–#308 en sous-tâches, actions en sous-sous-tâches) puis archivé dans
+  `docs/archives/` ; liens mis à jour (`README.md`, `PLAN_refonte-v3.0.0.md`).
 
 ## [2.17.6] — 2026-11-08
 

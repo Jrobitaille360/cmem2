@@ -2,6 +2,10 @@
 
 Date : 2026-11-08
 
+> **ARCHIVÉ (2026-11-08).** Converti en tâches cmemweb : tâche principale
+> #269 (projet cmem 7), phases en sous-tâches #270–#308, actions en
+> sous-sous-tâches. Le suivi se fait dans le backlog, plus dans ce fichier.
+
 ## Contexte
 
 Décision (2026-11-08) : cmem2_API et cmem_web ne sont plus commercialisés.
@@ -10,9 +14,9 @@ modules activables personne par personne. Hormis l'hébergement, seul le
 module IA a un coût réel : il est plafonné en dollars par mois, pour tout
 le monde, admin compris.
 
-Remplace [PLAN_paiement-externe-securise.md](archives/PLAN_paiement-externe-securise.md)
+Remplace [PLAN_paiement-externe-securise.md](PLAN_paiement-externe-securise.md)
 (Paddle — abandonné) et clôt définitivement
-[PLAN_mise-de-cote-paiement.md](archives/PLAN_mise-de-cote-paiement.md).
+[PLAN_mise-de-cote-paiement.md](PLAN_mise-de-cote-paiement.md).
 
 Décisions actées (2026-11-08) :
 
