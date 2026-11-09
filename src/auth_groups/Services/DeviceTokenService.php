@@ -224,7 +224,7 @@ class DeviceTokenService
     /**
      * Vérifie que le device_id est un UUID valide (format standard 8-4-4-4-12).
      */
-    private static function isValidDeviceId(string $deviceId): bool
+    public static function isValidDeviceId(string $deviceId): bool
     {
         return (bool) preg_match(
             '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i',
