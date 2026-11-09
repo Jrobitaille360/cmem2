@@ -44,7 +44,8 @@ test*/
 # Fichiers IDE
 .vscode/
 .idea/
-.claude/
+.claude/*
+!.claude/hooks/
 *.swp
 *.swo
 
