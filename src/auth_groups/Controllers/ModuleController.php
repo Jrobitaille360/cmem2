@@ -3,6 +3,7 @@
 namespace AuthGroups\Controllers;
 
 use Access\Services\AiBudgetService;
+use Access\Services\ModuleGrantService;
 use AuthGroups\Models\Group;
 use AuthGroups\Models\TenantModule;
 use AuthGroups\Models\User;
@@ -49,9 +50,10 @@ class ModuleController
      * $groupEnabled : au moins un groupe actif de l'usager a activé ce module (fusion
      * GET /modules — directive plan-equipe 20260813_143000, OR logique décision §3).
      */
-    private function toContract(string $key, string $planCode, ?array $row, bool $groupEnabled = false, ?array $aiBudget = null): array
+    private function toContract(string $key, string $planCode, ?array $row, bool $groupEnabled = false, ?array $aiBudget = null, array $grants = []): array
     {
-        $available = CmemModules::isAvailable($planCode, $key);
+        // Disponibilité = modules cochés (user_module_grants), plus le plan (Phase 3, #287).
+        $available = in_array($key, $grants, true);
         $personalEnabled = $row !== null
             ? ((int) $row['enabled'] === 1)
             : CmemModules::isEnabledByDefault($key);
@@ -103,9 +105,10 @@ class ModuleController
         }
 
         $aiBudget = (new AiBudgetService())->usage($userId);
+        $grants   = (new ModuleGrantService())->effectiveGrantsFor($userId);
         $modules  = [];
         foreach (CmemModules::KEYS as $key) {
-            $modules[] = $this->toContract($key, $plan, $rows[$key] ?? null, isset($groupEnabledKeys[$key]), $aiBudget);
+            $modules[] = $this->toContract($key, $plan, $rows[$key] ?? null, isset($groupEnabledKeys[$key]), $aiBudget, $grants);
         }
 
         Response::success('Modules récupérés', ['plan' => $plan, 'modules' => $modules]);
@@ -132,9 +135,10 @@ class ModuleController
         $userId = (int) $user['user_id'];
         $plan   = $this->planCode($userId);
 
-        if (!CmemModules::isAvailable($plan, $key)) {
+        $grants = (new ModuleGrantService())->effectiveGrantsFor($userId);
+        if (!in_array($key, $grants, true)) {
             LoggingMiddleware::logExit(403);
-            Response::error("Le module « {$key} » n'est pas inclus dans votre plan.",
+            Response::error("Le module « {$key} » n'est pas disponible pour ce compte.",
                 ['code' => 'MODULE_NOT_AVAILABLE', 'module' => $key, 'plan' => $plan], 403);
             return;
         }
@@ -143,6 +147,6 @@ class ModuleController
         $row = $this->model->setEnabled($userId, $this->appId($input), $key, $input['enabled']);
 
         $aiBudget = $key === 'ia' ? (new AiBudgetService())->usage($userId) : null;
-        Response::success('Module mis à jour', ['module' => $this->toContract($key, $plan, $row, false, $aiBudget)]);
+        Response::success('Module mis à jour', ['module' => $this->toContract($key, $plan, $row, false, $aiBudget, $grants)]);
     }
 }

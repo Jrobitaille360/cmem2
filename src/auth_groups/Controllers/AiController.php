@@ -63,7 +63,7 @@ class AiController
         $plan   = $this->planCode($userId);
 
         $row       = $this->model->findByOwnerAndKey($userId, self::MODULE_KEY);
-        $available = CmemModules::isAvailable($plan, self::MODULE_KEY);
+        $available = (new \Access\Services\ModuleGrantService())->isAvailable($userId, self::MODULE_KEY);
         $enabled   = $row !== null
             ? ((int) $row['enabled'] === 1)
             : CmemModules::isEnabledByDefault(self::MODULE_KEY);

@@ -72,6 +72,10 @@ class AccessApprovalController
         }
 
         $this->service->setStatus($targetId, $status);
+        if ($status === 'approved') {
+            // Première approbation : modules par défaut ; une réapprobation garde les grants existants.
+            (new \Access\Services\ModuleGrantService())->grantDefaultsIfNone($targetId, (int) $user['user_id']);
+        }
         LogService::info('Statut d\'accès modifié', [
             'user_id'    => $targetId,
             'status'     => $status,
@@ -85,6 +89,55 @@ class AccessApprovalController
             $this->service->notifyUserApproved($updated);
         }
         Response::success('Statut d\'accès mis à jour', ['user' => $updated]);
+    }
+
+    /** GET /users/{id}/modules — modules cochés d'un compte (ADMINISTRATEUR+). */
+    public function getModules(int $targetId, array $user): void
+    {
+        if (!$this->requireAdmin($user)) {
+            return;
+        }
+        $target = (new User())->findById($targetId);
+        if (!$target || !empty($target['deleted_at'])) {
+            Response::error('Utilisateur non trouvé', null, 404);
+            return;
+        }
+        Response::success('Modules cochés', [
+            'user_id' => $targetId,
+            'modules' => (new \Access\Services\ModuleGrantService())->grantsFor($targetId),
+        ]);
+    }
+
+    /** PUT /users/{id}/modules {modules: string[]} — remplace la liste (ADMINISTRATEUR+). */
+    public function setModules(int $targetId, array $user): void
+    {
+        if (!$this->requireAdmin($user)) {
+            return;
+        }
+        $input   = Response::getRequestParams();
+        $modules = $input['modules'] ?? null;
+        if (!is_array($modules) || array_values($modules) !== $modules) {
+            Response::error('Données de validation invalides', ['modules' => ['tableau de codes de modules attendu']], 422);
+            return;
+        }
+        $bad = array_filter($modules, fn($m) => !is_string($m) || !CmemModules::isValidKey($m));
+        if ($bad) {
+            Response::error('Données de validation invalides',
+                ['modules' => ['module(s) inconnu(s) : ' . implode(', ', array_map('strval', $bad))]], 422);
+            return;
+        }
+        $target = (new User())->findById($targetId);
+        if (!$target || !empty($target['deleted_at'])) {
+            Response::error('Utilisateur non trouvé', null, 404);
+            return;
+        }
+        $result = (new \Access\Services\ModuleGrantService())->setGrants($targetId, $modules, (int) $user['user_id']);
+        LogService::info('Modules cochés modifiés', [
+            'user_id'    => $targetId,
+            'modules'    => $result,
+            'updated_by' => $user['user_id'],
+        ]);
+        Response::success('Modules cochés mis à jour', ['user_id' => $targetId, 'modules' => $result]);
     }
 
     public function createInvitation(array $user): void

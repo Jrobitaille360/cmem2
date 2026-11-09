@@ -20,7 +20,8 @@
     "plan_equipe": "Directive 20260813_143000. Fusion : GET /modules d'un membre = union avec tous ses groupes actifs (enabled = OR logique, activé quelque part = activé). available suit le plan effectif (meilleur de perso/groupes, EntitlementService::getEffectivePlanForCmem). quota reste porté uniquement par la ligne perso en v1 (pas de quota de groupe). GET/PATCH /groups/{id}/modules[/{key}] : lecture = membre, écriture = admin du groupe (ou rôle système ADMINISTRATEUR+), plan résolu via EntitlementService::getEffectivePlanForGroup (abonnement propre du groupe, pas de fusion avec les membres).",
     "quota_ged": "Reporté. Le cap max_storage_mb de CmemPlans n'est pas enforcé ; ged renvoie quota=null. L'indicateur de stockage du front reste purement indicatif.",
     "quota_ia": "BREAKING 2026-11-08 : le quota ia en nombre d'appels est remplacé par un budget mensuel en dollars (plan accès sur approbation, Phase 1). ia renvoie quota=null et un champ budget {spent_usd, limit_usd, reset_at} (GET /modules, PATCH /modules/ia). Au dépassement, POST /ai/summarize répond 429 AI_BUDGET_EXCEEDED (docs/docs-api/ai/API_AI_ENDPOINTS.json, GET /ai/usage). Les vues de groupe (GET/PATCH /groups/{id}/modules) exposent encore l'ancien quota, non appliqué ; retrait prévu avec Stripe/CmemModules (Phase 4).",
-    "desactivation": "Éteindre un module coupe l'accès, jamais le contenu. Aucune donnée n'est supprimée ; réactiver rend les données telles quelles."
+    "desactivation": "Éteindre un module coupe l'accès, jamais le contenu. Aucune donnée n'est supprimée ; réactiver rend les données telles quelles.",
+    "modules_coches": "Phase 3 du plan accès sur approbation (après v2.18.0) : « disponible » ne lit plus aucun plan. Un module est disponible si le compte a une ligne dans user_module_grants (modules cochés par l'admin via PUT /users/{id}/modules, défaut projet/contacts/crm/ged à l'approbation, ou modules de l'invitation). GET /modules d'un membre : ses modules ∪ ceux des propriétaires de ses groupes actifs (IA imputée à l'appelant) ; GET/PATCH /groups/{id}/modules : modules du propriétaire du groupe. Le champ plan reste renvoyé pour compatibilité mais ne décide plus rien. Les décisions trois_etats/retrofit/plan_equipe ci-dessus décrivent le comportement antérieur (grille plan → modules utilisée pour dériver les grants à la migration)."
   },
   "endpoints": {
     "registre": {
@@ -46,8 +47,12 @@
               }
             ]
           },
-          "status_codes": { "200": "Liste retournée" },
-          "errors": { "401": "JWT absent ou invalide" }
+          "status_codes": {
+            "200": "Liste retournée"
+          },
+          "errors": {
+            "401": "JWT absent ou invalide"
+          }
         },
         {
           "method": "PATCH",
@@ -66,7 +71,9 @@
               "quota": "object|null"
             }
           },
-          "status_codes": { "200": "Module mis à jour" },
+          "status_codes": {
+            "200": "Module mis à jour"
+          },
           "errors": {
             "401": "JWT absent ou invalide",
             "403": "errors.code = MODULE_NOT_AVAILABLE — le plan ne donne pas droit au module. À distinguer d'un 403 d'authentification : le front affiche une invite à l'upgrade, pas une déconnexion. La réponse porte aussi errors.module et errors.plan.",
@@ -87,10 +94,17 @@
           "response": {
             "plan": "string — plan effectif du groupe : free | monthly | yearly | team | ami",
             "modules": [
-              { "key": "string", "available": "bool", "enabled": "bool", "quota": "object|null" }
+              {
+                "key": "string",
+                "available": "bool",
+                "enabled": "bool",
+                "quota": "object|null"
+              }
             ]
           },
-          "status_codes": { "200": "Liste retournée" },
+          "status_codes": {
+            "200": "Liste retournée"
+          },
           "errors": {
             "401": "JWT absent ou invalide",
             "403": "errors.code = GROUP_MEMBERSHIP_REQUIRED — l'usager n'est pas membre du groupe"
@@ -106,9 +120,16 @@
             "enabled": "bool — requis, booléen strict"
           },
           "response": {
-            "module": { "key": "string", "available": "bool", "enabled": "bool", "quota": "object|null" }
+            "module": {
+              "key": "string",
+              "available": "bool",
+              "enabled": "bool",
+              "quota": "object|null"
+            }
           },
-          "status_codes": { "200": "Module de groupe mis à jour" },
+          "status_codes": {
+            "200": "Module de groupe mis à jour"
+          },
           "errors": {
             "401": "JWT absent ou invalide",
             "403": "errors.code = GROUP_ADMIN_REQUIRED (non-admin) ou MODULE_NOT_AVAILABLE (plan du groupe insuffisant)",

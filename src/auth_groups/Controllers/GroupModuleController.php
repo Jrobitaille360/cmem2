@@ -2,6 +2,7 @@
 
 namespace AuthGroups\Controllers;
 
+use Access\Services\ModuleGrantService;
 use AuthGroups\Middleware\LoggingMiddleware;
 use AuthGroups\Models\Group;
 use AuthGroups\Models\TenantModule;
@@ -35,9 +36,10 @@ class GroupModuleController
         return $appId !== '' ? $appId : self::DEFAULT_APP_ID;
     }
 
-    private function toContract(string $key, string $planCode, ?array $row): array
+    private function toContract(string $key, string $planCode, ?array $row, array $grants = []): array
     {
-        $available = CmemModules::isAvailable($planCode, $key);
+        // Disponibilité en groupe = modules cochés du propriétaire du groupe (Phase 3, #287).
+        $available = in_array($key, $grants, true);
         $enabled   = $row !== null
             ? ((int) $row['enabled'] === 1)
             : CmemModules::isEnabledByDefault($key);
@@ -74,9 +76,10 @@ class GroupModuleController
         $plan = EntitlementService::getEffectivePlanForGroup($groupId)['code'];
         $rows = $this->model->findAllByGroup($groupId);
 
+        $grants  = (new ModuleGrantService())->grantsForGroup($groupId);
         $modules = [];
         foreach (CmemModules::KEYS as $key) {
-            $modules[] = $this->toContract($key, $plan, $rows[$key] ?? null);
+            $modules[] = $this->toContract($key, $plan, $rows[$key] ?? null, $grants);
         }
 
         Response::success('Modules du groupe récupérés', ['plan' => $plan, 'modules' => $modules]);
@@ -110,15 +113,16 @@ class GroupModuleController
 
         $plan = EntitlementService::getEffectivePlanForGroup($groupId)['code'];
 
-        if (!CmemModules::isAvailable($plan, $key)) {
+        $grants = (new ModuleGrantService())->grantsForGroup($groupId);
+        if (!in_array($key, $grants, true)) {
             LoggingMiddleware::logExit(403);
-            Response::error("Le module « {$key} » n'est pas inclus dans le plan de ce groupe.",
+            Response::error("Le module « {$key} » n'est pas disponible pour le propriétaire de ce groupe.",
                 ['code' => 'MODULE_NOT_AVAILABLE', 'module' => $key, 'plan' => $plan], 403);
             return;
         }
 
         $row = $this->model->setEnabledForGroup($groupId, $this->appId($input), $key, $input['enabled']);
 
-        Response::success('Module de groupe mis à jour', ['module' => $this->toContract($key, $plan, $row)]);
+        Response::success('Module de groupe mis à jour', ['module' => $this->toContract($key, $plan, $row, $grants)]);
     }
 }

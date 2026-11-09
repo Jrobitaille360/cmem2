@@ -75,6 +75,14 @@ class AccessApprovalService
                 $this->pdo->prepare("UPDATE users SET access_status = 'approved' WHERE id = ?")
                     ->execute([$userId]);
             }
+            // Modules cochés (Phase 3) : ceux de l'invitation, sinon le défaut d'approbation.
+            $grants  = new ModuleGrantService($this->pdo);
+            $modules = $inv['modules'] !== null ? json_decode((string) $inv['modules'], true) : null;
+            if (is_array($modules)) {
+                $grants->setGrants($userId, $modules, $inv['invited_by'] !== null ? (int) $inv['invited_by'] : null);
+            } else {
+                $grants->grantDefaultsIfNone($userId, $inv['invited_by'] !== null ? (int) $inv['invited_by'] : null);
+            }
             $this->pdo->commit();
             return true;
         } catch (\Throwable $e) {
