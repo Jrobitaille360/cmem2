@@ -70,7 +70,7 @@ class JwtAuthMiddleware
         // Accès sur approbation (plan #269, Phase 2) : un compte pending ou suspended
         // s'authentifie, mais seules quelques routes de compte lui restent ouvertes.
         $accessStatus = $userData['access_status'] ?? 'approved';
-        if ($accessStatus !== 'approved' && !self::isOpenToUnapproved()) {
+        if ($accessStatus !== 'approved' && !self::isOpenToUnapproved($accessStatus)) {
             $code = $accessStatus === 'suspended' ? 'ACCOUNT_SUSPENDED' : 'ACCOUNT_PENDING';
             LogService::info('Accès refusé : compte non approuvé', [
                 'user_id' => $userId,
@@ -104,8 +104,10 @@ class JwtAuthMiddleware
     /**
      * Routes ouvertes à un compte pending / suspended : GET /auth/me,
      * POST /auth/logout, DELETE /users/me (préfixe /v2 toléré).
+     * Compte pending seulement : GET /files/{id} et GET /files/{id}/info d'un fichier
+     * public ou grand-public (téléchargement public via OTP, directive jdb #420).
      */
-    private static function isOpenToUnapproved(): bool
+    private static function isOpenToUnapproved(string $accessStatus = 'pending'): bool
     {
         $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? '');
         $path   = (string) (parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? '');
@@ -115,9 +117,32 @@ class JwtAuthMiddleware
             $path = substr($path, 3);
         }
 
-        return ($method === 'GET' && $path === 'auth/me')
+        if (($method === 'GET' && $path === 'auth/me')
             || ($method === 'POST' && $path === 'auth/logout')
-            || ($method === 'DELETE' && $path === 'users/me');
+            || ($method === 'DELETE' && $path === 'users/me')) {
+            return true;
+        }
+
+        if ($accessStatus === 'pending' && $method === 'GET'
+            && preg_match('#^files/(\d+)(/info)?$#', $path, $m)) {
+            return self::isPublicFile((int) $m[1]);
+        }
+
+        return false;
+    }
+
+    /** Fichier non supprimé dont l'accessibilité est public ou grand-public. */
+    private static function isPublicFile(int $fileId): bool
+    {
+        try {
+            $st = \Database::getInstance()->getConnection()->prepare(
+                "SELECT accessibility FROM files WHERE id = ? AND deleted_at IS NULL"
+            );
+            $st->execute([$fileId]);
+            return in_array($st->fetchColumn(), ['public', 'grand-public'], true);
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     /**

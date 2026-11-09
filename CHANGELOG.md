@@ -26,6 +26,9 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - `Access\Services\ModuleGrantService` : grants perso, grants effectifs (perso ∪ propriétaires de groupes), grants de groupe.
 - Migration `docs/20261109_user_module_grants.sql` : table `user_module_grants` + grants dérivés du plan effectif actuel (tous : projet/contacts/crm/ged ; Stripe actif ou propriétaire de groupe abonné : + ia, booking ; plan « ami » : les 8). Appliquée sur dev le 2026-11-09 (646 comptes), **pas encore sur prod**.
 - Tests : `private/tests/test_module_grants.php` (59 vérifications) ; `test_modules`, `test_group_modules`, `test_ai_summarize`, `test_ai_budget`, `test_booking` posent les modules cochés en plus de leur abonnement de test (`testSetModuleGrants`) ; l'auto-approbation des comptes de test pose les modules par défaut. Suite complète sur dev : 3374 / 3374.
+- Directive jdb #420 : un compte `pending` (pas `suspended`) peut lire `GET /files/{id}` et `GET /files/{id}/info` d'un fichier `public` ou `grand-public` — rétablit le téléchargement public par OTP sur journauxdebord.com ; fichier privé ou inexistant → `403 ACCOUNT_PENDING`.
+- Directive cmem_web #421 : `access_status` sur chaque entrée de `GET /users`, filtre `?access_status=pending|approved|suspended` (`total` / `total_pages` cohérents, autre valeur → `422`) ; `access_status` dans `data.user` de `POST /auth/refresh`.
+- Tests : `test_access_approval.php` sections 6 et 7 (102 vérifications). Suite complète sur dev : 3399 / 3399.
 
 ### Tests
 

@@ -216,30 +216,40 @@ class User extends BaseModel {
     /**
      * Obtenir tous les utilisateurs (avec pagination)
      */
-    public function getAll($limit = 20, $offset = 0, $email = null, $includeDeleted = false) {
-        $deletedClause = $includeDeleted ? "" : "AND deleted_at IS NULL";
-        $query = "SELECT id, name, email, role, profile_image, bio, phone, date_of_birth, location, email_verified, last_login, created_at, deleted_at
+    public function getAll($limit = 20, $offset = 0, $email = null, $includeDeleted = false, ?string $accessStatus = null) {
+        [$where, $params] = $this->listFilters($email, $includeDeleted, $accessStatus);
+        $query = "SELECT id, name, email, role, access_status, profile_image, bio, phone, date_of_birth, location, email_verified, last_login, created_at, deleted_at
                  FROM {$this->table}
-                 WHERE 1=1 {$deletedClause}
+                 WHERE {$where}
                  ORDER BY created_at DESC
                  LIMIT :limit OFFSET :offset";
-
-        if ($email) {
-            $query = "SELECT id, name, email, role, profile_image, bio, phone, date_of_birth, location, email_verified, last_login, created_at, deleted_at
-                      FROM {$this->table}
-                      WHERE email = :email {$deletedClause}
-                      ORDER BY created_at DESC
-                      LIMIT :limit OFFSET :offset";
-        }
         $stmt = $this->getDb()->prepare($query);
         $stmt->bindParam(':limit', $limit, PDO::PARAM_INT);
         $stmt->bindParam(':offset', $offset, PDO::PARAM_INT);
-        if ($email) {
-            $stmt->bindParam(':email', $email);
+        foreach ($params as $k => $v) {
+            $stmt->bindValue($k, $v);
         }
         $stmt->execute();
-        
+
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /** Clause WHERE commune à getAll() et countFiltered(). */
+    private function listFilters(?string $email, bool $includeDeleted, ?string $accessStatus): array {
+        $where  = ['1=1'];
+        $params = [];
+        if (!$includeDeleted) {
+            $where[] = 'deleted_at IS NULL';
+        }
+        if ($email) {
+            $where[] = 'email = :email';
+            $params[':email'] = $email;
+        }
+        if ($accessStatus) {
+            $where[] = 'access_status = :access_status';
+            $params[':access_status'] = $accessStatus;
+        }
+        return [implode(' AND ', $where), $params];
     }
 
     /**
@@ -255,16 +265,10 @@ class User extends BaseModel {
     /**
      * Compter les utilisateurs avec filtre optionnel (miroir de getAll)
      */
-    public function countFiltered(?string $email = null, bool $includeDeleted = false): int {
-        $deletedClause = $includeDeleted ? "" : "AND deleted_at IS NULL";
-        if ($email) {
-            $query = "SELECT COUNT(*) as total FROM {$this->table} WHERE email = :email {$deletedClause}";
-            $stmt = $this->getDb()->prepare($query);
-            $stmt->bindParam(':email', $email);
-            $stmt->execute();
-        } else {
-            $stmt = $this->getDb()->query("SELECT COUNT(*) as total FROM {$this->table} WHERE 1=1 {$deletedClause}");
-        }
+    public function countFiltered(?string $email = null, bool $includeDeleted = false, ?string $accessStatus = null): int {
+        [$where, $params] = $this->listFilters($email, $includeDeleted, $accessStatus);
+        $stmt = $this->getDb()->prepare("SELECT COUNT(*) as total FROM {$this->table} WHERE {$where}");
+        $stmt->execute($params);
         return (int) $stmt->fetch(PDO::FETCH_ASSOC)['total'];
     }
 

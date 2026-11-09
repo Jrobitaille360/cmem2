@@ -44,9 +44,17 @@ class UserListController {
             $pagination = Response::getPaginationParams();
             $email  = $input['email'] ?? null;
             $includeDeleted = !empty($input['include_deleted']) && $input['include_deleted'] != '0';
+            // Filtre accès sur approbation (directive cmem_web #421)
+            $accessStatus = isset($input['access_status']) && $input['access_status'] !== '' ? (string) $input['access_status'] : null;
+            if ($accessStatus !== null && !in_array($accessStatus, ['pending', 'approved', 'suspended'], true)) {
+                LoggingMiddleware::logExit(422);
+                Response::error('Données de validation invalides',
+                    ['access_status' => ['valeurs permises : pending, approved, suspended']], 422);
+                return false;
+            }
             $user   = new User();
-            $users  = $user->getAll($pagination['limit'], ($pagination['page'] - 1) * $pagination['limit'], $email, $includeDeleted);
-            $total  = $user->countFiltered($email, $includeDeleted);
+            $users  = $user->getAll($pagination['limit'], ($pagination['page'] - 1) * $pagination['limit'], $email, $includeDeleted, $accessStatus);
+            $total  = $user->countFiltered($email, $includeDeleted, $accessStatus);
             $perPage = $pagination['limit'];
 
             LogService::info("Liste des utilisateurs récupérée avec succès", [

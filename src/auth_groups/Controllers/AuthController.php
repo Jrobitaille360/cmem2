@@ -531,6 +531,7 @@ class AuthController
                 'name'  => $userData['name'],
                 'email' => $userData['email'],
                 'role'  => $userData['role'],
+                'access_status' => $userData['access_status'] ?? 'approved',
             ],
         ]);
     }

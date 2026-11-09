@@ -180,7 +180,8 @@
               "id": "integer",
               "name": "string",
               "email": "string",
-              "role": "string"
+              "role": "string",
+              "access_status": "string — pending | approved | suspended"
             },
             "device_token": "string — nouveau device token (l'ancien est révoqué — REMPLACER côté client impérativement)",
             "device_id": "string"
@@ -513,9 +514,10 @@
           ],
           "query": {
             "email": "string (optional)",
-            "include_deleted": "boolean (optional) - inclut les comptes soft-deleted (deleted_at non nul) dans les résultats"
+            "include_deleted": "boolean (optional) - inclut les comptes soft-deleted (deleted_at non nul) dans les résultats",
+            "access_status": "string (optional) — pending | approved | suspended (filtre ; total / total_pages cohérents) ; autre valeur → 422"
           },
-          "response": "Array d'utilisateurs"
+          "response": "{ users: [ {id, name, email, role, access_status, profile_image, bio, phone, date_of_birth, location, email_verified, last_login, created_at, deleted_at} ], total, page, per_page, total_pages }"
         },
         {
           "method": "GET",
@@ -1022,10 +1024,15 @@
         "Tailles max : image 5 MB, document 10 MB, audio 20 MB, vidéo 50 MB, exécutable/archive (exe/msi/zip/7z) 200 MB"
       ],
       "routes": [
-        { "method": "GET", "path": "/files",
+        {
+          "method": "GET",
+          "path": "/files",
           "description": "Lister les fichiers d'un sous-dossier uploads/<folder>/",
           "auth_required": true,
-          "roles": ["ADMINISTRATEUR", "SUPERADMINISTRATEUR"],
+          "roles": [
+            "ADMINISTRATEUR",
+            "SUPERADMINISTRATEUR"
+          ],
           "query": {
             "folder": "string (required) — slug du dossier ; caractères autorisés : a-z 0-9 - _ ; max 80 car."
           },
@@ -1053,7 +1060,9 @@
             "403": "rôle insuffisant"
           }
         },
-        { "method": "POST", "path": "/files",
+        {
+          "method": "POST",
+          "path": "/files",
           "description": "Uploader un fichier — images, documents (dont .gpx), audio, vidéo, et exécutables/archives Windows (exe, msi, zip, 7z)",
           "body": {
             "content_type": "multipart/form-data",
@@ -1243,7 +1252,11 @@
             "data": {
               "file_id": "integer",
               "tags": [
-                { "id": "integer", "name": "string", "color": "string|null" }
+                {
+                  "id": "integer",
+                  "name": "string",
+                  "color": "string|null"
+                }
               ]
             }
           },
@@ -1355,7 +1368,11 @@
                   "deleted_at": "string (datetime)|null",
                   "url": "string",
                   "tags": [
-                    { "id": "integer", "name": "string", "color": "string|null" }
+                    {
+                      "id": "integer",
+                      "name": "string",
+                      "color": "string|null"
+                    }
                   ]
                 }
               ],

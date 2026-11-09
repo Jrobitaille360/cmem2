@@ -132,8 +132,20 @@ statut `users.access_status` :
 | `suspended` | Connexion permise, routes métier refusées. |
 
 Un compte `pending` ou `suspended` obtient son JWT (`data.user.access_status`
-dans la réponse de connexion et dans `GET /auth/me`), mais toute route JWT
-répond `403` sauf `GET /auth/me`, `POST /auth/logout` et `DELETE /users/me` :
+dans la réponse de connexion, de `POST /auth/refresh` et dans `GET /auth/me`),
+mais toute route JWT répond `403`, sauf :
+
+| Route | Ouverte à |
+| - | - |
+| `GET /auth/me` | `pending`, `suspended` |
+| `POST /auth/logout` | `pending`, `suspended` |
+| `DELETE /users/me` | `pending`, `suspended` |
+| `GET /files/{id}`, `GET /files/{id}/info` (fichier `public` ou `grand-public`) | `pending` seulement |
+
+L'exception fichiers permet le téléchargement public par OTP (jdb, directive #420) ;
+un fichier `private` ou inexistant reste refusé (`ACCOUNT_PENDING`).
+
+Réponse de refus :
 
 ```json
 {
@@ -155,6 +167,7 @@ un écran d'attente et propose la déconnexion.
 | GET | `/invitations` | Liste, `status` = `pending` / `accepted` / `expired` |
 | DELETE | `/invitations/{id}` | Supprime une invitation |
 | GET | `/users/{id}/modules` | Modules cochés du compte |
+| GET | `/users?access_status=pending` | Liste filtrée par statut (`access_status` sur chaque entrée) |
 | PUT | `/users/{id}/modules` | `{"modules": [...]}` remplace les modules cochés |
 
 Un ADMINISTRATEUR ne peut pas modifier le statut d'un autre ADMINISTRATEUR
