@@ -138,9 +138,8 @@ class AuthController
 
         // Compte de test E2E (dev seulement) : code fixe, aucun email envoyé,
         // exempt du rate limit. Inactif si les vars d'env sont absentes (prod).
-        $isTestAccount = OTP_TEST_ACCOUNT_EMAIL !== ''
-            && OTP_TEST_ACCOUNT_CODE !== ''
-            && $email === OTP_TEST_ACCOUNT_EMAIL;
+        $isTestAccount = OTP_TEST_ACCOUNT_CODE !== ''
+            && in_array($email, OTP_TEST_ACCOUNT_EMAILS, true);
 
         // Le compte de test E2E garde son propre code ; sinon AUTH_TEST_CODE prend le relais.
         $fixedCode    = $isTestAccount ? OTP_TEST_ACCOUNT_CODE : $globalTestCode;

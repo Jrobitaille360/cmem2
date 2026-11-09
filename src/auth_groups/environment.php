@@ -276,6 +276,8 @@ define('OTP_MAX_ATTEMPTS', (int)($_ENV['OTP_MAX_ATTEMPTS'] ?? 5));
 define('TMP_CODE', $_ENV['TMP_CODE'] ?? '');
 // Compte de test E2E à code OTP fixe (dev seulement — vars absentes en prod)
 define('OTP_TEST_ACCOUNT_EMAIL', strtolower(trim($_ENV['OTP_TEST_ACCOUNT_EMAIL'] ?? '')));
+// Plusieurs comptes possibles, séparés par des virgules (ex. e2e@test.local,e2e-ia@test.local) — même code fixe
+define('OTP_TEST_ACCOUNT_EMAILS', array_values(array_filter(array_map('trim', explode(',', OTP_TEST_ACCOUNT_EMAIL)))));
 define('OTP_TEST_ACCOUNT_CODE', trim($_ENV['OTP_TEST_ACCOUNT_CODE'] ?? ''));
 // Code OTP fixe pour TOUTE adresse (dev seulement) — ignoré si APP_ENV !== 'development'.
 // send-code : aucun courriel envoyé, code fixe, exempt du rate limit.
