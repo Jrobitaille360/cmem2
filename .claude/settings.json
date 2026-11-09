@@ -7,7 +7,7 @@
           {
             "type": "command",
             "shell": "powershell",
-            "command": "$j = [Console]::In.ReadToEnd() | ConvertFrom-Json; $cmd = $j.tool_input.command; if ($cmd -match 'git add -f') { Write-Output '{\"continue\": false, \"stopReason\": \"BLOCKED: git add -f bypasses .gitignore. Ask user before force-adding files.\"}'; exit 1 }; if ($cmd -match 'git tag') { $pr = (gh pr view --json state -q '.state' 2>$null); if ($pr -ne 'MERGED') { Write-Output '{\"continue\": false, \"stopReason\": \"BLOCKED: git tag before PR merge. Confirm PR is merged first.\"}'; exit 1 } }"
+            "command": "& \"$env:CLAUDE_PROJECT_DIR\\.claude\\hooks\\guard-git.ps1\""
           }
         ]
       }
