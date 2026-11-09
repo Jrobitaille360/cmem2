@@ -176,8 +176,7 @@ class BookingPageController
 
         $active = filter_var($input['active'] ?? false, FILTER_VALIDATE_BOOLEAN);
         if ($active) {
-            $plan = $this->planCode($userId);
-            if (!CmemModules::isAvailable($plan, self::MODULE_KEY)) {
+            if (!(new \Access\Services\ModuleGrantService())->isAvailable($userId, self::MODULE_KEY)) {
                 LoggingMiddleware::logExit(403);
                 Response::error("Le module « booking » n'est pas inclus dans votre plan.",
                     ['code' => 'MODULE_NOT_AVAILABLE', 'module' => self::MODULE_KEY], 403);

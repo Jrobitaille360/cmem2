@@ -11,16 +11,21 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ### BREAKING CHANGES
 
-- **Accès sur approbation** (plan #269, Phase 2, tâches #277 à #283) : les nouveaux comptes (`users/register` ou OTP `auth/send-code`) sont en attente (`users.access_status = pending`). Ils se connectent, mais toute route JWT répond `403` avec `errors.code` = `ACCOUNT_PENDING` (ou `ACCOUNT_SUSPENDED` pour un compte suspendu), sauf `GET /auth/me`, `POST /auth/logout` et `DELETE /users/me`. Les comptes existants sont approuvés par la migration. Les clients doivent afficher un écran d'attente (directives clients : Phase 5).
+- **Accès sur approbation** (plan #269, Phase 2, tâches #277 à #283) : les nouveaux comptes (`users/register` ou OTP `auth/send-code`) sont en attente (`users.access_status = pending`). Ils se connectent, mais toute route JWT répond `403` avec `errors.code` = `ACCOUNT_PENDING` (ou `ACCOUNT_SUSPENDED` pour un compte suspendu), sauf `GET /auth/me`, `POST /auth/logout` et `DELETE /users/me`. Les comptes existants sont approuvés par la migration. Les clients doivent afficher un écran d'attente (directives clients : Phase 5, tasks cmem_web #417, jdb #418, XMGame #419).
+- **Modules cochés par personne** (plan #269, Phase 3, tâches #284 à #289) : la disponibilité d'un module (`available` dans `GET /modules` et `GET /groups/{id}/modules`, `PATCH /modules/{key}`, `POST /ai/summarize`, `PUT /booking/page` actif, pages publiques de booking) ne lit plus le plan Stripe ni `cmem_plan_override` : elle vient de `user_module_grants`. `GET /modules` d'un membre = ses modules ∪ ceux des propriétaires de ses groupes actifs ; `GET/PATCH /groups/{id}/modules` = modules du propriétaire du groupe. Le champ `plan` reste renvoyé mais ne décide plus rien. Aucun module retiré aux comptes existants (grants dérivés du plan à la migration).
 
 ### Ajouté
 
 - `PUT /users/{id}/access-status` (ADMINISTRATEUR+) : `pending` / `approved` / `suspended` ; un ADMINISTRATEUR ne modifie pas un autre ADMINISTRATEUR, personne ne modifie un SUPERADMINISTRATEUR.
-- `POST/GET/DELETE /invitations` (ADMINISTRATEUR+) : liste blanche de courriels avec budget IA et modules (modules stockés, appliqués en Phase 3). Un courriel invité est approuvé à la création du compte, à la connexion, ou dès la création de l'invitation si le compte existe déjà en attente ; le budget est posé dans `users.ai_budget_usd_monthly`.
+- `POST/GET/DELETE /invitations` (ADMINISTRATEUR+) : liste blanche de courriels avec budget IA et modules (les modules de l'invitation deviennent les modules cochés du compte). Un courriel invité est approuvé à la création du compte, à la connexion, ou dès la création de l'invitation si le compte existe déjà en attente ; le budget est posé dans `users.ai_budget_usd_monthly`.
 - `access_status` exposé dans la réponse de connexion (`data.user`) et dans `GET /auth/me`.
 - Courriels : admin notifié à chaque inscription en attente (nouvelle variable `ACCESS_ADMIN_NOTIFY_EMAIL`, vide = aucun envoi) ; usager notifié quand un admin l'approuve.
 - Migration `docs/20261109_access_approval.sql` : colonne `users.access_status` (existants → `approved`, défaut `pending`) + table `access_invitations`. Appliquée sur dev le 2026-11-09, **pas encore sur prod**.
 - Tests : `private/tests/test_access_approval.php` (77 vérifications). `test_new_base.php` approuve en base les comptes créés par les tests (local / dev seulement, désactivable par `$GLOBALS['TEST_NO_AUTO_APPROVE']`). Suite complète sur dev : 3315 / 3315.
+- `GET/PUT /users/{id}/modules` (ADMINISTRATEUR+) : lire / remplacer les modules cochés d'un compte. À la première approbation : `projet`, `contacts`, `crm`, `ged` ; une réapprobation garde les modules existants.
+- `Access\Services\ModuleGrantService` : grants perso, grants effectifs (perso ∪ propriétaires de groupes), grants de groupe.
+- Migration `docs/20261109_user_module_grants.sql` : table `user_module_grants` + grants dérivés du plan effectif actuel (tous : projet/contacts/crm/ged ; Stripe actif ou propriétaire de groupe abonné : + ia, booking ; plan « ami » : les 8). Appliquée sur dev le 2026-11-09 (646 comptes), **pas encore sur prod**.
+- Tests : `private/tests/test_module_grants.php` (59 vérifications) ; `test_modules`, `test_group_modules`, `test_ai_summarize`, `test_ai_budget`, `test_booking` posent les modules cochés en plus de leur abonnement de test (`testSetModuleGrants`) ; l'auto-approbation des comptes de test pose les modules par défaut. Suite complète sur dev : 3374 / 3374.
 
 ### Tests
 

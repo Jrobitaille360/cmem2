@@ -83,6 +83,16 @@ class UserRouteHandler extends BaseRouteHandler
                 $this->validateIdAndCall($action, fn($targetId) =>
                     (new \Access\Controllers\AccessApprovalController())->updateStatus((int) $targetId, $user)),
 
+            // GET /users/{id}/modules — modules cochés (ADMINISTRATEUR+)
+            (isset($segments[2]) && $segments[2] === 'modules' && $method === 'GET') =>
+                $this->validateIdAndCall($action, fn($targetId) =>
+                    (new \Access\Controllers\AccessApprovalController())->getModules((int) $targetId, $user)),
+
+            // PUT /users/{id}/modules — remplace les modules cochés (ADMINISTRATEUR+)
+            (isset($segments[2]) && $segments[2] === 'modules' && $method === 'PUT') =>
+                $this->validateIdAndCall($action, fn($targetId) =>
+                    (new \Access\Controllers\AccessApprovalController())->setModules((int) $targetId, $user)),
+
             // GET /users/choose-plan?token=xxx - Afficher invitation plan (public)
             ($action === 'choose-plan' && $method === 'GET') =>
                 $this->handlePlanInvitationView(),

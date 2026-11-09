@@ -154,17 +154,23 @@ un écran d'attente et propose la déconnexion.
 | POST | `/invitations` | `{"email", "modules"?, "ai_budget_usd"?, "expires_in_days"?}` → 201 |
 | GET | `/invitations` | Liste, `status` = `pending` / `accepted` / `expired` |
 | DELETE | `/invitations/{id}` | Supprime une invitation |
+| GET | `/users/{id}/modules` | Modules cochés du compte |
+| PUT | `/users/{id}/modules` | `{"modules": [...]}` remplace les modules cochés |
 
 Un ADMINISTRATEUR ne peut pas modifier le statut d'un autre ADMINISTRATEUR
 (SUPERADMINISTRATEUR requis) ; personne ne modifie un SUPERADMINISTRATEUR.
+
+À la première approbation, le compte reçoit les modules cochés par défaut `projet`,
+`contacts`, `crm`, `ged`. Voir [modules/GUIDE.md](../modules/GUIDE.md) § « Modules cochés
+par personne ».
 
 ### Invitations
 
 Une invitation non expirée et non acceptée approuve le compte du même courriel :
 à la création du compte, à la connexion, ou tout de suite si le compte existe
 déjà en attente. Le budget `ai_budget_usd` est posé dans
-`users.ai_budget_usd_monthly`. Les `modules` sont validés et stockés ; ils
-seront appliqués avec les modules cochés par personne (Phase 3).
+`users.ai_budget_usd_monthly`. Les `modules` de l'invitation deviennent les
+modules cochés du compte (sinon le défaut d'approbation).
 
 Erreurs : `409` invitation active déjà existante, `422` courriel, module,
 budget ou durée invalide.

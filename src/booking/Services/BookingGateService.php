@@ -20,10 +20,7 @@ class BookingGateService
         if ($page === null || (int) $page['active'] !== 1) {
             return false;
         }
-        $userData = (new User())->findById((int) $page['owner_id']);
-        $override = $userData['cmem_plan_override'] ?? null;
-        $plan = EntitlementService::getEffectivePlanForCmem((int) $page['owner_id'], $override)['code'];
-
-        return CmemModules::isAvailable($plan, self::MODULE_KEY);
+        // Modules cochés de l'hôte (Phase 3) : plus de lecture de plan.
+        return (new \Access\Services\ModuleGrantService())->isAvailable((int) $page['owner_id'], self::MODULE_KEY);
     }
 }

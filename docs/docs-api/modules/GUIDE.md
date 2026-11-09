@@ -9,14 +9,14 @@ Trois notions distinctes, jamais fusionnées :
 
 | État | Qui décide | Où c'est stocké |
 | - | - | - |
-| **Disponible** | le plan cmem effectif | `Stripe\Config\CmemModules` (config statique, pas de table) |
+| **Disponible** | l'admin (modules cochés par personne) | `user_module_grants` (`Access\Services\ModuleGrantService`) |
 | **Activé** | l'usager | `tenant_modules.enabled` |
 | **Quota** | le serveur | `tenant_modules.quota_used` / `quota_reset_at` |
 
 Conséquence recherchée pour le module IA : un module peut être **disponible mais éteint** — aucun
 appel, aucun coût, tant que l'usager ne l'allume pas.
 
-L'autorité est serveur. Le front reflète un état et invite à l'upgrade ; il ne décide jamais d'un
+L'autorité est serveur. Le front reflète un état ; il ne décide jamais d'un
 droit. Un `PATCH` émis sans droit est refusé, quel que soit ce que croit le client.
 
 ## Les 8 clés
@@ -28,7 +28,31 @@ projet | contacts | crm | ged | ia | caldav | booking | push_avance
 Énumération figée dès la v1, alignée sur l'`ENUM` SQL de `tenant_modules.module_key`. Ajouter une
 clé exige une migration de l'enum **et** une mise à jour de `CmemModules::KEYS`.
 
-## Mapping plan → modules
+## Modules cochés par personne
+
+Depuis le plan accès sur approbation (Phase 3, après v2.18.0), la disponibilité ne lit plus
+aucun plan : un module est **disponible** pour un compte s'il a une ligne dans
+`user_module_grants`. L'admin (ADMINISTRATEUR+) coche les modules par personne :
+
+| Méthode | Route | Description |
+| - | - | - |
+| GET | `/users/{id}/modules` | `data.modules` : clés cochées, triées |
+| PUT | `/users/{id}/modules` | `{"modules": ["projet", "ia"]}` remplace la liste ; clé inconnue → `422` |
+
+- **À l'approbation** d'un compte (`PUT /users/{id}/access-status` → `approved`) : `projet`,
+  `contacts`, `crm`, `ged` si le compte n'a encore aucun module coché ; une réapprobation garde
+  les modules existants.
+- **Par invitation** : les `modules` de l'invitation (sinon le défaut ci-dessus).
+- **Groupes** : `GET /modules` d'un membre = ses modules ∪ ceux des propriétaires de ses groupes
+  actifs (l'IA reste imputée au budget de l'appelant) ; hors groupe, ses seuls modules.
+  `GET/PATCH /groups/{id}/modules` = modules du propriétaire du groupe.
+
+Le champ `plan` de `GET /modules` reste renvoyé pour compatibilité mais ne décide plus rien.
+
+## Mapping plan → modules (historique)
+
+Grille utilisée jusqu'à la Phase 3, et pour dériver les modules cochés des comptes existants
+lors de la migration `20261109_user_module_grants.sql` (aucun module retiré) :
 
 | `module_key` | `free` | `monthly` / `yearly` / `team` | `ami` | `enabled` par défaut | Quota |
 | - | - | - | - | - | - |
@@ -45,7 +69,7 @@ clé exige une migration de l'enum **et** une mise à jour de `CmemModules::KEYS
 
 **Cas particulier `booking`** : `tenant_modules.enabled` pour cette clé n'est pas consulté par le
 module — le vrai interrupteur est `booking_pages.active` (`PUT /booking/page`), qui vérifie
-directement `CmemModules::isAvailable`. `GET/PATCH /modules/booking` reste fonctionnel (registre
+directement le module coché `booking` (`ModuleGrantService::isAvailable`). `GET/PATCH /modules/booking` reste fonctionnel (registre
 générique) mais n'a aucun effet sur la page de réservation elle-même. Voir
 [docs/docs-api/booking/GUIDE.md](../booking/GUIDE.md).
 
@@ -100,13 +124,13 @@ Erreurs :
 | Code HTTP | `errors.code` | Cas |
 | - | - | - |
 | `401` | — | JWT absent ou invalide |
-| `403` | `MODULE_NOT_AVAILABLE` | le plan ne donne pas droit au module |
+| `403` | `MODULE_NOT_AVAILABLE` | module non coché pour ce compte (ni via un groupe) |
 | `422` | `UNKNOWN_MODULE_KEY` | clé hors énumération |
 | `422` | `VALIDATION_ERROR` | `enabled` absent ou non booléen |
 
 Le `403` porte `errors.module` et `errors.plan` en plus du code. Le front doit lire
-`errors.code` pour distinguer ce refus d'un `403` d'authentification : le premier appelle une
-invite à l'upgrade, le second une déconnexion.
+`errors.code` pour distinguer ce refus d'un `403` d'authentification ou d'un compte en attente
+(`ACCOUNT_PENDING`).
 
 ## Désactiver ne détruit rien
 
@@ -130,14 +154,13 @@ enforcé, `ged` renvoie `quota: null`.
 Directive `20260813_143000` (plan-equipe). `tenant_modules.group_id` (unicité
 `(group_id, module_key)` + CHECK XOR avec `owner_id`) est servi par deux mécanismes :
 
-1. **`GET /modules` fusionne** perso ∪ tous les groupes actifs de l'usager : `available` suit le
-   meilleur plan effectif (perso ou groupe, `EntitlementService::getEffectivePlanForCmem`),
+1. **`GET /modules` fusionne** perso ∪ tous les groupes actifs de l'usager : `available` suit les
+   modules cochés de l'usager ∪ ceux des propriétaires de ses groupes actifs,
    `enabled` est un **OR logique** (activé quelque part = activé). La forme de la réponse ne
    change pas — pas de champ `source` par module. `quota` reste porté uniquement par la ligne
    perso en v1 (pas de quota de groupe).
-2. **`GET/PATCH /groups/{id}/modules[/{key}]`** — vue et administration dédiées d'un groupe. Le
-   plan suit l'abonnement propre du groupe (`EntitlementService::getEffectivePlanForGroup`), sans
-   fusion avec les membres.
+2. **`GET/PATCH /groups/{id}/modules[/{key}]`** — vue et administration dédiées d'un groupe.
+   `available` suit les modules cochés du propriétaire du groupe, sans fusion avec les membres.
 
 ### `GET /groups/{id}/modules`
 
