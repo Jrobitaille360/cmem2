@@ -1,6 +1,6 @@
 # Guide — Module Access
 
-Version 1.1.0 · Base URL : `/v2/access`
+Version 1.2.0 · Base URL : `/v2/access` (accès sur approbation : `/users/{id}/access-status`, `/invitations`)
 
 > Référence complète : [API_ACCESS_ENDPOINTS.json](API_ACCESS_ENDPOINTS.json)
 
@@ -11,6 +11,7 @@ Version 1.1.0 · Base URL : `/v2/access`
 - [GET /v2/access/status](#get-v2accessstatus)
 - [Matrice d'accès](#matrice-daccès)
 - [Erreurs](#erreurs)
+- [Accès sur approbation](#accès-sur-approbation)
 
 ---
 
@@ -116,3 +117,60 @@ Règles de calcul par source (Stripe uniquement via JWT) :
 | --- | --- |
 | 401 | JWT absent ou invalide |
 | 422 | `app_id` manquant, ou `platform` invalide (valeurs : `android`, `web`, `windows`) |
+
+---
+
+## Accès sur approbation
+
+Depuis le plan accès sur approbation (Phase 2, après v2.18.0), tout compte a un
+statut `users.access_status` :
+
+| Statut | Effet |
+| - | - |
+| `pending` | Défaut des nouveaux comptes (`users/register`, OTP `auth/send-code`). Connexion permise, routes métier refusées. |
+| `approved` | Accès normal. Comptes existants à la migration. |
+| `suspended` | Connexion permise, routes métier refusées. |
+
+Un compte `pending` ou `suspended` obtient son JWT (`data.user.access_status`
+dans la réponse de connexion et dans `GET /auth/me`), mais toute route JWT
+répond `403` sauf `GET /auth/me`, `POST /auth/logout` et `DELETE /users/me` :
+
+```json
+{
+  "success": false,
+  "message": "Compte en attente d'approbation",
+  "errors": { "code": "ACCOUNT_PENDING", "message": "..." }
+}
+```
+
+`errors.code` vaut `ACCOUNT_PENDING` ou `ACCOUNT_SUSPENDED`. Le client affiche
+un écran d'attente et propose la déconnexion.
+
+### Endpoints admin (ADMINISTRATEUR ou plus)
+
+| Méthode | Route | Description |
+| - | - | - |
+| PUT | `/users/{id}/access-status` | `{"status": "pending" \| "approved" \| "suspended"}` |
+| POST | `/invitations` | `{"email", "modules"?, "ai_budget_usd"?, "expires_in_days"?}` → 201 |
+| GET | `/invitations` | Liste, `status` = `pending` / `accepted` / `expired` |
+| DELETE | `/invitations/{id}` | Supprime une invitation |
+
+Un ADMINISTRATEUR ne peut pas modifier le statut d'un autre ADMINISTRATEUR
+(SUPERADMINISTRATEUR requis) ; personne ne modifie un SUPERADMINISTRATEUR.
+
+### Invitations
+
+Une invitation non expirée et non acceptée approuve le compte du même courriel :
+à la création du compte, à la connexion, ou tout de suite si le compte existe
+déjà en attente. Le budget `ai_budget_usd` est posé dans
+`users.ai_budget_usd_monthly`. Les `modules` sont validés et stockés ; ils
+seront appliqués avec les modules cochés par personne (Phase 3).
+
+Erreurs : `409` invitation active déjà existante, `422` courriel, module,
+budget ou durée invalide.
+
+### Courriels
+
+- Admin : à chaque inscription en attente, vers `ACCESS_ADMIN_NOTIFY_EMAIL`
+  (`.env`, vide = aucun envoi).
+- Usager : quand un admin le fait passer de `pending` à `approved`.

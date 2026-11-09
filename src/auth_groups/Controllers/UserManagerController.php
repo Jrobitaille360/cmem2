@@ -219,6 +219,12 @@ class UserManagerController {
             $user->email_verified = 0;
             $user->profile_image = 'default.jpg'; // Avatar par défaut            
             if ($user->create()) {
+                // Accès sur approbation : courriel invité → approuvé dès la création
+                $accessService = new \Access\Services\AccessApprovalService();
+                if (!$accessService->applyInvitationFor((int) $user->id)) {
+                    $accessService->notifyAdminPendingSignup((int) $user->id);
+                }
+
                 // Récupérer l'utilisateur créé avec toutes ses données
                 $createdUser = $user->findById($user->id);
                 

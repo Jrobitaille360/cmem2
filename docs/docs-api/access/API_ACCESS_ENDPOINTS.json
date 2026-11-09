@@ -1,8 +1,8 @@
 {
   "api": {
     "name": "Access Module",
-    "version": "1.1.0",
-    "description": "Endpoint d'accès unifié (JWT) — agrège Stripe pour retourner la matrice d'accès premium par plateforme. Couvre web et windows. Android utilise GET /v2/subscriptions/playstore/status (X-Device-Token) directement. Introduit en v2.7.0.",
+    "version": "1.2.0",
+    "description": "Endpoint d'accès unifié (JWT) — agrège Stripe pour retourner la matrice d'accès premium par plateforme. Couvre web et windows. Android utilise GET /v2/subscriptions/playstore/status (X-Device-Token) directement. Introduit en v2.7.0. Après v2.18.0 : accès sur approbation (statut pending/approved/suspended, /invitations).",
     "generated": "2026-05-24",
     "base_url": "/v2",
     "authentication": {
@@ -38,7 +38,11 @@
                     "windows": true
                   },
                   "sources": [
-                    { "provider": "stripe", "status": "active", "expires_at": "2027-06-01T00:00:00" }
+                    {
+                      "provider": "stripe",
+                      "status": "active",
+                      "expires_at": "2027-06-01T00:00:00"
+                    }
                   ]
                 }
               }
@@ -60,8 +64,16 @@
           "access_matrix": {
             "description": "Règles de calcul de l'accès par source (Stripe uniquement via JWT)",
             "rules": {
-              "stripe_active": { "android": true, "web": true, "windows": true },
-              "none":          { "android": false, "web": false, "windows": false }
+              "stripe_active": {
+                "android": true,
+                "web": true,
+                "windows": true
+              },
+              "none": {
+                "android": false,
+                "web": false,
+                "windows": false
+              }
             },
             "note": "Les abonnements Play Store ne sont pas inclus — ils sont liés au device_uuid (anonyme) et non au user_id. Android doit appeler GET /v2/subscriptions/playstore/status."
           },
@@ -74,6 +86,149 @@
             }
           },
           "client_notes": "Endpoint pour clients web et windows authentifiés par JWT. Ne pas utiliser pour Android — utiliser GET /v2/subscriptions/playstore/status avec X-Device-Token."
+        }
+      ]
+    },
+    "approval": {
+      "description": "Accès sur approbation (plan #269 Phase 2, après v2.18.0). Les nouveaux comptes (users/register ou OTP auth/send-code) sont en users.access_status = 'pending' ; les comptes existants à la migration sont 'approved'. Un compte pending ou suspended se connecte normalement (JWT émis, data.user.access_status exposé), mais toute route JWT répond 403 sauf GET /auth/me, POST /auth/logout et DELETE /users/me. Un courriel invité (invitation non expirée, non acceptée) est approuvé à la création, à la connexion ou dès la création de l'invitation si le compte existe déjà en attente. Courriel à l'admin à chaque inscription en attente (ACCESS_ADMIN_NOTIFY_EMAIL, vide = aucun envoi) ; courriel à l'usager quand un admin le passe de pending à approved.",
+      "error_codes": {
+        "ACCOUNT_PENDING": "403 — compte en attente d'approbation (errors.code)",
+        "ACCOUNT_SUSPENDED": "403 — compte suspendu par un administrateur (errors.code)"
+      },
+      "guard_example": {
+        "status": 403,
+        "example": {
+          "success": false,
+          "message": "Compte en attente d'approbation",
+          "errors": {
+            "code": "ACCOUNT_PENDING",
+            "message": "Ce compte doit être approuvé par un administrateur avant d'utiliser l'application."
+          }
+        }
+      },
+      "routes": [
+        {
+          "method": "PUT",
+          "path": "/users/{id}/access-status",
+          "auth_required": true,
+          "role": "ADMINISTRATEUR+",
+          "description": "Approuve, suspend ou remet en attente un compte. Un ADMINISTRATEUR ne peut pas modifier un ADMINISTRATEUR (SUPERADMINISTRATEUR requis) ; personne ne modifie un SUPERADMINISTRATEUR.",
+          "body": {
+            "status": "string (required) — 'pending' | 'approved' | 'suspended'"
+          },
+          "responses": {
+            "200": {
+              "example": {
+                "success": true,
+                "message": "Statut d'accès mis à jour",
+                "data": {
+                  "user": {
+                    "id": 42,
+                    "email": "ami@exemple.ca",
+                    "access_status": "approved"
+                  }
+                }
+              }
+            },
+            "403": "rôle insuffisant",
+            "404": "utilisateur introuvable",
+            "422": "status invalide"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/invitations",
+          "auth_required": true,
+          "role": "ADMINISTRATEUR+",
+          "description": "Crée une invitation (liste blanche). Courriel normalisé en minuscules. Les modules sont validés contre le registre et stockés ; ils seront appliqués en Phase 3 (modules cochés par personne). Le budget IA est posé dans users.ai_budget_usd_monthly à l'acceptation.",
+          "body": {
+            "email": "string (required)",
+            "modules": "string[] (optional) — codes : projet, contacts, crm, ged, ia, caldav, booking, push_avance",
+            "ai_budget_usd": "number >= 0 (optional) — NULL = AI_DEFAULT_BUDGET_USD",
+            "expires_in_days": "int 1–365 (optional, défaut 30)"
+          },
+          "responses": {
+            "201": {
+              "example": {
+                "success": true,
+                "message": "Invitation créée",
+                "data": {
+                  "invitation": {
+                    "id": 12,
+                    "email": "ami@exemple.ca",
+                    "invited_by": 1,
+                    "modules": [
+                      "projet",
+                      "contacts"
+                    ],
+                    "ai_budget_usd": 3.5,
+                    "expires_at": "2026-12-09 07:30:00",
+                    "accepted_at": null,
+                    "created_at": "2026-11-09 07:30:00",
+                    "status": "pending"
+                  }
+                }
+              }
+            },
+            "401": "JWT absent",
+            "403": "rôle insuffisant",
+            "409": "invitation active déjà existante pour ce courriel",
+            "422": "courriel, module, budget ou durée invalide"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/invitations",
+          "auth_required": true,
+          "role": "ADMINISTRATEUR+",
+          "description": "Liste toutes les invitations, plus récentes d'abord. status = pending | accepted | expired.",
+          "responses": {
+            "200": {
+              "example": {
+                "success": true,
+                "message": "Invitations",
+                "data": {
+                  "invitations": [
+                    {
+                      "id": 12,
+                      "email": "ami@exemple.ca",
+                      "invited_by": 1,
+                      "modules": [
+                        "projet",
+                        "contacts"
+                      ],
+                      "ai_budget_usd": 3.5,
+                      "expires_at": "2026-12-09 07:30:00",
+                      "accepted_at": null,
+                      "created_at": "2026-11-09 07:30:00",
+                      "status": "pending"
+                    }
+                  ]
+                }
+              }
+            },
+            "403": "rôle insuffisant"
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/invitations/{id}",
+          "auth_required": true,
+          "role": "ADMINISTRATEUR+",
+          "description": "Supprime une invitation (acceptée ou non ; sans effet sur un compte déjà approuvé).",
+          "responses": {
+            "200": {
+              "example": {
+                "success": true,
+                "message": "Invitation supprimée",
+                "data": {
+                  "id": 12
+                }
+              }
+            },
+            "403": "rôle insuffisant",
+            "404": "invitation introuvable"
+          }
         }
       ]
     }

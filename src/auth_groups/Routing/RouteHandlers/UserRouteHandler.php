@@ -78,6 +78,11 @@ class UserRouteHandler extends BaseRouteHandler
                 $this->validateIdAndCall($action, fn($targetId) =>
                     $this->controller->updatePlanOverride($targetId, $user['user_id'], $user['role'])),
 
+            // PUT /users/{id}/access-status — accès sur approbation (ADMINISTRATEUR+)
+            (isset($segments[2]) && $segments[2] === 'access-status' && $method === 'PUT') =>
+                $this->validateIdAndCall($action, fn($targetId) =>
+                    (new \Access\Controllers\AccessApprovalController())->updateStatus((int) $targetId, $user)),
+
             // GET /users/choose-plan?token=xxx - Afficher invitation plan (public)
             ($action === 'choose-plan' && $method === 'GET') =>
                 $this->handlePlanInvitationView(),

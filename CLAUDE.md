@@ -17,6 +17,7 @@ Run a single module:
 
 ```bash
 php private/tests/test_access.php
+php private/tests/test_access_approval.php
 php private/tests/test_account_deletion.php
 php private/tests/test_ai_summarize.php
 php private/tests/test_ai_budget.php

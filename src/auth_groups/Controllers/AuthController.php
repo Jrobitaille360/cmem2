@@ -198,6 +198,14 @@ class AuthController
                 }
 
                 $userData = $userModel->findByEmail($email);
+                if ($userData) {
+                    $accessService = new \Access\Services\AccessApprovalService();
+                    if ($accessService->applyInvitationFor((int) $userData['id'])) {
+                        $userData = $userModel->findByEmail($email);
+                    } else {
+                        $accessService->notifyAdminPendingSignup((int) $userData['id']);
+                    }
+                }
                 LogService::info('Compte auto-créé via send-code (Option A)', ['email' => $email]);
             } else {
                 // Compte supprimé : retour générique, pas de recréation
@@ -694,6 +702,15 @@ class AuthController
     private function issueToken(array $userData, string $authMethod): void
     {
         $input     = Response::getRequestParams();
+
+        // Accès sur approbation : un compte en attente dont le courriel a une
+        // invitation valide est approuvé à la connexion.
+        $accessService = new \Access\Services\AccessApprovalService();
+        if (($userData['access_status'] ?? 'approved') === 'pending'
+            && $accessService->applyInvitationFor((int) $userData['id'])) {
+            $userData['access_status'] = 'approved';
+        }
+
         $token     = JwtService::generate($userData);
         $expiresAt = JwtService::getExpiresAt();
 
@@ -723,6 +740,7 @@ class AuthController
                 'name'  => $userData['name'],
                 'email' => $userData['email'],
                 'role'  => $userData['role'],
+                'access_status' => $userData['access_status'] ?? 'approved',
             ],
         ];
 
