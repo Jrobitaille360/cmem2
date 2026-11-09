@@ -9,6 +9,8 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+## [2.19.1] — 2026-11-09
+
 ### Corrigé
 
 - `POST /auth/login`, `POST /auth/verify-code` et `POST /auth/restore-account/verify` : un `device_id` fourni mais non UUID répond `422` avec `errors.device_id` au lieu d'un `500` (task #427). La vérification a lieu avant le mot de passe / le code OTP : le code n'est plus consommé par une requête vouée à l'échec. `POST /auth/refresh` inchangé (`401 INVALID_DEVICE_TOKEN`).
