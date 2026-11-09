@@ -9,6 +9,23 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+### BREAKING CHANGES
+
+- **Accès sur approbation** (plan #269, Phase 2, tâches #277 à #283) : les nouveaux comptes (`users/register` ou OTP `auth/send-code`) sont en attente (`users.access_status = pending`). Ils se connectent, mais toute route JWT répond `403` avec `errors.code` = `ACCOUNT_PENDING` (ou `ACCOUNT_SUSPENDED` pour un compte suspendu), sauf `GET /auth/me`, `POST /auth/logout` et `DELETE /users/me`. Les comptes existants sont approuvés par la migration. Les clients doivent afficher un écran d'attente (directives clients : Phase 5).
+
+### Ajouté
+
+- `PUT /users/{id}/access-status` (ADMINISTRATEUR+) : `pending` / `approved` / `suspended` ; un ADMINISTRATEUR ne modifie pas un autre ADMINISTRATEUR, personne ne modifie un SUPERADMINISTRATEUR.
+- `POST/GET/DELETE /invitations` (ADMINISTRATEUR+) : liste blanche de courriels avec budget IA et modules (modules stockés, appliqués en Phase 3). Un courriel invité est approuvé à la création du compte, à la connexion, ou dès la création de l'invitation si le compte existe déjà en attente ; le budget est posé dans `users.ai_budget_usd_monthly`.
+- `access_status` exposé dans la réponse de connexion (`data.user`) et dans `GET /auth/me`.
+- Courriels : admin notifié à chaque inscription en attente (nouvelle variable `ACCESS_ADMIN_NOTIFY_EMAIL`, vide = aucun envoi) ; usager notifié quand un admin l'approuve.
+- Migration `docs/20261109_access_approval.sql` : colonne `users.access_status` (existants → `approved`, défaut `pending`) + table `access_invitations`. Appliquée sur dev le 2026-11-09, **pas encore sur prod**.
+- Tests : `private/tests/test_access_approval.php` (77 vérifications). `test_new_base.php` approuve en base les comptes créés par les tests (local / dev seulement, désactivable par `$GLOBALS['TEST_NO_AUTO_APPROVE']`). Suite complète sur dev : 3315 / 3315.
+
+### Tests
+
+- Tests instables `If-Unmodified-Since` corrigés (tâche #413) : `test_calendars.php` (7.6, 16e.6e, 16e.12v4) et `test_projets.php` (3.7v4) attendent le changement de seconde avant l'écriture conditionnelle, conformément à la limite assumée `updated_at` à la seconde (Option C). Suite complète sur dev : 3238 / 3238 (avant Phase 2).
+
 ## [2.18.0] — 2026-11-08
 
 ### BREAKING CHANGES

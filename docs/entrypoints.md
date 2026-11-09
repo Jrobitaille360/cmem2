@@ -17,7 +17,7 @@ Chaque module expose sa documentation d'API au format JSON. Ces fichiers décriv
 | [playstore/API_PLAYSTORE_ENDPOINTS.json](docs-api/playstore/API_PLAYSTORE_ENDPOINTS.json) | 8 | Devices Android (register, pseudonyme) et abonnements Google Play (verify/status/cancel via X-Device-Token). |
 | [webdevice/API_WEBDEVICE_ENDPOINTS.json](docs-api/webdevice/API_WEBDEVICE_ENDPOINTS.json) | 5 (+5 alias) | Devices web et Windows (table `web_devices`) : register + pseudonyme. Routes `/v2/devices/windows/*` identiques en alias. |
 | [stripe/API_STRIPE_ENDPOINTS.json](docs-api/stripe/API_STRIPE_ENDPOINTS.json) | 5 (+6 legacy) | Abonnements Stripe web/Windows : checkout, portal, webhook, statut, annulation. `group_id` optionnel (plan équipe) sur checkout/portal/statut/annulation. Sections deprecated/removed pour le legacy `/subscription/*`. |
-| [access/API_ACCESS_ENDPOINTS.json](docs-api/access/API_ACCESS_ENDPOINTS.json) | 1 | `GET /v2/access/status` — statut d'accès consolidé (croisement Stripe + Play Store) par app_id. |
+| [access/API_ACCESS_ENDPOINTS.json](docs-api/access/API_ACCESS_ENDPOINTS.json) | 5 | `GET /v2/access/status` — statut d'accès consolidé (croisement Stripe + Play Store) par app_id. Accès sur approbation : `PUT /users/{id}/access-status`, `POST/GET/DELETE /invitations`, codes 403 `ACCOUNT_PENDING` / `ACCOUNT_SUSPENDED`. |
 | [traque/API_TRAQUE_ENDPOINTS.json](docs-api/traque/API_TRAQUE_ENDPOINTS.json) | 17 | Jeu Traque : monstres géolocalisés (OSM), combat, personnage (création, repos, level-up), bestiaire, leaderboard. |
 | [pomo/API_POMO_ENDPOINTS_v1_0_0.json](docs-api/pomo/API_POMO_ENDPOINTS_v1_0_0.json) | 1 | Plugin Pomodoro — phase 1A seulement : `POST /pomo/engagement` (waitlist/sondage public). Phases 1B/2/3 planifiées. |
 | [push/API_PUSH_ENDPOINTS.json](docs-api/push/API_PUSH_ENDPOINTS.json) | 5 | Notifications push web (VAPID) : clé publique, subscriptions par appareil, préférences par compte (4 kinds dont `contact_followup`). |
@@ -43,7 +43,7 @@ Chaque guide complète le JSON avec les flux d'intégration, exemples et codes d
 | [playstore/GUIDE.md](docs-api/playstore/GUIDE.md) | Devices Android, pseudonyme, abonnements Google Play (verify/status/cancel). |
 | [webdevice/GUIDE.md](docs-api/webdevice/GUIDE.md) | Devices web/Windows (alias `/v2/devices/windows/*`), pseudonyme multi-plateforme. |
 | [stripe/GUIDE.md](docs-api/stripe/GUIDE.md) | Checkout, portail, webhook `/v2/billing/*`, routes legacy dépréciées, plan effectif cmem, plan équipe (abonnement de groupe). |
-| [access/GUIDE.md](docs-api/access/GUIDE.md) | `GET /v2/access/status` — matrice d'accès premium par plateforme. |
+| [access/GUIDE.md](docs-api/access/GUIDE.md) | `GET /v2/access/status` — matrice d'accès premium par plateforme. Accès sur approbation (pending/approved/suspended), invitations admin. |
 | [traque/GUIDE.md](docs-api/traque/GUIDE.md) | Personnage, monstres géolocalisés, combat, repos, bestiaire, leaderboard. |
 | [pomo/GUIDE.md](docs-api/pomo/GUIDE.md) | Engagement public (Ph1A actif) ; support/sync/Stripe = contrat prévisionnel (404). |
 | [push/GUIDE.md](docs-api/push/GUIDE.md) | Flux d'abonnement Web Push, préférences par compte, sélection des échéances, idempotence, purge sur 410, cron. |

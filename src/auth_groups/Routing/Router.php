@@ -52,6 +52,7 @@ class Router
             'links'        => fn() => new LinkRouteHandler($auth),
             'modules'      => fn() => new ModuleRouteHandler($auth),
             'ai'           => fn() => new AiRouteHandler($auth),
+            'invitations'  => fn() => new \Access\Routing\InvitationRouteHandler($auth),
             'v2'           => fn() => new V2RouteHandler($auth),
         ];
 

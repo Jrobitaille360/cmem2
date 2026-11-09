@@ -67,6 +67,29 @@ class JwtAuthMiddleware
             return null;
         }
 
+        // Accès sur approbation (plan #269, Phase 2) : un compte pending ou suspended
+        // s'authentifie, mais seules quelques routes de compte lui restent ouvertes.
+        $accessStatus = $userData['access_status'] ?? 'approved';
+        if ($accessStatus !== 'approved' && !self::isOpenToUnapproved()) {
+            $code = $accessStatus === 'suspended' ? 'ACCOUNT_SUSPENDED' : 'ACCOUNT_PENDING';
+            LogService::info('Accès refusé : compte non approuvé', [
+                'user_id' => $userId,
+                'status'  => $accessStatus,
+                'route'   => $_SERVER['REQUEST_URI'] ?? 'UNKNOWN',
+            ]);
+            Response::error(
+                $code === 'ACCOUNT_SUSPENDED' ? 'Compte suspendu' : 'Compte en attente d\'approbation',
+                [
+                    'code'    => $code,
+                    'message' => $code === 'ACCOUNT_SUSPENDED'
+                        ? 'Ce compte a été suspendu par un administrateur.'
+                        : 'Ce compte doit être approuvé par un administrateur avant d\'utiliser l\'application.',
+                ],
+                403
+            );
+            return null;
+        }
+
         return [
             'user_id'   => $userId,
             'email'     => $userData['email'] ?? $payload['email'],
@@ -76,6 +99,25 @@ class JwtAuthMiddleware
             'exp'       => $payload['exp']    ?? null,
             'auth_type' => 'jwt',
         ];
+    }
+
+    /**
+     * Routes ouvertes à un compte pending / suspended : GET /auth/me,
+     * POST /auth/logout, DELETE /users/me (préfixe /v2 toléré).
+     */
+    private static function isOpenToUnapproved(): bool
+    {
+        $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? '');
+        $path   = (string) (parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? '');
+        $path   = str_replace(defined('BASE_PATH') ? BASE_PATH : '/cmem2_API', '', $path);
+        $path   = trim(str_replace('/index.php', '', $path), '/');
+        if (strpos($path, 'v2/') === 0) {
+            $path = substr($path, 3);
+        }
+
+        return ($method === 'GET' && $path === 'auth/me')
+            || ($method === 'POST' && $path === 'auth/logout')
+            || ($method === 'DELETE' && $path === 'users/me');
     }
 
     /**
