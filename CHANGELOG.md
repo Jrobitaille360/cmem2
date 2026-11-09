@@ -29,6 +29,7 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - Directive jdb #420 : un compte `pending` (pas `suspended`) peut lire `GET /files/{id}` et `GET /files/{id}/info` d'un fichier `public` ou `grand-public` — rétablit le téléchargement public par OTP sur journauxdebord.com ; fichier privé ou inexistant → `403 ACCOUNT_PENDING`.
 - Directive cmem_web #421 : `access_status` sur chaque entrée de `GET /users`, filtre `?access_status=pending|approved|suspended` (`total` / `total_pages` cohérents, autre valeur → `422`) ; `access_status` dans `data.user` de `POST /auth/refresh`.
 - Tests : `test_access_approval.php` sections 6 et 7 (102 vérifications). Suite complète sur dev : 3399 / 3399.
+- Comptes de test sur dev (XMGame #423) : `e2e-pending@test.local` (en attente) et `e2e-suspended@test.local` (suspendu), code OTP fixe, ajoutés à `OTP_TEST_ACCOUNT_EMAIL` ; exclus de l'auto-approbation des tests. Documentés dans `docs/docs-api/core/API_ENDPOINTS.json`.
 
 ### Tests
 
