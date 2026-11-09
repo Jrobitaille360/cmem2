@@ -99,7 +99,7 @@ Tests execute real HTTP requests via cURL against a running server. Each test fi
 ### Database initialization
 
 ```bash
-mysql -u root -p < docs/v-2-8-0/build_DB-v-2.8.0.sql
+mysql -u root -p < docs/versions-old/v-2-19-0/build_DB-v-2.19.0.sql
 ```
 
 ## Architecture
