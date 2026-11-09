@@ -62,6 +62,7 @@
             "400": "Champs email ou password manquants / format invalide",
             "401": "Email ou mot de passe incorrect",
             "403": "Email non vérifié",
+            "422": "device_id fourni mais non UUID (format 8-4-4-4-12) → errors.device_id ; vérifié avant le mot de passe / le code, qui n'est donc pas consommé",
             "429": "Trop de tentatives — réessayez dans 10 minutes (5 max / 10 min par email+IP)"
           }
         },
@@ -130,7 +131,8 @@
           "errors": {
             "400": "Données invalides",
             "401": "Code invalide ou expiré",
-            "404": "Aucun compte à restaurer — errors.error_code = NO_ACCOUNT_TO_RESTORE"
+            "404": "Aucun compte à restaurer — errors.error_code = NO_ACCOUNT_TO_RESTORE",
+            "422": "device_id fourni mais non UUID (format 8-4-4-4-12) → errors.device_id ; vérifié avant le mot de passe / le code, qui n'est donc pas consommé"
           }
         },
         {
@@ -141,7 +143,7 @@
           "body": {
             "email": "string (required)",
             "code": "string (required) — code OTP à 6 chiffres",
-            "device_id": "string (optional) — pour obtenir un device_token longue durée",
+            "device_id": "string (optional) — UUID — pour obtenir un device_token longue durée",
             "device_name": "string (optional)"
           },
           "response": {
@@ -159,7 +161,8 @@
           },
           "errors": {
             "400": "Champs manquants",
-            "401": "Code incorrect, expiré ou déjà utilisé (max 5 tentatives)"
+            "401": "Code incorrect, expiré ou déjà utilisé (max 5 tentatives)",
+            "422": "device_id fourni mais non UUID (format 8-4-4-4-12) → errors.device_id ; vérifié avant le mot de passe / le code, qui n'est donc pas consommé"
           }
         },
         {

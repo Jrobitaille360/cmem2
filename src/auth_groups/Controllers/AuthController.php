@@ -49,6 +49,10 @@ class AuthController
             return;
         }
 
+        if ($this->rejectInvalidDeviceId($input)) {
+            return;
+        }
+
         $email = strtolower(trim($input['email']));
 
         if (!RateLimitService::check($email, 'login')) {
@@ -275,6 +279,10 @@ class AuthController
             return;
         }
 
+        if ($this->rejectInvalidDeviceId($input)) {
+            return;
+        }
+
         $email = strtolower(trim($input['email']));
         $code  = trim($input['code']);
 
@@ -390,6 +398,10 @@ class AuthController
         if (!$validation['valid']) {
             LoggingMiddleware::logExit(400);
             Response::error('Données invalides', $validation['errors'], 400);
+            return;
+        }
+
+        if ($this->rejectInvalidDeviceId($input)) {
             return;
         }
 
@@ -692,6 +704,25 @@ class AuthController
     // -----------------------------------------------------------------------
     // Helper privé
     // -----------------------------------------------------------------------
+
+    /**
+     * device_id optionnel : s'il est fourni, il doit être un UUID. Vérifié avant
+     * le mot de passe / le code OTP pour ne pas consommer le code sur une
+     * requête qui ne peut pas aboutir. Envoie le 422 et retourne true si invalide.
+     */
+    private function rejectInvalidDeviceId(array $input): bool
+    {
+        $deviceId = trim((string) ($input['device_id'] ?? ''));
+        if ($deviceId === '' || DeviceTokenService::isValidDeviceId($deviceId)) {
+            return false;
+        }
+
+        LoggingMiddleware::logExit(422);
+        Response::error('Données invalides', [
+            'device_id' => 'device_id doit être un UUID valide (format 8-4-4-4-12).',
+        ], 422);
+        return true;
+    }
 
     /**
      * Génère un JWT, enregistre la session et envoie la réponse.
