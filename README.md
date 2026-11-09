@@ -1,6 +1,6 @@
 ﻿# cmem2 API
 
-![Version](https://img.shields.io/badge/version-2.17.6-blue.svg)
+![Version](https://img.shields.io/badge/version-2.18.0-blue.svg)
 ![PHP](https://img.shields.io/badge/PHP-8.0+-purple.svg)
 ![Status](https://img.shields.io/badge/status-production%20ready-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
@@ -44,7 +44,7 @@ cmem2 API fournit :
 - **WebDevice** : Gestion des tokens de notification push web
 - **Push** : Notifications Web Push (VAPID) — abonnements par device, préférences par compte, envoi cron
 - **Modules** : Registre de modules activables — gating par plan, toggle usager
-- **IA** : Proxy IA — résumé d'agenda via `POST /ai/summarize`, gating par module `ia`
+- **IA** : Proxy IA — résumé d'agenda via `POST /ai/summarize`, gating par module `ia`, budget mensuel en dollars (`GET /ai/usage`)
 
 ## Technologies
 
@@ -467,7 +467,7 @@ Chaque module a son propre fichier `private/tests/test_<module>.php` (voir la li
 - [x] Plan équipe — facturation Stripe portée par un groupe + modules de groupe (v2.16.0)
 - [x] Plugin Booking — réservation publique par lien, zones matérialisées (v2.16.0)
 - [x] Suivi du temps par tâche — sessions start/stop, un seul minuteur actif par usager (v2.17.0)
-- [ ] Accès sur approbation — fin de la commercialisation : invitations + approbation, modules cochés par personne, budget IA en $, caps à 3 niveaux, retrait Stripe/Play Store ([plan](docs/archives/PLAN_acces-sur-approbation.md) — suivi : task cmem #269)
+- [ ] Accès sur approbation — fin de la commercialisation : invitations + approbation, modules cochés par personne, budget IA en $, caps à 3 niveaux, retrait Stripe/Play Store ([plan](docs/archives/PLAN_acces-sur-approbation.md) — suivi : task cmem #269) — Phase 1 (budget IA en $) livrée en v2.18.0
 - [ ] Rate limiting Redis
 
 ## Licence
@@ -476,4 +476,4 @@ MIT — voir [LICENSE](LICENSE). Dépendances tierces : [THIRD_PARTY_LICENSES.md
 
 ---
 
-**Version** : 2.17.6 · **Mis à jour** : 2026-11-08 · **Auteur** : [Jrobitaille360](https://github.com/Jrobitaille360)
+**Version** : 2.18.0 · **Mis à jour** : 2026-11-08 · **Auteur** : [Jrobitaille360](https://github.com/Jrobitaille360)
