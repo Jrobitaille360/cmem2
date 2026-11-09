@@ -9,6 +9,8 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+## [2.19.0] — 2026-11-09
+
 ### BREAKING CHANGES
 
 - **Accès sur approbation** (plan #269, Phase 2, tâches #277 à #283) : les nouveaux comptes (`users/register` ou OTP `auth/send-code`) sont en attente (`users.access_status = pending`). Ils se connectent, mais toute route JWT répond `403` avec `errors.code` = `ACCOUNT_PENDING` (ou `ACCOUNT_SUSPENDED` pour un compte suspendu), sauf `GET /auth/me`, `POST /auth/logout` et `DELETE /users/me`. Les comptes existants sont approuvés par la migration. Les clients doivent afficher un écran d'attente (directives clients : Phase 5, tasks cmem_web #417, jdb #418, XMGame #419).
@@ -20,15 +22,16 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - `POST/GET/DELETE /invitations` (ADMINISTRATEUR+) : liste blanche de courriels avec budget IA et modules (les modules de l'invitation deviennent les modules cochés du compte). Un courriel invité est approuvé à la création du compte, à la connexion, ou dès la création de l'invitation si le compte existe déjà en attente ; le budget est posé dans `users.ai_budget_usd_monthly`.
 - `access_status` exposé dans la réponse de connexion (`data.user`) et dans `GET /auth/me`.
 - Courriels : admin notifié à chaque inscription en attente (nouvelle variable `ACCESS_ADMIN_NOTIFY_EMAIL`, vide = aucun envoi) ; usager notifié quand un admin l'approuve.
-- Migration `docs/20261109_access_approval.sql` : colonne `users.access_status` (existants → `approved`, défaut `pending`) + table `access_invitations`. Appliquée sur dev le 2026-11-09, **pas encore sur prod**.
+- Migration `docs/v-2-19-0/20261109_access_approval.sql` : colonne `users.access_status` (existants → `approved`, défaut `pending`) + table `access_invitations`. Appliquée sur dev le 2026-11-09, **pas encore sur prod**.
 - Tests : `private/tests/test_access_approval.php` (77 vérifications). `test_new_base.php` approuve en base les comptes créés par les tests (local / dev seulement, désactivable par `$GLOBALS['TEST_NO_AUTO_APPROVE']`). Suite complète sur dev : 3315 / 3315.
 - `GET/PUT /users/{id}/modules` (ADMINISTRATEUR+) : lire / remplacer les modules cochés d'un compte. À la première approbation : `projet`, `contacts`, `crm`, `ged` ; une réapprobation garde les modules existants.
 - `Access\Services\ModuleGrantService` : grants perso, grants effectifs (perso ∪ propriétaires de groupes), grants de groupe.
-- Migration `docs/20261109_user_module_grants.sql` : table `user_module_grants` + grants dérivés du plan effectif actuel (tous : projet/contacts/crm/ged ; Stripe actif ou propriétaire de groupe abonné : + ia, booking ; plan « ami » : les 8). Appliquée sur dev le 2026-11-09 (646 comptes), **pas encore sur prod**.
+- Migration `docs/v-2-19-0/20261109_user_module_grants.sql` : table `user_module_grants` + grants dérivés du plan effectif actuel (tous : projet/contacts/crm/ged ; Stripe actif ou propriétaire de groupe abonné : + ia, booking ; plan « ami » : les 8). Appliquée sur dev le 2026-11-09 (646 comptes), **pas encore sur prod**.
 - Tests : `private/tests/test_module_grants.php` (59 vérifications) ; `test_modules`, `test_group_modules`, `test_ai_summarize`, `test_ai_budget`, `test_booking` posent les modules cochés en plus de leur abonnement de test (`testSetModuleGrants`) ; l'auto-approbation des comptes de test pose les modules par défaut. Suite complète sur dev : 3374 / 3374.
 - Directive jdb #420 : un compte `pending` (pas `suspended`) peut lire `GET /files/{id}` et `GET /files/{id}/info` d'un fichier `public` ou `grand-public` — rétablit le téléchargement public par OTP sur journauxdebord.com ; fichier privé ou inexistant → `403 ACCOUNT_PENDING`.
 - Directive cmem_web #421 : `access_status` sur chaque entrée de `GET /users`, filtre `?access_status=pending|approved|suspended` (`total` / `total_pages` cohérents, autre valeur → `422`) ; `access_status` dans `data.user` de `POST /auth/refresh`.
 - Tests : `test_access_approval.php` sections 6 et 7 (102 vérifications). Suite complète sur dev : 3399 / 3399.
+- Schéma complet `docs/v-2-19-0/build_DB-v-2.19.0.sql` : `users.access_status` intégrée dans `users`, tables `access_invitations` et `user_module_grants` (import validé sur base locale jetable, 88 tables).
 - Comptes de test sur dev (XMGame #423) : `e2e-pending@test.local` (en attente) et `e2e-suspended@test.local` (suspendu), code OTP fixe, ajoutés à `OTP_TEST_ACCOUNT_EMAIL` ; exclus de l'auto-approbation des tests. Documentés dans `docs/docs-api/core/API_ENDPOINTS.json`.
 
 ### Tests
