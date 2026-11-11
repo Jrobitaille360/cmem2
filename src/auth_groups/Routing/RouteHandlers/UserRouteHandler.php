@@ -93,6 +93,16 @@ class UserRouteHandler extends BaseRouteHandler
                 $this->validateIdAndCall($action, fn($targetId) =>
                     (new \Access\Controllers\AccessApprovalController())->setModules((int) $targetId, $user)),
 
+            // GET /users/{id}/caps — caps de l'usager (ADMINISTRATEUR+, #295)
+            (isset($segments[2]) && $segments[2] === 'caps' && $method === 'GET') =>
+                $this->validateIdAndCall($action, fn($targetId) =>
+                    (new \Access\Controllers\ResourceCapController())->getUserCaps((int) $targetId, $user)),
+
+            // PUT /users/{id}/caps — remplace les surcharges de l'usager (ADMINISTRATEUR+, #295)
+            (isset($segments[2]) && $segments[2] === 'caps' && $method === 'PUT') =>
+                $this->validateIdAndCall($action, fn($targetId) =>
+                    (new \Access\Controllers\ResourceCapController())->putUserCaps((int) $targetId, $user)),
+
             // GET /users/choose-plan?token=xxx - Afficher invitation plan (public)
             ($action === 'choose-plan' && $method === 'GET') =>
                 $this->handlePlanInvitationView(),

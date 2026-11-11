@@ -4,6 +4,8 @@ namespace Stripe\Services;
 
 use AuthGroups\Models\Group;
 use AuthGroups\Models\User;
+use Access\Config\ResourceCaps;
+use Access\Services\ResourceCapService;
 use Stripe\Config\CmemPlans;
 use Stripe\Models\StripeSubscription;
 
@@ -21,21 +23,24 @@ class EntitlementService
 
     /**
      * Caps cmem effectifs pour un user (utilisé par les points d'enforcement).
+     * Phase 3 bis (#294) : défaut ResourceCaps + surcharge utilisateur — plus aucune
+     * lecture de plan (CmemPlans) pour les caps.
      */
     public static function getFeaturesForUser(int $userId): array
     {
-        $userData = (new User())->findById($userId);
-        $override = $userData['cmem_plan_override'] ?? null;
-        return self::getEffectivePlanForCmem($userId, $override)['features'];
+        return (new ResourceCapService())->effectiveForUser($userId);
     }
 
     /**
      * Vérifie un quota cmem. Retourne null si sous la limite, sinon le payload d'erreur
      * QUOTA_EXCEEDED (à passer tel quel dans Response::error(..., $payload, 403)).
+     * Ressource de groupe (max_group_members) : passer $groupId → surcharge du groupe.
      */
-    public static function checkQuota(int $userId, string $resourceKey, int $currentCount): ?array
+    public static function checkQuota(int $userId, string $resourceKey, int $currentCount, ?int $groupId = null): ?array
     {
-        $features = self::getFeaturesForUser($userId);
+        $features = ($groupId !== null && ResourceCaps::isGroupKey($resourceKey))
+            ? (new ResourceCapService())->effectiveForGroup($groupId)
+            : self::getFeaturesForUser($userId);
         $limit    = $features[$resourceKey] ?? null;
 
         if ($limit !== null && $currentCount >= $limit) {
@@ -75,11 +80,12 @@ class EntitlementService
                     'source'   => 'group',
                     'status'   => $sub['status'],
                     'group_id' => $groupId,
-                    'features' => CmemPlans::get($sub['plan']),
                 ];
             }
         }
 
+        // Caps (#294) : défaut + surcharge utilisateur, indépendants du plan.
+        $best['features'] = self::getFeaturesForUser($userId);
         return $best;
     }
 
@@ -93,7 +99,6 @@ class EntitlementService
                 'code'     => $code,
                 'source'   => 'stripe',
                 'status'   => $sub['status'],
-                'features' => CmemPlans::get($code),
             ];
         }
 
@@ -102,7 +107,6 @@ class EntitlementService
                 'code'     => $planOverride,
                 'source'   => 'override',
                 'status'   => null,
-                'features' => CmemPlans::get($planOverride),
             ];
         }
 
@@ -110,7 +114,6 @@ class EntitlementService
             'code'     => 'free',
             'source'   => 'default',
             'status'   => null,
-            'features' => CmemPlans::get('free'),
         ];
     }
 
@@ -123,21 +126,12 @@ class EntitlementService
     {
         $sub = (new StripeSubscription())->findByGroupAndApps($groupId, self::CMEM_APP_IDS);
 
-        if ($sub && in_array($sub['status'], self::ACTIVE_STATUSES, true)) {
-            $code = $sub['plan'];
-            return [
-                'code'     => $code,
-                'source'   => 'stripe',
-                'status'   => $sub['status'],
-                'features' => CmemPlans::get($code),
-            ];
-        }
+        $plan = ($sub && in_array($sub['status'], self::ACTIVE_STATUSES, true))
+            ? ['code' => $sub['plan'], 'source' => 'stripe', 'status' => $sub['status']]
+            : ['code' => 'free', 'source' => 'default', 'status' => null];
 
-        return [
-            'code'     => 'free',
-            'source'   => 'default',
-            'status'   => null,
-            'features' => CmemPlans::get('free'),
-        ];
+        // Caps (#294) : défaut + surcharge du groupe, indépendants du plan.
+        $plan['features'] = (new ResourceCapService())->effectiveForGroup($groupId);
+        return $plan;
     }
 }
