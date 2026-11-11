@@ -114,6 +114,29 @@ class EmailNotificationQueue extends BaseModel
     }
 
     /**
+     * Annule une notification en attente (occurrence annulée au moment de l'envoi).
+     */
+    public static function cancelOneById(int $id): void
+    {
+        self::getStaticDb()->prepare(
+            "UPDATE email_notification_queue SET status = 'cancelled', updated_at = NOW()
+             WHERE id = ? AND status = 'pending'"
+        )->execute([$id]);
+    }
+
+    /**
+     * Supprime les notifications en attente d'un événement (série replanifiée par le cron).
+     */
+    public static function deletePendingForEvent(int $eventId): int
+    {
+        $stmt = self::getStaticDb()->prepare(
+            "DELETE FROM email_notification_queue WHERE event_id = ? AND status = 'pending'"
+        );
+        $stmt->execute([$eventId]);
+        return $stmt->rowCount();
+    }
+
+    /**
      * Annule une notification spécifique si elle est encore en attente.
      * Retourne false si introuvable ou déjà envoyée.
      */

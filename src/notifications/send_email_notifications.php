@@ -19,7 +19,11 @@
  * Test manuel (SSH) :
  *   /usr/local/bin/php /home/lmdkhdg5/cmem2.journauxdebord.com/src/notifications/send_email_notifications.php
  *
- * Dry-run (liste ce qui serait envoyé sans envoyer) :
+ * Options :
+ *   --plan-only     planifie les rappels des séries sans rien envoyer
+ *   --horizon=H     fenêtre de planification des séries en heures (défaut 48)
+ *
+ * Dry-run (liste ce qui serait envoyé sans envoyer ni planifier) :
  *   /usr/local/bin/php /home/lmdkhdg5/cmem2.journauxdebord.com/src/notifications/send_email_notifications.php --dry-run
  */
 
@@ -44,12 +48,29 @@ use AuthGroups\Services\LogService;
 // ------------------------------------------------------------------
 // Arguments CLI
 // ------------------------------------------------------------------
-$dryRun    = in_array('--dry-run', $argv, true);
-$batchSize = 50;
+$dryRun       = in_array('--dry-run', $argv, true);
+$planOnly     = in_array('--plan-only', $argv, true);
+$batchSize    = 50;
+$horizonHours = 48;
 foreach ($argv as $arg) {
     if (str_starts_with($arg, '--batch=')) {
         $batchSize = max(1, (int)substr($arg, 8));
     }
+    if (str_starts_with($arg, '--horizon=')) {
+        $horizonHours = max(1, min(24 * 31, (int)substr($arg, 10)));
+    }
+}
+
+// ------------------------------------------------------------------
+// Verrou : une seule exécution à la fois (cron relancé / chevauchement)
+// → aucun doublon de planification ni d'envoi (directive #438).
+// Fichier propre à l'installation (prod et dev partagent le même /tmp).
+// ------------------------------------------------------------------
+$lockFile = sys_get_temp_dir() . '/cmem2_email_notifications_' . md5($rootDir) . '.lock';
+$lockFp   = fopen($lockFile, 'c');
+if ($lockFp === false || !flock($lockFp, LOCK_EX | LOCK_NB)) {
+    echo date('[Y-m-d H:i:s]') . " Exécution précédente encore active — sortie." . PHP_EOL;
+    exit(0);
 }
 
 // ------------------------------------------------------------------
@@ -71,6 +92,16 @@ if ($dryRun) {
 }
 
 try {
+    // Rappels des occurrences de séries sur la fenêtre glissante (directive #438)
+    $plan = EmailNotificationService::planRecurringReminders($horizonHours);
+    echo date('[Y-m-d H:i:s]') . " Séries : {$plan['events']} événement(s), "
+       . "planifiés: {$plan['planned']}, recalés: {$plan['updated']}, retirés: {$plan['removed']} "
+       . "(horizon {$horizonHours} h)" . PHP_EOL;
+
+    if ($planOnly) {
+        exit(0);
+    }
+
     $stats = EmailNotificationService::processDueNotifications($batchSize);
 
     $elapsed = round(microtime(true) - $start, 3);

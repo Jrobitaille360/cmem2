@@ -9,6 +9,16 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+### Changé
+
+- `POST /calendars/{id}/events` et `PUT /calendars/{id}/events/{eventId}` : un rappel `notifications[]` d'un autre type que `EMAIL` (`DISPLAY`, `notification`, `AUDIO`) répond `422` avec `errors.code` = `REMINDER_CHANNEL_UNSUPPORTED` (directive cmem_web #440). Avant, il était enregistré mais jamais envoyé. L'import `.ics` reste permissif : un `VALARM ACTION:DISPLAY` est conservé sans envoi, l'import réussit. Les données existantes ne sont pas touchées (58 événements DISPLAY en prod le 2026-11-10, convertis plus tard par le plan #236).
+
+### Corrigé
+
+- Rappels courriel des événements récurrents : chaque occurrence reçoit désormais son rappel, pas seulement la première (directive cmem_web #438). Le cron `send_email_notifications.php` planifie les occurrences sur une fenêtre glissante de 48 h (`--horizon`, `--plan-only`). Il respecte les occurrences annulées (EXDATE) et déplacées, dans le fuseau de l'événement, sans doublon (clé événement + occurrence + délai, verrou fichier). Le courriel affiche la date et l'heure réelles de l'occurrence. Voir `docs/cron.md`. La crontab ne change pas.
+- Rappels courriel saisis avec la clé `minutes` (acceptée par le validateur, et utilisée par l'import `.ics` `ACTION:EMAIL`) au lieu de `minutes_before` : ils sont maintenant planifiés (2 événements concernés en prod).
+- Tests : `private/tests/test_ics_email_recurring_reminders.php`, section 4 de `test_ics_email_notifications.php` réécrite (422 DISPLAY, import `.ics` DISPLAY).
+
 ## [2.19.1] — 2026-11-09
 
 ### Corrigé

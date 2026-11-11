@@ -675,7 +675,7 @@ class EventOccurrence extends BaseModel
     /**
      * Expanse un seul événement (récurrent ou non) sur une plage, exceptions appliquées.
      */
-    private static function expandEventInRange(array $event, string $start, string $end): array
+    public static function expandEventInRange(array $event, string $start, string $end): array
     {
         // Événement sans RRULE ni RDATE : occurrence unique s'il chevauche la plage.
         if (empty($event['recurrence_rule']) && empty($event['rdate'])) {

@@ -24,6 +24,32 @@ Snapshot du crontab serveur (`lmdkhdg5@15.235.14.237:27`), relevé le 2026-07-15
   n'est pas un cron cmem2_API géré via `src/cron/maintenance.php`, à ne pas confondre.
 - Référence complète du script maintenance : `src/cron/maintenance.php` (en-tête du fichier).
 
+## Rappels courriel des séries (directive #438)
+
+Depuis le 2026-11-10, `send_email_notifications.php` fait deux passes à chaque minute. La
+crontab ne change pas.
+
+1. **Planification** (`planRecurringReminders`) : pour chaque événement récurrent (RRULE/RDATE)
+   avec un rappel `EMAIL`, les occurrences sont calculées dans le fuseau de l'événement. Une ligne
+   est créée dans `email_notification_queue` pour chaque rappel dont l'heure tombe dans la fenêtre
+   glissante (`--horizon`, 48 h par défaut ; marge de retard de 15 min).
+   - Occurrence annulée (EXDATE, `DELETE only_this`) : pas de rappel, la ligne en attente est
+     retirée.
+   - Occurrence déplacée : `fire_at` est recalé sur la nouvelle heure.
+   - Idempotence sur (`event_id`, `occurrence_key`, `minutes_before`) : une ligne existante n'est
+     jamais recréée, y compris une ligne annulée par l'usager.
+2. **Envoi** (`processDueNotifications`) : le courriel reprend la date, l'heure et les
+   modifications de l'occurrence visée. Une occurrence annulée entre-temps passe en `cancelled`
+   sans envoi.
+
+Un verrou fichier (`/tmp/cmem2_email_notifications_<md5 racine>.lock`, propre à chaque
+installation) empêche deux exécutions simultanées.
+
+```bash
+php src/notifications/send_email_notifications.php --plan-only --horizon=168   # planifie sans envoyer
+php src/notifications/send_email_notifications.php --dry-run                  # liste les envois dus, n'écrit rien
+```
+
 ## Roulement d'horizon booking (réservation publique)
 
 `src/cron/booking_regenerate.php` — pour chaque `booking_pages.active = 1`, régénère les zones
