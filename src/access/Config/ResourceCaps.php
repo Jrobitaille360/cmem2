@@ -6,7 +6,7 @@ namespace Access\Config;
  * Caps de ressources — grille par défaut (plan accès sur approbation #269, Phase 3 bis, task #292).
  *
  * Résolution à trois niveaux (voir EntitlementService::checkQuota) :
- *   1. défaut : cette grille (reprise de l'ancien plan « monthly » de Stripe\Config\CmemPlans) ;
+ *   1. défaut : cette grille (reprise de l'ancien plan « monthly » de l'ex-CmemPlans, retiré avec Stripe) ;
  *   2. par groupe : table group_resource_caps (seulement les clés de GROUP_KEYS) ;
  *   3. par utilisateur : table user_resource_caps (toutes les autres clés).
  * Une surcharge à NULL = illimité explicite.

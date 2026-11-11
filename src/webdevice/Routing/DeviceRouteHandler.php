@@ -9,7 +9,7 @@ use WebDevice\Controllers\WebDeviceController;
 
 /**
  * /v2/devices/{android|web|windows}/* — enregistrement d'appareil et pseudonyme.
- * Extrait de l'ancien Playstore\Routing\PlaystoreRouteHandler (#298) : le lien
+ * Extrait de l'ancien routeur Play Store (#298) : le lien
  * d'appareil n'a rien à voir avec le paiement et survit au retrait du Play Store.
  */
 class DeviceRouteHandler extends BaseRouteHandler

@@ -78,7 +78,7 @@ class PuzzleRouteHandler extends BaseRouteHandler
                 return;
             }
 
-            Response::error('Endpoint supprimé — utilisez /v2/devices/* et /v2/subscriptions/*', null, 410);
+            Response::error('Endpoint supprimé — utilisez /v2/devices/*', null, 410);
             return;
         }
 

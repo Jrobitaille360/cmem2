@@ -404,36 +404,3 @@ define('MAX_TRENDING_TAGS', (int)($_ENV['MAX_TRENDING_TAGS'] ?? 20));
 // Configuration de la pagination
 define('DEFAULT_PAGE_SIZE', (int)($_ENV['DEFAULT_PAGE_SIZE'] ?? 20));
 define('MAX_PAGE_SIZE', (int)($_ENV['MAX_PAGE_SIZE'] ?? 100));
-
-// ============================================
-// STRIPE — Paiements et abonnements
-// ============================================
-if (!defined('STRIPE_SECRET_KEY')) {
-    define('STRIPE_SECRET_KEY',           $_ENV['STRIPE_SECRET_KEY']           ?? '');
-}
-if (!defined('STRIPE_WEBHOOK_SECRET')) {
-    define('STRIPE_WEBHOOK_SECRET',       $_ENV['STRIPE_WEBHOOK_SECRET']       ?? '');
-}
-if (!defined('STRIPE_PRICE_PUZZLE_MONTHLY')) {
-    define('STRIPE_PRICE_PUZZLE_MONTHLY', $_ENV['STRIPE_PRICE_PUZZLE_MONTHLY'] ?? '');
-}
-if (!defined('STRIPE_PRICE_PUZZLE_YEARLY')) {
-    define('STRIPE_PRICE_PUZZLE_YEARLY',  $_ENV['STRIPE_PRICE_PUZZLE_YEARLY']  ?? '');
-}
-if (!defined('STRIPE_PRICE_CMEM_MONTHLY')) {
-    define('STRIPE_PRICE_CMEM_MONTHLY',   $_ENV['STRIPE_PRICE_CMEM_MONTHLY']   ?? '');
-}
-if (!defined('STRIPE_PRICE_CMEM_YEARLY')) {
-    define('STRIPE_PRICE_CMEM_YEARLY',    $_ENV['STRIPE_PRICE_CMEM_YEARLY']    ?? '');
-}
-// Tenant cmemweb (client cmem_web) — mêmes prix que CMEM (voir docs/docs-api/stripe/TENANT_CMEMWEB.md)
-if (!defined('STRIPE_PRICE_CMEMWEB_MONTHLY')) {
-    define('STRIPE_PRICE_CMEMWEB_MONTHLY', $_ENV['STRIPE_PRICE_CMEMWEB_MONTHLY'] ?? '');
-}
-if (!defined('STRIPE_PRICE_CMEMWEB_YEARLY')) {
-    define('STRIPE_PRICE_CMEMWEB_YEARLY',  $_ENV['STRIPE_PRICE_CMEMWEB_YEARLY']  ?? '');
-}
-// Plan Équipe (groupe) — directive plan-equipe 20260813
-if (!defined('STRIPE_PRICE_CMEMWEB_TEAM')) {
-    define('STRIPE_PRICE_CMEMWEB_TEAM',    $_ENV['STRIPE_PRICE_CMEMWEB_TEAM']    ?? '');
-}

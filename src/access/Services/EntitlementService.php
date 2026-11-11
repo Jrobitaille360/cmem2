@@ -2,28 +2,25 @@
 
 namespace Access\Services;
 
-use AuthGroups\Models\Group;
-use AuthGroups\Models\User;
 use Access\Config\ResourceCaps;
-use Stripe\Config\CmemPlans;
-use Stripe\Models\StripeSubscription;
 
 /**
- * Résolution du plan effectif cmem — phase 7a.
- * Ordre de priorité : stripe_subscriptions actif (tenant cmem) > users.cmem_plan_override > 'free'.
- * Tenant cmem = app_id 'cmemweb' (primaire) + 'cmem' (alias legacy, voir docs/docs-api/stripe/TENANT_CMEMWEB.md).
+ * Plan effectif et caps cmem.
+ *
+ * Depuis le retrait de Stripe (plan accès sur approbation #269, tâche #300), il n'existe
+ * plus d'abonnement : le plan effectif vaut users.cmem_plan_override (seul « ami » est
+ * assignable) ou 'free'. Il ne décide plus de rien — la disponibilité des modules vient de
+ * user_module_grants (ModuleGrantService) et les caps de ResourceCapService. Le champ
+ * « plan » reste exposé (/auth/me, GET /modules) pour ne pas casser le contrat client.
  */
 class EntitlementService
 {
-    private const ACTIVE_STATUSES = ['trialing', 'active', 'past_due'];
-
-    /** app_id de la famille tenant cmem — 'cmemweb' primaire, 'cmem' conservé en alias. */
-    private const CMEM_APP_IDS = ['cmemweb', 'cmem'];
+    /** Codes assignables via users.cmem_plan_override (admin). */
+    public const OVERRIDABLE_PLAN_CODES = ['ami'];
 
     /**
      * Caps cmem effectifs pour un user (utilisé par les points d'enforcement).
-     * Phase 3 bis (#294) : défaut ResourceCaps + surcharge utilisateur — plus aucune
-     * lecture de plan (CmemPlans) pour les caps.
+     * Phase 3 bis (#294) : défaut ResourceCaps + surcharge utilisateur.
      */
     public static function getFeaturesForUser(int $userId): array
     {
@@ -54,83 +51,25 @@ class EntitlementService
         return null;
     }
 
-    /**
-     * Plan effectif = meilleur de (plan perso, plan de chaque groupe actif dont l'usager est
-     * membre) — directive plan-equipe 20260813_143000. Le plan perso se résout d'abord comme
-     * avant (stripe > override > free) ; les groupes actifs sont ensuite comparés via
-     * CmemPlans::rank(). Égalité de rang : le perso gagne sur un groupe ; entre deux groupes,
-     * le plus petit group_id gagne (déterministe).
-     */
+    /** Plan effectif d'un usager : override admin, sinon 'free'. */
     public static function getEffectivePlanForCmem(int $userId, ?string $planOverride): array
     {
-        $personal = self::resolvePersonalPlan($userId, $planOverride);
-        $best     = $personal;
+        $plan = $planOverride
+            ? ['code' => $planOverride, 'source' => 'override', 'status' => null]
+            : ['code' => 'free',        'source' => 'default',  'status' => null];
 
-        $groupIds = (new Group())->getActiveGroupIdsByUserId($userId);
-        foreach ($groupIds as $groupId) {
-            $sub = (new StripeSubscription())->findByGroupAndApps($groupId, self::CMEM_APP_IDS);
-            if (!$sub || !in_array($sub['status'], self::ACTIVE_STATUSES, true)) {
-                continue;
-            }
-
-            if (CmemPlans::rank($sub['plan']) > CmemPlans::rank($best['code'])) {
-                $best = [
-                    'code'     => $sub['plan'],
-                    'source'   => 'group',
-                    'status'   => $sub['status'],
-                    'group_id' => $groupId,
-                ];
-            }
-        }
-
-        // Caps (#294) : défaut + surcharge utilisateur, indépendants du plan.
-        $best['features'] = self::getFeaturesForUser($userId);
-        return $best;
+        $plan['features'] = self::getFeaturesForUser($userId);
+        return $plan;
     }
 
-    private static function resolvePersonalPlan(int $userId, ?string $planOverride): array
+    /** Plan effectif d'un groupe : toujours 'free' (plus d'abonnement de groupe). */
+    public static function getEffectivePlanForGroup(int $groupId): array
     {
-        $sub = (new StripeSubscription())->findByUserAndApps($userId, self::CMEM_APP_IDS);
-
-        if ($sub && in_array($sub['status'], self::ACTIVE_STATUSES, true)) {
-            $code = $sub['plan'];
-            return [
-                'code'     => $code,
-                'source'   => 'stripe',
-                'status'   => $sub['status'],
-            ];
-        }
-
-        if ($planOverride) {
-            return [
-                'code'     => $planOverride,
-                'source'   => 'override',
-                'status'   => null,
-            ];
-        }
-
         return [
             'code'     => 'free',
             'source'   => 'default',
             'status'   => null,
+            'features' => (new ResourceCapService())->effectiveForGroup($groupId),
         ];
-    }
-
-    /**
-     * Plan effectif d'un GROUPE — pas de fusion avec les membres, juste l'abonnement propre
-     * du groupe ou 'free'. Utilisé par GroupModuleController pour le gating des modules
-     * de groupe.
-     */
-    public static function getEffectivePlanForGroup(int $groupId): array
-    {
-        $sub = (new StripeSubscription())->findByGroupAndApps($groupId, self::CMEM_APP_IDS);
-
-        $plan = ($sub && in_array($sub['status'], self::ACTIVE_STATUSES, true))
-            ? ['code' => $sub['plan'], 'source' => 'stripe', 'status' => $sub['status']]
-            : ['code' => 'free', 'source' => 'default', 'status' => null];
-
-        // Caps (#294) : défaut + surcharge du groupe, indépendants du plan.
-        $plan['features'] = (new ResourceCapService())->effectiveForGroup($groupId);
-        return $plan;
     }
 }

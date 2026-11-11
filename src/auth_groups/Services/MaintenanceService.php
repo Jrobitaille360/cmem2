@@ -356,7 +356,6 @@ class MaintenanceService implements MaintenanceTaskInterface
                     'groupes transférés' => $report['groups_transferred'],
                     'groupes supprimés'  => $report['groups_deleted'],
                     'casse-têtes'        => $report['puzzles_reassigned'],
-                    'facturation'        => $report['billing_archived'],
                 ];
 
                 foreach ($report['warnings'] as $warning) {

@@ -5,16 +5,15 @@ namespace AuthGroups\Routing\RouteHandlers;
 use Access\Routing\AccessRouteHandler;
 use AuthGroups\Routing\BaseRouteHandler;
 use AuthGroups\Utils\Response;
-use Playstore\Routing\PlaystoreRouteHandler;
 use Puzzle\Routing\PuzzleRouteHandler;
-use Stripe\Routing\StripeRouteHandler;
 use WebDevice\Routing\DeviceRouteHandler;
 
 /**
  * V2RouteHandler — dispatch /v2/{module}/* vers les handlers de modules v2.
  *
  * segments[0] = 'v2'
- * segments[1] = module : devices, subscriptions, billing, access, puzzle
+ * segments[1] = module : devices, access, puzzle
+ * (/v2/billing/* et /v2/subscriptions/* retirés avec Stripe / Play Store — #300)
  */
 class V2RouteHandler extends BaseRouteHandler
 {
@@ -34,9 +33,6 @@ class V2RouteHandler extends BaseRouteHandler
         $handler = match (true) {
             $s1 === 'puzzle'                               => new PuzzleRouteHandler($this->authService),
             $s1 === 'devices'                              => new DeviceRouteHandler($this->authService),
-            $s1 === 'subscriptions' && $s2 === 'playstore' => new PlaystoreRouteHandler($this->authService),
-            $s1 === 'subscriptions' && $s2 === 'stripe'    => new StripeRouteHandler($this->authService),
-            $s1 === 'billing'                              => new StripeRouteHandler($this->authService),
             $s1 === 'access'                               => new AccessRouteHandler($this->authService),
             default                                        => null,
         };

@@ -14,7 +14,7 @@ use AuthGroups\Services\LogService;
 use AuthGroups\Services\RateLimitService;
 use AuthGroups\Services\UserSessionService;
 use AuthGroups\Middleware\LoggingMiddleware;
-use Stripe\Config\CmemPlans;
+use Access\Services\EntitlementService;
 use Exception;
 
 /**
@@ -392,66 +392,6 @@ class UserManagerController {
     }
 
     /**
-     * Filet Stripe avant suppression de compte.
-     *
-     * Annule un abonnement encore actif ; si l'appel Stripe échoue, refuse la
-     * suppression (409) plutôt que de laisser un compte supprimé être facturé.
-     *
-     * @return bool true si la suppression peut se poursuivre.
-     */
-    private function cancelStripeSafetyNet($userId): bool
-    {
-        if (!class_exists('\Stripe\Services\StripeSubscriptionService')) {
-            return true; // Module Stripe non activé sur cette installation
-        }
-
-        try {
-            $db   = \Database::getInstance()->getConnection();
-            $stmt = $db->prepare(
-                "SELECT app_id FROM stripe_subscriptions
-                  WHERE user_id = ?
-                    AND status IN ('active', 'trialing', 'past_due')
-                    AND cancel_at_period_end = 0"
-            );
-            $stmt->execute([$userId]);
-            $appIds = $stmt->fetchAll(\PDO::FETCH_COLUMN);
-        } catch (\Throwable $e) {
-            // Table absente : rien à annuler.
-            return true;
-        }
-
-        foreach ($appIds as $appId) {
-            try {
-                \Stripe\Services\StripeSubscriptionService::cancel((int) $userId, (string) $appId);
-                LogService::info('Abonnement Stripe annulé avant suppression de compte', [
-                    'user_id' => $userId,
-                    'app_id'  => $appId,
-                ]);
-            } catch (\Throwable $e) {
-                LogService::error('Annulation Stripe impossible — suppression refusée', [
-                    'user_id' => $userId,
-                    'app_id'  => $appId,
-                    'error'   => $e->getMessage(),
-                ]);
-                LoggingMiddleware::logExit(409);
-                Response::error(
-                    'Impossible d\'annuler l\'abonnement Stripe — suppression annulée',
-                    [
-                        'error_code' => 'STRIPE_CANCEL_FAILED',
-                        'message'    => 'L\'abonnement n\'a pas pu être annulé. Réessayez plus tard '
-                                      . 'ou annulez-le avant de supprimer le compte.',
-                        'app_id'     => $appId,
-                    ],
-                    409
-                );
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    /**
      * Supprimer un utilisateur (soft delete)
      */
     public function delete($userId, $currentUserId, $currentUserRole) {
@@ -503,13 +443,6 @@ class UserManagerController {
 
                 $force_delete = $input['force_delete']?? false; // Par défaut, on fait un soft delete
             }
-            // Filet Stripe — un compte supprimé qui reste facturé est le pire scénario.
-            // Le client annule normalement avant d'appeler cette route ; le serveur ne
-            // peut pas en dépendre (autre client, coupure réseau, appel direct à l'API).
-            if (!$force_delete && !$this->cancelStripeSafetyNet($userId)) {
-                return false; // Réponse 409 déjà envoyée
-            }
-
             if( $user->delete($force_delete)){
                 LogService::info("Utilisateur supprimé (force delete = $force_delete)", [
                     'deleted_user_id' => $userId,
@@ -768,7 +701,7 @@ class UserManagerController {
             }
 
             $planOverride = $input['cmem_plan_override'];
-            if ($planOverride !== null && !in_array($planOverride, CmemPlans::overridableCodes(), true)) {
+            if ($planOverride !== null && !in_array($planOverride, EntitlementService::OVERRIDABLE_PLAN_CODES, true)) {
                 LoggingMiddleware::logExit(422);
                 Response::error('Données de validation invalides', ['cmem_plan_override' => ['valeur non reconnue']], 422);
                 return false;
