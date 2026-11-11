@@ -53,6 +53,7 @@ class Router
             'modules'      => fn() => new ModuleRouteHandler($auth),
             'ai'           => fn() => new AiRouteHandler($auth),
             'invitations'  => fn() => new \Access\Routing\InvitationRouteHandler($auth),
+            'caps'         => fn() => new \Access\Routing\CapsRouteHandler($auth),
             'v2'           => fn() => new V2RouteHandler($auth),
         ];
 

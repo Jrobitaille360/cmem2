@@ -9,7 +9,13 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+### Ajouté
+
+- Caps de ressources à trois niveaux (plan #269, Phase 3 bis, tâches #293 à #295) : défaut `Access\Config\ResourceCaps` (ancien plan monthly) → surcharge par groupe (`max_group_members`) → surcharge par utilisateur (autres clés), `null` = illimité explicite. Endpoints ADMINISTRATEUR+ : `GET /caps/defaults`, `GET/PUT /users/{id}/caps`, `GET/PUT /groups/{id}/caps`. Migration pendante `docs/20261109_resource_caps.sql` (tables `user_resource_caps`, `group_resource_caps`), appliquée sur dev le 2026-11-10.
+
 ### Changé
+
+- Quotas (`QUOTA_EXCEEDED`, contrat 403 inchangé) et `GET /auth/me` (`data.user.plan.features`) : les caps ne dépendent plus du plan Stripe / `cmem_plan_override`. Tous les comptes passent au défaut (plus large que l'ancien plan free : 25 calendriers, 2000 contacts, etc.). `max_group_members` est maintenant vérifié à l'ajout direct d'un membre (`POST /groups/{id}/members/{user_id}`) et à l'acceptation d'une invitation de groupe.
 
 - `POST /calendars/{id}/events` et `PUT /calendars/{id}/events/{eventId}` : un rappel `notifications[]` d'un autre type que `EMAIL` (`DISPLAY`, `notification`, `AUDIO`) répond `422` avec `errors.code` = `REMINDER_CHANNEL_UNSUPPORTED` (directive cmem_web #440). Avant, il était enregistré mais jamais envoyé. L'import `.ics` reste permissif : un `VALARM ACTION:DISPLAY` est conservé sans envoi, l'import réussit. Les données existantes ne sont pas touchées (58 événements DISPLAY en prod le 2026-11-10, convertis plus tard par le plan #236).
 

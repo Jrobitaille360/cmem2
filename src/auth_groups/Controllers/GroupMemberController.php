@@ -305,6 +305,18 @@ class GroupMemberController
                 Response::error('L\'utilisateur est déjà membre de ce groupe', null, 400);
             }
 
+            // Cap max_group_members du groupe (défaut ou surcharge de groupe — #294)
+            $quotaError = \Stripe\Services\EntitlementService::checkQuota(
+                (int) $currentUserId,
+                'max_group_members',
+                $group->countMembers($groupId),
+                (int) $groupId
+            );
+            if ($quotaError) {
+                LoggingMiddleware::logExit(403);
+                Response::error('Quota de membres du groupe atteint', $quotaError, 403);
+            }
+
             // Ajouter le membre directement
             $success = $group->addMemberDirect($groupId, $userId, $role, $currentUserId);
 

@@ -1,8 +1,8 @@
 {
   "api": {
     "name": "Access Module",
-    "version": "1.2.0",
-    "description": "Endpoint d'accès unifié (JWT) — agrège Stripe pour retourner la matrice d'accès premium par plateforme. Couvre web et windows. Android utilise GET /v2/subscriptions/playstore/status (X-Device-Token) directement. Introduit en v2.7.0. Après v2.18.0 : accès sur approbation (statut pending/approved/suspended, /invitations).",
+    "version": "1.3.0",
+    "description": "Endpoint d'accès unifié (JWT) — agrège Stripe pour retourner la matrice d'accès premium par plateforme. Couvre web et windows. Android utilise GET /v2/subscriptions/playstore/status (X-Device-Token) directement. Introduit en v2.7.0. Après v2.18.0 : accès sur approbation (statut pending/approved/suspended, /invitations). Phase 3 bis : caps de ressources à trois niveaux (/caps/defaults, /users/{id}/caps, /groups/{id}/caps).",
     "generated": "2026-05-24",
     "base_url": "/v2",
     "authentication": {
@@ -282,6 +282,134 @@
             "403": "rôle insuffisant",
             "404": "utilisateur introuvable",
             "422": "modules absent, pas un tableau, ou clé inconnue"
+          }
+        }
+      ]
+    },
+    "caps": {
+      "description": "Caps de ressources à trois niveaux (plan #269, Phase 3 bis, tâches #293-#295) — ADMINISTRATEUR+. Défaut (ancien plan monthly) → surcharge par groupe (max_group_members) → surcharge par utilisateur (autres clés). value null = illimité explicite. Les quotas (403 QUOTA_EXCEEDED { code, resource, limit, current }) et GET /auth/me (data.user.plan.features) reflètent les caps effectifs ; plus aucune lecture du plan Stripe pour les caps.",
+      "auth_required": true,
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/caps/defaults",
+          "auth_required": true,
+          "role": "ADMINISTRATEUR+",
+          "description": "Grille par défaut et liste des clés de groupe.",
+          "responses": {
+            "200": {
+              "example": {
+                "success": true,
+                "message": "Caps par défaut",
+                "data": {
+                  "caps": {
+                    "max_calendars": 25,
+                    "max_journals": 2500,
+                    "max_tasks": 5000,
+                    "max_devices": 5,
+                    "max_storage_mb": 2000,
+                    "max_groups": 10,
+                    "max_group_members": 50,
+                    "max_contacts": 2000
+                  },
+                  "group_keys": [
+                    "max_group_members"
+                  ]
+                }
+              }
+            },
+            "403": "rôle insuffisant"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/users/{id}/caps",
+          "auth_required": true,
+          "role": "ADMINISTRATEUR+",
+          "description": "Surcharges de l'usager et caps effectifs (clés perso : défaut ou surcharge ; max_group_members : défaut).",
+          "responses": {
+            "200": {
+              "example": {
+                "success": true,
+                "message": "Caps de l'utilisateur",
+                "data": {
+                  "user_id": 42,
+                  "overrides": {
+                    "max_contacts": 2
+                  },
+                  "effective": {
+                    "max_calendars": 25,
+                    "max_journals": 2500,
+                    "max_tasks": 5000,
+                    "max_devices": 5,
+                    "max_storage_mb": 2000,
+                    "max_groups": 10,
+                    "max_group_members": 50,
+                    "max_contacts": 2
+                  }
+                }
+              }
+            },
+            "403": "rôle insuffisant",
+            "404": "utilisateur introuvable"
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/users/{id}/caps",
+          "auth_required": true,
+          "role": "ADMINISTRATEUR+",
+          "description": "Remplace toutes les surcharges de l'usager (clés absentes = retour au défaut ; {} = tout au défaut). Clés permises : max_calendars, max_journals, max_tasks, max_devices, max_storage_mb, max_groups, max_contacts.",
+          "body": {
+            "caps": "object (required) — { cle: entier ≥ 0 | null (illimité) }"
+          },
+          "responses": {
+            "200": "même forme que GET",
+            "403": "rôle insuffisant",
+            "404": "utilisateur introuvable",
+            "422": "caps absent ou pas un objet, clé inconnue ou de groupe, valeur négative ou non entière"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/groups/{id}/caps",
+          "auth_required": true,
+          "role": "ADMINISTRATEUR+",
+          "description": "Surcharges du groupe et caps effectifs du groupe (max_group_members).",
+          "responses": {
+            "200": {
+              "example": {
+                "success": true,
+                "message": "Caps du groupe",
+                "data": {
+                  "group_id": 7,
+                  "overrides": {
+                    "max_group_members": 10
+                  },
+                  "effective": {
+                    "max_group_members": 10
+                  }
+                }
+              }
+            },
+            "403": "rôle insuffisant",
+            "404": "groupe introuvable"
+          }
+        },
+        {
+          "method": "PUT",
+          "path": "/groups/{id}/caps",
+          "auth_required": true,
+          "role": "ADMINISTRATEUR+",
+          "description": "Remplace les surcharges du groupe. Seule clé permise : max_group_members. Appliqué à POST /groups/{id}/members/{user_id} et à l'acceptation d'invitation de groupe (403 QUOTA_EXCEEDED resource=max_group_members).",
+          "body": {
+            "caps": "object (required) — { max_group_members: entier ≥ 0 | null }"
+          },
+          "responses": {
+            "200": "même forme que GET",
+            "403": "rôle insuffisant",
+            "404": "groupe introuvable",
+            "422": "caps absent ou pas un objet, clé autre que max_group_members, valeur invalide"
           }
         }
       ]

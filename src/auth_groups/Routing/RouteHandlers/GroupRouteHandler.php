@@ -74,6 +74,16 @@ class GroupRouteHandler extends BaseRouteHandler
                 $this->validateIdAndCall($action, fn($groupId) =>
                     $this->memberController->getMembers($groupId, $user['user_id'], $user['role'])),
 
+            // GET /groups/{id}/caps — caps du groupe (ADMINISTRATEUR+, #295)
+            (isset($segments[2]) && $segments[2] === 'caps' && $method === 'GET' && !isset($segments[3])) =>
+                $this->validateIdAndCall($action, fn($groupId) =>
+                    (new \Access\Controllers\ResourceCapController())->getGroupCaps((int) $groupId, $user)),
+
+            // PUT /groups/{id}/caps — remplace les surcharges du groupe (ADMINISTRATEUR+, #295)
+            (isset($segments[2]) && $segments[2] === 'caps' && $method === 'PUT' && !isset($segments[3])) =>
+                $this->validateIdAndCall($action, fn($groupId) =>
+                    (new \Access\Controllers\ResourceCapController())->putGroupCaps((int) $groupId, $user)),
+
             // GET /groups/{id}/modules — plan équipe (directive 20260813_143000)
             (isset($segments[2]) && $segments[2] === 'modules' && $method === 'GET' && !isset($segments[3])) =>
                 $this->validateIdAndCall($action, fn($groupId) =>

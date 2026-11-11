@@ -280,7 +280,20 @@ class GroupInvitationController
                 Response::error('Ce groupe a atteint sa limite de membres', null, 400);
                 return false;
             }
-            
+
+            // Cap max_group_members du groupe (défaut ou surcharge de groupe — #294)
+            $quotaError = \Stripe\Services\EntitlementService::checkQuota(
+                (int) $currentUserId,
+                'max_group_members',
+                $memberCount,
+                (int) $invitationData['group_id']
+            );
+            if ($quotaError) {
+                LoggingMiddleware::logExit(403);
+                Response::error('Quota de membres du groupe atteint', $quotaError, 403);
+                return false;
+            }
+
             $addResult = $group->addMember($invitationData, $currentUserId);
             
             if (!$addResult['success']) {             
