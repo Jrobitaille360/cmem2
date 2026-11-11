@@ -2,44 +2,36 @@
 
 namespace Access\Services;
 
-use Stripe\Models\StripeSubscription;
+use AuthGroups\Models\User;
 
+/**
+ * Matrice d'accès GET /v2/access/status — plan accès sur approbation (#269, tâche #299).
+ *
+ * Plus d'abonnement : l'accès découle de users.access_status (approbation admin),
+ * identique sur toutes les plateformes. La source unique « approval » expose le
+ * statut et les modules disponibles (grants effectifs, groupes inclus).
+ * app_id reste accepté par le contrat mais n'influe plus sur le résultat.
+ */
 class AccessService
 {
-    // Android subscriptions (Playstore) are anonymous — no user_id linkage.
-    // Android clients query /v2/subscriptions/playstore/status directly via device_token.
-    // This JWT-based endpoint covers Stripe (web/windows) only.
-
     public static function getMatrix(int $userId, string $appId): array
     {
-        $stripeActive = self::isStripeActive($userId, $appId);
+        $user    = (new User())->findById($userId);
+        $status  = $user['access_status'] ?? 'approved';
+        $granted = $status === 'approved';
 
-        $matrix = [
-            'android' => $stripeActive,
-            'web'     => $stripeActive,
-            'windows' => $stripeActive,
+        return [
+            'matrix'  => [
+                'android' => $granted,
+                'web'     => $granted,
+                'windows' => $granted,
+            ],
+            'sources' => [[
+                'provider'   => 'approval',
+                'status'     => $status,
+                'expires_at' => null,
+                'modules'    => $granted ? (new ModuleGrantService())->effectiveGrantsFor($userId) : [],
+            ]],
         ];
-
-        $sources = [];
-
-        if ($stripeActive) {
-            $row       = (new StripeSubscription())->findByUserAndApp($userId, $appId);
-            $sources[] = [
-                'provider'   => 'stripe',
-                'status'     => $row['status'] ?? 'active',
-                'expires_at' => $row['expires_at'] ?? null,
-            ];
-        }
-
-        return ['matrix' => $matrix, 'sources' => $sources];
-    }
-
-    private static function isStripeActive(int $userId, string $appId): bool
-    {
-        $row = (new StripeSubscription())->findByUserAndApp($userId, $appId);
-        if (!$row) {
-            return false;
-        }
-        return \in_array($row['status'], ['active', 'trialing', 'past_due'], true);
     }
 }
