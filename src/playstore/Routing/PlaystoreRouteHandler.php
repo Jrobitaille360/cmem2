@@ -4,7 +4,7 @@ namespace Playstore\Routing;
 
 use AuthGroups\Routing\BaseRouteHandler;
 use AuthGroups\Utils\Response;
-use Playstore\Controllers\DeviceController;
+use WebDevice\Controllers\DeviceController;
 use Playstore\Controllers\SubscriptionController;
 use WebDevice\Controllers\WebDeviceController;
 
@@ -150,7 +150,7 @@ class PlaystoreRouteHandler extends BaseRouteHandler
                 return;
             }
 
-            $device = (new \Playstore\Models\AndroidDevice())->findByValidToken($deviceToken);
+            $device = (new \WebDevice\Models\AndroidDevice())->findByValidToken($deviceToken);
 
             if (!$device) {
                 Response::error('Device token invalide ou expiré', null, 401);

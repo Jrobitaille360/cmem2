@@ -7,7 +7,7 @@ use AuthGroups\Middleware\LoggingMiddleware;
 use AuthGroups\Routing\BaseRouteHandler;
 use AuthGroups\Utils\Response;
 use AuthGroups\Utils\RoleHelper;
-use Playstore\Models\AndroidDevice;
+use WebDevice\Models\AndroidDevice;
 use Puzzle\Controllers\AdminController;
 use Puzzle\Controllers\CarouselController;
 use Puzzle\Controllers\ThemeController;

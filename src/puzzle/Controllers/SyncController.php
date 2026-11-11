@@ -5,7 +5,7 @@ namespace Puzzle\Controllers;
 use AuthGroups\Middleware\LoggingMiddleware;
 use AuthGroups\Models\AppUserSettings;
 use AuthGroups\Utils\Response;
-use Playstore\Models\AndroidDevice;
+use WebDevice\Models\AndroidDevice;
 use WebDevice\Models\WebDevice;
 
 /**

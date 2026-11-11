@@ -4,7 +4,7 @@ namespace Puzzle\Controllers;
 
 use AuthGroups\Middleware\LoggingMiddleware;
 use AuthGroups\Utils\Response;
-use Playstore\Models\AndroidDevice;
+use WebDevice\Models\AndroidDevice;
 use Puzzle\Models\PuzzleImage;
 use WebDevice\Models\WebDevice;
 

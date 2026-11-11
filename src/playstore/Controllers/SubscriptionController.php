@@ -1,6 +1,6 @@
 <?php
 
-namespace Playstore\Controllers;
+namespace WebDevice\Controllers;
 
 use AuthGroups\Middleware\LoggingMiddleware;
 use AuthGroups\Utils\Response;

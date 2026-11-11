@@ -1,6 +1,6 @@
 <?php
 
-namespace Playstore\Models;
+namespace WebDevice\Models;
 
 use AuthGroups\Models\BaseModel;
 use PDO;
