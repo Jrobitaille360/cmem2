@@ -9,9 +9,11 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+## [2.20.0] — 2026-11-10
+
 ### Ajouté
 
-- Caps de ressources à trois niveaux (plan #269, Phase 3 bis, tâches #293 à #295) : défaut `Access\Config\ResourceCaps` (ancien plan monthly) → surcharge par groupe (`max_group_members`) → surcharge par utilisateur (autres clés), `null` = illimité explicite. Endpoints ADMINISTRATEUR+ : `GET /caps/defaults`, `GET/PUT /users/{id}/caps`, `GET/PUT /groups/{id}/caps`. Migration pendante `docs/20261109_resource_caps.sql` (tables `user_resource_caps`, `group_resource_caps`), appliquée sur dev le 2026-11-10.
+- Caps de ressources à trois niveaux (plan #269, Phase 3 bis, tâches #293 à #295) : défaut `Access\Config\ResourceCaps` (ancien plan monthly) → surcharge par groupe (`max_group_members`) → surcharge par utilisateur (autres clés), `null` = illimité explicite. Endpoints ADMINISTRATEUR+ : `GET /caps/defaults`, `GET/PUT /users/{id}/caps`, `GET/PUT /groups/{id}/caps`. Migration `docs/v-2-20-0/20261109_resource_caps.sql` (tables `user_resource_caps`, `group_resource_caps`), appliquée sur dev et en prod le 2026-11-10 (intégrée dans `docs/v-2-20-0/build_DB-v-2.20.0.sql`).
 
 ### Changé
 
