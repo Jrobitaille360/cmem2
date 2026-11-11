@@ -304,7 +304,7 @@ class EmailNotificationService
             if (strtoupper($notif['type'] ?? '') !== 'EMAIL') {
                 continue;
             }
-            $minutes = (int)($notif['minutes_before'] ?? 0);
+            $minutes = (int)($notif['minutes_before'] ?? $notif['minutes'] ?? 0);
             if ($minutes <= 0) {
                 continue;
             }
@@ -337,8 +337,179 @@ class EmailNotificationService
      */
     public static function rescheduleEmailsForEvent(int $eventId, array $event, int $userId): void
     {
-        EmailNotificationQueue::cancelPendingForEvent($eventId);
+        if (!empty($event['recurrence_rule']) || !empty($event['rdate'])) {
+            // Série : les lignes en attente sont supprimées (pas annulées) pour que le
+            // balayage planRecurringReminders() les recrée selon les nouveaux rappels —
+            // une ligne 'cancelled' bloque la replanification (annulation manuelle).
+            EmailNotificationQueue::deletePendingForEvent($eventId);
+        } else {
+            EmailNotificationQueue::cancelPendingForEvent($eventId);
+        }
         self::scheduleEmailsForEvent($event, $userId);
+    }
+
+    /**
+     * Planifie les rappels EMAIL de chaque occurrence des événements récurrents sur une
+     * fenêtre glissante (cron, directive #438).
+     *
+     * - Occurrences calculées à la volée (RRULE/RDATE, fuseau de l'événement), exceptions
+     *   appliquées : occurrence annulée/EXDATE → pas de rappel, occurrence déplacée →
+     *   rappel calé sur la nouvelle heure.
+     * - Clé d'idempotence : (event_id, occurrence_key, minutes_before). Une ligne existante,
+     *   quel que soit son statut (dont 'cancelled' par l'usager), n'est jamais recréée.
+     * - Ligne en attente devenue sans objet (occurrence exclue/déplacée hors fenêtre) :
+     *   supprimée ; fire_at d'une ligne en attente recalé si l'occurrence a bougé.
+     *
+     * @param int $horizonHours Fenêtre de planification (fire_at ≤ maintenant + horizon)
+     * @return array ['events', 'planned', 'updated', 'removed']
+     */
+    public static function planRecurringReminders(int $horizonHours = 48): array
+    {
+        $stats = ['events' => 0, 'planned' => 0, 'updated' => 0, 'removed' => 0];
+        $db    = self::getDb();
+        $utc   = new DateTimeZone('UTC');
+
+        $now      = new DateTime('now', $utc);
+        $minFire  = (clone $now)->modify('-' . self::PLAN_GRACE_MINUTES . ' minutes');
+        $maxFire  = (clone $now)->modify("+{$horizonHours} hours");
+
+        $stmt = $db->query(
+            "SELECT e.*, c.user_id AS owner_id
+             FROM calendar_events e
+             JOIN calendars c ON c.id = e.calendar_id AND c.deleted_at IS NULL
+             WHERE e.deleted_at IS NULL
+               AND (e.status IS NULL OR e.status != 'cancelled')
+               AND ((e.recurrence_rule IS NOT NULL AND e.recurrence_rule != '')
+                    OR (e.rdate IS NOT NULL AND e.rdate != ''))
+               AND e.notifications LIKE '%EMAIL%'"
+        );
+
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $event) {
+            try {
+                self::planEventReminders($db, $event, $now, $minFire, $maxFire, $stats);
+            } catch (\Throwable $e) {
+                LogService::warning('EmailNotificationService::planRecurringReminders: événement ignoré', [
+                    'event_id' => $event['id'] ?? null,
+                    'error'    => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $stats;
+    }
+
+    /** Marge de retard acceptée pour planifier un rappel dont l'heure vient de passer (cron en retard). */
+    private const PLAN_GRACE_MINUTES = 15;
+
+    private static function planEventReminders(
+        PDO $db,
+        array $event,
+        DateTime $now,
+        DateTime $minFire,
+        DateTime $maxFire,
+        array &$stats
+    ): void {
+        $minutesList = [];
+        foreach (self::parseNotifications($event['notifications'] ?? null) as $notif) {
+            $m = (int)($notif['minutes_before'] ?? $notif['minutes'] ?? 0);
+            if (strtoupper($notif['type'] ?? '') === 'EMAIL' && $m > 0) {
+                $minutesList[$m] = true;
+            }
+        }
+        if (empty($minutesList)) {
+            return;
+        }
+
+        $userId   = (int)$event['owner_id'];
+        $userInfo = self::getUserNotificationInfo($userId);
+        if (!$userInfo || !$userInfo['email_notifications_enabled']) {
+            return;
+        }
+        $recipientEmail = $userInfo['notification_email'] ?: $userInfo['email'];
+        $eventId  = (int)$event['id'];
+        $timezone = $event['timezone'] ?: 'America/Montreal';
+        $tz       = new DateTimeZone($timezone);
+        $stats['events']++;
+
+        // Plage d'expansion (fuseau de l'événement) : couvre la fenêtre des fire_at
+        // + le plus grand délai de rappel, avec un jour de marge de chaque côté
+        // (occurrences déplacées d'un jour à l'autre).
+        $maxMinutes = max(array_keys($minutesList));
+        $rangeStart = (clone $minFire)->setTimezone($tz)->modify('-1 day');
+        $rangeEnd   = (clone $maxFire)->setTimezone($tz)->modify("+{$maxMinutes} minutes")->modify('+1 day');
+
+        $occurrences = \ICS\Models\EventOccurrence::expandEventInRange(
+            $event,
+            $rangeStart->format('Y-m-d H:i:s'),
+            $rangeEnd->format('Y-m-d H:i:s')
+        );
+
+        // Rappels voulus : "occurrence_key|minutes" → fire_at UTC
+        $desired = [];
+        foreach ($occurrences as $occ) {
+            $key = "{$eventId}_0_" . $occ['occurrence_date'];
+            foreach (array_keys($minutesList) as $m) {
+                $fireAt = self::calcFireAt($occ['start_datetime'], $timezone, $m);
+                if ($fireAt === null || $fireAt < $minFire || $fireAt > $maxFire) {
+                    continue;
+                }
+                $desired["{$key}|{$m}"] = $fireAt->format('Y-m-d H:i:s');
+            }
+        }
+
+        $rowsStmt = $db->prepare(
+            "SELECT id, occurrence_key, minutes_before, fire_at, status
+             FROM email_notification_queue WHERE event_id = ?"
+        );
+        $rowsStmt->execute([$eventId]);
+        $existing = [];
+        foreach ($rowsStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $existing["{$row['occurrence_key']}|{$row['minutes_before']}"][] = $row;
+        }
+
+        $minStr = $minFire->format('Y-m-d H:i:s');
+        $maxStr = $maxFire->format('Y-m-d H:i:s');
+
+        // Lignes en attente dans la fenêtre devenues sans objet → supprimées
+        foreach ($existing as $k => $rows) {
+            if (isset($desired[$k])) {
+                continue;
+            }
+            foreach ($rows as $row) {
+                if ($row['status'] === 'pending' && $row['fire_at'] >= $minStr && $row['fire_at'] <= $maxStr) {
+                    $db->prepare("DELETE FROM email_notification_queue WHERE id = ? AND status = 'pending'")
+                       ->execute([$row['id']]);
+                    $stats['removed']++;
+                }
+            }
+        }
+
+        foreach ($desired as $k => $fireAt) {
+            if (isset($existing[$k])) {
+                foreach ($existing[$k] as $row) {
+                    if ($row['status'] === 'pending' && $row['fire_at'] !== $fireAt) {
+                        $db->prepare(
+                            "UPDATE email_notification_queue SET fire_at = ?, updated_at = NOW()
+                             WHERE id = ? AND status = 'pending'"
+                        )->execute([$fireAt, $row['id']]);
+                        $stats['updated']++;
+                    }
+                }
+                continue;
+            }
+
+            [$occKey, $m] = explode('|', $k);
+            $entry                 = new EmailNotificationQueue();
+            $entry->userId         = $userId;
+            $entry->eventId        = $eventId;
+            $entry->calendarId     = (int)$event['calendar_id'];
+            $entry->occurrenceKey  = $occKey;
+            $entry->fireAt         = $fireAt;
+            $entry->minutesBefore  = (int)$m;
+            $entry->recipientEmail = $recipientEmail;
+            $entry->schedule();
+            $stats['planned']++;
+        }
     }
 
     /**
@@ -382,6 +553,15 @@ class EmailNotificationService
             if (!$eventData) {
                 EmailNotificationQueue::markAttemptFailed((int)$row['id'], 'Événement introuvable');
                 $stats['failed']++;
+                continue;
+            }
+
+            // Série : données de l'occurrence visée (date réelle, exceptions) ;
+            // occurrence annulée depuis la planification → pas d'envoi.
+            $eventData = self::resolveReminderOccurrence($eventData, (string)$row['occurrence_key']);
+            if ($eventData === null) {
+                EmailNotificationQueue::cancelOneById((int)$row['id']);
+                $stats['skipped']++;
                 continue;
             }
 
@@ -538,7 +718,7 @@ class EmailNotificationService
         $db   = self::getDb();
         $stmt = $db->prepare(
             "SELECT id, title, start_datetime, end_datetime, timezone,
-                    location, meeting_link, description
+                    location, meeting_link, description, recurrence_rule, rdate
              FROM calendar_events
              WHERE id = ? AND deleted_at IS NULL LIMIT 1"
         );
@@ -561,6 +741,48 @@ class EmailNotificationService
         );
         $stmt->execute([$eventId, $occurrenceDate, $recurrenceIndex]);
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    /**
+     * Données d'envoi d'un rappel : pour une série, l'occurrence désignée par
+     * occurrence_key ("{eventId}_{idx}_{Y-m-d}") — date réelle, exceptions appliquées.
+     * Retourne null si l'occurrence est annulée (EXDATE / DELETE only_this).
+     */
+    private static function resolveReminderOccurrence(array $event, string $occurrenceKey): ?array
+    {
+        $isSeries = !empty($event['recurrence_rule']) || !empty($event['rdate']);
+        if (!$isSeries || !preg_match('/_(\d{4}-\d{2}-\d{2})$/', $occurrenceKey, $m)) {
+            return $event;
+        }
+        $occDate = $m[1];
+
+        $stmt = self::getDb()->prepare(
+            "SELECT is_cancelled, is_modified, modified_title, modified_start_datetime,
+                    modified_end_datetime, modified_location
+             FROM event_occurrences
+             WHERE event_id = ? AND occurrence_date = ? AND (is_cancelled = 1 OR is_modified = 1)
+             LIMIT 1"
+        );
+        $stmt->execute([(int)$event['id'], $occDate]);
+        $exception = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+
+        if ($exception && !empty($exception['is_cancelled'])) {
+            return null;
+        }
+
+        // Occurrence non modifiée : date de la clé + heure locale de l'événement de base.
+        $tz        = new DateTimeZone($event['timezone'] ?: 'America/Montreal');
+        $baseStart = new DateTime($event['start_datetime'], $tz);
+        $baseEnd   = new DateTime($event['end_datetime'], $tz);
+        $start     = new DateTime($occDate . ' ' . $baseStart->format('H:i:s'), $tz);
+        $end       = (clone $start)->add($baseStart->diff($baseEnd));
+
+        $occurrenceEvent = array_merge($event, [
+            'start_datetime' => $start->format('Y-m-d H:i:s'),
+            'end_datetime'   => $end->format('Y-m-d H:i:s'),
+        ]);
+
+        return $exception ? self::resolveOccurrenceData($occurrenceEvent, $exception) : $occurrenceEvent;
     }
 
     /**

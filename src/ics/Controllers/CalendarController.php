@@ -1131,6 +1131,9 @@ class CalendarController
         }
 
         // Validation des nouveaux champs
+        if (self::rejectUnsupportedReminderChannels($input)) {
+            return;
+        }
         $eventValidation = \ICS\Utils\EventValidator::validateEventFields($input);
         if (!$eventValidation['valid']) {
             LogService::warning("Validation des nouveaux champs échouée", [
@@ -1319,6 +1322,9 @@ class CalendarController
         }
         
         // Validation des nouveaux champs
+        if (self::rejectUnsupportedReminderChannels($input)) {
+            return;
+        }
         $eventValidation = \ICS\Utils\EventValidator::validateEventFields($input);
         if (!$eventValidation['valid']) {
             LogService::warning("Validation des nouveaux champs échouée", [
@@ -2013,6 +2019,46 @@ class CalendarController
     /**
      * Modifie une occurrence spécifique d'un événement récurrent
      */
+    /**
+     * Directive #440 : seuls les rappels EMAIL sont envoyés. Un rappel DISPLAY (ou
+     * notification / AUDIO) serait enregistré sans jamais partir → 422 tant que le push
+     * par élément n'existe pas (plan cmem_web #236). L'import .ics n'est pas concerné.
+     *
+     * @return bool true si la réponse 422 a été émise
+     */
+    private static function rejectUnsupportedReminderChannels(array $input): bool
+    {
+        if (!array_key_exists('notifications', $input) || empty($input['notifications'])) {
+            return false;
+        }
+        $notifications = $input['notifications'];
+        if (is_string($notifications)) {
+            $notifications = json_decode($notifications, true);
+        }
+        if (!is_array($notifications)) {
+            return false; // format invalide : laissé au validateur (400)
+        }
+        foreach ($notifications as $index => $notif) {
+            if (!is_array($notif) || !isset($notif['type'])) {
+                continue;
+            }
+            if (strtoupper((string)$notif['type']) !== 'EMAIL') {
+                LoggingMiddleware::logExit(422);
+                Response::error(
+                    'Rappel push par élément pas encore disponible : seuls les rappels EMAIL sont acceptés',
+                    [
+                        'code'  => 'REMINDER_CHANNEL_UNSUPPORTED',
+                        'field' => "notifications.{$index}.type",
+                        'type'  => (string)$notif['type'],
+                    ],
+                    422
+                );
+                return true;
+            }
+        }
+        return false;
+    }
+
     public function updateEventOccurrence($calendarId, $eventId, $userId): void
     {
         LoggingMiddleware::logEntry();

@@ -33,6 +33,7 @@ php private/tests/test_contacts_interactions.php
 php private/tests/test_contacts_opportunites.php
 php private/tests/test_cors_e2e_account.php
 php private/tests/test_email_verification.php
+php private/tests/test_ics_email_recurring_reminders.php
 php private/tests/test_entrypoints.php
 php private/tests/test_files.php
 php private/tests/test_files_accessibility.php
@@ -73,6 +74,7 @@ php private/tests/test_puzzle_share.php
 php private/tests/test_quiz.php
 php private/tests/test_quiz2.php
 php private/tests/test_quiz3.php
+php private/tests/test_resource_caps.php
 php private/tests/test_secret_admin.php
 php private/tests/test_stats.php
 php private/tests/test_stripe_group_billing.php

@@ -120,7 +120,7 @@
             "404": "Calendrier non trouvé",
             "500": "Erreur lors de la mise à jour"
           },
-          "notes": "Nécessite accès en écriture (propriétaire ou partage write). UID fourni et conforme UUID v4 préservé ; UID absent ou non conforme remplacé par un nouveau UUID v4."
+          "notes": "Nécessite accès en écriture (propriétaire ou partage write). UID fourni et conforme UUID v4 préservé ; UID absent ou non conforme remplacé par un nouveau UUID v4. VALARM : un ACTION:DISPLAY ne fait jamais échouer l'import (pas de 422, contrairement à POST/PUT) ; il est conservé dans notifications (type 'notification') sans aucun envoi, en attendant le push par élément (directive #440)."
         },
         {
           "method": "POST",
@@ -216,9 +216,10 @@
             "rdate": "string (optional) - Phase 4 — RDATE : dates additionnelles (datetimes locales CSV)",
             "related_to": "string (optional) - Phase 4 — UID RFC 5545 de l'événement parent (RELATED-TO;RELTYPE=PARENT)",
             "duration": "string (optional) - Phase 4 — durée ISO 8601 ex: PT1H30M — exclusif avec end_datetime",
-            "notifications": "array (optional) - [{type: EMAIL|DISPLAY, minutes_before: int}] — exportés BEGIN:VALARM (Phase 4)"
+            "notifications": "array (optional) - [{type: 'EMAIL', minutes_before: int}] — exportés BEGIN:VALARM (Phase 4). Seul EMAIL est accepté : tout autre type (DISPLAY, notification, AUDIO) → 422 REMINDER_CHANNEL_UNSUPPORTED (directive #440), le push par élément n'existant pas encore. Série récurrente : un rappel par occurrence (cron, directive #438)."
           },
-          "response": "Événement créé avec ID"
+          "response": "Événement créé avec ID",
+          "errors": { "422": "REMINDER_CHANNEL_UNSUPPORTED — notifications[] contient un type autre que EMAIL ; corps errors: { code, field: 'notifications.{i}.type', type }" }
         },
         { "method": "GET", "path": "/calendars/{id}/events",
           "description": "Récupérer les événements d'un calendrier",
@@ -274,13 +275,17 @@
             "attachments": "array (optional) (Phase 2)",
             "rdate": "string (optional) - RDATE dates CSV (Phase 4)",
             "related_to": "string (optional) - UID parent (Phase 4)",
-            "duration": "string (optional) - durée ISO 8601 (Phase 4)"
+            "duration": "string (optional) - durée ISO 8601 (Phase 4)",
+            "notifications": "array (optional) - [{type: 'EMAIL', minutes_before: int}] — remplace les rappels ; tout autre type → 422 REMINDER_CHANNEL_UNSUPPORTED (directive #440)"
           },
           "headers": {
             "If-Unmodified-Since": "string ISO 8601 UTC (optional) - versioning optimiste (directive 20260812_113000). Absent = comportement inchangé. Doit valoir exactement le updatedAt reçu au dernier GET/PUT ; sinon 409. LIMITE CONNUE : comparaison à la seconde (updated_at MySQL sans fraction) - deux écritures sur la même ressource dans la même seconde UTC ne sont pas détectées comme conflit. Non bloquant pour le rejeu de file offline (séparé par un aller-retour réseau) ; risque théorique seulement en cas d'écriture concurrente vraie de deux appareils dans la même seconde. Voir docs/PLAN_concurrence-updated-at-microsecondes.md."
           },
           "response": "Événement mis à jour (inclut updatedAt, ISO 8601 UTC)",
-          "errors": { "409": "Conflit de version (If-Unmodified-Since ne correspond pas à updatedAt en base) - corps: { data: { current: <événement complet> } }" }
+          "errors": {
+            "409": "Conflit de version (If-Unmodified-Since ne correspond pas à updatedAt en base) - corps: { data: { current: <événement complet> } }",
+            "422": "REMINDER_CHANNEL_UNSUPPORTED — notifications[] contient un type autre que EMAIL (directive #440)"
+          }
         },
         {
           "method": "DELETE",
