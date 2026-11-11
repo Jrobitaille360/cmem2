@@ -5,7 +5,7 @@ namespace WebDevice\Controllers;
 use AuthGroups\Middleware\LoggingMiddleware;
 use AuthGroups\Models\AppUserSettings;
 use AuthGroups\Utils\Response;
-use Stripe\Services\EntitlementService;
+use Access\Services\EntitlementService;
 use WebDevice\Models\WebDevice;
 
 class WebDeviceController

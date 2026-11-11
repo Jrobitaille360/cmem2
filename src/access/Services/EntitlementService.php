@@ -1,11 +1,10 @@
 <?php
 
-namespace Stripe\Services;
+namespace Access\Services;
 
 use AuthGroups\Models\Group;
 use AuthGroups\Models\User;
 use Access\Config\ResourceCaps;
-use Access\Services\ResourceCapService;
 use Stripe\Config\CmemPlans;
 use Stripe\Models\StripeSubscription;
 

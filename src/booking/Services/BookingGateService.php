@@ -3,8 +3,8 @@
 namespace Booking\Services;
 
 use AuthGroups\Models\User;
-use Stripe\Config\CmemModules;
-use Stripe\Services\EntitlementService;
+use Access\Config\CmemModules;
+use Access\Services\EntitlementService;
 
 /**
  * Vérifie qu'une page de booking est utilisable côté public : existe, active, et le plan de

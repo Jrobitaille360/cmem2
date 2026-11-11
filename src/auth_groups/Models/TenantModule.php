@@ -9,7 +9,7 @@ use PDO;
  * Directive cmem_web 20260727_144926.
  *
  * L'absence de ligne n'est pas une erreur : elle signifie « état par défaut »
- * (voir Stripe\Config\CmemModules::isEnabledByDefault). Une ligne n'est créée
+ * (voir Access\Config\CmemModules::isEnabledByDefault). Une ligne n'est créée
  * qu'au premier PATCH — GET /modules ne backfille rien.
  *
  * `group_id` sert le plan équipe (directive 20260813_143000) : mêmes garanties XOR/UPSERT

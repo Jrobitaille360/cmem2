@@ -9,8 +9,8 @@ use AuthGroups\Models\TenantModule;
 use AuthGroups\Models\User;
 use AuthGroups\Utils\Response;
 use AuthGroups\Middleware\LoggingMiddleware;
-use Stripe\Config\CmemModules;
-use Stripe\Services\EntitlementService;
+use Access\Config\CmemModules;
+use Access\Services\EntitlementService;
 
 /**
  * Registre de modules activables — GET /modules, PATCH /modules/{key}.

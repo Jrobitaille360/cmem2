@@ -11,7 +11,7 @@ use Contacts\Services\ContactMessageService;
 use Contacts\Services\CsvParser;
 use Contacts\Services\VCardParser;
 use Contacts\Services\VCardSerializer;
-use Stripe\Services\EntitlementService;
+use Access\Services\EntitlementService;
 
 /**
  * Contrôleur du pilier Contacts — directive cmem_web 20260723_084409.

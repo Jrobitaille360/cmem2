@@ -1,6 +1,6 @@
 <?php
 
-namespace Stripe\Config;
+namespace Access\Config;
 
 /**
  * Registre de modules cmem — config statique, pas de table DB (même parti pris que CmemPlans).

@@ -9,8 +9,8 @@ use Booking\Models\BookingPage;
 use Booking\Models\BookingSlot;
 use Booking\Services\BookingSlotService;
 use ICS\Models\Calendar;
-use Stripe\Config\CmemModules;
-use Stripe\Services\EntitlementService;
+use Access\Config\CmemModules;
+use Access\Services\EntitlementService;
 
 /**
  * GET/PUT/DELETE /booking/page — configuration de la page de réservation de l'hôte authentifié.

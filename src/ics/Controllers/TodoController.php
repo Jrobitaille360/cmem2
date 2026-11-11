@@ -10,7 +10,7 @@ use AuthGroups\Utils\Response;
 use AuthGroups\Utils\Validator;
 use AuthGroups\Middleware\LoggingMiddleware;
 use AuthGroups\Services\LogService;
-use Stripe\Services\EntitlementService;
+use Access\Services\EntitlementService;
 
 /**
  * Contrôleur VTODO — Phase 5.1
