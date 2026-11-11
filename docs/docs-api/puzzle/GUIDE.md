@@ -10,7 +10,7 @@ Version 2.0.0 · Base URL : `/v2/puzzle`
 - [Vue d'ensemble](#vue-densemble)
 - [Authentification](#authentification)
 - [Démarrage rapide](#démarrage-rapide)
-- [Abonnement premium](#abonnement-premium)
+- [Accès premium](#accès-premium)
 - [Pseudonyme](#pseudonyme)
 - [Liaison à un compte cmem2](#liaison-à-un-compte-cmem2)
 - [Carrousel d'images](#carrousel-dimages)
@@ -30,17 +30,16 @@ Le plugin Puzzle fournit une API REST pour une application mobile de puzzle (Flu
 **Aucun compte utilisateur n'est requis** : l'authentification repose sur un token d'appareil opaque,
 généré une fois à l'installation.
 
-Depuis v2.7.0, l'enregistrement d'appareil, le pseudonyme et l'abonnement sont gérés par les
-modules transverses :
+Depuis v2.7.0, l'enregistrement d'appareil et le pseudonyme sont gérés par les modules
+transverses :
 
 | Besoin | Module | Endpoints |
 | --- | --- | --- |
-| Enregistrer l'appareil | Playstore | `POST /v2/devices/android/register` |
-| Pseudonyme | Playstore | `GET/POST/DELETE /v2/devices/android/pseudonym` |
-| Valider l'abonnement | Playstore | `POST /v2/subscriptions/playstore/verify` |
+| Enregistrer l'appareil | WebDevice | `POST /v2/devices/android/register` |
+| Pseudonyme | WebDevice | `GET/POST/DELETE /v2/devices/android/pseudonym` |
 | Statut d'accès premium | Access | `GET /v2/access/status` |
 
-Voir [../playstore/GUIDE.md](../playstore/GUIDE.md) pour le détail de ces endpoints.
+Voir [../webdevice/GUIDE.md](../webdevice/GUIDE.md) pour le détail de ces endpoints.
 
 Fonctionnalités du plugin :
 
@@ -74,10 +73,10 @@ Authorization: Bearer {device_token}
 | --- | --- | --- |
 | Public | Aucun | `POST /v2/devices/android/register` uniquement |
 | Gratuit | `device_token` valide | Carrousel, livraison images, pseudonyme |
-| Premium | `device_token` + abonnement actif | Tout, y compris thèmes, backup, partagé |
+| Premium | `device_token` lié à un compte approuvé | Tout, y compris thèmes, backup, partagé |
 
-Le statut premium est vérifié côté serveur via la table `subscriptions`
-(Play Store ou Stripe). Erreur `403 SUBSCRIPTION_REQUIRED` si aucun abonnement actif.
+Le statut premium découle de l'approbation du compte lié à l'appareil (plus d'abonnement
+depuis le retrait de Stripe / Play Store). Erreur `403 SUBSCRIPTION_REQUIRED` sinon.
 
 ---
 
@@ -137,27 +136,11 @@ Réponse :
 
 ---
 
-## Abonnement premium
+## Accès premium
 
-L'abonnement Google Play doit être validé côté serveur à chaque démarrage de l'app.
-Le serveur enregistre l'abonnement dans la table `subscriptions` (source unique de vérité).
-L'accès premium est ensuite retrouvé par `purchase_token` — il **survit à une réinstallation**.
-
-### Valider un achat
-
-```txt
-POST /v2/subscriptions/playstore/verify
-Authorization: Bearer {device_token}
-Content-Type: application/json
-
-{
-  "purchase_token": "token-recu-de-google-play",
-  "product_id": "premium_monthly"
-}
-```
-
-Voir [../playstore/GUIDE.md](../playstore/GUIDE.md) pour les réponses détaillées,
-l'upgrade/downgrade et la réinstallation.
+Il n'y a plus d'abonnement (Stripe et Google Play retirés). Un appareil est premium quand il
+est lié à un compte cmem2 **approuvé** — voir [Liaison à un compte cmem2](#liaison-à-un-compte-cmem2).
+Les routes `/v2/subscriptions/*` répondent `404`.
 
 ### Connaître le statut d'accès
 
@@ -176,7 +159,7 @@ en mode gratuit sans afficher d'erreur.
 Le pseudonyme est **requis** avant de créer ou rejoindre un casse-tête partagé, et pour
 récupérer une sauvegarde par pseudonyme. Il est unique sur tout le serveur.
 
-Géré par le module Playstore :
+Géré par le module WebDevice :
 
 | Méthode | Route | Usage |
 | --- | --- | --- |
@@ -185,14 +168,14 @@ Géré par le module Playstore :
 | DELETE | `/v2/devices/android/pseudonym` | Supprimer |
 | GET | `/v2/devices/android/pseudonym/check/{pseudo}` | Vérifier la disponibilité |
 
-Erreur `409 PSEUDONYM_TAKEN` si déjà utilisé. Détails : [../playstore/GUIDE.md](../playstore/GUIDE.md).
+Erreur `409 PSEUDONYM_TAKEN` si déjà utilisé. Détails : [../webdevice/GUIDE.md](../webdevice/GUIDE.md).
 
 ---
 
 ## Liaison à un compte cmem2
 
-Un appareil peut être lié à un compte cmem2 pour hériter de l'abonnement du compte
-(utile multi-appareils ou après achat Stripe web).
+Un appareil peut être lié à un compte cmem2 pour hériter de son accès premium
+(compte approuvé).
 
 ```txt
 POST /puzzle/auth/link-device
@@ -714,24 +697,22 @@ Laisser le cache HTTP de Flutter gérer la mise en cache.
    Si absent : générer un UUID v4, le stocker
 2. POST /v2/devices/android/register { device_uuid }
    → Stocker device_token et expires_at
-3. Si abonnement Google Play détecté :
-   POST /v2/subscriptions/playstore/verify { purchase_token, product_id }
-4. GET /v2/access/status?app_id=puzzle&platform=android
+3. GET /v2/access/status?app_id=puzzle&platform=android
    → Activer ou désactiver les fonctionnalités premium selon is_premium
-5. GET /v2/puzzle/carousel → afficher les images
+4. GET /v2/puzzle/carousel → afficher les images
 ```
 
 ---
 
 ## Routes dépréciées
 
-Migrées en v2.7.0 vers les modules `/v2/devices/*` et `/v2/subscriptions/*`.
+Migrées en v2.7.0 vers le module `/v2/devices/*`.
 
 | Ancienne route | Remplacée par |
 | --- | --- |
 | `POST /puzzle/auth/register-device` | `POST /v2/devices/android/register` |
 | `POST /puzzle/auth/pseudonym` | `POST /v2/devices/android/pseudonym` |
-| `POST /puzzle/auth/verify-subscription` | `POST /v2/subscriptions/playstore/verify` |
+| `POST /puzzle/auth/verify-subscription` | Aucune — abonnements retirés |
 | `POST /puzzle/shared/{uid}/move` | `POST /v2/puzzle/shared/{uid}/pick` + `/drop` |
 
 > Les routes `/puzzle/*` (sans `/v2`) restent techniquement routées vers le même gestionnaire,

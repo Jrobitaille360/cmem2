@@ -1,6 +1,6 @@
 # Guide — Module Access
 
-Version 1.2.0 · Base URL : `/v2/access` (accès sur approbation : `/users/{id}/access-status`, `/invitations`)
+Version 2.0.0 · Base URL : `/v2/access` (accès sur approbation : `/users/{id}/access-status`, `/invitations`)
 
 > Référence complète : [API_ACCESS_ENDPOINTS.json](API_ACCESS_ENDPOINTS.json)
 
@@ -17,17 +17,13 @@ Version 1.2.0 · Base URL : `/v2/access` (accès sur approbation : `/users/{id}/
 
 ## Vue d'ensemble
 
-Le module Access fournit un **endpoint d'accès unifié** : il agrège les abonnements Stripe
-pour retourner la matrice d'accès premium par plateforme. Introduit en v2.7.0.
+Le module Access fournit un **endpoint d'accès unifié** : la matrice d'accès premium par
+plateforme, dérivée de l'**approbation du compte** (`users.access_status`) et des modules
+cochés. Introduit en v2.7.0.
 
-| Plateforme | Vérification d'accès |
-| --- | --- |
-| Web | `GET /v2/access/status` (JWT) |
-| Windows | `GET /v2/access/status` (JWT) |
-| Android | `GET /v2/subscriptions/playstore/status` (X-Device-Token) — **pas ce module** |
-
-> Les abonnements Play Store ne sont pas inclus dans ce module : ils sont liés au
-> `device_uuid` (anonyme) et non au `user_id`. Voir [../playstore/GUIDE.md](../playstore/GUIDE.md).
+> **BREAKING (retrait Stripe / Play Store, #299-#300)** : il n'existe plus d'abonnement.
+> `GET /v2/access/status` vaut pour **toutes** les plateformes, Android compris ; les routes
+> `/v2/subscriptions/*` et `/v2/billing/*` répondent `404`.
 
 ---
 
@@ -43,8 +39,8 @@ JWT obtenu via `POST /auth/login` (voir [../core/GUIDE.md](../core/GUIDE.md)).
 
 ## GET /v2/access/status
 
-Retourne le statut premium consolidé pour l'utilisateur authentifié, une app et
-optionnellement une plateforme. Source : Stripe uniquement.
+Retourne le statut d'accès de l'utilisateur authentifié, optionnellement pour une
+plateforme. Source unique : l'approbation du compte.
 
 ```http
 GET /v2/access/status?app_id=puzzle
@@ -53,7 +49,7 @@ Authorization: Bearer {jwt_token}
 
 | Paramètre query | Type | Description |
 | --- | --- | --- |
-| `app_id` | string, requis | Identifiant de l'application |
+| `app_id` | string, requis | Identifiant de l'application (conservé pour le contrat, sans effet sur le résultat) |
 | `platform` | string, optionnel | `android` \| `web` \| `windows` — filtre la réponse |
 
 ### Réponse sans filtre `platform` — matrice complète
@@ -69,7 +65,12 @@ Authorization: Bearer {jwt_token}
       "windows": true
     },
     "sources": [
-      { "provider": "stripe", "status": "active", "expires_at": "2027-06-01T00:00:00" }
+      {
+        "provider": "approval",
+        "status": "approved",
+        "expires_at": null,
+        "modules": ["contacts", "crm", "ged", "projet"]
+      }
     ]
   }
 }
@@ -81,33 +82,37 @@ Authorization: Bearer {jwt_token}
 {
   "success": true,
   "data": {
-    "is_premium": false,
+    "is_premium": true,
     "platform": "web",
-    "sources": []
+    "sources": [
+      { "provider": "approval", "status": "approved", "expires_at": null, "modules": ["contacts", "crm", "ged", "projet"] }
+    ]
   }
 }
 ```
 
 ### Tableau `sources`
 
-Abonnements actifs contribuant à l'accès :
+Une seule entrée :
 
 | Champ | Type | Valeurs |
 | --- | --- | --- |
-| `provider` | string | `stripe` |
-| `status` | string | `active` \| `trialing` \| `past_due` |
-| `expires_at` | datetime \| null | Date d'expiration |
+| `provider` | string | `approval` |
+| `status` | string | `approved` \| `pending` \| `suspended` (`users.access_status`) |
+| `expires_at` | null | L'approbation n'expire pas |
+| `modules` | string[] | Modules disponibles (grants effectifs, groupes inclus), triés ; `[]` si non approuvé |
 
 ---
 
 ## Matrice d'accès
 
-Règles de calcul par source (Stripe uniquement via JWT) :
-
-| Source | android | web | windows |
+| Statut du compte | android | web | windows |
 | --- | --- | --- | --- |
-| Stripe actif | true | true | true |
-| Aucune | false | false | false |
+| `approved` | true | true | true |
+| `pending` / `suspended` | false | false | false |
+
+> En pratique, un compte `pending` ou `suspended` reçoit `403` (garde centrale) avant
+> d'atteindre la matrice — voir [Accès sur approbation](#accès-sur-approbation).
 
 ---
 
@@ -116,6 +121,7 @@ Règles de calcul par source (Stripe uniquement via JWT) :
 | Code | Signification |
 | --- | --- |
 | 401 | JWT absent ou invalide |
+| 403 | Compte `pending` ou `suspended` — `ACCOUNT_PENDING` / `ACCOUNT_SUSPENDED` |
 | 422 | `app_id` manquant, ou `platform` invalide (valeurs : `android`, `web`, `windows`) |
 
 ---

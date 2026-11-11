@@ -1,8 +1,8 @@
 {
   "api": {
     "name": "Access Module",
-    "version": "1.3.0",
-    "description": "Endpoint d'accès unifié (JWT) — agrège Stripe pour retourner la matrice d'accès premium par plateforme. Couvre web et windows. Android utilise GET /v2/subscriptions/playstore/status (X-Device-Token) directement. Introduit en v2.7.0. Après v2.18.0 : accès sur approbation (statut pending/approved/suspended, /invitations). Phase 3 bis : caps de ressources à trois niveaux (/caps/defaults, /users/{id}/caps, /groups/{id}/caps).",
+    "version": "2.0.0",
+    "description": "Endpoint d'accès unifié (JWT) — matrice d'accès premium par plateforme, dérivée de l'approbation du compte (users.access_status) et des modules cochés. Toutes plateformes (android, web, windows). Introduit en v2.7.0 ; BREAKING (#299/#300) : plus d'abonnement Stripe / Play Store, sources = une entrée 'approval'. Après v2.18.0 : accès sur approbation (statut pending/approved/suspended, /invitations). Phase 3 bis : caps de ressources à trois niveaux (/caps/defaults, /users/{id}/caps, /groups/{id}/caps).",
     "generated": "2026-05-24",
     "base_url": "/v2",
     "authentication": {
@@ -13,16 +13,16 @@
   },
   "endpoints": {
     "access": {
-      "description": "Accès premium consolidé (Stripe) — JWT requis",
+      "description": "Accès premium consolidé (approbation du compte) — JWT requis",
       "base_path": "/v2/access",
       "routes": [
         {
           "method": "GET",
           "path": "/v2/access/status",
           "auth_required": true,
-          "description": "Retourne le statut premium consolidé pour un utilisateur authentifié par JWT, une app et optionnellement une plateforme. Source : Stripe uniquement. Pour Android, utiliser GET /v2/subscriptions/playstore/status avec X-Device-Token.",
+          "description": "Retourne le statut d'accès pour un utilisateur authentifié par JWT et optionnellement une plateforme. Source unique : l'approbation du compte (approved → true partout). Valable pour Android, web et Windows.",
           "query_params": {
-            "app_id": "string (required) — identifiant de l'application",
+            "app_id": "string (required) — identifiant de l'application (conservé pour le contrat, n'influe plus sur le résultat)",
             "platform": "string (optional) — 'android' | 'web' | 'windows'. Si fourni, retourne is_premium pour cette plateforme uniquement."
           },
           "responses": {
@@ -39,9 +39,10 @@
                   },
                   "sources": [
                     {
-                      "provider": "stripe",
-                      "status": "active",
-                      "expires_at": "2027-06-01T00:00:00"
+                      "provider": "approval",
+                      "status": "approved",
+                      "expires_at": null,
+                      "modules": ["contacts", "crm", "ged", "projet"]
                     }
                   ]
                 }
@@ -52,40 +53,49 @@
               "example": {
                 "success": true,
                 "data": {
-                  "is_premium": false,
+                  "is_premium": true,
                   "platform": "web",
-                  "sources": []
+                  "sources": [
+                    {
+                      "provider": "approval",
+                      "status": "approved",
+                      "expires_at": null,
+                      "modules": ["contacts", "crm", "ged", "projet"]
+                    }
+                  ]
                 }
               }
             },
             "401": "JWT absent ou invalide",
+            "403": "Compte pending ou suspended — ACCOUNT_PENDING / ACCOUNT_SUSPENDED (garde centrale, voir approval)",
             "422": "app_id manquant | platform invalide (valeurs acceptées : android, web, windows)"
           },
           "access_matrix": {
-            "description": "Règles de calcul de l'accès par source (Stripe uniquement via JWT)",
+            "description": "Règles de calcul de l'accès",
             "rules": {
-              "stripe_active": {
+              "approved": {
                 "android": true,
                 "web": true,
                 "windows": true
               },
-              "none": {
+              "pending_or_suspended": {
                 "android": false,
                 "web": false,
                 "windows": false
               }
             },
-            "note": "Les abonnements Play Store ne sont pas inclus — ils sont liés au device_uuid (anonyme) et non au user_id. Android doit appeler GET /v2/subscriptions/playstore/status."
+            "note": "En pratique, un compte pending ou suspended reçoit 403 avant d'atteindre la matrice."
           },
           "sources_array": {
-            "description": "Tableau des abonnements actifs contribuant à l'accès",
+            "description": "Une seule entrée, provider 'approval'",
             "schema": {
-              "provider": "string — 'stripe'",
-              "status": "string — 'active' | 'trialing' | 'past_due'",
-              "expires_at": "datetime | null"
+              "provider": "string — 'approval'",
+              "status": "string — 'approved' | 'pending' | 'suspended' (users.access_status)",
+              "expires_at": "null — l'approbation n'expire pas",
+              "modules": "string[] — modules disponibles (grants effectifs, groupes inclus), triés ; [] si non approuvé"
             }
           },
-          "client_notes": "Endpoint pour clients web et windows authentifiés par JWT. Ne pas utiliser pour Android — utiliser GET /v2/subscriptions/playstore/status avec X-Device-Token."
+          "client_notes": "Endpoint commun à toutes les plateformes. Les routes /v2/subscriptions/* et /v2/billing/* n'existent plus (404)."
         }
       ]
     },

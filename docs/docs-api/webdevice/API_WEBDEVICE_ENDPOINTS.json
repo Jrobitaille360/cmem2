@@ -1,25 +1,113 @@
 {
   "api": {
     "name": "WebDevice Module",
-    "version": "1.0.0",
-    "description": "Enregistrement des devices web et Windows (table web_devices). Pendant du module Play Store pour les plateformes non-Android. Multi-app via app_id. Introduit en v2.7.0, documenté en 2.8.0.",
-    "generated": "2026-07-06",
+    "version": "1.1.0",
+    "description": "Enregistrement d'appareil et pseudonyme pour Android (table android_devices), web et Windows (table web_devices). Multi-app via app_id. Les routes /v2/devices/android/* viennent de l'ancien module Play Store, retiré avec les abonnements (plan accès sur approbation #269).",
+    "generated": "2026-11-11",
     "base_url": "/v2",
     "authentication": {
       "devices": {
         "type": "JWT_BEARER (optionnel pour register, requis pour pseudonyme)",
         "header": "Authorization: Bearer {jwt_token}",
         "obtain": "POST /auth/login",
-        "note": "POST /v2/devices/web/register et /v2/devices/windows/register acceptent JWT ou anonyme"
+        "note": "POST /v2/devices/{android|web|windows}/register acceptent JWT ou anonyme"
       }
     },
     "notes": [
       "Les routes /v2/devices/windows/* sont strictement identiques aux routes /v2/devices/web/* — les deux plateformes partagent la table web_devices.",
-      "Le device_token obtenu sert d'Authorization Bearer pour les routes /v2/puzzle/* (au même titre qu'un token Android).",
-      "Les abonnements web/Windows passent par Stripe : voir docs/docs-api/stripe/API_STRIPE_ENDPOINTS.json et GET /v2/access/status (JWT)."
+      "Les routes /v2/devices/android/* utilisent la table android_devices ; le pseudonyme est commun aux trois plateformes (app_user_settings).",
+      "Le device_token obtenu sert d'Authorization Bearer pour les routes /v2/puzzle/*.",
+      "Plus d'abonnement (Stripe / Google Play retirés) : l'accès découle de l'approbation du compte — GET /v2/access/status (JWT)."
     ]
   },
   "endpoints": {
+    "devices_android": {
+      "description": "Gestion des devices Android",
+      "base_path": "/v2/devices/android",
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/v2/devices/android/register",
+          "auth_required": false,
+          "auth_note": "JWT optionnel — anonyme si absent, lié au compte si JWT présent",
+          "description": "Enregistre ou renouvelle un device Android. Upsert sur (app_id, device_uuid) — un nouveau device_token est généré à chaque appel.",
+          "body": {
+            "app_id": "string (required) — identifiant de l'application (ex. 'puzzle')",
+            "device_uuid": "string (required) — UUID v4 stable généré à l'installation, jamais changé"
+          },
+          "responses": {
+            "200": "{ success: true, data: { device_token: string (64 hex), expires_at: datetime, pseudonym: string|null } }",
+            "422": "app_id manquant | device_uuid manquant ou format UUID v4 invalide"
+          },
+          "client_notes": "Appeler au premier démarrage et à chaque réinstallation. Stocker device_token localement (expire 365 jours). Passer device_uuid comme obfuscatedExternalAccountId (BillingFlowParams) avant tout achat Play Store."
+        },
+        {
+          "method": "GET",
+          "path": "/v2/devices/android/pseudonym",
+          "auth_required": true,
+          "auth_note": "JWT requis",
+          "description": "Retourne le pseudonyme actuel de l'utilisateur pour cet app_id.",
+          "query_params": {
+            "app_id": "string (required)"
+          },
+          "responses": {
+            "200": "{ success: true, data: { pseudonym: string|null } }",
+            "401": "JWT absent ou invalide",
+            "422": "app_id manquant"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/v2/devices/android/pseudonym",
+          "auth_required": true,
+          "auth_note": "JWT requis",
+          "description": "Définit ou remplace le pseudonyme de l'utilisateur pour cet app_id. Le pseudonyme est unique par app_id sur tout le serveur.",
+          "body": {
+            "app_id": "string (required)",
+            "pseudonym": "string (required) — 2 à 64 chars, lettres/chiffres/_/./- uniquement"
+          },
+          "responses": {
+            "200": "{ success: true, data: { pseudonym: string } }",
+            "401": "JWT absent ou invalide",
+            "409": "Pseudonyme déjà pris par un autre utilisateur pour ce app_id",
+            "422": "app_id ou pseudonym manquant | pseudonym trop court/long | caractères invalides"
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/v2/devices/android/pseudonym",
+          "auth_required": true,
+          "auth_note": "JWT requis",
+          "description": "Supprime le pseudonyme de l'utilisateur pour cet app_id (met à NULL).",
+          "body": {
+            "app_id": "string (required)"
+          },
+          "responses": {
+            "200": "{ success: true, message: 'Pseudonyme supprimé' }",
+            "401": "JWT absent ou invalide",
+            "422": "app_id manquant"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/v2/devices/android/pseudonym/check/{pseudo}",
+          "auth_required": true,
+          "auth_note": "JWT requis",
+          "description": "Vérifie si un pseudonyme est disponible pour cet app_id. Retourne available=true si libre ou si le pseudonyme appartient à l'utilisateur courant.",
+          "params": {
+            "pseudo": "string (required) — pseudonyme à vérifier"
+          },
+          "query_params": {
+            "app_id": "string (required)"
+          },
+          "responses": {
+            "200": "{ success: true, data: { available: bool } }",
+            "401": "JWT absent ou invalide",
+            "422": "app_id manquant"
+          }
+        }
+      ]
+    },
     "devices_web": {
       "description": "Gestion des devices web — mêmes routes disponibles sous /v2/devices/windows/*",
       "base_path": "/v2/devices/web",
@@ -114,8 +202,7 @@
     }
   },
   "access_model": {
-    "description": "L'accès premium web/Windows est géré via Stripe.",
-    "web_windows_check": "GET /v2/access/status?app_id={app_id} — JWT",
-    "subscribe": "POST /v2/billing/checkout — JWT (voir docs/docs-api/stripe/API_STRIPE_ENDPOINTS.json)"
+    "description": "Plus d'abonnement : un appareil lié à un compte approuvé (users.access_status = approved) a accès aux fonctions premium, sur toutes les plateformes.",
+    "check": "GET /v2/access/status?app_id={app_id} — JWT"
   }
 }

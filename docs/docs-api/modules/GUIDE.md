@@ -165,10 +165,10 @@ Directive `20260813_143000` (plan-equipe). `tenant_modules.group_id` (unicité
 ### `GET /groups/{id}/modules`
 
 Ouvert à tout **membre** du groupe. Même forme que `GET /modules`, avec `plan` = plan effectif du
-groupe (`free` par défaut si aucun abonnement).
+groupe — toujours `free` depuis le retrait de Stripe.
 
 ```json
-{ "success": true, "data": { "plan": "team", "modules": [ /* mêmes 8 clés */ ] } }
+{ "success": true, "data": { "plan": "free", "modules": [ /* mêmes 8 clés */ ] } }
 ```
 
 Erreurs : `401` (JWT absent), `403 GROUP_MEMBERSHIP_REQUIRED` (non-membre).
@@ -184,12 +184,12 @@ et codes d'erreur que `PATCH /modules/{key}` (`UNKNOWN_MODULE_KEY`, `VALIDATION_
 
 | Rôle | Fichier |
 | - | - |
-| Enum, mapping, quotas | `src/stripe/Config/CmemModules.php` |
-| Plans + classement | `src/stripe/Config/CmemPlans.php` |
+| Enum, quotas | `src/access/Config/CmemModules.php` |
+| Disponibilité (modules cochés) | `src/access/Services/ModuleGrantService.php` |
 | Accès table | `src/auth_groups/Models/TenantModule.php` |
 | Endpoints (perso) | `src/auth_groups/Controllers/ModuleController.php` |
 | Endpoints (groupe) | `src/auth_groups/Controllers/GroupModuleController.php` |
-| Plan effectif (perso + groupe) | `src/stripe/Services/EntitlementService.php` |
+| Plan effectif (override admin ou `free`) | `src/access/Services/EntitlementService.php` |
 | Routage | `src/auth_groups/Routing/RouteHandlers/ModuleRouteHandler.php`, `GroupRouteHandler.php` |
 | Migrations | `docs/20260727_tenant_modules.sql`, `docs/v-2-16-0/20260813_group_billing.sql` |
-| Tests | `private/tests/test_modules.php`, `test_group_modules.php`, `test_plan_effectif_groupe.php` |
+| Tests | `private/tests/test_modules.php`, `test_group_modules.php`, `test_module_grants.php` |
