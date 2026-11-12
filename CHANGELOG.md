@@ -16,6 +16,7 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - Puzzle : un appareil est premium s'il est lié (`POST /puzzle/auth/link-device`) à un compte approuvé. Code `403 SUBSCRIPTION_REQUIRED` conservé sinon.
 - `data.user.plan` (`GET /auth/me`) et `data.plan` (`GET /modules`, `GET /groups/{id}/modules`) : `code` vaut `cmem_plan_override` (`ami`) ou `free`, `source` vaut `override` ou `default` ; plus de source `stripe` ni `group`. Le plan ne décide plus de rien (disponibilité = modules cochés, caps = `ResourceCaps`).
 - `DELETE /users/me` ne renvoie plus `409 STRIPE_CANCEL_FAILED` (plus d'abonnement à annuler).
+- Plans legacy retirés (tâche #480) : `GET /plans`, `GET /plans/{id}` → `404` ; `GET|POST /users/choose-plan` supprimés. `POST /users/verify-email` répond `{ email_verified: true }` sans `plan_extended`, `new_plan_expiry_days` ni `improved_limits`, et n'envoie plus le courriel d'invitation aux plans payants. L'inscription n'assigne plus de plan « free » de 7 jours (`users.plan_id`, `plan_expires_at`).
 
 ### Changé
 
@@ -27,7 +28,8 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 - `src/stripe/`, `src/playstore/`, crons `expire_stripe.php` et `expire_playstore.php`, `SubscriptionController` / `SubscriptionService` / modèle `Subscription` (legacy `/subscription/*`), variables `STRIPE_*` (`environment.php`, `.env.example`), autoload `Stripe\` / `Playstore\`.
 - Docs `docs/docs-api/stripe/` et `docs/docs-api/playstore/` (devices Android documentés dans `docs/docs-api/webdevice/`).
-- Migration en attente `docs/20261111_drop_payment_tables.sql` : supprime `stripe_subscriptions`, `stripe_processed_events`, `playstore_subscriptions`, `subscriptions` (export préalable requis, non appliquée).
+- Migration `docs/20261111_drop_payment_tables.sql` : supprime `stripe_subscriptions`, `stripe_processed_events`, `playstore_subscriptions`, `subscriptions` (export préalable ; appliquée sur dev le 2026-11-11).
+- `PlanController`, modèle `Plan`, `PlanRouteHandler`, expiration des `plan_invitations` (maintenance), courriels `sendEmailConfirmedWithPlanReminder` et inscription avec invitation aux plans. Migration `docs/20261111_drop_legacy_plans.sql` : supprime `plans`, `plan_invitations`, `users.plan_id`, `users.plan_expires_at`, `users.plan_auto_renew` (export préalable requis).
 - Tests : `test_payment_removal.php` (garde-fou), `test_access.php` réécrit ; tests Stripe / Play Store / plan équipe retirés.
 
 ## [2.20.0] — 2026-11-10

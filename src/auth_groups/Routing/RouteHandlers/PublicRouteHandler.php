@@ -187,7 +187,6 @@ class PublicRouteHandler extends BaseRouteHandler
                 'groups' => 'Création et gestion de groupes avec rôles et permissions',
                 'files' => 'Upload, stockage et gestion de fichiers avec versioning',
                 'tags' => 'Système de tags avancé avec recherche et associations',
-                'plans' => 'Gestion des plans d\'abonnement et facturation',
                 'plugins' => 'Système de plugins extensible (ICS Calendar, etc.)'
             ],
             'resources' => [
@@ -249,10 +248,6 @@ class PublicRouteHandler extends BaseRouteHandler
                     'tags' => [
                         'description' => 'Gestion des tags',
                         'operations' => 'CRUD, associations, search, most-used, suggestions'
-                    ],
-                    'plans' => [
-                        'description' => 'Gestion des abonnements',
-                        'operations' => 'subscribe, upgrade, cancel, billing history'
                     ],
                     'stats' => [
                         'description' => 'Statistiques et analytics',

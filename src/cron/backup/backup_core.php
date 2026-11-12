@@ -29,7 +29,6 @@ $outFile   = "{$destDir}/cmem2_{$module}_{$stamp}.sql";
 
 // Tables dans l'ordre FK (parents avant enfants)
 $tables = [
-    'plans',
     'users',
     'tags',
     'groups',
@@ -47,7 +46,6 @@ $tables = [
     'group_invitations',
     'group_tag_relations',
     'file_tag_relations',
-    'plan_invitations',
     'group_stats_snapshot',
     'user_stats_snapshot',
     'platform_stats',

@@ -5,7 +5,6 @@ namespace AuthGroups\Routing\RouteHandlers;
 use AuthGroups\Routing\BaseRouteHandler;
 use AuthGroups\Controllers\UserController;
 use AuthGroups\Controllers\UserSessionController;
-use AuthGroups\Controllers\PlanController;
 use AuthGroups\Controllers\UserE2eKeyController;
 use AuthGroups\Utils\Response;
 
@@ -13,7 +12,6 @@ class UserRouteHandler extends BaseRouteHandler
 {
     private UserController $controller;
     private UserSessionController $sessionController;
-    private PlanController $planController;
     private ?object $notificationController = null;
     private ?UserE2eKeyController $e2eKeyController = null;
 
@@ -21,7 +19,6 @@ class UserRouteHandler extends BaseRouteHandler
         parent::__construct($authService);
         $this->controller = new UserController();
         $this->sessionController = new UserSessionController();
-        $this->planController = new PlanController();
     }
 
     private function getE2eKeyController(): UserE2eKeyController
@@ -102,14 +99,6 @@ class UserRouteHandler extends BaseRouteHandler
             (isset($segments[2]) && $segments[2] === 'caps' && $method === 'PUT') =>
                 $this->validateIdAndCall($action, fn($targetId) =>
                     (new \Access\Controllers\ResourceCapController())->putUserCaps((int) $targetId, $user)),
-
-            // GET /users/choose-plan?token=xxx - Afficher invitation plan (public)
-            ($action === 'choose-plan' && $method === 'GET') =>
-                $this->handlePlanInvitationView(),
-
-            // POST /users/choose-plan - Sélectionner un plan via token (public)
-            ($action === 'choose-plan' && $method === 'POST') =>
-                $this->handlePlanSelection(),
 
             // GET /users
             ($action === '' && $method === 'GET') =>
@@ -218,33 +207,5 @@ class UserRouteHandler extends BaseRouteHandler
             return;
         }
         $callback($id);
-    }
-
-    /**
-     * Gère l'affichage d'une invitation plan (public)
-     */
-    private function handlePlanInvitationView(): void {
-        // Cette route est publique, donc on désactive temporairement l'auth
-        $originalRequiresAuth = $this->requiresAuth;
-        $this->requiresAuth = false;
-        
-        $this->planController->viewPlanInvitation();
-        
-        // Remettre l'auth comme avant
-        $this->requiresAuth = $originalRequiresAuth;
-    }
-
-    /**
-     * Gère la sélection d'un plan (public)
-     */
-    private function handlePlanSelection(): void {
-        // Cette route est publique, donc on désactive temporairement l'auth
-        $originalRequiresAuth = $this->requiresAuth;
-        $this->requiresAuth = false;
-        
-        $this->planController->choosePlan();
-        
-        // Remettre l'auth comme avant
-        $this->requiresAuth = $originalRequiresAuth;
     }
 }

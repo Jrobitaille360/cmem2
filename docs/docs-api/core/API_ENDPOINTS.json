@@ -382,7 +382,7 @@
             "token": "string (required) — 8 chiffres",
             "email": "string (optional) — permet de compter les tentatives sur le token de l'usager"
           },
-          "response": "Message de confirmation",
+          "response": "{ email_verified: true } — plus de champs plan_extended / new_plan_expiry_days / improved_limits ni de courriel d'invitation aux plans (retirés #480)",
           "rate_limit": "5 tentatives par 10 minutes par couple (email + IP) ; 5 tentatives par token, au-delà le token est invalidé",
           "errors": {
             "400": "Token manquant, ou email déjà vérifié",
@@ -453,49 +453,6 @@
           "auth_required": false,
           "body": {
             "code": "string (required)"
-          },
-          "response": "Message de confirmation"
-        },
-        {
-          "method": "GET",
-          "path": "/plans",
-          "description": "Lister tous les plans d'abonnement disponibles",
-          "auth_required": false,
-          "query": {
-            "page": "integer (optional)",
-            "limit": "integer (optional)",
-            "active": "integer 0|1 (optional)"
-          },
-          "response": "{ plans: Plan[], total: integer }"
-        },
-        {
-          "method": "GET",
-          "path": "/plans/{id}",
-          "description": "Obtenir les détails d'un plan spécifique",
-          "auth_required": false,
-          "params": {
-            "id": "integer (required)"
-          },
-          "response": "Plan object"
-        },
-        {
-          "method": "GET",
-          "path": "/users/choose-plan",
-          "description": "Afficher l'invitation à choisir un plan (token requis en query string)",
-          "auth_required": false,
-          "query": {
-            "token": "string (required)"
-          },
-          "response": "Informations du plan à choisir"
-        },
-        {
-          "method": "POST",
-          "path": "/users/choose-plan",
-          "description": "Sélectionner un plan d'abonnement",
-          "auth_required": false,
-          "body": {
-            "token": "string (required)",
-            "plan_id": "integer (required)"
           },
           "response": "Message de confirmation"
         }
@@ -1623,24 +1580,6 @@
             "SUPERADMINISTRATEUR"
           ],
           "response": "Nombre de sessions nettoyées"
-        }
-      ]
-    },
-    "plans": {
-      "description": "Plans d'abonnement disponibles — accès public sans auth",
-      "base_path": "/plans",
-      "routes": [
-        {
-          "method": "GET",
-          "path": "/plans",
-          "description": "Lister tous les plans actifs",
-          "auth_required": false,
-          "response": {
-            "plans": "array — liste des plans disponibles"
-          },
-          "errors": {
-            "500": "Erreur serveur"
-          }
         }
       ]
     }

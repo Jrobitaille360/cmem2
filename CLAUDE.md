@@ -60,7 +60,6 @@ php private/tests/test_maintenance.php
 php private/tests/test_modules.php
 php private/tests/test_module_grants.php
 php private/tests/test_password_reset.php
-php private/tests/test_plans.php
 php private/tests/test_payment_removal.php
 php private/tests/test_pomo.php
 php private/tests/test_pseudo.php

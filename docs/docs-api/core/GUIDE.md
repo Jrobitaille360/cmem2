@@ -279,8 +279,6 @@ Réponse `200` :
 | DELETE | `/users/{id}/sessions` | JWT (ADMIN+ ou soi-même) | Terminer toutes les sessions |
 | GET | `/users/{id}/session-status` | JWT (ADMIN+ ou soi-même) | Présence d'une session active |
 | PUT | `/users/{id}/plan-override` | JWT (SUPERADMINISTRATEUR) | Poser/retirer l'assignation manuelle du plan cmem (`cmem_plan_override`, ex. `'ami'`, ou `null` pour retirer) |
-| GET | `/users/choose-plan` | JWT | Plans disponibles pour l'utilisateur |
-| POST | `/users/choose-plan` | JWT | Choisir un plan |
 | POST | `/users/app` | JWT | Créer une configuration d'application (`app_id` + `json_data`) |
 | GET | `/users/app` | JWT | Lister ses configurations d'applications |
 | GET | `/users/app/{app_id}` | JWT | Lire une configuration |

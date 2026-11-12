@@ -35,7 +35,6 @@ class MaintenanceService implements MaintenanceTaskInterface
         $this->purgeNotifications($db, $result);
         $this->purgeOldStats($db, $result);
         $this->expireGroupInvitations($db, $result);
-        $this->expirePlanInvitations($db, $result);
         $this->purgeLoginAttempts($db, $result);
         $this->purgeOtpCodes($db, $result);
         $this->purgeJwtBlacklist($db, $result);
@@ -145,32 +144,6 @@ class MaintenanceService implements MaintenanceTaskInterface
         } catch (\Throwable $e) {
             $result['errors'][] = 'expireGroupInvitations: ' . $e->getMessage();
             LogService::error('Maintenance[auth_groups] expireGroupInvitations', ['exception' => $e->getMessage()]);
-        }
-    }
-
-    private function expirePlanInvitations(\PDO $db, array &$result): void
-    {
-        try {
-            $sql = "
-                UPDATE plan_invitations
-                SET status = 'expired'
-                WHERE status = 'pending'
-                  AND expires_at < NOW()
-            ";
-
-            if ($this->dryRun) {
-                $stmt = $db->prepare("SELECT COUNT(*) FROM plan_invitations WHERE status = 'pending' AND expires_at < NOW()");
-                $stmt->execute();
-                $result['rows_updated']['plan_invitations (→ expired)'] = (int) $stmt->fetchColumn();
-                return;
-            }
-
-            $stmt = $db->prepare($sql);
-            $stmt->execute();
-            $result['rows_updated']['plan_invitations (→ expired)'] = $stmt->rowCount();
-        } catch (\Throwable $e) {
-            $result['errors'][] = 'expirePlanInvitations: ' . $e->getMessage();
-            LogService::error('Maintenance[auth_groups] expirePlanInvitations', ['exception' => $e->getMessage()]);
         }
     }
 
