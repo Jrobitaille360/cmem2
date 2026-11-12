@@ -7,7 +7,7 @@ use AuthGroups\Middleware\LoggingMiddleware;
 use AuthGroups\Routing\BaseRouteHandler;
 use AuthGroups\Utils\Response;
 use AuthGroups\Utils\RoleHelper;
-use Playstore\Models\AndroidDevice;
+use WebDevice\Models\AndroidDevice;
 use Puzzle\Controllers\AdminController;
 use Puzzle\Controllers\CarouselController;
 use Puzzle\Controllers\ThemeController;
@@ -78,7 +78,7 @@ class PuzzleRouteHandler extends BaseRouteHandler
                 return;
             }
 
-            Response::error('Endpoint supprimé — utilisez /v2/devices/* et /v2/subscriptions/*', null, 410);
+            Response::error('Endpoint supprimé — utilisez /v2/devices/*', null, 410);
             return;
         }
 

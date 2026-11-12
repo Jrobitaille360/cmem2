@@ -10,8 +10,8 @@ use AuthGroups\Middleware\LoggingMiddleware;
 use AuthGroups\Utils\Response;
 use AuthGroups\Utils\Validator;
 use Access\Services\AiBudgetService;
-use Stripe\Config\CmemModules;
-use Stripe\Services\EntitlementService;
+use Access\Config\CmemModules;
+use Access\Services\EntitlementService;
 use Throwable;
 
 /**

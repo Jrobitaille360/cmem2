@@ -12,7 +12,6 @@ namespace AuthGroups\Services;
  * le DELETE final fait l'essentiel du travail. Ce service traite ce que la cascade
  * ne peut pas faire :
  *
- *   - archiver les registres de facturation avant que la cascade ne les emporte ;
  *   - transférer la propriété des groupes partagés (sinon la cascade les détruirait
  *     pour leurs autres membres) ;
  *   - réattribuer les parties de casse-tête au partenaire survivant ;
@@ -67,7 +66,6 @@ class AccountPurgeService
         $report = [
             'user_id'             => $userId,
             'dry_run'             => $dryRun,
-            'billing_archived'    => 0,
             'groups_transferred'  => 0,
             'groups_deleted'      => 0,
             'puzzles_reassigned'  => 0,
@@ -101,7 +99,6 @@ class AccountPurgeService
         try {
             $db->beginTransaction();
 
-            self::archiveBilling($db, $userId, $dryRun, $report);
             self::handleGroups($db, $userId, $dryRun, $report);
             self::reassignPuzzles($db, $userId, $dryRun, $report);
             self::deleteFileRows($db, $userId, $dryRun, $report, count($files));
@@ -180,45 +177,6 @@ class AccountPurgeService
             return null;
         }
         return $real;
-    }
-
-    /**
-     * Registres de facturation conservés anonymisés (obligation fiscale).
-     * La ligne d'origine part ensuite avec la cascade sur users.
-     */
-    private static function archiveBilling(\PDO $db, int $userId, bool $dryRun, array &$report): void
-    {
-        $stmt = $db->prepare('SELECT * FROM stripe_subscriptions WHERE user_id = ?');
-        $stmt->execute([$userId]);
-        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
-
-        if ($dryRun) {
-            $report['billing_archived'] = count($rows);
-            return;
-        }
-
-        $insert = $db->prepare(
-            'INSERT INTO billing_archive
-                (app_id, stripe_customer_id, stripe_subscription_id, plan, status,
-                 is_trial, trial_end, expires_at, cancel_at_period_end, subscribed_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-        );
-
-        foreach ($rows as $row) {
-            $insert->execute([
-                $row['app_id'],
-                $row['stripe_customer_id'],
-                $row['stripe_subscription_id'],
-                $row['plan'],
-                $row['status'],
-                $row['is_trial'],
-                $row['trial_end'],
-                $row['expires_at'],
-                $row['cancel_at_period_end'],
-                $row['created_at'],
-            ]);
-            $report['billing_archived']++;
-        }
     }
 
     /**

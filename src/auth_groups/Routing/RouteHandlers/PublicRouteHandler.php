@@ -187,8 +187,6 @@ class PublicRouteHandler extends BaseRouteHandler
                 'groups' => 'Création et gestion de groupes avec rôles et permissions',
                 'files' => 'Upload, stockage et gestion de fichiers avec versioning',
                 'tags' => 'Système de tags avancé avec recherche et associations',
-                'plans' => 'Gestion des plans d\'abonnement et facturation',
-                'webhooks' => 'Intégration webhooks pour paiements (Stripe, PayPal)',
                 'plugins' => 'Système de plugins extensible (ICS Calendar, etc.)'
             ],
             'resources' => [
@@ -251,10 +249,6 @@ class PublicRouteHandler extends BaseRouteHandler
                         'description' => 'Gestion des tags',
                         'operations' => 'CRUD, associations, search, most-used, suggestions'
                     ],
-                    'plans' => [
-                        'description' => 'Gestion des abonnements',
-                        'operations' => 'subscribe, upgrade, cancel, billing history'
-                    ],
                     'stats' => [
                         'description' => 'Statistiques et analytics',
                         'operations' => 'platform, users, groups, usage metrics'
@@ -269,11 +263,6 @@ class PublicRouteHandler extends BaseRouteHandler
                         'description' => 'Plugin de calendriers ICS',
                         'endpoints' => 'GET /calendars, POST /calendars, GET /calendars/{id}/events, etc.'
                     ]
-                ],
-                'webhooks' => [
-                    'POST /webhook/payment - Webhook générique de paiement',
-                    'POST /webhook/stripe - Webhook Stripe (signature verification)',
-                    'POST /webhook/paypal - Webhook PayPal (IPN validation)'
                 ],
                 'admin' => [
                     'secret-admin' => 'Endpoints d\'administration (authentification super-admin requise)',

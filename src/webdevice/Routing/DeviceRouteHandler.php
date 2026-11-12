@@ -1,20 +1,24 @@
 <?php
 
-namespace Playstore\Routing;
+namespace WebDevice\Routing;
 
 use AuthGroups\Routing\BaseRouteHandler;
 use AuthGroups\Utils\Response;
-use Playstore\Controllers\DeviceController;
-use Playstore\Controllers\SubscriptionController;
+use WebDevice\Controllers\DeviceController;
 use WebDevice\Controllers\WebDeviceController;
 
-class PlaystoreRouteHandler extends BaseRouteHandler
+/**
+ * /v2/devices/{android|web|windows}/* — enregistrement d'appareil et pseudonyme.
+ * Extrait de l'ancien routeur Play Store (#298) : le lien
+ * d'appareil n'a rien à voir avec le paiement et survit au retrait du Play Store.
+ */
+class DeviceRouteHandler extends BaseRouteHandler
 {
     protected bool $requiresAuth = false;
 
     protected function getSupportedControllers(): array
     {
-        return ['playstore'];
+        return ['devices'];
     }
 
     protected function handleRoute(array $request): void
@@ -22,9 +26,9 @@ class PlaystoreRouteHandler extends BaseRouteHandler
         $method   = $request['method']   ?? 'GET';
         $segments = $request['segments'] ?? [];
 
-        // segments[0] = 'v2'
-        $s1 = $segments[1] ?? '';   // 'devices' ou 'subscriptions'
-        $s2 = $segments[2] ?? '';   // 'android', 'web' ou 'playstore'
+        // segments[0] = 'v2', segments[1] = 'devices'
+        $s1 = $segments[1] ?? '';   // 'devices'
+        $s2 = $segments[2] ?? '';   // 'android', 'web' ou 'windows'
         $s3 = $segments[3] ?? '';   // action
         $s4 = $segments[4] ?? '';   // 'check'
         $s5 = $segments[5] ?? '';   // {pseudo}
@@ -135,34 +139,6 @@ class PlaystoreRouteHandler extends BaseRouteHandler
             }
 
             Response::error('Endpoint non trouvé', null, 404);
-            return;
-        }
-
-        // --------------------------------------------------------------------
-        // /v2/subscriptions/playstore/*
-        // Auth : X-Device-Token (Android, jamais de JWT — pas d'email requis)
-        // --------------------------------------------------------------------
-        if ($s1 === 'subscriptions' && $s2 === 'playstore') {
-            $deviceToken = $_SERVER['HTTP_X_DEVICE_TOKEN'] ?? '';
-
-            if (!$deviceToken) {
-                Response::error('X-Device-Token requis', null, 401);
-                return;
-            }
-
-            $device = (new \Playstore\Models\AndroidDevice())->findByValidToken($deviceToken);
-
-            if (!$device) {
-                Response::error('Device token invalide ou expiré', null, 401);
-                return;
-            }
-
-            match (true) {
-                ($s3 === 'verify' && $method === 'POST')   => (new SubscriptionController())->verify($device),
-                ($s3 === 'status' && $method === 'GET')    => (new SubscriptionController())->getStatus($device),
-                ($s3 === ''       && $method === 'DELETE') => (new SubscriptionController())->cancel($device),
-                default => Response::error('Endpoint non trouvé', null, 404),
-            };
             return;
         }
 

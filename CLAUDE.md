@@ -60,9 +60,7 @@ php private/tests/test_maintenance.php
 php private/tests/test_modules.php
 php private/tests/test_module_grants.php
 php private/tests/test_password_reset.php
-php private/tests/test_plan_effectif_groupe.php
-php private/tests/test_plans.php
-php private/tests/test_playstore.php
+php private/tests/test_payment_removal.php
 php private/tests/test_pomo.php
 php private/tests/test_pseudo.php
 php private/tests/test_public.php
@@ -77,10 +75,6 @@ php private/tests/test_quiz3.php
 php private/tests/test_resource_caps.php
 php private/tests/test_secret_admin.php
 php private/tests/test_stats.php
-php private/tests/test_stripe_group_billing.php
-php private/tests/test_stripe_v2.php
-php private/tests/test_stripe_webhooks.php
-php private/tests/test_subscriptions.php
 php private/tests/test_tags.php
 php private/tests/test_traque.php
 php private/tests/test_traque_rest.php
@@ -135,11 +129,9 @@ src/<module>/
 | `src/booking/` | `Booking\` | Public booking — host slot page, materialized zones, token-based cancellation |
 | `src/pomo/` | `Pomo\` | Engagement waitlist and support forms |
 | `src/puzzle/` | `Puzzle\` | Collaborative puzzle with pick/drop mechanics |
-| `src/access/` | `Access\` | Subscription access control (Stripe + Playstore cross-check) |
-| `src/stripe/` | `Stripe\` | Stripe payment and subscription processing |
-| `src/playstore/` | `Playstore\` | Google Play Store subscription verification |
+| `src/access/` | `Access\` | Approval-based access: account status, invitations, module grants, resource caps, AI budget, `/v2/access/status` |
 | `src/traque/` | `Traque\` | Game plugin: combat, monsters, OSM biomes, achievements |
-| `src/webdevice/` | `WebDevice\` | Web push device token management |
+| `src/webdevice/` | `WebDevice\` | Device registration (Android, web, Windows) — `/v2/devices/*`, device_token, pseudonym |
 | `src/push/` | `Push\` | Web Push (VAPID) — `/push/*`, subscriptions per device, prefs per account, send cron |
 | `src/notifications/` | *(scripts)* | Email notification scripts (no routing) |
 | `src/cron/` | *(scripts)* | Backup cron scripts (no routing) |

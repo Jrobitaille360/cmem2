@@ -10,7 +10,7 @@
       "description": "GET/PUT/DELETE /booking/page requièrent Authorization: Bearer <jwt_token> (hôte). Les 4 routes /booking/public/* sont sans authentification."
     },
     "notes": [
-      "Gating par plan : tenant_modules.booking disponible sur monthly/yearly/team/ami, pas free (Stripe\\Config\\CmemModules::AVAILABLE)",
+      "Gating par modules cochés : booking disponible si présent dans user_module_grants (ModuleGrantService) — plus de plan Stripe",
       "app_id : défaut serveur 'puzzle' comme le reste de l'API, cmem_web transmet toujours 'cmemweb'",
       "GET /booking/public/{slug} retourne un 404 BOOKING_UNAVAILABLE identique que la page soit inexistante, inactive, ou que le plan de l'hôte ait été rétrogradé — anti-énumération de slug volontaire",
       "Réservation atomique : POST /booking/public/{slug}/book fait un UPDATE ... WHERE reserved = 0 — pas de revérification applicative, la course entre deux invités se règle par la contrainte SQL",

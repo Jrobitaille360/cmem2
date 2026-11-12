@@ -17,7 +17,6 @@ Version 2.2.4 · Base URL : `/`
 - [Endpoints — Tags](#endpoints--tags)
 - [Endpoints — Statistiques](#endpoints--statistiques)
 - [Endpoints — Public](#endpoints--public)
-- [Abonnements Premium](#abonnements-premium)
 - [Erreurs](#erreurs)
 - [Migrations](#migrations)
 
@@ -171,13 +170,12 @@ Réponse `200` :
   "token_type": "Bearer",
   "expires_at": "2026-04-20 12:00:00",
   "user": { "id": 1, "name": "Alice", "email": "alice@example.com", "role": "UTILISATEUR" },
-  "subscriptions": { "puzzle": { "is_premium": true, "show_ads": false, "is_trial": false, "trial_end": null, "expires_at": "2027-04-20 12:00:00", "provider": "stripe", "plan": "yearly" } },
   "device_token": "abc123...",
   "device_id": "550e8400..."
 }
 ```
 
-> `subscriptions` est aussi présent dans la réponse de `POST /auth/verify-code`. Objet vide `{}` si aucun abonnement actif.
+> Plus de champ `subscriptions` (abonnements retirés) : l'accès se lit dans `user.access_status`.
 
 ### POST /auth/send-code
 
@@ -281,8 +279,6 @@ Réponse `200` :
 | DELETE | `/users/{id}/sessions` | JWT (ADMIN+ ou soi-même) | Terminer toutes les sessions |
 | GET | `/users/{id}/session-status` | JWT (ADMIN+ ou soi-même) | Présence d'une session active |
 | PUT | `/users/{id}/plan-override` | JWT (SUPERADMINISTRATEUR) | Poser/retirer l'assignation manuelle du plan cmem (`cmem_plan_override`, ex. `'ami'`, ou `null` pour retirer) |
-| GET | `/users/choose-plan` | JWT | Plans disponibles pour l'utilisateur |
-| POST | `/users/choose-plan` | JWT | Choisir un plan |
 | POST | `/users/app` | JWT | Créer une configuration d'application (`app_id` + `json_data`) |
 | GET | `/users/app` | JWT | Lister ses configurations d'applications |
 | GET | `/users/app/{app_id}` | JWT | Lire une configuration |
@@ -354,8 +350,7 @@ définitivement après un **délai de grâce de 30 jours** (`ACCOUNT_PURGE_GRACE
 
 ### Parcours
 
-1. `DELETE /users/me` — le serveur annule d'abord tout abonnement Stripe encore actif, puis pose
-   `deleted_at`. Réponse :
+1. `DELETE /users/me` — le serveur pose `deleted_at`. Réponse :
 
    ```json
    { "deleted": true, "purge_scheduled_at": "2026-08-28T02:14:07Z" }
@@ -375,23 +370,6 @@ définitivement après un **délai de grâce de 30 jours** (`ACCOUNT_PURGE_GRACE
 4. Après 30 jours, le cron de maintenance efface physiquement le compte. L'adresse redevient
    disponible pour une inscription neuve, sans aucun reliquat.
 
-### Si l'annulation Stripe échoue
-
-`DELETE /users/me` renvoie `409` et **ne supprime pas** le compte :
-
-```json
-{
-  "success": false,
-  "errors": {
-    "error_code": "STRIPE_CANCEL_FAILED",
-    "app_id": "cmemweb"
-  }
-}
-```
-
-Aucun compte supprimé ne reste facturé. Réessayer plus tard, ou annuler l'abonnement d'abord via
-`DELETE /v2/subscriptions/stripe`.
-
 ### Ce qui est effacé, ce qui est conservé
 
 | Donnée | Sort |
@@ -408,7 +386,7 @@ Aucun compte supprimé ne reste facturé. Réessayer plus tard, ou annuler l'abo
 | Groupe dont l'usager est le seul membre | Effacé |
 | Propriété d'un groupe partagé | Transférée au membre le plus ancien |
 | Partie de casse-tête partagée | Conservée chez le partenaire, sans trace de l'usager parti |
-| Registres de facturation Stripe | Conservés **anonymisés** (`billing_archive`) — obligation fiscale, aucun identifiant d'usager |
+| Registres de facturation déjà archivés | Conservés **anonymisés** (`billing_archive`, plus alimenté depuis le retrait de Stripe) |
 
 ### Cron
 
@@ -700,61 +678,3 @@ Format standard de toutes les réponses d'erreur :
 | [create_proc_reset_auth_groups.sql](create_proc_reset_auth_groups.sql) | Procédure reset données test |
 | [migrations/20260409_subscriptions.sql](migrations/20260409_subscriptions.sql) | Table `subscriptions` (v2.2.4) |
 | [../20260505_subscriptions_purchase_token_unique.sql](../20260505_subscriptions_purchase_token_unique.sql) | Contrainte `uq_purchase_token_app` + migration devices Google Play (v2.5.0) |
-
----
-
-## Abonnements Premium
-
-Les endpoints `/subscription/*` permettent de gérer les abonnements Premium **par application** (`app_id`). L'accès Premium est indépendant pour chaque app : un utilisateur peut être Premium pour `puzzle` mais pas pour `quiz`.
-
-La table `subscriptions` est la **source unique de vérité** pour tous les providers. Pour Google Play (plugin Puzzle), le lookup s'effectue par `purchase_token + app_id` — l'abonnement est donc lié à l'achat, pas à l'appareil, et survit à une réinstallation.
-
-### Endpoints
-
-| Méthode | Endpoint | Auth | Description |
-| --- | --- | --- | --- |
-| GET | `/subscription/status` | JWT | Statut Premium de toutes les apps |
-| GET | `/subscription/status?app_id={app}` | JWT | Statut Premium d'une app spécifique |
-| POST | `/subscription/verify` | JWT | Valider un achat provider et activer le Premium |
-| DELETE | `/subscription/cancel` | JWT | Annuler un abonnement |
-
-> **Dépréciées depuis v2.7.0** : `POST /subscription/checkout` et `POST /subscription/portal`
-> retournent `410 Gone`. Utiliser `POST /v2/billing/checkout` et `POST /v2/billing/portal`
-> — voir [../stripe/GUIDE.md](../stripe/GUIDE.md).
-
-### Structure de réponse
-
-Chaque entrée `app_id` dans `subscriptions{}` retourne :
-
-| Champ | Type | Description |
-| --- | --- | --- |
-| `is_premium` | boolean | `true` si l'abonnement est actif |
-| `show_ads` | boolean | `true` si les publicités doivent être affichées (= `!is_premium`) |
-| `expires_at` | datetime\|null | Date d'expiration UTC (`Y-m-d H:i:s`) |
-| `provider` | string\|null | `stripe`, `google_play`, `apple`, `microsoft` |
-| `plan` | string\|null | `monthly` (+31 j) ou `yearly` (+365 j) |
-| `is_trial` | boolean | `true` si l'abonnement est en période d'essai |
-| `trial_end` | datetime\|null | Fin de la période d'essai UTC, ou `null` |
-
-> Utiliser `show_ads` (et non `is_premium`) pour décider d'afficher les publicités.
-
-### Checkout et portail Stripe
-
-Le paiement web (Checkout) et le portail de gestion Stripe sont gérés par le module Stripe :
-`POST /v2/billing/checkout` et `POST /v2/billing/portal`.
-Voir [../stripe/GUIDE.md](../stripe/GUIDE.md).
-
-### Providers supportés
-
-| Provider | Plateforme |
-| --- | --- |
-| `stripe` | Web, Windows |
-| `google_play` | Android |
-| `apple` | iOS / macOS |
-| `microsoft` | Microsoft Store |
-
-### CRON
-
-Le script `src/cron/expire_subscriptions.php` (planifié à 03:00) expire automatiquement les abonnements dépassés et envoie un email de notification aux utilisateurs concernés.
-
-> Documentation complète : [docs/v 2.2.4/2.2.4_CLIENT.md](../v%202.2.4/2.2.4_CLIENT.md)

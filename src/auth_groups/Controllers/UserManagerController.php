@@ -3,7 +3,6 @@
 namespace AuthGroups\Controllers;
 
 use AuthGroups\Models\User;
-use AuthGroups\Models\Plan;
 use AuthGroups\Services\EmailService;
 use AuthGroups\Services\AuthService;
 use AuthGroups\Utils\Response;
@@ -14,7 +13,7 @@ use AuthGroups\Services\LogService;
 use AuthGroups\Services\RateLimitService;
 use AuthGroups\Services\UserSessionService;
 use AuthGroups\Middleware\LoggingMiddleware;
-use Stripe\Config\CmemPlans;
+use Access\Services\EntitlementService;
 use Exception;
 
 /**
@@ -228,26 +227,8 @@ class UserManagerController {
                 // Récupérer l'utilisateur créé avec toutes ses données
                 $createdUser = $user->findById($user->id);
                 
-                // 1. Assigner le plan gratuit par défaut
                 $pdo = \Database::getInstance()->getConnection();
-                $freePlan = Plan::findByName(Plan::PLAN_FREE);
-                if ($freePlan) {
-                    $stmt = $pdo->prepare("
-                        UPDATE users 
-                        SET plan_id = :plan_id, plan_expires_at = DATE_ADD(NOW(), INTERVAL 7 DAY)
-                        WHERE id = :user_id
-                    ");
-                    $stmt->execute([
-                        'plan_id' => $freePlan['id'],
-                        'user_id' => $createdUser['id']
-                    ]);
-                    
-                    LogService::info("Plan gratuit assigné", [
-                        'user_id' => $createdUser['id'],
-                        'plan_id' => $freePlan['id']
-                    ]);
-                }
-                
+
                 // 2. Générer et stocker le token de vérification d'email (8 chiffres)
                 //    Le token ne sort que par courriel — jamais dans la réponse HTTP.
                 $issued            = $this->issueVerificationToken($pdo, (int) $createdUser['id']);
@@ -392,66 +373,6 @@ class UserManagerController {
     }
 
     /**
-     * Filet Stripe avant suppression de compte.
-     *
-     * Annule un abonnement encore actif ; si l'appel Stripe échoue, refuse la
-     * suppression (409) plutôt que de laisser un compte supprimé être facturé.
-     *
-     * @return bool true si la suppression peut se poursuivre.
-     */
-    private function cancelStripeSafetyNet($userId): bool
-    {
-        if (!class_exists('\Stripe\Services\StripeSubscriptionService')) {
-            return true; // Module Stripe non activé sur cette installation
-        }
-
-        try {
-            $db   = \Database::getInstance()->getConnection();
-            $stmt = $db->prepare(
-                "SELECT app_id FROM stripe_subscriptions
-                  WHERE user_id = ?
-                    AND status IN ('active', 'trialing', 'past_due')
-                    AND cancel_at_period_end = 0"
-            );
-            $stmt->execute([$userId]);
-            $appIds = $stmt->fetchAll(\PDO::FETCH_COLUMN);
-        } catch (\Throwable $e) {
-            // Table absente : rien à annuler.
-            return true;
-        }
-
-        foreach ($appIds as $appId) {
-            try {
-                \Stripe\Services\StripeSubscriptionService::cancel((int) $userId, (string) $appId);
-                LogService::info('Abonnement Stripe annulé avant suppression de compte', [
-                    'user_id' => $userId,
-                    'app_id'  => $appId,
-                ]);
-            } catch (\Throwable $e) {
-                LogService::error('Annulation Stripe impossible — suppression refusée', [
-                    'user_id' => $userId,
-                    'app_id'  => $appId,
-                    'error'   => $e->getMessage(),
-                ]);
-                LoggingMiddleware::logExit(409);
-                Response::error(
-                    'Impossible d\'annuler l\'abonnement Stripe — suppression annulée',
-                    [
-                        'error_code' => 'STRIPE_CANCEL_FAILED',
-                        'message'    => 'L\'abonnement n\'a pas pu être annulé. Réessayez plus tard '
-                                      . 'ou annulez-le avant de supprimer le compte.',
-                        'app_id'     => $appId,
-                    ],
-                    409
-                );
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    /**
      * Supprimer un utilisateur (soft delete)
      */
     public function delete($userId, $currentUserId, $currentUserRole) {
@@ -503,13 +424,6 @@ class UserManagerController {
 
                 $force_delete = $input['force_delete']?? false; // Par défaut, on fait un soft delete
             }
-            // Filet Stripe — un compte supprimé qui reste facturé est le pire scénario.
-            // Le client annule normalement avant d'appeler cette route ; le serveur ne
-            // peut pas en dépendre (autre client, coupure réseau, appel direct à l'API).
-            if (!$force_delete && !$this->cancelStripeSafetyNet($userId)) {
-                return false; // Réponse 409 déjà envoyée
-            }
-
             if( $user->delete($force_delete)){
                 LogService::info("Utilisateur supprimé (force delete = $force_delete)", [
                     'deleted_user_id' => $userId,
@@ -768,7 +682,7 @@ class UserManagerController {
             }
 
             $planOverride = $input['cmem_plan_override'];
-            if ($planOverride !== null && !in_array($planOverride, CmemPlans::overridableCodes(), true)) {
+            if ($planOverride !== null && !in_array($planOverride, EntitlementService::OVERRIDABLE_PLAN_CODES, true)) {
                 LoggingMiddleware::logExit(422);
                 Response::error('Données de validation invalides', ['cmem_plan_override' => ['valeur non reconnue']], 422);
                 return false;
@@ -897,108 +811,13 @@ class UserManagerController {
             // Update email_verified
             $userModel->markEmailAsVerified($userId);
             
-            // 1. Étendre les limites du plan free après confirmation d'email
-            try {
-                // Étendre l'expiration du plan gratuit à 30 jours au lieu de 7
-                $stmt = $pdo->prepare("
-                    UPDATE users 
-                    SET plan_expires_at = DATE_ADD(NOW(), INTERVAL 30 DAY)
-                    WHERE id = :user_id AND plan_id = (SELECT id FROM plans WHERE name = 'free' LIMIT 1)
-                ");
-                $stmt->execute(['user_id' => $userId]);
-                
-                // Étendre l'expiration des API keys liées au plan gratuit
-                $stmt = $pdo->prepare("
-                    UPDATE api_keys 
-                    SET expires_at = DATE_ADD(NOW(), INTERVAL 30 DAY),
-                        rate_limit_per_minute = 30,
-                        rate_limit_per_hour = 1800
-                    WHERE user_id = :user_id 
-                    AND plan_limited = 1 
-                    AND plan_id = (SELECT id FROM plans WHERE name = 'free' LIMIT 1)
-                ");
-                $stmt->execute(['user_id' => $userId]);
-                
-                LogService::info("Plan gratuit étendu après confirmation email", [
-                    'user_id' => $userId,
-                    'new_expiry' => '30 jours',
-                    'new_rate_limit' => '30/minute'
-                ]);
-                
-            } catch (Exception $planError) {
-                LogService::error("Erreur lors de l'extension du plan gratuit", [
-                    'user_id' => $userId,
-                    'error' => $planError->getMessage()
-                ]);
-                // Ne pas faire échouer la confirmation d'email pour cette erreur
-            }
-            
-            // 2. Créer une nouvelle invitation aux plans payants avec délai étendu
-            try {
-                $planInvitationToken = bin2hex(random_bytes(32));
-                $planInvitationExpires = date('Y-m-d H:i:s', time() + (15 * 24 * 60 * 60)); // 15 jours
-                
-                // Invalider les anciennes invitations
-                $stmt = $pdo->prepare("
-                    UPDATE plan_invitations 
-                    SET status = 'expired' 
-                    WHERE user_id = :user_id AND status = 'pending'
-                ");
-                $stmt->execute(['user_id' => $userId]);
-                
-                // Créer nouvelle invitation
-                $stmt = $pdo->prepare("
-                    INSERT INTO plan_invitations (user_id, invitation_token, expires_at) 
-                    VALUES (:user_id, :token, :expires_at)
-                ");
-                $stmt->execute([
-                    'user_id' => $userId,
-                    'token' => $planInvitationToken,
-                    'expires_at' => $planInvitationExpires
-                ]);
-                
-                // 3. Envoyer email de félicitations avec nouvelle invitation aux plans
-                $emailService = new EmailService();
-                $emailSent = $emailService->sendEmailConfirmedWithPlanReminder(
-                    $userData['email'],
-                    $userData['name'],
-                    $planInvitationToken,
-                    30 // jours d'extension
-                );
-                
-                if ($emailSent) {
-                    LogService::info("Email de félicitations avec invitation plan envoyé", [
-                        'user_id' => $userId,
-                        'email' => $userData['email']
-                    ]);
-                } else {
-                    LogService::warning("Échec envoi email félicitations", [
-                        'user_id' => $userId,
-                        'email' => $userData['email']
-                    ]);
-                }
-                
-            } catch (Exception $invitationError) {
-                LogService::error("Erreur lors de la création d'invitation plan", [
-                    'user_id' => $userId,
-                    'error' => $invitationError->getMessage()
-                ]);
-                // Ne pas faire échouer la confirmation d'email pour cette erreur
-            }
-            
             // Soft delete du token de reset s'il a été utilisé
             $stmt = $pdo->prepare("UPDATE email_verifications SET deleted_at = NOW() WHERE token = :token");
             $stmt->execute(['token' => $input['token']]);
             
             LoggingMiddleware::logExit(200);
-            Response::success('Email confirmé avec succès. Votre plan gratuit a été étendu à 30 jours avec des limites améliorées !', [
+            Response::success('Email confirmé avec succès.', [
                 'email_verified' => true,
-                'plan_extended' => true,
-                'new_plan_expiry_days' => 30,
-                'improved_limits' => [
-                    'rate_limit_per_minute' => 30,
-                    'rate_limit_per_hour' => 1800
-                ]
             ]);
             return true;
         } catch (Exception $e) {

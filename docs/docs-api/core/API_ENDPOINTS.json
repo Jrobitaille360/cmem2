@@ -2,7 +2,7 @@
   "api": {
     "name": "AuthGroups API",
     "version": "2.8.0",
-    "description": "API REST complète pour la gestion d'authentification, groupes, fichiers, tags et abonnements Premium",
+    "description": "API REST complète pour la gestion d'authentification, groupes, fichiers, tags, accès sur approbation",
     "generated": "2026-07-07",
     "base_url": "/",
     "authentication": {
@@ -342,7 +342,7 @@
         {
           "method": "GET",
           "path": "/entrypoints/{module}",
-          "description": "Contenu JSON des entrypoints du module (ex. core, stripe, ics, items, puzzle…)",
+          "description": "Contenu JSON des entrypoints du module (ex. core, access, ics, items, puzzle…)",
           "auth_required": false,
           "response": "{ module: string, files: { 'API_*_ENDPOINTS.json': { …contenu décodé… } } }",
           "errors": {
@@ -382,7 +382,7 @@
             "token": "string (required) — 8 chiffres",
             "email": "string (optional) — permet de compter les tentatives sur le token de l'usager"
           },
-          "response": "Message de confirmation",
+          "response": "{ email_verified: true } — plus de champs plan_extended / new_plan_expiry_days / improved_limits ni de courriel d'invitation aux plans (retirés #480)",
           "rate_limit": "5 tentatives par 10 minutes par couple (email + IP) ; 5 tentatives par token, au-delà le token est invalidé",
           "errors": {
             "400": "Token manquant, ou email déjà vérifié",
@@ -455,49 +455,6 @@
             "code": "string (required)"
           },
           "response": "Message de confirmation"
-        },
-        {
-          "method": "GET",
-          "path": "/plans",
-          "description": "Lister tous les plans d'abonnement disponibles",
-          "auth_required": false,
-          "query": {
-            "page": "integer (optional)",
-            "limit": "integer (optional)",
-            "active": "integer 0|1 (optional)"
-          },
-          "response": "{ plans: Plan[], total: integer }"
-        },
-        {
-          "method": "GET",
-          "path": "/plans/{id}",
-          "description": "Obtenir les détails d'un plan spécifique",
-          "auth_required": false,
-          "params": {
-            "id": "integer (required)"
-          },
-          "response": "Plan object"
-        },
-        {
-          "method": "GET",
-          "path": "/users/choose-plan",
-          "description": "Afficher l'invitation à choisir un plan (token requis en query string)",
-          "auth_required": false,
-          "query": {
-            "token": "string (required)"
-          },
-          "response": "Informations du plan à choisir"
-        },
-        {
-          "method": "POST",
-          "path": "/users/choose-plan",
-          "description": "Sélectionner un plan d'abonnement",
-          "auth_required": false,
-          "body": {
-            "token": "string (required)",
-            "plan_id": "integer (required)"
-          },
-          "response": "Message de confirmation"
         }
       ]
     },
@@ -548,15 +505,11 @@
             "password": "string (required)"
           },
           "notes": [
-            "Filet Stripe : si un abonnement Stripe actif subsiste, le serveur l'annule avant de supprimer le compte. Si l'annulation échoue, la suppression est refusée (409 STRIPE_CANCEL_FAILED) — aucun compte supprimé ne reste facturé",
             "purge_scheduled_at indique la date d'effacement physique. Le champ est informatif : son absence ne remet pas en cause le succès de la suppression",
             "Pendant le délai de grâce, POST /auth/send-code renvoie 409 ACCOUNT_PENDING_DELETION ; la restauration passe par POST /auth/restore-account ou une connexion mot de passe réussie",
             "Après la purge, l'adresse redevient disponible pour une inscription neuve"
           ],
-          "response": "{ deleted: true, purge_scheduled_at: \"2026-08-28T00:00:00Z\" }",
-          "errors": {
-            "409": "Abonnement Stripe non annulable — errors.error_code = STRIPE_CANCEL_FAILED, errors.app_id = app concernée. Réessayer plus tard ou annuler l'abonnement d'abord"
-          }
+          "response": "{ deleted: true, purge_scheduled_at: \"2026-08-28T00:00:00Z\" }"
         },
         {
           "method": "GET",
@@ -1627,24 +1580,6 @@
             "SUPERADMINISTRATEUR"
           ],
           "response": "Nombre de sessions nettoyées"
-        }
-      ]
-    },
-    "plans": {
-      "description": "Plans d'abonnement disponibles — accès public sans auth",
-      "base_path": "/plans",
-      "routes": [
-        {
-          "method": "GET",
-          "path": "/plans",
-          "description": "Lister tous les plans actifs",
-          "auth_required": false,
-          "response": {
-            "plans": "array — liste des plans disponibles"
-          },
-          "errors": {
-            "500": "Erreur serveur"
-          }
         }
       ]
     }

@@ -26,8 +26,6 @@
             "Quiz\\": "src/quiz/",
             "Puzzle\\": "src/puzzle/",
             "Traque\\": "src/traque/",
-            "Playstore\\": "src/playstore/",
-            "Stripe\\": "src/stripe/",
             "Access\\": "src/access/",
             "WebDevice\\": "src/webdevice/"
         },

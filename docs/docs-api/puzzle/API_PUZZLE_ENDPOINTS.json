@@ -2,7 +2,7 @@
   "api": {
     "name": "Puzzle API",
     "version": "2.0.0",
-    "description": "Plugin puzzle : carrousel d'images, thèmes, sauvegarde en ligne, casse-têtes partagés en temps réel. Authentification par device_token obtenu via POST /v2/devices/android/register. Depuis v2.7.0 : routes sous /v2/puzzle/*, device et abonnement gérés par les modules /v2/devices/ et /v2/subscriptions/.",
+    "description": "Plugin puzzle : carrousel d'images, thèmes, sauvegarde en ligne, casse-têtes partagés en temps réel. Authentification par device_token obtenu via POST /v2/devices/android/register. Depuis v2.7.0 : routes sous /v2/puzzle/*, appareil géré par le module /v2/devices/. Plus d'abonnement (#300) : premium = appareil lié à un compte approuvé.",
     "generated": "2026-05-19",
     "reviewed": "2026-05-19",
     "base_url": "/v2/puzzle",
@@ -14,7 +14,7 @@
         "obtain": "POST /v2/devices/android/register"
       },
       "premium": {
-        "description": "Certains endpoints nécessitent un abonnement actif. Statut vérifié via /v2/access/status (Play Store ou Stripe). Erreur 403 SUBSCRIPTION_REQUIRED si aucun abonnement actif."
+        "description": "Certains endpoints sont premium : l'appareil doit être lié (POST /puzzle/auth/link-device) à un compte approuvé. Erreur 403 SUBSCRIPTION_REQUIRED sinon (code conservé pour le contrat)."
       }
     }
   },
@@ -209,14 +209,14 @@
       ]
     },
     "auth": {
-      "description": "Liaison appareil ↔ compte cmem2. Seule route /puzzle/auth/* encore active — les autres répondent 410 (migrées vers /v2/devices/* et /v2/subscriptions/* en v2.7.0).",
+      "description": "Liaison appareil ↔ compte cmem2. Seule route /puzzle/auth/* encore active — les autres répondent 410 (migrées vers /v2/devices/* en v2.7.0).",
       "auth_required": true,
       "auth_type": "JWT_BEARER",
       "routes": [
         {
           "method": "POST",
           "path": "/puzzle/auth/link-device",
-          "description": "Lie un device_token (android_devices ou web_devices) au compte cmem2 authentifié par JWT. Permet à l'appareil d'hériter de l'abonnement du compte.",
+          "description": "Lie un device_token (android_devices ou web_devices) au compte cmem2 authentifié par JWT. Permet à l'appareil d'hériter de l'accès premium du compte (compte approuvé).",
           "headers": {
             "Authorization": "Bearer {jwt_token}"
           },

@@ -4,7 +4,7 @@ namespace Access\Services;
 
 use Database;
 use PDO;
-use Stripe\Config\CmemModules;
+use Access\Config\CmemModules;
 
 /**
  * Modules cochés par personne (plan accès sur approbation #269, Phase 3).

@@ -8,8 +8,8 @@ use AuthGroups\Models\Group;
 use AuthGroups\Models\TenantModule;
 use AuthGroups\Utils\Response;
 use AuthGroups\Utils\RoleHelper;
-use Stripe\Config\CmemModules;
-use Stripe\Services\EntitlementService;
+use Access\Config\CmemModules;
+use Access\Services\EntitlementService;
 
 /**
  * Registre de modules activables au niveau du GROUPE — GET/PATCH /groups/{id}/modules[/{key}].

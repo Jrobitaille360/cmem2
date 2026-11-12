@@ -7,7 +7,7 @@ use AuthGroups\Models\User;
 use AuthGroups\Services\LogService;
 use AuthGroups\Utils\Response;
 use AuthGroups\Utils\RoleHelper;
-use Stripe\Config\CmemModules;
+use Access\Config\CmemModules;
 
 /**
  * Accès sur approbation (plan #269, Phase 2) — endpoints admin (ADMINISTRATEUR+).

@@ -10,7 +10,7 @@ use AuthGroups\Utils\Validator;
 use AuthGroups\Services\LogService;
 use AuthGroups\Services\AuthService;
 use AuthGroups\Middleware\LoggingMiddleware;
-use Stripe\Services\EntitlementService;
+use Access\Services\EntitlementService;
 use Exception;
 
 class GroupManagerController

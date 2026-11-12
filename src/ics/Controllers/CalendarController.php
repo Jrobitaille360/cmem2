@@ -15,7 +15,7 @@ use AuthGroups\Services\EmailService;
 use AuthGroups\Models\User;
 use AuthGroups\Models\Group;
 use PharIo\Manifest\Email;
-use Stripe\Services\EntitlementService;
+use Access\Services\EntitlementService;
 
 class CalendarController
 {

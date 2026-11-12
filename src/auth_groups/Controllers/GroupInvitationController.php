@@ -282,7 +282,7 @@ class GroupInvitationController
             }
 
             // Cap max_group_members du groupe (défaut ou surcharge de groupe — #294)
-            $quotaError = \Stripe\Services\EntitlementService::checkQuota(
+            $quotaError = \Access\Services\EntitlementService::checkQuota(
                 (int) $currentUserId,
                 'max_group_members',
                 $memberCount,

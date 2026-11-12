@@ -5,7 +5,7 @@
 ![Status](https://img.shields.io/badge/status-production%20ready-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 
-API REST modulaire pour la plateforme **Memories v2**. Elle regroupe les modules : authentification/groupes (core), calendriers ICS/CalDAV, Pomodoro, Quiz interactif, gestionnaire générique Items, pilier Contacts (CRM), gestion de projet (Projets), puzzle collaboratif, jeu Traque, contrôle d'accès aux abonnements (Access), paiements Stripe, vérification Playstore, notifications push web VAPID (Push) et gestion des tokens push web (WebDevice).
+API REST modulaire pour la plateforme **Memories v2**. Elle regroupe les modules : authentification/groupes (core), calendriers ICS/CalDAV, Pomodoro, Quiz interactif, gestionnaire générique Items, pilier Contacts (CRM), gestion de projet (Projets), puzzle collaboratif, jeu Traque, accès sur approbation (Access), notifications push web VAPID (Push) et enregistrement d'appareils Android/web/Windows (WebDevice).
 
 Authentification **JWT** HS256 (Bearer, 15 jours). Deux méthodes de connexion : **email + mot de passe** ou **email + code OTP**.
 
@@ -38,10 +38,8 @@ cmem2 API fournit :
 - **Booking** : Réservation publique par lien — page hôte sans authentification, zones matérialisées, réservation atomique, annulation par jeton
 - **Puzzle** : Puzzle collaboratif — pick/drop de pièces, sessions partagées
 - **Traque** : Jeu type combat/exploration — monstres, biomes OSM, achievements, rôles (`gm`, `traque_admin`)
-- **Access** : Contrôle d'accès aux abonnements — croisement Stripe / Playstore
-- **Stripe** : Paiements et abonnements Stripe
-- **Playstore** : Vérification des abonnements Google Play Store
-- **WebDevice** : Gestion des tokens de notification push web
+- **Access** : Accès sur approbation — statut de compte, invitations, modules cochés, caps, budget IA
+- **WebDevice** : Enregistrement d'appareils Android, web et Windows (device_token, pseudonyme)
 - **Push** : Notifications Web Push (VAPID) — abonnements par device, préférences par compte, envoi cron
 - **Modules** : Registre de modules activables — gating par plan, toggle usager
 - **IA** : Proxy IA — résumé d'agenda via `POST /ai/summarize`, gating par module `ia`, budget mensuel en dollars (`GET /ai/usage`)
@@ -112,7 +110,6 @@ Ces variables changent selon la cible de déploiement (marquées `↓ à ajuster
 | `LOG_LEVEL` | `debug` | `debug` | `info` |
 | `LOG_DIR` | `logs/` | `logs/` | `logs/` |
 | `BACKUP_DIR` | chemin local | `/home/xxx/backups/` | `/home/xxx/backups/` |
-| `STRIPE_SECRET_KEY` | `sk_test_…` | `sk_test_…` | `sk_live_…` |
 | `PUZZLE_DEBUG_PREMIUM` | `false` | `false` | `false` |
 
 `LOG_DIR` accepte un chemin relatif à la racine du projet (`logs/`) ou un chemin absolu
@@ -130,8 +127,6 @@ Ces variables changent selon la cible de déploiement (marquées `↓ à ajuster
 | `DB_PASS` | Mot de passe MySQL |
 | `SMTP_PASSWORD` | Mot de passe SMTP |
 | `BACKUP_PASSPHRASE` | Passphrase de chiffrement des backups |
-| `STRIPE_SECRET_KEY` | Clé secrète Stripe (`sk_test_` ou `sk_live_`) |
-| `STRIPE_WEBHOOK_SECRET` | Secret de signature webhook Stripe |
 
 ## Architecture
 
@@ -173,10 +168,8 @@ cmem2_API/
 │   │   └── Routing/
 │   ├── puzzle/                # Puzzle collaboratif
 │   ├── traque/                # Jeu combat/exploration
-│   ├── access/                # Contrôle d'accès abonnements
-│   ├── stripe/                # Paiements Stripe
-│   ├── playstore/             # Vérification Playstore
-│   ├── webdevice/             # Tokens push web
+│   ├── access/                # Accès sur approbation, modules, caps, budget IA
+│   ├── webdevice/             # Appareils Android/web/Windows
 │   ├── notifications/         # Scripts notifications email (pas de routing)
 │   ├── cron/                  # Scripts cron backup (pas de routing)
 │   └── logs/
@@ -200,8 +193,6 @@ Namespaces PSR-4 :
 - `Puzzle\` → `src/puzzle/`
 - `Traque\` → `src/traque/`
 - `Access\` → `src/access/`
-- `Stripe\` → `src/stripe/`
-- `Playstore\` → `src/playstore/`
 - `WebDevice\` → `src/webdevice/`
 
 ## Authentification
@@ -403,8 +394,6 @@ Voir [docs/docs-api/booking/GUIDE.md](docs/docs-api/booking/GUIDE.md) pour la r�
 | Puzzle | [docs/docs-api/puzzle/API_PUZZLE_ENDPOINTS.json](docs/docs-api/puzzle/API_PUZZLE_ENDPOINTS.json) | [docs/docs-api/puzzle/GUIDE.md](docs/docs-api/puzzle/GUIDE.md) |
 | Traque | [docs/docs-api/traque/API_TRAQUE_ENDPOINTS.json](docs/docs-api/traque/API_TRAQUE_ENDPOINTS.json) | [docs/docs-api/traque/GUIDE.md](docs/docs-api/traque/GUIDE.md) |
 | Access | [docs/docs-api/access/API_ACCESS_ENDPOINTS.json](docs/docs-api/access/API_ACCESS_ENDPOINTS.json) | [docs/docs-api/access/GUIDE.md](docs/docs-api/access/GUIDE.md) |
-| Stripe | [docs/docs-api/stripe/API_STRIPE_ENDPOINTS.json](docs/docs-api/stripe/API_STRIPE_ENDPOINTS.json) | [docs/docs-api/stripe/GUIDE.md](docs/docs-api/stripe/GUIDE.md) |
-| Playstore | [docs/docs-api/playstore/API_PLAYSTORE_ENDPOINTS.json](docs/docs-api/playstore/API_PLAYSTORE_ENDPOINTS.json) | [docs/docs-api/playstore/GUIDE.md](docs/docs-api/playstore/GUIDE.md) |
 | WebDevice | [docs/docs-api/webdevice/API_WEBDEVICE_ENDPOINTS.json](docs/docs-api/webdevice/API_WEBDEVICE_ENDPOINTS.json) | [docs/docs-api/webdevice/GUIDE.md](docs/docs-api/webdevice/GUIDE.md) |
 | Push | [docs/docs-api/push/API_PUSH_ENDPOINTS.json](docs/docs-api/push/API_PUSH_ENDPOINTS.json) | [docs/docs-api/push/GUIDE.md](docs/docs-api/push/GUIDE.md) |
 | Modules | [docs/docs-api/modules/API_MODULES_ENDPOINTS.json](docs/docs-api/modules/API_MODULES_ENDPOINTS.json) | [docs/docs-api/modules/GUIDE.md](docs/docs-api/modules/GUIDE.md) |

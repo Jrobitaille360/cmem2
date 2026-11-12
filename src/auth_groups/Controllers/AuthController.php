@@ -14,7 +14,7 @@ use AuthGroups\Services\UserSessionService;
 use AuthGroups\Utils\Response;
 use AuthGroups\Utils\Validator;
 use AuthGroups\Middleware\LoggingMiddleware;
-use Stripe\Services\EntitlementService;
+use Access\Services\EntitlementService;
 use Exception;
 
 /**
