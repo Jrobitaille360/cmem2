@@ -9,6 +9,8 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+## [2.21.0] — 2026-11-12
+
 ### BREAKING CHANGES
 
 - Retrait de Stripe et du Play Store (plan #269, Phase 4, tâches #296 à #303). Les routes `/v2/billing/*` (checkout, portail, webhook), `/v2/subscriptions/stripe/*`, `/v2/subscriptions/playstore/*` et l'ancien `/subscription/*` répondent `404`.
@@ -28,8 +30,8 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 - `src/stripe/`, `src/playstore/`, crons `expire_stripe.php` et `expire_playstore.php`, `SubscriptionController` / `SubscriptionService` / modèle `Subscription` (legacy `/subscription/*`), variables `STRIPE_*` (`environment.php`, `.env.example`), autoload `Stripe\` / `Playstore\`.
 - Docs `docs/docs-api/stripe/` et `docs/docs-api/playstore/` (devices Android documentés dans `docs/docs-api/webdevice/`).
-- Migration `docs/20261111_drop_payment_tables.sql` : supprime `stripe_subscriptions`, `stripe_processed_events`, `playstore_subscriptions`, `subscriptions` (export préalable ; appliquée sur dev le 2026-11-11).
-- `PlanController`, modèle `Plan`, `PlanRouteHandler`, expiration des `plan_invitations` (maintenance), courriels `sendEmailConfirmedWithPlanReminder` et inscription avec invitation aux plans. Migration `docs/20261111_drop_legacy_plans.sql` : supprime `plans`, `plan_invitations`, `users.plan_id`, `users.plan_expires_at`, `users.plan_auto_renew` (export préalable requis).
+- Migration `docs/v-2-21-0/20261111_drop_payment_tables.sql` : supprime `stripe_subscriptions`, `stripe_processed_events`, `playstore_subscriptions`, `subscriptions` (export préalable ; appliquée sur dev le 2026-11-11).
+- `PlanController`, modèle `Plan`, `PlanRouteHandler`, expiration des `plan_invitations` (maintenance), courriels `sendEmailConfirmedWithPlanReminder` et inscription avec invitation aux plans. Migration `docs/v-2-21-0/20261111_drop_legacy_plans.sql` : supprime `plans`, `plan_invitations`, `users.plan_id`, `users.plan_expires_at`, `users.plan_auto_renew` (export préalable requis). Schéma de référence : `docs/v-2-21-0/build_DB-v-2.21.0.sql`.
 - Tests : `test_payment_removal.php` (garde-fou), `test_access.php` réécrit ; tests Stripe / Play Store / plan équipe retirés.
 
 ## [2.20.0] — 2026-11-10

@@ -1,6 +1,6 @@
 ﻿# cmem2 API
 
-![Version](https://img.shields.io/badge/version-2.20.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.21.0-blue.svg)
 ![PHP](https://img.shields.io/badge/PHP-8.0+-purple.svg)
 ![Status](https://img.shields.io/badge/status-production%20ready-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
@@ -456,7 +456,7 @@ Chaque module a son propre fichier `private/tests/test_<module>.php` (voir la li
 - [x] Plan équipe — facturation Stripe portée par un groupe + modules de groupe (v2.16.0)
 - [x] Plugin Booking — réservation publique par lien, zones matérialisées (v2.16.0)
 - [x] Suivi du temps par tâche — sessions start/stop, un seul minuteur actif par usager (v2.17.0)
-- [ ] Accès sur approbation — fin de la commercialisation : invitations + approbation, modules cochés par personne, budget IA en $, caps à 3 niveaux, retrait Stripe/Play Store ([plan](docs/archives/PLAN_acces-sur-approbation.md) — suivi : task cmem #269) — Phase 1 (budget IA en $) livrée en v2.18.0 ; Phases 2 (approbation, invitations) et 3 (modules cochés) livrées en v2.19.0
+- [x] Accès sur approbation — fin de la commercialisation : invitations + approbation, modules cochés par personne, budget IA en $, caps à 3 niveaux, retrait Stripe/Play Store ([plan](docs/archives/PLAN_acces-sur-approbation.md) — suivi : task cmem #269) — Phase 1 (budget IA en $) livrée en v2.18.0 ; Phases 2 (approbation, invitations) et 3 (modules cochés) livrées en v2.19.0 ; Phase 3 bis (caps) en v2.20.0 ; Phases 4 et 6 (retrait Stripe / Play Store, plans legacy) en v2.21.0
 - [ ] Rate limiting Redis
 
 ## Licence
@@ -465,4 +465,4 @@ MIT — voir [LICENSE](LICENSE). Dépendances tierces : [THIRD_PARTY_LICENSES.md
 
 ---
 
-**Version** : 2.20.0 · **Mis à jour** : 2026-11-10 · **Auteur** : [Jrobitaille360](https://github.com/Jrobitaille360)
+**Version** : 2.21.0 · **Mis à jour** : 2026-11-12 · **Auteur** : [Jrobitaille360](https://github.com/Jrobitaille360)
