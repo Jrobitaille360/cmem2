@@ -242,13 +242,13 @@ class IcsParser
         }
         $event['exdates'] = empty($exdates) ? null : $exdates;
 
-        // Phase 4.4 — VALARM → notifications JSON [{type, minutes}]
+        // Phase 4.4 — VALARM → notifications [{type: EMAIL|DISPLAY, minutes_before}] (#487 : AUDIO → DISPLAY)
         $notifications = [];
         if (isset($vevent->VALARM)) {
             foreach ($vevent->VALARM as $alarm) {
                 /** @var \Sabre\VObject\Component $alarm */
                 $actionRaw = strtolower((string)($alarm->ACTION ?? 'display'));
-                $type      = ($actionRaw === 'email') ? 'email' : 'notification';
+                $type      = ($actionRaw === 'email') ? 'EMAIL' : 'DISPLAY';
                 $minutes   = 0;
 
                 if (isset($alarm->TRIGGER)) {
@@ -261,7 +261,7 @@ class IcsParser
                     }
                 }
 
-                $notifications[] = ['type' => $type, 'minutes' => $minutes];
+                $notifications[] = ['type' => $type, 'minutes_before' => $minutes];
             }
         }
         $event['notifications'] = empty($notifications) ? null : $notifications;

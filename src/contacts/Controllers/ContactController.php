@@ -81,6 +81,8 @@ class ContactController
             'date_relance'     => $c['date_relance']     ?? null,
             'motif_relance'    => $c['motif_relance']    ?? null,
             'relance_faite_le' => $c['relance_faite_le'] ?? null,
+            // Rappels de la relance (#487) : null = défaut du type contact_followup.
+            'notifications'    => \AuthGroups\Services\ReminderList::normalize($c['notifications'] ?? null),
             // Chiffrement de bout en bout — restitués tels quels, jamais interprétés.
             'enc_alg'       => $c['enc_alg']     ?? null,
             'enc_iv'        => $c['enc_iv']      ?? null,
@@ -322,7 +324,13 @@ class ContactController
             return;
         }
 
+        $reminders = \AuthGroups\Services\ReminderList::extract($p);
+        if ($reminders === false) { return; }
+
         $fields = $this->extractFields($p, true);
+        if ($reminders['present']) {
+            $fields['notifications'] = \AuthGroups\Services\ReminderList::toStorage($reminders['value']);
+        }
 
         if ($fields['prenom'] === '' && $fields['nom'] === '' && empty($fields['organisation'])) {
             LoggingMiddleware::logExit(422);
@@ -361,7 +369,13 @@ class ContactController
             return;
         }
 
+        $reminders = \AuthGroups\Services\ReminderList::extract($p);
+        if ($reminders === false) { return; }
+
         $fields = $this->extractFields($p, false);
+        if ($reminders['present']) {
+            $fields['notifications'] = \AuthGroups\Services\ReminderList::toStorage($reminders['value']);
+        }
 
         // Changer la date de relance rouvre le suivi : la marque « faite » est levée, sauf si
         // le client fournit lui-même relance_faite_le dans la même requête.

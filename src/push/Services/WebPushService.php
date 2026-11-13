@@ -76,21 +76,59 @@ class WebPushService
     }
 
     /**
-     * Envoie un payload à tous les appareils d'un usager.
+     * Envoie un payload à tous les appareils d'un usager (compatibilité — le cron unifié
+     * #487 passe par sendToSubscriptions() pour journaliser appareil par appareil).
      *
      * @param array $payload  ['title' => …, 'body' => …, 'data' => ['type' => …, 'id' => …]]
      * @return array{devices:int, delivered:int, purged:int, error:?string}
      */
     public static function sendToOwner(int $ownerId, array $payload): array
     {
-        $model = new PushSubscription();
-        $subs  = $model->listByOwner($ownerId);
-
+        $subs = (new PushSubscription())->listByOwner($ownerId);
         if (empty($subs)) {
             return ['devices' => 0, 'delivered' => 0, 'purged' => 0, 'error' => 'aucune subscription'];
         }
+
+        $results   = self::sendToSubscriptions($subs, $payload);
+        $delivered = count(array_filter($results, fn($r) => $r['ok']));
+        $purged    = count(array_filter($results, fn($r) => $r['purged']));
+        $lastError = null;
+        foreach ($results as $r) {
+            if (!$r['ok'] && $r['error'] !== null) {
+                $lastError = $r['error'];
+            }
+        }
+
+        return [
+            'devices'   => count($subs),
+            'delivered' => $delivered,
+            'purged'    => $purged,
+            'error'     => $delivered > 0 ? null : $lastError,
+        ];
+    }
+
+    /**
+     * Envoie un payload à une liste d'abonnements (lignes push_subscriptions) et rend le
+     * résultat appareil par appareil. Un endpoint mort (404 / 410) est purgé sur-le-champ ;
+     * un envoi réussi met à jour last_seen_at (= last_success_at du contrat #236).
+     *
+     * @param array<int, array> $subs lignes push_subscriptions (id, endpoint, p256dh, auth)
+     * @return array<int, array{ok:bool, purged:bool, error:?string}> indexé par id d'abonnement
+     */
+    public static function sendToSubscriptions(array $subs, array $payload): array
+    {
+        $results = [];
+        foreach ($subs as $sub) {
+            $results[(int) $sub['id']] = ['ok' => false, 'purged' => false, 'error' => null];
+        }
+        if (empty($subs)) {
+            return $results;
+        }
         if (!self::isConfigured()) {
-            return ['devices' => count($subs), 'delivered' => 0, 'purged' => 0, 'error' => 'VAPID non configuré'];
+            foreach ($results as &$r) {
+                $r['error'] = 'VAPID non configuré';
+            }
+            return $results;
         }
 
         self::warnIfOpensslUnconfigured();
@@ -106,9 +144,13 @@ class WebPushService
             $webPush->setReuseVAPIDHeaders(true);
         } catch (\Throwable $e) {
             LogService::error('WebPushService : initialisation impossible', ['error' => $e->getMessage()]);
-            return ['devices' => count($subs), 'delivered' => 0, 'purged' => 0, 'error' => $e->getMessage()];
+            foreach ($results as &$r) {
+                $r['error'] = mb_substr($e->getMessage(), 0, 255);
+            }
+            return $results;
         }
 
+        $model      = new PushSubscription();
         $byEndpoint = [];
         $json       = json_encode($payload, JSON_UNESCAPED_UNICODE);
 
@@ -125,6 +167,7 @@ class WebPushService
                     $json
                 );
             } catch (\Throwable $e) {
+                $results[(int) $sub['id']]['error'] = 'subscription illisible';
                 LogService::warning('WebPushService : subscription illisible', [
                     'subscription_id' => $sub['id'],
                     'error'           => $e->getMessage(),
@@ -132,30 +175,26 @@ class WebPushService
             }
         }
 
-        $delivered = 0;
-        $purged    = 0;
-        $lastError = null;
-
         try {
             foreach ($webPush->flush() as $report) {
-                $endpoint = $report->getEndpoint();
-                $subId    = $byEndpoint[$endpoint] ?? null;
-
-                if ($report->isSuccess()) {
-                    $delivered++;
-                    if ($subId) {
-                        $model->touchLastSeen($subId);
-                    }
+                $subId = $byEndpoint[$report->getEndpoint()] ?? null;
+                if ($subId === null) {
                     continue;
                 }
 
-                $lastError = $report->getReason();
-                $status    = $report->getResponse() ? $report->getResponse()->getStatusCode() : null;
+                if ($report->isSuccess()) {
+                    $results[$subId]['ok'] = true;
+                    $model->touchLastSeen($subId);
+                    continue;
+                }
+
+                $status = $report->getResponse() ? $report->getResponse()->getStatusCode() : null;
+                $results[$subId]['error'] = mb_substr((string) $report->getReason(), 0, 255);
 
                 // 404 / 410 : endpoint mort → purge immédiate (maintenance principale).
-                if ($subId && ($report->isSubscriptionExpired() || in_array($status, [404, 410], true))) {
+                if ($report->isSubscriptionExpired() || in_array($status, [404, 410], true)) {
                     $model->deleteById($subId);
-                    $purged++;
+                    $results[$subId]['purged'] = true;
                     LogService::info('Push : subscription purgée', [
                         'subscription_id' => $subId,
                         'status'          => $status,
@@ -163,15 +202,14 @@ class WebPushService
                 }
             }
         } catch (\Throwable $e) {
-            $lastError = $e->getMessage();
             LogService::error('WebPushService : flush en échec', ['error' => $e->getMessage()]);
+            foreach ($results as &$r) {
+                if (!$r['ok'] && $r['error'] === null) {
+                    $r['error'] = mb_substr($e->getMessage(), 0, 255);
+                }
+            }
         }
 
-        return [
-            'devices'   => count($subs),
-            'delivered' => $delivered,
-            'purged'    => $purged,
-            'error'     => $delivered > 0 ? null : $lastError,
-        ];
+        return $results;
     }
 }

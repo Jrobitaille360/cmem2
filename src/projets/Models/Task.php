@@ -167,8 +167,8 @@ class Task extends BaseModel
             'INSERT INTO calendar_todos
                 (calendar_id, user_id, project_id, parent_id, uid, title, description,
                  dtstart, due, all_day, status, priority, percent_complete, assignee,
-                 url, categories, remind_minutes_before, sequence, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())'
+                 url, categories, remind_minutes_before, notifications, sequence, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())'
         );
         $stmt->execute([
             $calendarId,
@@ -187,7 +187,8 @@ class Task extends BaseModel
             $data['assignee'] ?? null,
             $data['url'] ?? null,
             isset($data['categories']) ? json_encode(array_values($data['categories'])) : null,
-            $data['rappelMinutesAvant'] ?? null,
+            \AuthGroups\Services\ReminderList::firstLead($data['notifications'] ?? null),
+            \AuthGroups\Services\ReminderList::toStorage($data['notifications'] ?? null),
             (int) ($data['sequence'] ?? 0),
         ]);
         $id = (int) $this->getDb()->lastInsertId();
@@ -196,6 +197,40 @@ class Task extends BaseModel
             $this->replaceDependencies($id, $data['dependsOn']);
         }
         return $id;
+    }
+
+    /**
+     * Rappels (#487) : résout `notifications` (prioritaire) ou `rappelMinutesAvant` (déprécié,
+     * n → [EMAIL n, DISPLAY n], null → défaut du type) en une clé `notifications` validée.
+     * Sans l'un ni l'autre, $data est rendu tel quel (création : défaut ; maj : inchangé).
+     *
+     * @return array{data:array, error:?array}
+     */
+    public static function prepareReminders(array $data): array
+    {
+        if (array_key_exists('notifications', $data)) {
+            $check = \AuthGroups\Services\ReminderList::validate($data['notifications']);
+        } elseif (array_key_exists('rappelMinutesAvant', $data)) {
+            $n = $data['rappelMinutesAvant'];
+            $m = is_numeric($n) ? (int) $n : $n;
+            $check = \AuthGroups\Services\ReminderList::validate(
+                $n === null || $n === '' ? null : [
+                    ['type' => 'EMAIL', 'minutes_before' => $m],
+                    ['type' => 'DISPLAY', 'minutes_before' => $m],
+                ]
+            );
+            if (!$check['ok']) {
+                $check['error']['field'] = 'rappelMinutesAvant';
+            }
+        } else {
+            return ['data' => $data, 'error' => null];
+        }
+        unset($data['rappelMinutesAvant']);
+        if (!$check['ok']) {
+            return ['data' => $data, 'error' => $check['error']];
+        }
+        $data['notifications'] = $check['value'];
+        return ['data' => $data, 'error' => null];
     }
 
     /** @param array $data champs contrat §6 présents à modifier */
@@ -231,9 +266,13 @@ class Task extends BaseModel
             $sets[] = 'categories = ?';
             $params[] = $data['categories'] === null ? null : json_encode(array_values($data['categories']));
         }
-        if (array_key_exists('rappelMinutesAvant', $data)) {
+        // Rappels (#487) : `notifications` déjà résolu par prepareReminders() ;
+        // remind_minutes_before suit (premier délai) pour un retour arrière éventuel.
+        if (array_key_exists('notifications', $data)) {
+            $sets[] = 'notifications = ?';
+            $params[] = \AuthGroups\Services\ReminderList::toStorage($data['notifications']);
             $sets[] = 'remind_minutes_before = ?';
-            $params[] = $data['rappelMinutesAvant'];
+            $params[] = \AuthGroups\Services\ReminderList::firstLead($data['notifications']);
         }
         if (array_key_exists('parentId', $data)) {
             $sets[] = 'parent_id = ?';
@@ -299,6 +338,7 @@ class Task extends BaseModel
 
     private function rowToContract(array $row, array $dependsOn): array
     {
+        $notifs = \AuthGroups\Services\ReminderList::normalize($row['notifications'] ?? null);
         return [
             'id'                 => (int) $row['id'],
             'title'              => $row['title'],
@@ -318,7 +358,12 @@ class Task extends BaseModel
             'assignee'           => $row['assignee'],
             'url'                => $row['url'],
             'categories'         => $row['categories'] !== null ? (json_decode($row['categories'], true) ?? []) : [],
-            'rappelMinutesAvant' => $row['remind_minutes_before'] !== null ? (int) $row['remind_minutes_before'] : null,
+            'notifications'      => $notifs,
+            // Déprécié (#487) : premier délai de la liste ; repli sur l'ancienne colonne tant
+            // que la reprise des données (#493) n'a pas converti la ligne.
+            'rappelMinutesAvant' => $notifs !== null
+                ? \AuthGroups\Services\ReminderList::firstLead($notifs)
+                : ($row['remind_minutes_before'] !== null ? (int) $row['remind_minutes_before'] : null),
         ];
     }
 }

@@ -1131,7 +1131,9 @@ class CalendarController
         }
 
         // Validation des nouveaux champs
-        if (self::rejectUnsupportedReminderChannels($input)) {
+        // Rappels (#487) : validés à part (422 codés), puis retirés de $input pour EventValidator
+        $reminders = self::extractReminders($input);
+        if ($reminders === false) {
             return;
         }
         $eventValidation = \ICS\Utils\EventValidator::validateEventFields($input);
@@ -1218,7 +1220,7 @@ class CalendarController
             // Nouveaux champs
             $event->timezone = $eventValidation['data']['timezone'] ?? 'America/Montreal';
             $event->meetingLink = $eventValidation['data']['meeting_link'] ?? null;
-            $event->notifications = $eventValidation['data']['notifications'] ?? null;
+            $event->notifications = $reminders['present'] ? $reminders['value'] : null;
             $event->color = $eventValidation['data']['color'] ?? null;
             // Phase 2
             if (isset($eventValidation['data']['priority']))    $event->priority    = $eventValidation['data']['priority'];
@@ -1322,7 +1324,9 @@ class CalendarController
         }
         
         // Validation des nouveaux champs
-        if (self::rejectUnsupportedReminderChannels($input)) {
+        // Rappels (#487) : validés à part (422 codés), puis retirés de $input pour EventValidator
+        $reminders = self::extractReminders($input);
+        if ($reminders === false) {
             return;
         }
         $eventValidation = \ICS\Utils\EventValidator::validateEventFields($input);
@@ -1460,9 +1464,10 @@ class CalendarController
                 $event->meetingLink = $eventValidation['data']['meeting_link'];
                 $updatedFields[] = 'meeting_link';
             }
-            if (isset($eventValidation['data']['notifications'])) {
-                $event->notifications = $eventValidation['data']['notifications'];
-                $updatedFields[] = 'notifications';
+            if ($reminders['present']) {
+                $event->notifications    = $reminders['value'];
+                $event->notificationsSet = true;
+                $updatedFields[]         = 'notifications';
             }
             if (isset($eventValidation['data']['color']) && $eventValidation['data']['color'] !== '') {
                 $event->color = $eventValidation['data']['color'];
@@ -2017,48 +2022,22 @@ class CalendarController
     }
 
     /**
-     * Modifie une occurrence spécifique d'un événement récurrent
-     */
-    /**
-     * Directive #440 : seuls les rappels EMAIL sont envoyés. Un rappel DISPLAY (ou
-     * notification / AUDIO) serait enregistré sans jamais partir → 422 tant que le push
-     * par élément n'existe pas (plan cmem_web #236). L'import .ics n'est pas concerné.
+     * Rappels par élément (#487, contrat #236 §3) : valide `notifications` si le champ est
+     * présent, émet le 422 codé au premier défaut, et retire le champ de $input pour que
+     * EventValidator ne le revalide pas avec ses règles historiques.
      *
-     * @return bool true si la réponse 422 a été émise
+     * @return array{present:bool, value:?array}|false false = réponse 422 déjà émise
      */
-    private static function rejectUnsupportedReminderChannels(array $input): bool
+    private static function extractReminders(array &$input): array|false
     {
-        if (!array_key_exists('notifications', $input) || empty($input['notifications'])) {
-            return false;
-        }
-        $notifications = $input['notifications'];
-        if (is_string($notifications)) {
-            $notifications = json_decode($notifications, true);
-        }
-        if (!is_array($notifications)) {
-            return false; // format invalide : laissé au validateur (400)
-        }
-        foreach ($notifications as $index => $notif) {
-            if (!is_array($notif) || !isset($notif['type'])) {
-                continue;
-            }
-            if (strtoupper((string)$notif['type']) !== 'EMAIL') {
-                LoggingMiddleware::logExit(422);
-                Response::error(
-                    'Rappel push par élément pas encore disponible : seuls les rappels EMAIL sont acceptés',
-                    [
-                        'code'  => 'REMINDER_CHANNEL_UNSUPPORTED',
-                        'field' => "notifications.{$index}.type",
-                        'type'  => (string)$notif['type'],
-                    ],
-                    422
-                );
-                return true;
-            }
-        }
-        return false;
+        $reminders = \AuthGroups\Services\ReminderList::extract($input);
+        unset($input['notifications']);
+        return $reminders;
     }
 
+    /**
+     * Modifie une occurrence spécifique d'un événement récurrent
+     */
     public function updateEventOccurrence($calendarId, $eventId, $userId): void
     {
         LoggingMiddleware::logEntry();

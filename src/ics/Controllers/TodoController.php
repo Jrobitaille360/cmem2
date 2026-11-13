@@ -74,6 +74,11 @@ class TodoController
             return;
         }
 
+        $reminders = \AuthGroups\Services\ReminderList::extract($input);
+        if ($reminders === false) {
+            return;
+        }
+
         if (!$this->calModel->isOwner($calendarId, $userId)) {
             LoggingMiddleware::logExit(403);
             Response::error('Accès non autorisé', null, 403);
@@ -113,6 +118,7 @@ class TodoController
             $todo->url             = $input['url'] ?? null;
             $todo->timezone        = $input['timezone'] ?? 'America/Montreal';
             $todo->recurrenceRule  = $input['recurrence_rule'] ?? null;
+            $todo->notifications   = $reminders['value'];
 
             $result = $todo->create();
             LoggingMiddleware::logExit(201);
@@ -215,6 +221,11 @@ class TodoController
             return;
         }
 
+        $reminders = \AuthGroups\Services\ReminderList::extract($input);
+        if ($reminders === false) {
+            return;
+        }
+
         if (!$this->todoModel->isOwner($todoId, $calendarId, $userId)) {
             LoggingMiddleware::logExit(403);
             Response::error('Accès non autorisé', null, 403);
@@ -271,6 +282,11 @@ class TodoController
                 } else {
                     $todo->encIv = $input['enc_iv'];
                 }
+            }
+
+            if ($reminders['present']) {
+                $todo->notifications    = $reminders['value'];
+                $todo->notificationsSet = true;
             }
 
             $todo->update();

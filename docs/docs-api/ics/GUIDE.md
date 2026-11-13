@@ -18,6 +18,7 @@ Version 2.0.0 · Base URL : `/calendars` (REST) · `/caldav` (CalDAV)
 - [Endpoints — Journaux (VJOURNAL)](#endpoints--journaux-vjournal)
 - [Endpoints — Étiquettes (Tags)](#endpoints--étiquettes-tags)
 - [Endpoints — Disponibilités (VFREEBUSY)](#endpoints--disponibilités-vfreebusy)
+- [Rappels unifiés (v2.22.0, contrat #236)](#rappels-unifiés-v2220-contrat-236)
 - [Endpoints — Notifications et RSVP](#endpoints--notifications-et-rsvp)
 - [CalDAV](#caldav)
 - [Import / Export ICS](#import--export-ics)
@@ -545,11 +546,83 @@ propriétaire. Avec l'en-tête `Accept: text/calendar`, la réponse est un `VCAL
 
 ---
 
+## Rappels unifiés (v2.22.0, contrat #236)
+
+Un rappel = un **canal** + un **délai** avant l'échéance. Même forme partout (événements,
+tâches, tâches de projet, contacts, opportunités, défauts) :
+
+```json
+{ "type": "EMAIL", "minutes_before": 1440 }
+```
+
+`type` : `EMAIL` (courriel à l'adresse du compte) ou `DISPLAY` (push sur les appareils,
+RFC 5545 `ACTION:DISPLAY`). En lecture, les formes héritées (`email`, `notification`,
+`AUDIO`, clé `minutes`) sont normalisées.
+
+### Trois niveaux
+
+1. **Défaut par type** — `GET|PUT /notifications/defaults` : `event`, `recurring`,
+   `task_due` (tâches et tâches de projet), `contact_followup` (relances et opportunités).
+   Délais permis : `0, 5, 10, 15, 30, 60, 120, 1440, 2880`. Plage silencieuse et
+   `show_entity_detail` du type valent pour les deux canaux.
+2. **Liste par élément** — champ `notifications` des POST/PUT : remplace le défaut.
+   Délai libre de `0` à `40320` (4 semaines), 10 rappels au plus.
+3. **Appareil** — `GET|PUT|DELETE /notifications/devices[/{id}]` : types acceptés
+   (`kinds`) et plage silencieuse propre. Filtre le push seulement.
+
+`app_id` est obligatoire sur `/notifications/defaults` et `/notifications/devices`
+(`422 APP_ID_REQUIRED`).
+
+### Sémantique du champ `notifications`
+
+| Valeur envoyée | Effet |
+| - | - |
+| absent | Création : défaut du type. Mise à jour : inchangé. |
+| `null` | Revenir au défaut du type (stocké `NULL`). |
+| `[]` | Aucun rappel pour cet élément. |
+| `[...]` | Cette liste remplace le défaut du type. |
+
+En lecture (détail, listing, expansion des occurrences) : `null` ou la liste normalisée.
+
+| Code `422` | Cas | `field` |
+| - | - | - |
+| `REMINDER_CHANNEL_UNKNOWN` | `type` hors `EMAIL`/`DISPLAY` | `notifications.{i}.type` |
+| `REMINDER_LEAD_INVALID` | délai non entier, hors `0..40320` (défauts : hors liste) | `notifications.{i}.minutes_before` |
+| `REMINDER_DUPLICATE` | même `type` + délai deux fois | `notifications.{i}` |
+| `REMINDER_TOO_MANY` | plus de 10 rappels | `notifications` |
+
+`REMINDER_CHANNEL_UNSUPPORTED` (#440) est retiré : `DISPLAY` est accepté et envoyé.
+
+### Envoi
+
+Cron unifié `src/notifications/send_reminders.php` (les deux crontabs historiques
+l'appellent, une par canal) :
+
+- rappels effectifs = liste de l'élément, sinon défaut du type ;
+- un rappel part à `échéance − minutes_before` ; s'il est passé depuis plus que la
+  tolérance du type (60 min ; 7 jours pour `contact_followup`), il n'est pas envoyé ;
+- `EMAIL` si `users.email_notifications_enabled` ; `DISPLAY` vers chaque appareil dont
+  `kinds` contient le type, hors plages silencieuses (type et appareil) ;
+- titre générique, sauf `show_entity_detail` du type et fiche non chiffrée ;
+- idempotence : `reminder_log`, une ligne par (élément, occurrence, canal, délai, appareil) ;
+- échéances date seule (tâche « toute la journée », tâche de projet, relance, clôture) :
+  00:00 dans le fuseau de l'usager.
+
+La file `email_notification_queue` (et `GET /notifications/email`) n'est plus traitée :
+dépréciée, retirée à la version suivante.
+
+---
+
 ## Endpoints — Notifications et RSVP
 
 | Méthode | Endpoint | Description |
 | --- | --- | --- |
-| GET | `/notifications/email` | Notifications planifiées |
+| GET | `/notifications/defaults?app_id=` | Rappels par défaut par type (4 kind) |
+| PUT | `/notifications/defaults` | Remplace les kind fournis |
+| GET | `/notifications/devices?app_id=` | Appareils (abonnements push) |
+| PUT | `/notifications/devices/{id}` | Types acceptés, plage silencieuse, libellé |
+| DELETE | `/notifications/devices/{id}?app_id=` | Supprime l'abonnement (204) |
+| GET | `/notifications/email` | Déprécié — ancienne file courriel |
 | POST | `/notifications/email/test` | Envoyer email de test |
 | DELETE | `/notifications/email/{id}` | Annuler une notification |
 | POST | `/notifications/send-email` | Envoyer rappel immédiat |

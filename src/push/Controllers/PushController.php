@@ -3,6 +3,7 @@
 namespace Push\Controllers;
 
 use AuthGroups\Middleware\LoggingMiddleware;
+use AuthGroups\Models\NotificationDefault;
 use AuthGroups\Utils\Response;
 use Push\Models\NotificationPref;
 use Push\Models\PushSubscription;
@@ -147,7 +148,8 @@ class PushController
         LoggingMiddleware::logEntry();
         $params = Response::getRequestParams();
 
-        $prefs = (new NotificationPref())->findByOwnerWithDefaults(
+        $prefs = self::projectDefaults(
+            (new NotificationPref())->findByOwnerWithDefaults((int) $user['user_id'], $this->appId($params)),
             (int) $user['user_id'],
             $this->appId($params)
         );
@@ -240,11 +242,60 @@ class PushController
             );
         }
 
+        // Compatibilité #487 (contrat #236 §7.7) : la préférence push d'un kind devient le
+        // rappel DISPLAY de son défaut ; les rappels EMAIL du défaut sont conservés.
+        $ownerId  = (int) $user['user_id'];
+        $defaults = NotificationDefault::findByOwner($ownerId, $appId);
+        foreach ($validated as $pref) {
+            $d     = $defaults[$pref['kind']] ?? NotificationDefault::blank($pref['kind']);
+            $list  = array_values(array_filter($d['notifications'], fn($n) => $n['type'] !== 'DISPLAY'));
+            if ($pref['enabled']) {
+                $list[] = ['type' => 'DISPLAY', 'minutes_before' => $pref['lead_minutes']];
+            }
+            NotificationDefault::upsert($ownerId, $appId, [
+                'kind'               => $pref['kind'],
+                'notifications'      => $list,
+                'quiet_from'         => $pref['quiet_from'] !== null ? substr($pref['quiet_from'], 0, 5) : null,
+                'quiet_to'           => $pref['quiet_to'] !== null ? substr($pref['quiet_to'], 0, 5) : null,
+                'show_entity_detail' => $pref['show_entity_detail'],
+            ]);
+        }
+
         LoggingMiddleware::logExit(200);
         Response::success('Préférences mises à jour', [
             'scope'       => 'account',
-            'preferences' => $model->findByOwnerWithDefaults((int) $user['user_id'], $appId),
+            'preferences' => self::projectDefaults($model->findByOwnerWithDefaults($ownerId, $appId), $ownerId, $appId),
         ]);
+    }
+
+    /**
+     * Compatibilité #487 : projette les défauts par type (notification_defaults) sur l'ancienne
+     * forme des préférences push. Un kind réglé dans les défauts fait autorité (enabled = a un
+     * rappel DISPLAY, lead_minutes = son délai) ; sinon l'ancienne ligne notification_prefs.
+     */
+    private static function projectDefaults(array $legacy, int $ownerId, string $appId): array
+    {
+        $defaults = NotificationDefault::findByOwner($ownerId, $appId);
+        foreach ($legacy as &$pref) {
+            $d = $defaults[$pref['kind']] ?? null;
+            if ($d === null) {
+                continue;
+            }
+            $display = null;
+            foreach ($d['notifications'] as $n) {
+                if ($n['type'] === 'DISPLAY') {
+                    $display = $n;
+                    break;
+                }
+            }
+            $pref['enabled']            = $display !== null;
+            $pref['lead_minutes']       = $display !== null ? (int) $display['minutes_before'] : $pref['lead_minutes'];
+            $pref['quiet_from']         = $d['quiet_from'];
+            $pref['quiet_to']           = $d['quiet_to'];
+            $pref['show_entity_detail'] = $d['show_entity_detail'];
+        }
+        unset($pref);
+        return $legacy;
     }
 
     /** null si absent, false si format invalide, sinon 'HH:MM:00'. */

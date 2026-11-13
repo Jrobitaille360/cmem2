@@ -388,6 +388,14 @@ Le cron `contact_followup` balaie **deux** sources : les relances de fiche et le
 `entity: "contact" | "opportunite"` pour savoir quelle vue ouvrir. Le corps reste générique :
 ni le nom du contact ni le motif n'y figurent. Détails : `docs/docs-api/push/GUIDE.md`.
 
+### Rappels par fiche (v2.22.0)
+
+Contacts et opportunités acceptent un champ `notifications` (POST/PUT) : rappels de la
+relance (`date_relance`) ou de la clôture prévue (`date_cloture_prevue`), canal `EMAIL` ou
+`DISPLAY`. `null` = défaut du type `contact_followup`, `[]` = aucun rappel. Échéance à 00:00
+dans le fuseau de l'usager. Fiche chiffrée : titre toujours générique. Règles et codes `422` :
+[guide ICS — Rappels unifiés](../ics/GUIDE.md#rappels-unifiés-v2220-contrat-236).
+
 ## Partage (réservé P1)
 
 La table `contact_shares` et la colonne `partage_scope` existent mais ne sont **pas exploitées**

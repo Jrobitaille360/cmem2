@@ -28,6 +28,8 @@ class CalendarEvent extends BaseModel
     public $timezone;
     public $meetingLink;
     public $notifications;
+    /** true = `notifications` à écrire tel quel à la mise à jour, NULL compris (#487). */
+    public bool $notificationsSet = false;
     public $color;
     public $createdAt;
     public $updatedAt;
@@ -239,8 +241,8 @@ class CalendarEvent extends BaseModel
             $row['attachments'] = json_decode($row['attachments'], true) ?? [];
         if (isset($row['attendees']) && is_string($row['attendees']))
             $row['attendees'] = json_decode($row['attendees'], true) ?? [];
-        if (isset($row['notifications']) && is_string($row['notifications']))
-            $row['notifications'] = json_decode($row['notifications'], true) ?? [];
+        if (array_key_exists('notifications', $row))
+            $row['notifications'] = \AuthGroups\Services\ReminderList::normalize($row['notifications']);
         if (isset($row['updated_at']))
             $row['updatedAt'] = \AuthGroups\Utils\DateHelper::toIso8601Utc($row['updated_at']);
         return $row;
@@ -268,10 +270,16 @@ class CalendarEvent extends BaseModel
         $stmt = $this->getDb()->prepare($query);
         $stmt->execute($params);
         $events = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
+
         if (empty($events)) {
             return [];
         }
+        // Rappels relus sous la forme du contrat #487 (seul champ JSON décodé ici :
+        // les autres restent tels que les clients du listing les lisent déjà)
+        foreach ($events as &$row) {
+            $row['notifications'] = \AuthGroups\Services\ReminderList::normalize($row['notifications'] ?? null);
+        }
+        unset($row);
         $expandedEvents = [];
         // traiter les évenements multi-jours
         if( $expandMultiJour=="true" || $expandMultiJour===true )   {
@@ -397,7 +405,10 @@ class CalendarEvent extends BaseModel
                 $values[] = $this->meetingLink;
             }
             
-            if(isset($this->notifications)) {
+            if ($this->notificationsSet) {
+                $fields[] = "notifications = ?";
+                $values[] = \AuthGroups\Services\ReminderList::toStorage($this->notifications);
+            } elseif(isset($this->notifications)) {
                 $fields[] = "notifications = ?";
                 $notificationsJson = is_string($this->notifications) 
                     ? $this->notifications 

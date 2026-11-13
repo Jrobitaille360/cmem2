@@ -82,11 +82,20 @@ final class VEventSerializer
 
         if (!empty($t['url'])) { $L[] = 'URL:' . (string) $t['url']; }
 
-        if (!empty($t['rappelMinutesAvant'])) {
+        // VALARM depuis la liste de rappels (#487) — EMAIL ↔ ACTION:EMAIL, DISPLAY ↔ ACTION:DISPLAY.
+        // Repli : ancienne colonne seule (ligne pas encore reprise par #493).
+        $alarms = $t['notifications'] ?? null;
+        if ($alarms === null && !empty($t['rappelMinutesAvant'])) {
+            $alarms = [['type' => 'DISPLAY', 'minutes_before' => (int) $t['rappelMinutesAvant']]];
+        }
+        foreach ($alarms ?? [] as $a) {
             $L[] = 'BEGIN:VALARM';
-            $L[] = 'ACTION:DISPLAY';
+            $L[] = 'ACTION:' . ($a['type'] === 'EMAIL' ? 'EMAIL' : 'DISPLAY');
             $L[] = 'DESCRIPTION:' . $this->esc((string) $t['title']);
-            $L[] = 'TRIGGER;RELATED=START:-PT' . (int) $t['rappelMinutesAvant'] . 'M';
+            if ($a['type'] === 'EMAIL') {
+                $L[] = 'SUMMARY:' . $this->esc((string) $t['title']);
+            }
+            $L[] = 'TRIGGER;RELATED=START:-PT' . (int) $a['minutes_before'] . 'M';
             $L[] = 'END:VALARM';
         }
         $L[] = 'END:VEVENT';

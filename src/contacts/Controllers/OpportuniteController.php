@@ -81,6 +81,8 @@ class OpportuniteController
             'devise'              => $o['devise'],
             'date_cloture_prevue' => $o['date_cloture_prevue'],
             'notes'               => $o['notes'],
+            // Rappels de la clôture prévue (#487) : null = défaut du type contact_followup.
+            'notifications'       => \AuthGroups\Services\ReminderList::normalize($o['notifications'] ?? null),
             'cree_le'             => $o['cree_le'],
             'maj_le'              => $o['maj_le'],
         ];
@@ -156,6 +158,14 @@ class OpportuniteController
         if (array_key_exists('notes', $p)) {
             $notes = $p['notes'] === null ? null : trim((string) $p['notes']);
             $fields['notes'] = ($notes === '') ? null : $notes;
+        }
+
+        $reminders = \AuthGroups\Services\ReminderList::extract($p);
+        if ($reminders === false) {
+            return null; // 422 déjà émis
+        }
+        if ($reminders['present']) {
+            $fields['notifications'] = \AuthGroups\Services\ReminderList::toStorage($reminders['value']);
         }
 
         return $fields;

@@ -106,6 +106,12 @@ class TaskController
             Response::error($err, null, 422);
             return;
         }
+        $prep = Task::prepareReminders($data);
+        if ($prep['error']) {
+            Response::error($prep['error']['message'], $prep['error'], 422);
+            return;
+        }
+        $data = $prep['data'];
 
         $pdo = $this->pdo();
         $pdo->beginTransaction();
@@ -165,6 +171,12 @@ class TaskController
             Response::error($err, null, 422);
             return;
         }
+        $prep = Task::prepareReminders($data);
+        if ($prep['error']) {
+            Response::error($prep['error']['message'], $prep['error'], 422);
+            return;
+        }
+        $data = $prep['data'];
 
         $pdo = $this->pdo();
         $pdo->beginTransaction();
