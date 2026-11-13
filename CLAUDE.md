@@ -68,6 +68,7 @@ php private/tests/test_projets.php
 php private/tests/test_push.php
 php private/tests/test_reminders.php
 php private/tests/test_reminders_cron.php
+php private/tests/test_reminders_text.php
 php private/tests/test_puzzle_admin.php
 php private/tests/test_puzzle_backup.php
 php private/tests/test_puzzle_share.php

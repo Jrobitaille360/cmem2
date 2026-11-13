@@ -118,7 +118,7 @@ class ReminderScanner
                     'minutes_before' => $lead,
                     'title'          => ($showDetail && $realTitle !== '') ? $realTitle : self::genericTitle(),
                     'real_title'     => $realTitle,
-                    'body'           => $this->buildDetailedBody($kind, $item, $userTz) ?? self::genericBody($kind, $lead),
+                    'body'           => $this->buildDetailedBody($kind, $item, $userTz, $showDetail) ?? self::genericBody($kind, $lead),
                     'generic_body'   => self::genericBody($kind, $lead),
                     'data'           => $data,
                     'encrypted'      => !empty($item['encrypted']),
@@ -358,7 +358,7 @@ class ReminderScanner
     {
         try {
             $stmt = $this->db->prepare(
-                "SELECT id, prenom, nom, organisation, date_relance, enc_alg, notifications
+                "SELECT id, prenom, nom, organisation, date_relance, motif_relance, enc_alg, notifications
                    FROM contacts
                   WHERE user_id = ? AND supprime_le IS NULL
                     AND date_relance IS NOT NULL AND relance_faite_le IS NULL
@@ -386,6 +386,7 @@ class ReminderScanner
                 'due_at'         => $dueAt,
                 'notifications'  => ReminderList::normalize($row['notifications']),
                 'title'          => $encrypted ? '' : ($name !== '' ? $name : (string) $row['organisation']),
+                'motif'          => $encrypted ? null : $row['motif_relance'],
                 'encrypted'      => $encrypted,
             ];
         }
@@ -439,11 +440,12 @@ class ReminderScanner
     ];
 
     /** @param array{due_at:DateTimeImmutable,all_day?:bool,start_datetime?:string,end_datetime?:string,timezone?:string} $item */
-    public function buildDetailedBody(string $kind, array $item, string $userTz): ?string
+    public function buildDetailedBody(string $kind, array $item, string $userTz, bool $showDetail = false): ?string
     {
         return match ($kind) {
             'event', 'recurring' => $this->buildEventBody($item, $userTz),
             'task_due'           => $this->buildTaskDueBody($item, $userTz),
+            'contact_followup'   => self::followupBody($item, $userTz, $showDetail),
             default              => null,
         };
     }
@@ -475,6 +477,24 @@ class ReminderScanner
             : self::formatDateFr($due) . ' ' . self::formatTimeFr($due);
     }
 
+    /**
+     * Relance de contact : « Relance : 13 nov. » (+ « — motif » si show_entity_detail et fiche
+     * non chiffrée). Opportunité : « Clôture prévue : 13 nov. » (directive cmem_web #501).
+     *
+     * @param array{entity_type:string,due_at:DateTimeImmutable,motif?:?string,encrypted?:bool} $item
+     */
+    public static function followupBody(array $item, string $userTz, bool $showDetail): string
+    {
+        $date = self::formatDateFr($item['due_at']->setTimezone(new DateTimeZone($userTz)));
+        if (($item['entity_type'] ?? '') === 'opportunite') {
+            return "Clôture prévue : {$date}";
+        }
+        $motif = trim((string) ($item['motif'] ?? ''));
+        return $showDetail && empty($item['encrypted']) && $motif !== ''
+            ? "Relance : {$date} — {$motif}"
+            : "Relance : {$date}";
+    }
+
     private static function formatDateFr(\DateTimeInterface $d): string
     {
         $texte = $d->format('j') . ' ' . self::MOIS_ABBR[(int) $d->format('n')];
@@ -489,15 +509,37 @@ class ReminderScanner
         return $d->format('G') . 'h' . $d->format('i');
     }
 
+    /**
+     * Délai exact, sans arrondi (directive cmem_web #501) : 93 → « dans 1 h 33 »,
+     * 60 → « dans 1 heure », 120 → « dans 2 heures », 1440 → « dans 1 jour »,
+     * 1533 → « dans 1 jour et 1 h 33 ».
+     */
+    public static function formatDelai(int $leadMinutes): string
+    {
+        if ($leadMinutes <= 0) {
+            return 'maintenant';
+        }
+        $plural = fn(int $n, string $unit) => $n . ' ' . $unit . ($n > 1 ? 's' : '');
+        $days   = intdiv($leadMinutes, 1440);
+        $hours  = intdiv($leadMinutes % 1440, 60);
+        $mins   = $leadMinutes % 60;
+
+        $rest = match (true) {
+            $hours > 0 && $mins > 0 => $hours . ' h ' . str_pad((string) $mins, 2, '0', STR_PAD_LEFT),
+            $hours > 0              => $plural($hours, 'heure'),
+            $mins > 0               => $plural($mins, 'minute'),
+            default                 => '',
+        };
+        if ($days === 0) {
+            return 'dans ' . $rest;
+        }
+        return 'dans ' . $plural($days, 'jour') . ($rest !== '' ? ' et ' . $rest : '');
+    }
+
     /** Corps générique — aucun détail d'entité (directive §6). */
     public static function genericBody(string $kind, int $leadMinutes): string
     {
-        $delai = match (true) {
-            $leadMinutes === 0   => 'maintenant',
-            $leadMinutes >= 1440 => 'dans ' . (int) round($leadMinutes / 1440) . ' jour(s)',
-            $leadMinutes >= 60   => 'dans ' . (int) round($leadMinutes / 60) . ' heure(s)',
-            default              => "dans {$leadMinutes} minutes",
-        };
+        $delai = self::formatDelai($leadMinutes);
 
         return match ($kind) {
             'event', 'recurring' => "Vous avez un événement {$delai}.",

@@ -86,7 +86,7 @@ Par défaut, un `kind` jamais réglé est renvoyé avec `enabled = false` : le p
 Par kind, opt-in, **défaut `false`** : le `title` du push reste générique (`PUSH_GENERIC_TITLE`).
 Réglé à `true`, `title` devient le titre réel de l'entité — titre événement/tâche, nom
 contact, titre opportunité — au lieu du générique. `body` est indépendant de ce réglage :
-voir § Corps du rappel — date/heure réelle.
+voir § Corps du rappel — date/heure réelle (seul le motif de relance en dépend).
 
 ## Corps du rappel — date/heure réelle (task cmem #215)
 
@@ -101,9 +101,17 @@ délai générique :
 | Événement journée entière ou multi-jours | `3 sept. - 5 sept.` |
 | Tâche échue, avec heure | `3 sept. 14h05` |
 | Tâche échue, journée entière | `3 sept.` |
+| Relance de contact (directive #501) | `Relance : 3 sept.` |
+| Relance de contact, `show_entity_detail` (fiche non chiffrée) | `Relance : 3 sept. — Rappeler pour le devis` |
+| Clôture d'opportunité (directive #501) | `Clôture prévue : 3 sept.` |
 
-L'année n'est ajoutée que si elle diffère de l'année courante. `contact_followup` conserve
-le texte générique par délai (« dans 1 jour(s) », etc.) — non concerné par ce changement.
+L'année n'est ajoutée que si elle diffère de l'année courante. Depuis la directive #501,
+`contact_followup` donne aussi la date (et le motif de relance selon `show_entity_detail`).
+
+Le courriel reprend la phrase de délai (« Un suivi de contact est à faire dans 1 h 33. »)
+suivie de ce corps. Délai exact, sans arrondi : `93` → « dans 1 h 33 », `60` → « dans
+1 heure », `120` → « dans 2 heures », `1440` → « dans 1 jour », `1533` → « dans 1 jour et
+1 h 33 ».
 
 ## Sélection des échéances
 
@@ -182,7 +190,7 @@ Options :
 Sortie, une ligne par rappel (élément, canal, délai) :
 
 ```txt
-DUE user=297 channel=DISPLAY kind=contact_followup entity=41 entity_type=opportunite occ=2026-07-27 lead=1440 devices=2 due=2026-07-27T04:00:00+00:00 title="Rappel" body="Un suivi de contact est à faire dans 1 jour(s)."
+DUE user=297 channel=DISPLAY kind=contact_followup entity=41 entity_type=opportunite occ=2026-07-27 lead=1440 devices=2 due=2026-07-27T04:00:00+00:00 title="Rappel" body="Clôture prévue : 27 juil."
 ```
 
 ## Tests

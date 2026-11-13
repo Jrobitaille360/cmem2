@@ -9,6 +9,12 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+### Corrigé
+
+- Texte des rappels (directive cmem_web #501) : délai exact sans arrondi trompeur ni « (s) » — 93 min → « dans 1 h 33 », 60 → « dans 1 heure », 120 → « dans 2 heures », 1440 → « dans 1 jour », 1533 → « dans 1 jour et 1 h 33 » — pour tous les types (courriel et push).
+- Rappels `contact_followup` : le corps détaillé donne la date — « Relance : 13 nov. » pour un contact (suivi de « — motif » avec `show_entity_detail`, jamais pour une fiche chiffrée), « Clôture prévue : 13 nov. » pour une opportunité. Le courriel ajoute cette ligne sous la phrase de délai ; le push l'utilise comme corps (court, plus tronqué), comme l'horaire pour les événements et tâches.
+- Tests : `test_reminders_text.php` (unitaire), critères K7.4 à K7.6 dans `test_reminders_cron.php`.
+
 ## [2.22.0] — 2026-11-12
 
 ### BREAKING CHANGES
