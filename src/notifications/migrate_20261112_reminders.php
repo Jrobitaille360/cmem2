@@ -2,7 +2,7 @@
 
 /**
  * Reprise des données — rappels unifiés (directive cmem_web #487, contrat #236 §7), tâche #493.
- * À lancer APRÈS la migration de schéma docs/20261112_notifications_unifiees.sql.
+ * À lancer APRÈS la migration de schéma docs/v-2-22-0/20261112_notifications_unifiees.sql.
  *
  * Usage :
  *   php src/notifications/migrate_20261112_reminders.php                 → comptes seulement (aucune écriture)
