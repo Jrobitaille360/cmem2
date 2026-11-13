@@ -64,6 +64,18 @@ class NotificationRouteHandler extends BaseRouteHandler
             ($sub === 'email' && $method === 'DELETE' && ctype_digit($third) && $third !== '') =>
                 $this->controller->cancelEmailNotification((int)$third, $user['user_id']),
 
+            // Rappels unifiés (#487, contrat #236 §4-§5) — contrôleur AuthGroups
+            ($sub === 'defaults' && $third === '' && $method === 'GET') =>
+                (new \AuthGroups\Controllers\NotificationSettingsController())->getDefaults($user),
+            ($sub === 'defaults' && $third === '' && $method === 'PUT') =>
+                (new \AuthGroups\Controllers\NotificationSettingsController())->putDefaults($user),
+            ($sub === 'devices' && $third === '' && $method === 'GET') =>
+                (new \AuthGroups\Controllers\NotificationSettingsController())->listDevices($user),
+            ($sub === 'devices' && ctype_digit($third) && $method === 'PUT') =>
+                (new \AuthGroups\Controllers\NotificationSettingsController())->updateDevice($user, (int) $third),
+            ($sub === 'devices' && ctype_digit($third) && $method === 'DELETE') =>
+                (new \AuthGroups\Controllers\NotificationSettingsController())->deleteDevice($user, (int) $third),
+
             default => Response::error('Route notifications non trouvée', null, 404),
         };
     }

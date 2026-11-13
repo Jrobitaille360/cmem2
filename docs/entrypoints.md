@@ -5,7 +5,7 @@ Chaque module expose sa documentation d'API au format JSON. Ces fichiers décriv
 | Fichier | Routes | Description |
 | - | - | - |
 | [core/API_ENDPOINTS.json](docs-api/core/API_ENDPOINTS.json) | 91 | API cœur : auth JWT/OTP, users, groups (dont `/groups/{id}/modules` — plan équipe), files, tags, stats, métadonnées de clé e2e (`/users/me/e2e-key`), suppression de compte et restauration. Document de référence transmis aux clients. |
-| [ics/API_ICS_ENDPOINTS.json](docs-api/ics/API_ICS_ENDPOINTS.json) | 49 | Calendriers ICS/CalDAV : événements, occurrences, todos, journaux, partage, notifications email, sessions de temps par tâche. |
+| [ics/API_ICS_ENDPOINTS.json](docs-api/ics/API_ICS_ENDPOINTS.json) | 55 | Calendriers ICS/CalDAV : événements, occurrences, todos, journaux, partage, sessions de temps par tâche. Rappels unifiés (v2.22.0) : champ `notifications` EMAIL/DISPLAY par élément, `/notifications/defaults` (défauts par type), `/notifications/devices` (appareils), cron unifié courriel + push. |
 | [contacts/API_CONTACTS_ENDPOINTS.json](docs-api/contacts/API_CONTACTS_ENDPOINTS.json) | 19 | Pilier Contacts : fiches personnes/organisations, vCard 4.0 import/export, cap `max_contacts`, chiffrement de bout en bout, CRM (interactions, `/opportunites`), corbeille (`/contacts/deleted` + restore). |
 | [projets/API_PROJETS_ENDPOINTS.json](docs-api/projets/API_PROJETS_ENDPOINTS.json) | 18 | Gestion de projet : tâches, hiérarchie/dépendances (DAG), round-trip JSON, export `.ics` VEVENT, corbeille projets et tâches (`/deleted` + restore). |
 | [links/API_LINKS_ENDPOINTS.json](docs-api/links/API_LINKS_ENDPOINTS.json) | 3 | Liens croisés bidirectionnels entre entités (event, task, journal, project, project_task, file, contact, interaction, opportunite) : création idempotente, liste enrichie du titre cible, suppression, cascade de purge. |
@@ -18,7 +18,7 @@ Chaque module expose sa documentation d'API au format JSON. Ces fichiers décriv
 | [access/API_ACCESS_ENDPOINTS.json](docs-api/access/API_ACCESS_ENDPOINTS.json) | 12 | `GET /v2/access/status` — statut d'accès dérivé de l'approbation du compte (source `approval`, modules cochés), toutes plateformes. Plus d'abonnement : `/v2/billing/*`, `/v2/subscriptions/*` et `/subscription/*` retirés (404). Accès sur approbation : `PUT /users/{id}/access-status`, `POST/GET/DELETE /invitations`, `GET/PUT /users/{id}/modules` (modules cochés), codes 403 `ACCOUNT_PENDING` / `ACCOUNT_SUSPENDED`. Caps de ressources à trois niveaux : `GET /caps/defaults`, `GET/PUT /users/{id}/caps`, `GET/PUT /groups/{id}/caps`. |
 | [traque/API_TRAQUE_ENDPOINTS.json](docs-api/traque/API_TRAQUE_ENDPOINTS.json) | 17 | Jeu Traque : monstres géolocalisés (OSM), combat, personnage (création, repos, level-up), bestiaire, leaderboard. |
 | [pomo/API_POMO_ENDPOINTS_v1_0_0.json](docs-api/pomo/API_POMO_ENDPOINTS_v1_0_0.json) | 1 | Plugin Pomodoro — phase 1A seulement : `POST /pomo/engagement` (waitlist/sondage public). Phases 1B/2/3 planifiées. |
-| [push/API_PUSH_ENDPOINTS.json](docs-api/push/API_PUSH_ENDPOINTS.json) | 5 | Notifications push web (VAPID) : clé publique, subscriptions par appareil, préférences par compte (4 kinds dont `contact_followup`). |
+| [push/API_PUSH_ENDPOINTS.json](docs-api/push/API_PUSH_ENDPOINTS.json) | 5 | Notifications push web (VAPID) : clé publique, subscriptions par appareil. `/push/preferences` déprécié (v2.22.0) : projection des défauts `/notifications/defaults`. |
 | [modules/API_MODULES_ENDPOINTS.json](docs-api/modules/API_MODULES_ENDPOINTS.json) | 4 | Registre de modules activables : gating par plan (`available`), interrupteur usager (`enabled`), quota serveur. Plan équipe : `GET/PATCH /groups/{id}/modules[/{key}]`, fusionnés dans `GET /modules`. |
 | [ai/API_AI_ENDPOINTS.json](docs-api/ai/API_AI_ENDPOINTS.json) | 2 | Proxy IA — `POST /ai/summarize` (résumé d'agenda), `GET /ai/usage`. Budget mensuel en dollars réservé avant l'appel modèle, clé Anthropic serveur seule, consigne fixe (pas de prompt libre). |
 
@@ -30,7 +30,7 @@ Chaque guide complète le JSON avec les flux d'intégration, exemples et codes d
 | Guide | Contenu |
 | - | - |
 | [core/GUIDE.md](docs-api/core/GUIDE.md) | Auth JWT/OTP, device tokens, users, groupes, fichiers (accessibilité, SVG→PNG), tags, stats, abonnements. |
-| [ics/GUIDE.md](docs-api/ics/GUIDE.md) | Calendriers, événements récurrents, occurrences, VTODO/VJOURNAL/VFREEBUSY, partage public, CalDAV. |
+| [ics/GUIDE.md](docs-api/ics/GUIDE.md) | Calendriers, événements récurrents, occurrences, VTODO/VJOURNAL/VFREEBUSY, partage public, CalDAV, rappels unifiés (forme, sémantique, codes 422, envoi). |
 | [contacts/GUIDE.md](docs-api/contacts/GUIDE.md) | Fiches contacts, champs répétables, vCard 4.0 et import, cap de plan, chiffrement de bout en bout, envoi de courriel, CRM (interactions, opportunités), GED, relance. |
 | [links/GUIDE.md](docs-api/links/GUIDE.md) | Modèle polymorphe des liens, règles (idempotence, sens inverse, scoping propriétaire), cascade de purge. |
 | [booking/GUIDE.md](docs-api/booking/GUIDE.md) | Gating par plan, endpoints hôte et publics, génération des zones, cron, erreurs. |
@@ -42,7 +42,7 @@ Chaque guide complète le JSON avec les flux d'intégration, exemples et codes d
 | [access/GUIDE.md](docs-api/access/GUIDE.md) | `GET /v2/access/status` — matrice d'accès premium par plateforme. Accès sur approbation (pending/approved/suspended), invitations admin. |
 | [traque/GUIDE.md](docs-api/traque/GUIDE.md) | Personnage, monstres géolocalisés, combat, repos, bestiaire, leaderboard. |
 | [pomo/GUIDE.md](docs-api/pomo/GUIDE.md) | Engagement public (Ph1A actif) ; support/sync/Stripe = contrat prévisionnel (404). |
-| [push/GUIDE.md](docs-api/push/GUIDE.md) | Flux d'abonnement Web Push, préférences par compte, sélection des échéances, idempotence, purge sur 410, cron. |
+| [push/GUIDE.md](docs-api/push/GUIDE.md) | Flux d'abonnement Web Push, préférences (dépréciées), sélection commune courriel + push, idempotence par appareil (`reminder_log`), purge 410 et 90 jours, cron unifié. |
 | [modules/GUIDE.md](docs-api/modules/GUIDE.md) | Trois états (disponible / activé / quota), mapping plan→modules, rétro-fit des pans livrés, codes d'erreur du gating, plan équipe (fusion perso ∪ groupe). |
 | [ai/GUIDE.md](docs-api/ai/GUIDE.md) | Contrat de confidentialité (métadonnées seulement, jamais de corps de journal), quota avant appel, consigne fixe côté serveur. |
 

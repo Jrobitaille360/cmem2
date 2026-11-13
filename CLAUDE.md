@@ -33,7 +33,6 @@ php private/tests/test_contacts_interactions.php
 php private/tests/test_contacts_opportunites.php
 php private/tests/test_cors_e2e_account.php
 php private/tests/test_email_verification.php
-php private/tests/test_ics_email_recurring_reminders.php
 php private/tests/test_entrypoints.php
 php private/tests/test_files.php
 php private/tests/test_files_accessibility.php
@@ -58,6 +57,7 @@ php private/tests/test_links.php
 php private/tests/test_links_ged.php
 php private/tests/test_maintenance.php
 php private/tests/test_modules.php
+php private/tests/test_notification_settings.php
 php private/tests/test_module_grants.php
 php private/tests/test_password_reset.php
 php private/tests/test_payment_removal.php
@@ -66,6 +66,8 @@ php private/tests/test_pseudo.php
 php private/tests/test_public.php
 php private/tests/test_projets.php
 php private/tests/test_push.php
+php private/tests/test_reminders.php
+php private/tests/test_reminders_cron.php
 php private/tests/test_puzzle_admin.php
 php private/tests/test_puzzle_backup.php
 php private/tests/test_puzzle_share.php

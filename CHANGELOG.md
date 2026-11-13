@@ -9,6 +9,39 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+### BREAKING CHANGES
+
+- Rappels unifiés (directive cmem_web #487, contrat #236) : `REMINDER_CHANNEL_UNSUPPORTED` (#440) est retiré, `DISPLAY` est accepté et envoyé. Écriture de `notifications` validée par codes `422` `{ code, field, message }` : `REMINDER_CHANNEL_UNKNOWN` (seuls `EMAIL`/`DISPLAY`, `notification` et `AUDIO` refusés en écriture), `REMINDER_LEAD_INVALID` (entier `0..40320`), `REMINDER_DUPLICATE`, `REMINDER_TOO_MANY` (> 10).
+- `notifications` des événements est relu sous forme normalisée `[{type: EMAIL|DISPLAY, minutes_before}]` ou `null`, y compris dans le listing `GET /calendars/{id}/events` (renvoyait la chaîne JSON brute) et l'expansion des occurrences.
+- Sémantique de `notifications`, identique pour toutes les entités : absent = défaut du type (création) / inchangé (mise à jour) ; `null` = défaut du type ; `[]` = aucun rappel ; liste = remplace le défaut.
+- Rappels courriel : titre générique par défaut (titre réel seulement avec `show_entity_detail` du type, jamais pour une fiche chiffrée), envoyés à l'adresse du compte (`users.notification_email` n'est plus lu), soumis à la plage silencieuse du type.
+- La file `email_notification_queue` n'est plus traitée ; `GET /notifications/email` est déprécié. Les rappels en attente sont annulés par la reprise des données et recalculés par le cron unifié.
+- Journal d'envoi par appareil : un appareil réabonné reçoit les rappels encore dans la tolérance qu'il n'avait pas reçus.
+
+### Ajouté
+
+- Champ `notifications` (liste par élément) sur les tâches (`/calendars/{id}/todos`), les tâches de projet (`/projets/projects/{id}/tasks`, `/projets/tasks/{id}`), les contacts (`/contacts`) et les opportunités (`/contacts/{id}/opportunites`, `/opportunites/{id}`). Import JSON de projet : `notifications` et `rappelMinutesAvant` acceptés.
+- `GET|PUT /notifications/defaults?app_id=` : rappels par défaut par type (`event`, `recurring`, `task_due`, `contact_followup`), délais `0, 5, 10, 15, 30, 60, 120, 1440, 2880`, plage silencieuse et `show_entity_detail` valant pour les deux canaux.
+- `GET /notifications/devices?app_id=`, `PUT|DELETE /notifications/devices/{id}` : appareils (abonnements push) avec types acceptés (`kinds`) et plage silencieuse propre ; l'endpoint complet ne circule pas (`endpoint_hash`). Codes `422` `APP_ID_REQUIRED`, `DEFAULTS_REQUIRED`, `REMINDER_KIND_UNKNOWN`, `QUIET_TIME_INVALID`, `QUIET_RANGE_INCOMPLETE`.
+- Cron unifié `src/notifications/send_reminders.php` (`--channel=EMAIL|DISPLAY|all`, `--dry-run`, `--now`, `--user`) : une sélection pour événements, occurrences de séries (exceptions appliquées), tâches, tâches de projet, relances et opportunités ; un rappel part à `échéance − délai` tant que son retard reste dans la tolérance (60 min, 7 jours pour `contact_followup`) ; idempotence par `reminder_log` ; purge des abonnements sans envoi réussi depuis 90 jours. `send_email_notifications.php` et `send_push_notifications.php` deviennent des enveloppes (crontab inchangée). Variable `.env` facultative `REMINDER_APP_ID` (défaut `cmemweb`).
+- Migration `docs/20261112_notifications_unifiees.sql` (`notification_defaults`, `reminder_log`, `push_subscriptions.kinds|quiet_from|quiet_to`, colonnes `notifications` sur `calendar_todos`, `contacts`, `opportunite`) et reprise des données `src/notifications/migrate_20261112_reminders.php` (comptage par défaut, `--apply --cutoff=`).
+- Tests : `test_reminders.php`, `test_notification_settings.php`, `test_reminders_cron.php`.
+
+### Corrigé
+
+- Les rappels des tâches de projet (`rappelMinutesAvant`) sont enfin envoyés, par courriel et push (#439).
+- `GET|PUT /users/me/notification-preferences` étaient capturés par `GET|PUT /users/me` : la désactivation des courriels de rappel n'avait aucun effet.
+- Import `.ics` : `ACTION:AUDIO` / `DISPLAY` → `DISPLAY`, `ACTION:EMAIL` → `EMAIL`, délai sous `minutes_before`.
+
+### Déprécié
+
+- `rappelMinutesAvant` des tâches de projet : accepté en écriture (`n` → `[EMAIL n, DISPLAY n]`, ignoré si `notifications` est fourni), relu comme premier délai de la liste ; retiré à la version suivante.
+- `GET|PUT /push/preferences` : projection des défauts `DISPLAY` de `/notifications/defaults` ; retirés à la version suivante.
+
+### Supprimé
+
+- `Push\Services\DueScanner` (remplacé par `AuthGroups\Services\ReminderScanner`). Test `test_ics_email_recurring_reminders.php` retiré des suites (critères #438 repris par `test_reminders_cron.php`).
+
 ## [2.21.0] — 2026-11-12
 
 ### BREAKING CHANGES

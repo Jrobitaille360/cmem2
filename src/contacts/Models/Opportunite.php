@@ -22,7 +22,8 @@ class Opportunite extends BaseModel
     public const ETAPES = ['prospect', 'qualifie', 'proposition', 'gagne', 'perdu'];
 
     /** Champs acceptés en création / mise à jour partielle. */
-    public const FIELDS = ['titre', 'etape', 'montant', 'devise', 'date_cloture_prevue', 'notes'];
+    public const FIELDS = ['titre', 'etape', 'montant', 'devise', 'date_cloture_prevue', 'notes',
+                           'notifications']; // JSON déjà sérialisé par le contrôleur (#487)
 
     /** Requis par BaseModel — création via createOpportunite(). */
     public function create()

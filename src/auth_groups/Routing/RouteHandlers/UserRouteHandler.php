@@ -120,11 +120,12 @@ class UserRouteHandler extends BaseRouteHandler
                 $this->getE2eKeyController()->delete((int) $user['user_id']),
 
             // GET /users/me
-            ($action === 'me' && $method === 'GET') =>
+            // (sans segment suivant : /users/me/notification-preferences était capturé ici)
+            ($action === 'me' && !isset($segments[2]) && $method === 'GET') =>
                 $this->controller->getById($user['user_id'], $user['user_id'], $user['role']),
-            
+
             // PUT /users/me
-            ($action === 'me' && $method === 'PUT') =>
+            ($action === 'me' && !isset($segments[2]) && $method === 'PUT') =>
                 $this->controller->updateProfile($user['user_id'], $user['user_id'], $user['role']),
 
             // DELETE /users/me

@@ -6,7 +6,9 @@
     "generated": "2026-04-03",
     "base_url": "/calendars",
     "authentication": {
-      "types": ["JWT_BEARER"],
+      "types": [
+        "JWT_BEARER"
+      ],
       "header": "Authorization: Bearer {jwt_token}",
       "description": "Authentification JWT requise pour tous les endpoints sauf téléchargement ICS public"
     }
@@ -182,7 +184,9 @@
       "base_path": "/calendars/{id}/events",
       "auth_required": true,
       "routes": [
-        { "method": "POST", "path": "/calendars/{id}/events",
+        {
+          "method": "POST",
+          "path": "/calendars/{id}/events",
           "description": "Créer un événement dans un calendrier",
           "params": {
             "id": "integer (required) - ID du calendrier"
@@ -216,12 +220,16 @@
             "rdate": "string (optional) - Phase 4 — RDATE : dates additionnelles (datetimes locales CSV)",
             "related_to": "string (optional) - Phase 4 — UID RFC 5545 de l'événement parent (RELATED-TO;RELTYPE=PARENT)",
             "duration": "string (optional) - Phase 4 — durée ISO 8601 ex: PT1H30M — exclusif avec end_datetime",
-            "notifications": "array (optional) - [{type: 'EMAIL', minutes_before: int}] — exportés BEGIN:VALARM (Phase 4). Seul EMAIL est accepté : tout autre type (DISPLAY, notification, AUDIO) → 422 REMINDER_CHANNEL_UNSUPPORTED (directive #440), le push par élément n'existant pas encore. Série récurrente : un rappel par occurrence (cron, directive #438)."
+            "notifications": "array|null (optional) — rappels de l'élément [{type: 'EMAIL'|'DISPLAY', minutes_before: 0..40320}] (contrat #236). Absent : création = défaut du type, mise à jour = inchangé ; null = défaut du type ; [] = aucun rappel ; liste = remplace le défaut. Max 10, pas de doublon type+délai. 422 : REMINDER_CHANNEL_UNKNOWN, REMINDER_LEAD_INVALID, REMINDER_DUPLICATE, REMINDER_TOO_MANY (errors = {code, field, message}). En lecture : null ou la liste normalisée."
           },
           "response": "Événement créé avec ID",
-          "errors": { "422": "REMINDER_CHANNEL_UNSUPPORTED — notifications[] contient un type autre que EMAIL ; corps errors: { code, field: 'notifications.{i}.type', type }" }
+          "errors": {
+            "422": "REMINDER_CHANNEL_UNKNOWN | REMINDER_LEAD_INVALID | REMINDER_DUPLICATE | REMINDER_TOO_MANY — errors: { code, field (notifications.{i}[.type|.minutes_before]), message } (contrat #236 ; REMINDER_CHANNEL_UNSUPPORTED retiré en v2.22.0)"
+          }
         },
-        { "method": "GET", "path": "/calendars/{id}/events",
+        {
+          "method": "GET",
+          "path": "/calendars/{id}/events",
           "description": "Récupérer les événements d'un calendrier",
           "params": {
             "id": "integer (required) - ID du calendrier"
@@ -276,7 +284,7 @@
             "rdate": "string (optional) - RDATE dates CSV (Phase 4)",
             "related_to": "string (optional) - UID parent (Phase 4)",
             "duration": "string (optional) - durée ISO 8601 (Phase 4)",
-            "notifications": "array (optional) - [{type: 'EMAIL', minutes_before: int}] — remplace les rappels ; tout autre type → 422 REMINDER_CHANNEL_UNSUPPORTED (directive #440)"
+            "notifications": "array|null (optional) — rappels de l'élément [{type: 'EMAIL'|'DISPLAY', minutes_before: 0..40320}] (contrat #236). Absent : création = défaut du type, mise à jour = inchangé ; null = défaut du type ; [] = aucun rappel ; liste = remplace le défaut. Max 10, pas de doublon type+délai. 422 : REMINDER_CHANNEL_UNKNOWN, REMINDER_LEAD_INVALID, REMINDER_DUPLICATE, REMINDER_TOO_MANY (errors = {code, field, message}). En lecture : null ou la liste normalisée."
           },
           "headers": {
             "If-Unmodified-Since": "string ISO 8601 UTC (optional) - versioning optimiste (directive 20260812_113000). Absent = comportement inchangé. Doit valoir exactement le updatedAt reçu au dernier GET/PUT ; sinon 409. LIMITE CONNUE : comparaison à la seconde (updated_at MySQL sans fraction) - deux écritures sur la même ressource dans la même seconde UTC ne sont pas détectées comme conflit. Non bloquant pour le rejeu de file offline (séparé par un aller-retour réseau) ; risque théorique seulement en cas d'écriture concurrente vraie de deux appareils dans la même seconde. Voir docs/PLAN_concurrence-updated-at-microsecondes.md."
@@ -284,7 +292,7 @@
           "response": "Événement mis à jour (inclut updatedAt, ISO 8601 UTC)",
           "errors": {
             "409": "Conflit de version (If-Unmodified-Since ne correspond pas à updatedAt en base) - corps: { data: { current: <événement complet> } }",
-            "422": "REMINDER_CHANNEL_UNSUPPORTED — notifications[] contient un type autre que EMAIL (directive #440)"
+            "422": "REMINDER_CHANNEL_UNKNOWN | REMINDER_LEAD_INVALID | REMINDER_DUPLICATE | REMINDER_TOO_MANY — errors: { code, field (notifications.{i}[.type|.minutes_before]), message } (contrat #236 ; REMINDER_CHANNEL_UNSUPPORTED retiré en v2.22.0)"
           }
         },
         {
@@ -311,13 +319,17 @@
           "method": "GET",
           "path": "/calendars/{id}/events/deleted",
           "description": "Lister les événements soft-deleted du calendrier (corbeille) — limité aux 30 derniers jours après deleted_at (fenêtre de restauration), triés deleted_at DESC. Purge physique définitive après 90 jours (cron ICS\\Services\\MaintenanceService).",
-          "params": { "id": "integer (required) - ID du calendrier" },
+          "params": {
+            "id": "integer (required) - ID du calendrier"
+          },
           "query_params": {
             "page": "integer (optional, défaut 1)",
             "limit": "integer (optional, défaut 20, max 100)"
           },
           "response": "{ events: Array, count: integer, page: integer, limit: integer }",
-          "errors": { "404": "Calendrier non trouvé ou accès non autorisé" }
+          "errors": {
+            "404": "Calendrier non trouvé ou accès non autorisé"
+          }
         },
         {
           "method": "POST",
@@ -333,7 +345,9 @@
             "404": "Non trouvé / pas supprimé / fenêtre de restauration expirée"
           }
         },
-        { "method": "GET", "path": "/calendars/{id}/events/{eventId}/occurrences",
+        {
+          "method": "GET",
+          "path": "/calendars/{id}/events/{eventId}/occurrences",
           "description": "Obtenir les occurrences d'un événement récurrent",
           "params": {
             "id": "integer (required) - ID du calendrier",
@@ -341,7 +355,9 @@
           },
           "response": "Liste des occurrences avec dates"
         },
-        { "method": "GET", "path": "/calendars/{id}/events/occurrences",
+        {
+          "method": "GET",
+          "path": "/calendars/{id}/events/occurrences",
           "description": "Obtenir toutes les occurrences (récursives ou non) du calendrier entre deux dates",
           "params": {
             "id": "integer (required) - ID du calendrier"
@@ -352,7 +368,9 @@
           },
           "response": "Liste des occurrences avec dates"
         },
-        { "method": "GET", "path": "/calendars/{id}/events/occurrences/expand",
+        {
+          "method": "GET",
+          "path": "/calendars/{id}/events/occurrences/expand",
           "description": "Phase 3 rewrite cmem_web — expansion RRULE À LA DEMANDE (timezone-aware, RFC 5545) sur la seule plage demandée, sans dépendre de la table pré-calculée event_occurrences ni du CRON. Route additive : coexiste avec /calendars/{id}/events/occurrences (chemin CRON, client Flutter) qui reste strictement inchangé. Les deux chemins lisent les mêmes exceptions (is_cancelled/is_modified) — une occurrence annulée/modifiée par un client est vue par l'autre.",
           "params": {
             "id": "integer (required) - ID du calendrier"
@@ -369,7 +387,9 @@
             "422": "RRULE non supportée par recurr (message d'erreur explicite inclus)"
           }
         },
-        { "method": "GET", "path": "/calendars/{id}/events/{eventId}/occurrences/expand",
+        {
+          "method": "GET",
+          "path": "/calendars/{id}/events/{eventId}/occurrences/expand",
           "description": "Variante par événement de GET /calendars/{id}/events/occurrences/expand — mêmes règles, limité à un seul événement.",
           "params": {
             "id": "integer (required) - ID du calendrier",
@@ -452,7 +472,9 @@
           "method": "POST",
           "path": "/calendars/{id}/todos",
           "description": "Créer une tâche VTODO dans un calendrier",
-          "params": { "id": "integer (required)" },
+          "params": {
+            "id": "integer (required)"
+          },
           "body": {
             "title": "string (required, max 2000) - Titre de la tâche (SUMMARY), ou base64 opaque si enc_alg est renseigné",
             "description": "string (optional, max 16000000) - Contenu, ou base64 opaque si enc_alg est renseigné",
@@ -467,7 +489,8 @@
             "categories": "array of strings (optional)",
             "url": "string (optional)",
             "timezone": "string (optional, default: America/Montreal)",
-            "recurrence_rule": "string (optional) - Règle de récurrence RRULE valide (RFC 5545 §3.8.5.4) ex: FREQ=WEEKLY;BYDAY=MO,WE"
+            "recurrence_rule": "string (optional) - Règle de récurrence RRULE valide (RFC 5545 §3.8.5.4) ex: FREQ=WEEKLY;BYDAY=MO,WE",
+            "notifications": "array|null (optional) — rappels de l'élément [{type: 'EMAIL'|'DISPLAY', minutes_before: 0..40320}] (contrat #236). Absent : création = défaut du type, mise à jour = inchangé ; null = défaut du type ; [] = aucun rappel ; liste = remplace le défaut. Max 10, pas de doublon type+délai. 422 : REMINDER_CHANNEL_UNKNOWN, REMINDER_LEAD_INVALID, REMINDER_DUPLICATE, REMINDER_TOO_MANY (errors = {code, field, message}). En lecture : null ou la liste normalisée."
           },
           "response": "Todo object avec uid (UUID v4)",
           "errors": {
@@ -476,25 +499,61 @@
           }
         },
         {
+          "method": "PUT",
+          "path": "/calendars/{id}/todos/{todoId}",
+          "description": "Mise à jour partielle d'une tâche (champs absents inchangés ; enc_alg / enc_iv null = retour au clair). If-Match / If-Unmodified-Since supportés.",
+          "body": {
+            "title": "string (optional)",
+            "description": "string (optional)",
+            "due": "date|datetime (optional)",
+            "dtstart": "date|datetime (optional)",
+            "completed": "datetime (optional)",
+            "status": "NEEDS-ACTION|IN-PROCESS|COMPLETED|CANCELLED (optional)",
+            "priority": "integer 0-9 (optional)",
+            "percent_complete": "integer 0-100 (optional)",
+            "categories": "array (optional)",
+            "recurrence_rule": "string (optional)",
+            "is_all_day": "boolean (optional)",
+            "enc_alg": "string|null (optional)",
+            "enc_iv": "string|null (optional)",
+            "notifications": "array|null (optional) — rappels de l'élément [{type: 'EMAIL'|'DISPLAY', minutes_before: 0..40320}] (contrat #236). Absent : création = défaut du type, mise à jour = inchangé ; null = défaut du type ; [] = aucun rappel ; liste = remplace le défaut. Max 10, pas de doublon type+délai. 422 : REMINDER_CHANNEL_UNKNOWN, REMINDER_LEAD_INVALID, REMINDER_DUPLICATE, REMINDER_TOO_MANY (errors = {code, field, message}). En lecture : null ou la liste normalisée."
+          },
+          "errors": {
+            "403": "Accès non autorisé",
+            "412": "Précondition (version) échouée",
+            "422": "Codes REMINDER_*"
+          }
+        },
+        {
           "method": "GET",
           "path": "/calendars/{id}/todos",
           "description": "Lister les tâches d'un calendrier",
-          "params": { "id": "integer (required)" },
+          "params": {
+            "id": "integer (required)"
+          },
           "response": "{ todos: Array, count: integer }"
         },
         {
           "method": "GET",
           "path": "/calendars/{id}/todos/{todoId}",
           "description": "Obtenir une tâche spécifique",
-          "params": { "id": "integer (required)", "todoId": "integer (required)" },
+          "params": {
+            "id": "integer (required)",
+            "todoId": "integer (required)"
+          },
           "response": "Todo object",
-          "errors": { "404": "Tâche non trouvée" }
+          "errors": {
+            "404": "Tâche non trouvée"
+          }
         },
         {
           "method": "PUT | PATCH",
           "path": "/calendars/{id}/todos/{todoId}",
           "description": "Mettre à jour une tâche. PUT et PATCH sont équivalents : dans les deux cas seuls les champs présents dans le corps sont modifiés.",
-          "params": { "id": "integer (required)", "todoId": "integer (required)" },
+          "params": {
+            "id": "integer (required)",
+            "todoId": "integer (required)"
+          },
           "body": {
             "title": "string (optional, max 2000)",
             "description": "string (optional, max 16000000)",
@@ -520,27 +579,40 @@
           "method": "DELETE",
           "path": "/calendars/{id}/todos/{todoId}",
           "description": "Supprimer une tâche (soft delete)",
-          "params": { "id": "integer (required)", "todoId": "integer (required)" },
+          "params": {
+            "id": "integer (required)",
+            "todoId": "integer (required)"
+          },
           "response": "{ todo_id, deleted_at }",
-          "errors": { "403": "Permission insuffisante", "404": "Non trouvé" }
+          "errors": {
+            "403": "Permission insuffisante",
+            "404": "Non trouvé"
+          }
         },
         {
           "method": "GET",
           "path": "/calendars/{id}/todos/deleted",
           "description": "Lister les tâches soft-deleted du calendrier (corbeille) — limité aux 30 derniers jours après deleted_at (fenêtre de restauration), triées deleted_at DESC. Purge physique définitive après 90 jours (cron ICS\\Services\\MaintenanceService).",
-          "params": { "id": "integer (required)" },
+          "params": {
+            "id": "integer (required)"
+          },
           "query_params": {
             "page": "integer (optional, défaut 1)",
             "limit": "integer (optional, défaut 20, max 100)"
           },
           "response": "{ todos: Array, count: integer, page: integer, limit: integer }",
-          "errors": { "404": "Calendrier non trouvé ou accès non autorisé" }
+          "errors": {
+            "404": "Calendrier non trouvé ou accès non autorisé"
+          }
         },
         {
           "method": "POST",
           "path": "/calendars/{id}/todos/{todoId}/restore",
           "description": "Restaurer une tâche soft-deleted (deleted_at remis à NULL). Réservé au créateur de la tâche (même modèle d'autorisation que DELETE). 404 si non soft-deleted, déjà restaurée, hard-deleted, ou fenêtre de 30 jours dépassée.",
-          "params": { "id": "integer (required)", "todoId": "integer (required)" },
+          "params": {
+            "id": "integer (required)",
+            "todoId": "integer (required)"
+          },
           "response": "{ todo_id: integer }",
           "errors": {
             "403": "Accès non autorisé (non créateur)",
@@ -563,7 +635,10 @@
           "method": "POST",
           "path": "/calendars/{id}/todos/{todoId}/time-sessions/start",
           "description": "Démarrer une session de temps sur une tâche. Accès requis : même permission que GET .../todos/{todoId} (lecture du calendrier), pas nécessairement propriétaire de la tâche.",
-          "params": { "id": "integer (required)", "todoId": "integer (required)" },
+          "params": {
+            "id": "integer (required)",
+            "todoId": "integer (required)"
+          },
           "body": {
             "note": "string (optional, max 2000) - Note libre, ou base64 opaque si enc_alg est renseigné",
             "enc_alg": "string (optional, max 32) - voir chiffrement_e2e",
@@ -579,9 +654,14 @@
           "method": "GET",
           "path": "/calendars/{id}/todos/{todoId}/time-sessions",
           "description": "Lister les sessions de temps d'une tâche, triées started_at DESC.",
-          "params": { "id": "integer (required)", "todoId": "integer (required)" },
+          "params": {
+            "id": "integer (required)",
+            "todoId": "integer (required)"
+          },
           "response": "{ sessions: Array, count: integer }",
-          "errors": { "404": "Calendrier ou tâche non trouvé / accès non autorisé" }
+          "errors": {
+            "404": "Calendrier ou tâche non trouvé / accès non autorisé"
+          }
         },
         {
           "method": "GET",
@@ -593,7 +673,9 @@
           "method": "PATCH",
           "path": "/time-sessions/{id}/stop",
           "description": "Arrêter une session en cours (pose ended_at). Réservé au propriétaire de la session.",
-          "params": { "id": "integer (required)" },
+          "params": {
+            "id": "integer (required)"
+          },
           "response": "{ session: Object }",
           "errors": {
             "403": "Accès non autorisé (pas le propriétaire de la session)",
@@ -605,7 +687,9 @@
           "method": "PUT | PATCH",
           "path": "/time-sessions/{id}",
           "description": "Correction manuelle d'une session (started_at, ended_at, note). Réservé au propriétaire de la session.",
-          "params": { "id": "integer (required)" },
+          "params": {
+            "id": "integer (required)"
+          },
           "body": {
             "started_at": "date ou datetime (optional)",
             "ended_at": "date, datetime ou null (optional) - null réouvre la session (doit rester la seule active pour l'usager)",
@@ -625,7 +709,9 @@
           "method": "DELETE",
           "path": "/time-sessions/{id}",
           "description": "Supprimer définitivement une session (hard delete, pas de corbeille). Réservé au propriétaire de la session.",
-          "params": { "id": "integer (required)" },
+          "params": {
+            "id": "integer (required)"
+          },
           "response": "{ }",
           "errors": {
             "403": "Accès non autorisé",
@@ -643,15 +729,21 @@
           "method": "GET",
           "path": "/calendars/{id}/tags",
           "description": "Lister les étiquettes d'un calendrier, triées par name. Accès lecture (propriétaire ou membre partagé, lecture ou écriture).",
-          "params": { "id": "integer (required)" },
+          "params": {
+            "id": "integer (required)"
+          },
           "response": "{ tags: Array of { id, calendar_id, name, color }, count: integer }",
-          "errors": { "404": "Calendrier non trouvé ou accès non autorisé" }
+          "errors": {
+            "404": "Calendrier non trouvé ou accès non autorisé"
+          }
         },
         {
           "method": "POST",
           "path": "/calendars/{id}/tags",
           "description": "Créer une étiquette (réservoir, pas encore appliquée à un enregistrement). Accès écriture (propriétaire ou membre partagé en écriture).",
-          "params": { "id": "integer (required)" },
+          "params": {
+            "id": "integer (required)"
+          },
           "body": {
             "name": "string (required, max 191)",
             "color": "string (optional, max 20)"
@@ -667,7 +759,10 @@
           "method": "PUT",
           "path": "/calendars/{id}/tags/{tagId}",
           "description": "Renommer/recolorer une étiquette. Si name change, remplace l'ancienne valeur par la nouvelle dans categories[] de tous les events/todos/journals du calendrier qui la contiennent (transaction serveur). Accès écriture.",
-          "params": { "id": "integer (required)", "tagId": "integer (required)" },
+          "params": {
+            "id": "integer (required)",
+            "tagId": "integer (required)"
+          },
           "body": {
             "name": "string (optional, max 191)",
             "color": "string (optional, max 20)"
@@ -684,9 +779,15 @@
           "method": "DELETE",
           "path": "/calendars/{id}/tags/{tagId}",
           "description": "Supprimer une étiquette. Retire sa valeur de categories[] de tous les events/todos/journals du calendrier qui la contiennent (transaction serveur). Accès écriture.",
-          "params": { "id": "integer (required)", "tagId": "integer (required)" },
+          "params": {
+            "id": "integer (required)",
+            "tagId": "integer (required)"
+          },
           "response": "204 No Content",
-          "errors": { "403": "Permission insuffisante", "404": "Étiquette non trouvée" }
+          "errors": {
+            "403": "Permission insuffisante",
+            "404": "Étiquette non trouvée"
+          }
         }
       ]
     },
@@ -708,7 +809,9 @@
           "method": "POST",
           "path": "/calendars/{id}/journals",
           "description": "Créer une entrée de journal VJOURNAL",
-          "params": { "id": "integer (required)" },
+          "params": {
+            "id": "integer (required)"
+          },
           "body": {
             "summary": "string (required, max 2000) - Résumé du journal, ou base64 opaque si enc_alg est renseigné",
             "description": "string (optional, max 16000000) - Contenu, ou base64 opaque si enc_alg est renseigné",
@@ -731,22 +834,32 @@
           "method": "GET",
           "path": "/calendars/{id}/journals",
           "description": "Lister les entrées de journal",
-          "params": { "id": "integer (required)" },
+          "params": {
+            "id": "integer (required)"
+          },
           "response": "{ journals: Array, count: integer }"
         },
         {
           "method": "GET",
           "path": "/calendars/{id}/journals/{journalId}",
           "description": "Obtenir une entrée de journal spécifique",
-          "params": { "id": "integer (required)", "journalId": "integer (required)" },
+          "params": {
+            "id": "integer (required)",
+            "journalId": "integer (required)"
+          },
           "response": "Journal object (inclut updatedAt, ISO 8601 UTC)",
-          "errors": { "404": "Journal non trouvé" }
+          "errors": {
+            "404": "Journal non trouvé"
+          }
         },
         {
           "method": "PUT | PATCH",
           "path": "/calendars/{id}/journals/{journalId}",
           "description": "Mettre à jour une entrée de journal. PUT et PATCH sont équivalents : dans les deux cas seuls les champs présents dans le corps sont modifiés.",
-          "params": { "id": "integer (required)", "journalId": "integer (required)" },
+          "params": {
+            "id": "integer (required)",
+            "journalId": "integer (required)"
+          },
           "body": {
             "summary": "string (optional, max 2000)",
             "description": "string (optional, max 16000000)",
@@ -771,27 +884,40 @@
           "method": "DELETE",
           "path": "/calendars/{id}/journals/{journalId}",
           "description": "Supprimer une entrée de journal (soft delete)",
-          "params": { "id": "integer (required)", "journalId": "integer (required)" },
+          "params": {
+            "id": "integer (required)",
+            "journalId": "integer (required)"
+          },
           "response": "{ journal_id, deleted_at }",
-          "errors": { "403": "Permission insuffisante", "404": "Non trouvé" }
+          "errors": {
+            "403": "Permission insuffisante",
+            "404": "Non trouvé"
+          }
         },
         {
           "method": "GET",
           "path": "/calendars/{id}/journals/deleted",
           "description": "Lister les journaux soft-deleted du calendrier (corbeille) — limité aux 30 derniers jours après deleted_at (fenêtre de restauration), triés deleted_at DESC. Purge physique définitive après 90 jours (cron ICS\\Services\\MaintenanceService).",
-          "params": { "id": "integer (required)" },
+          "params": {
+            "id": "integer (required)"
+          },
           "query_params": {
             "page": "integer (optional, défaut 1)",
             "limit": "integer (optional, défaut 20, max 100)"
           },
           "response": "{ journals: Array, count: integer, page: integer, limit: integer }",
-          "errors": { "404": "Calendrier non trouvé ou accès non autorisé" }
+          "errors": {
+            "404": "Calendrier non trouvé ou accès non autorisé"
+          }
         },
         {
           "method": "POST",
           "path": "/calendars/{id}/journals/{journalId}/restore",
           "description": "Restaurer un journal soft-deleted (deleted_at remis à NULL). Réservé au créateur du journal (même modèle d'autorisation que DELETE). 404 si non soft-deleted, déjà restauré, hard-deleted, ou fenêtre de 30 jours dépassée.",
-          "params": { "id": "integer (required)", "journalId": "integer (required)" },
+          "params": {
+            "id": "integer (required)",
+            "journalId": "integer (required)"
+          },
           "response": "{ journal_id: integer }",
           "errors": {
             "403": "Accès non autorisé (non créateur)",
@@ -808,7 +934,9 @@
           "method": "GET",
           "path": "/calendars/{id}/freebusy",
           "description": "Obtenir les plages occupées d'un calendrier — agrège les événements TRANSP=OPAQUE. Récurrence expansée à la volée (RRULE TZID-aware, même moteur que /occurrences/expand) : un événement récurrent OPAQUE produit un créneau busy par occurrence réelle dans la plage (exceptions is_cancelled/is_modified appliquées). Borne end date-seule normalisée en fin de journée (23:59:59) avant la requête.",
-          "params": { "id": "integer (required)" },
+          "params": {
+            "id": "integer (required)"
+          },
           "query": {
             "start": "date ou datetime (required) - Début de la période",
             "end": "date ou datetime (required) - Fin de la période (date-seule → fin de journée incluse)"
@@ -824,32 +952,91 @@
       ]
     },
     "notifications": {
-      "description": "Gestion des notifications email et réponses RSVP (iTIP)",
+      "description": "Rappels unifiés (contrat #236, v2.22.0) : défauts par type, appareils ; notifications email historiques et réponses RSVP (iTIP)",
       "base_path": "/notifications",
       "auth_required": true,
       "routes": [
         {
           "method": "GET",
+          "path": "/notifications/defaults?app_id={app_id}",
+          "description": "Rappels par défaut par type. Les 4 kind sont toujours renvoyés ; un kind jamais réglé : notifications [], quiet_from/quiet_to null, show_entity_detail false.",
+          "params": {
+            "app_id": "string (required) — 422 APP_ID_REQUIRED sinon"
+          },
+          "response": "{ defaults: [{ kind: event | recurring | task_due | contact_followup, notifications: [{type, minutes_before}], quiet_from: 'HH:MM'|null, quiet_to: 'HH:MM'|null, show_entity_detail: bool }] }"
+        },
+        {
+          "method": "PUT",
+          "path": "/notifications/defaults",
+          "description": "Remplace les kind fournis (les autres sont inchangés). Tout est validé avant écriture. Réponse = GET. La plage silencieuse d'un type vaut pour le courriel et le push ; show_entity_detail = titre réel (push et courriel), sauf fiche chiffrée.",
+          "body": {
+            "app_id": "string (required)",
+            "defaults": "array (required) — [{ kind, notifications (délais dans 0,5,10,15,30,60,120,1440,2880), quiet_from?, quiet_to?, show_entity_detail? }]"
+          },
+          "errors": {
+            "422": "APP_ID_REQUIRED, DEFAULTS_REQUIRED, REMINDER_KIND_UNKNOWN (defaults.{i}.kind), REMINDER_LEAD_INVALID / REMINDER_CHANNEL_UNKNOWN / REMINDER_DUPLICATE / REMINDER_TOO_MANY (defaults.{i}.notifications.{j}…), QUIET_TIME_INVALID, QUIET_RANGE_INCOMPLETE"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/notifications/devices?app_id={app_id}",
+          "description": "Appareils (abonnements push) du compte pour l'app. L'endpoint complet ne circule pas : endpoint_hash = SHA-256 hex de l'endpoint, pour repérer l'appareil courant.",
+          "response": "{ devices: [{ id, device_label, endpoint_hash, created_at, last_success_at, kinds: [event | recurring | task_due | contact_followup], quiet_from, quiet_to }] }"
+        },
+        {
+          "method": "PUT",
+          "path": "/notifications/devices/{id}",
+          "description": "Filtre push de l'appareil : types acceptés et plage silencieuse propre (en plus de celle du type). Champs absents inchangés. Nouvel abonnement : les 4 types ; ré-abonnement : types conservés.",
+          "body": {
+            "app_id": "string (required)",
+            "kinds": "array (optional)",
+            "quiet_from": "HH:MM|null (optional)",
+            "quiet_to": "HH:MM|null (optional)",
+            "device_label": "string|null (optional)"
+          },
+          "response": "{ device: {…} }",
+          "errors": {
+            "404": "Appareil inconnu ou à un tiers",
+            "422": "APP_ID_REQUIRED, REMINDER_KIND_UNKNOWN (kinds.{i}), QUIET_TIME_INVALID, QUIET_RANGE_INCOMPLETE"
+          }
+        },
+        {
+          "method": "DELETE",
+          "path": "/notifications/devices/{id}?app_id={app_id}",
+          "description": "Supprime l'abonnement (même effet que DELETE /push/subscribe). 204 sans corps.",
+          "errors": {
+            "404": "Appareil inconnu ou à un tiers"
+          }
+        },
+        {
+          "method": "GET",
           "path": "/notifications/email",
-          "description": "Lister les notifications email planifiées de l'utilisateur"
+          "description": "DÉPRÉCIÉ (v2.22.0) — liste l'ancienne file email_notification_queue, qui n'est plus traitée : les rappels courriel sont envoyés par le cron unifié (reminder_log)."
         },
         {
           "method": "POST",
           "path": "/notifications/email/test",
           "description": "Envoyer un email de test SMTP",
-          "body": { "email": "string (optional) — destinataire (défaut: email du compte)" }
+          "body": {
+            "email": "string (optional) — destinataire (défaut: email du compte)"
+          }
         },
         {
           "method": "DELETE",
           "path": "/notifications/email/{id}",
           "description": "Annuler une notification email planifiée",
-          "params": { "id": "integer (required)" }
+          "params": {
+            "id": "integer (required)"
+          }
         },
         {
           "method": "POST",
           "path": "/notifications/send-email",
           "description": "Envoyer immédiatement un rappel email pour une occurrence",
-          "body": { "event_id": "integer (required)", "occurrence_date": "string YYYY-MM-DD (required)" }
+          "body": {
+            "event_id": "integer (required)",
+            "occurrence_date": "string YYYY-MM-DD (required)"
+          }
         },
         {
           "method": "POST",
@@ -867,7 +1054,19 @@
             "404": "Événement ou attendee introuvable"
           }
         }
-      ]
+      ],
+      "reminders": {
+        "format": "{ type: 'EMAIL' | 'DISPLAY', minutes_before: int } — même forme pour événements, tâches (calendar_todos), tâches de projet, contacts, opportunités et défauts. En lecture, les formes héritées (email, notification, AUDIO, clé minutes) sont normalisées.",
+        "entites": {
+          "event": "POST|PUT /calendars/{id}/events[/{eventId}] — début de chaque occurrence ; kind event (ou recurring pour une série)",
+          "todo": "POST|PUT /calendars/{id}/todos[/{todoId}] — due ; kind task_due",
+          "project_task": "POST /projets/projects/{id}/tasks, PATCH /projets/tasks/{id} — due (date seule : 00:00 fuseau usager) ; kind task_due",
+          "contact": "POST|PUT /contacts[/{id}] — date_relance ; kind contact_followup",
+          "opportunite": "POST /contacts/{id}/opportunites, PUT /opportunites/{id} — date_cloture_prevue ; kind contact_followup"
+        },
+        "envoi": "Cron unifié src/notifications/send_reminders.php : rappels effectifs = liste de l'élément sinon défaut du kind ; EMAIL à l'adresse du compte si email_notifications_enabled ; DISPLAY à chaque appareil dont kinds contient le type, hors plages silencieuses (type + appareil). Un rappel dont le moment est passé depuis plus que la tolérance du kind (60 min ; 7 jours pour contact_followup) n'est pas envoyé. Idempotence : reminder_log (élément, occurrence, canal, délai, appareil). Titre générique sauf show_entity_detail. Purge des abonnements sans succès depuis 90 jours.",
+        "ics": "EMAIL ↔ ACTION:EMAIL, DISPLAY ↔ ACTION:DISPLAY, minutes_before ↔ TRIGGER:-PT{n}M ; ACTION:AUDIO importé → DISPLAY."
+      }
     },
     "caldav": {
       "description": "Endpoints CalDAV pour synchronisation calendrier",

@@ -34,6 +34,19 @@ class ProjectController
         return $project;
     }
 
+    /**
+     * Import JSON (#487) : résout notifications / rappelMinutesAvant d'une ligne ; un rappel
+     * invalide fait échouer l'import entier (rollback → 422 « Import rejeté »).
+     */
+    private static function importReminders(array $data): array
+    {
+        $prep = Task::prepareReminders($data);
+        if ($prep['error']) {
+            throw new \RuntimeException("{$prep['error']['code']} ({$prep['error']['field']})");
+        }
+        return $prep['data'];
+    }
+
     private function toContract(array $project): array
     {
         return [
@@ -243,7 +256,7 @@ class ProjectController
             $tmpToReal = [];
             foreach ($diff['aCreer'] as $row) {
                 $tmpId = $row['id'] ?? null;
-                $newId = $taskModel->createTask($id, (int) $project['calendar_id'], (int) $user['user_id'], [
+                $newId = $taskModel->createTask($id, (int) $project['calendar_id'], (int) $user['user_id'], self::importReminders([
                     'title'              => $row['title'],
                     'description'        => $row['description'] ?? null,
                     'dtstart'            => $row['dtstart'] ?? null,
@@ -255,8 +268,7 @@ class ProjectController
                     'assignee'           => $row['assignee'] ?? null,
                     'url'                => $row['url'] ?? null,
                     'categories'         => $row['categories'] ?? null,
-                    'rappelMinutesAvant' => $row['rappelMinutesAvant'] ?? null,
-                ]);
+                ] + array_intersect_key($row, ['notifications' => true, 'rappelMinutesAvant' => true])));
                 // Clé normalisée : id temporaire texte OU numérique absent du projet (directive #235)
                 $cle = JsonRoundTrip::cle($tmpId);
                 if ($cle !== null) { $tmpToReal[$cle] = $newId; }
@@ -287,7 +299,7 @@ class ProjectController
                 unset($update['id']);
                 $update['parentId']  = $resolve($row['parentId'] ?? null);
                 $update['dependsOn'] = $deps;
-                $taskModel->updateTask($realId, $update);
+                $taskModel->updateTask($realId, self::importReminders($update));
             }
 
             // Validation arbre/DAG sur l'état final avant commit

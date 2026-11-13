@@ -533,7 +533,7 @@ class EventOccurrence extends BaseModel
                             'timezone' => $event['timezone'],
                             'attendees' => $event['attendees'],
                             'meeting_link' => $event['meeting_link'],
-                            'notifications' => $event['notifications'],
+                            'notifications' => \AuthGroups\Services\ReminderList::normalize($event['notifications'] ?? null),
                             'recurrence_rule' => $event['recurrence_rule'],
                             'is_recurring' => false,
                             'parent_event_id' => $event['id'],
@@ -566,7 +566,7 @@ class EventOccurrence extends BaseModel
                         'timezone' => $event['timezone'],
                         'attendees' => $event['attendees'],
                         'meeting_link' => $event['meeting_link'],
-                        'notifications' => $event['notifications'],
+                        'notifications' => \AuthGroups\Services\ReminderList::normalize($event['notifications'] ?? null),
                         'recurrence_rule' => $event['recurrence_rule'],
                         'is_recurring' => false,
                         'parent_event_id' => $event['id'],
@@ -677,6 +677,11 @@ class EventOccurrence extends BaseModel
      */
     public static function expandEventInRange(array $event, string $start, string $end): array
     {
+        // Rappels relus sous la forme du contrat #487 (ligne brute : JSON, formes héritées)
+        if (array_key_exists('notifications', $event)) {
+            $event['notifications'] = \AuthGroups\Services\ReminderList::normalize($event['notifications']);
+        }
+
         // Événement sans RRULE ni RDATE : occurrence unique s'il chevauche la plage.
         if (empty($event['recurrence_rule']) && empty($event['rdate'])) {
             if ($event['end_datetime'] >= $start && $event['start_datetime'] <= $end) {
@@ -881,7 +886,7 @@ class EventOccurrence extends BaseModel
                             'timezone' => $event['timezone'],
                             'attendees' => $event['attendees'],
                             'meeting_link' => $event['meeting_link'],
-                            'notifications' => $event['notifications'],
+                            'notifications' => \AuthGroups\Services\ReminderList::normalize($event['notifications'] ?? null),
                             'recurrence_rule' => $event['recurrence_rule'],
                             'is_recurring' => false,
                             'parent_event_id' => $event['id'],
@@ -915,7 +920,7 @@ class EventOccurrence extends BaseModel
                         'timezone' => $event['timezone'],
                         'attendees' => $event['attendees'],
                         'meeting_link' => $event['meeting_link'],
-                        'notifications' => $event['notifications'],
+                        'notifications' => \AuthGroups\Services\ReminderList::normalize($event['notifications'] ?? null),
                         'recurrence_rule' => $event['recurrence_rule'],
                         'is_recurring' => false,
                         'parent_event_id' => $event['id'],

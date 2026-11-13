@@ -12,8 +12,8 @@
     "notes": "Portée owner-strict : user_id est le PROPRIÉTAIRE de la fiche, pas un compte lié — un contact n'est pas forcément un utilisateur de l'app. Multi-tenant via app_id (défaut serveur 'puzzle', 'cmemweb' pour cmem_web) : app_id doit être transmis en création ET en lecture de liste, sinon la liste renvoie le tenant par défaut. Suppression = soft-delete (supprime_le) ; GET /contacts/deleted + POST /contacts/{id}/restore permettent de lister/restaurer une fiche dans les 30 jours suivant la suppression (Contact::RESTORE_RETENTION_DAYS), passé quoi seule la purge RGPD existante s'applique. Les colonnes/clés JSON sont en français ; les noms de tables suivent la convention du dépôt (contacts, contact_shares)."
   },
   "renommages_directive": {
-    "contacts_max": "max_contacts — aligné sur max_calendars / max_journals / max_tasks",
     "429": "403 + payload QUOTA_EXCEEDED — aligné sur EntitlementService::checkQuota",
+    "contacts_max": "max_contacts — aligné sur max_calendars / max_journals / max_tasks",
     "table contact": "contacts — tables du dépôt au pluriel",
     "table contact_partage": "contact_shares — noms de tables en anglais"
   },
@@ -60,8 +60,12 @@
             "contacts": "Contact[]",
             "total": "int — nombre total avant pagination"
           },
-          "status_codes": { "200": "Liste récupérée" },
-          "errors": { "401": "JWT absent ou invalide" }
+          "status_codes": {
+            "200": "Liste récupérée"
+          },
+          "errors": {
+            "401": "JWT absent ou invalide"
+          }
         },
         {
           "method": "POST",
@@ -90,10 +94,15 @@
             "relance_faite_le": "bool|datetime|null — true horodate côté serveur, null annule la marque",
             "enc_alg": "string|null — optionnel, max 32 ; voir chiffrement_e2e",
             "enc_iv": "string|null — optionnel, max 32 ; voir chiffrement_e2e",
-            "enc_payload": "string|null — optionnel, max 16000000 ; base64 opaque, voir chiffrement_e2e"
+            "enc_payload": "string|null — optionnel, max 16000000 ; base64 opaque, voir chiffrement_e2e",
+            "notifications": "array|null (optional) — rappels de l'élément [{type: 'EMAIL'|'DISPLAY', minutes_before: 0..40320}] (contrat #236). Absent : création = défaut du type, mise à jour = inchangé ; null = défaut du type ; [] = aucun rappel ; liste = remplace le défaut. Max 10, pas de doublon type+délai. 422 : REMINDER_CHANNEL_UNKNOWN, REMINDER_LEAD_INVALID, REMINDER_DUPLICATE, REMINDER_TOO_MANY (errors = {code, field, message}). En lecture : null ou la liste normalisée."
           },
-          "response": { "contact": "Contact" },
-          "status_codes": { "201": "Contact créé" },
+          "response": {
+            "contact": "Contact"
+          },
+          "status_codes": {
+            "201": "Contact créé"
+          },
           "errors": {
             "400": "enc_alg / enc_iv au-delà de 32 caractères, ou enc_payload au-delà de 16 000 000",
             "401": "JWT absent ou invalide",
@@ -106,8 +115,12 @@
           "path": "/contacts/{id}",
           "description": "Fiche complète.",
           "auth_required": true,
-          "response": { "contact": "Contact" },
-          "status_codes": { "200": "Contact récupéré" },
+          "response": {
+            "contact": "Contact"
+          },
+          "status_codes": {
+            "200": "Contact récupéré"
+          },
           "errors": {
             "401": "JWT absent ou invalide",
             "403": "La fiche appartient à un autre propriétaire",
@@ -122,8 +135,12 @@
           "body": "Mêmes champs que POST, tous optionnels",
           "regle_relance": "Poser une date_relance différente de l'existante remet relance_faite_le à null, sauf si relance_faite_le est fourni dans la même requête.",
           "regle_chiffrement": "enc_alg / enc_iv / enc_payload à null remettent la fiche en clair ; champs omis = inchangés.",
-          "response": { "contact": "Contact" },
-          "status_codes": { "200": "Contact mis à jour" },
+          "response": {
+            "contact": "Contact"
+          },
+          "status_codes": {
+            "200": "Contact mis à jour"
+          },
           "errors": {
             "400": "enc_alg / enc_iv au-delà de 32 caractères, ou enc_payload au-delà de 16 000 000",
             "401": "JWT absent ou invalide",
@@ -137,8 +154,12 @@
           "path": "/contacts/{id}",
           "description": "Soft-delete : renseigne supprime_le. La ligne reste en base jusqu'à la purge RGPD.",
           "auth_required": true,
-          "response": { "id": "int" },
-          "status_codes": { "200": "Contact supprimé" },
+          "response": {
+            "id": "int"
+          },
+          "status_codes": {
+            "200": "Contact supprimé"
+          },
           "errors": {
             "401": "JWT absent ou invalide",
             "403": "La fiche appartient à un autre propriétaire",
@@ -160,16 +181,24 @@
             "page": "int",
             "limit": "int"
           },
-          "status_codes": { "200": "Corbeille récupérée" },
-          "errors": { "401": "JWT absent ou invalide" }
+          "status_codes": {
+            "200": "Corbeille récupérée"
+          },
+          "errors": {
+            "401": "JWT absent ou invalide"
+          }
         },
         {
           "method": "POST",
           "path": "/contacts/{id}/restore",
           "description": "Annule le soft-delete d'une fiche, dans la fenêtre de 30 jours suivant la suppression (Contact::RESTORE_RETENTION_DAYS).",
           "auth_required": true,
-          "response": { "contact": "Contact" },
-          "status_codes": { "200": "Contact restauré" },
+          "response": {
+            "contact": "Contact"
+          },
+          "status_codes": {
+            "200": "Contact restauré"
+          },
           "errors": {
             "401": "JWT absent ou invalide",
             "403": "La fiche appartient à un autre propriétaire",
@@ -204,7 +233,9 @@
               "envoye_le": "datetime"
             }
           },
-          "status_codes": { "201": "Message envoyé et journalisé" },
+          "status_codes": {
+            "201": "Message envoyé et journalisé"
+          },
           "errors": {
             "401": "JWT absent ou invalide",
             "403": "La fiche appartient à un autre propriétaire",
@@ -221,7 +252,9 @@
           "response": {
             "messages": "array — [{ id, contact_id, canal, destinataire, sujet, statut, envoye_le }]"
           },
-          "status_codes": { "200": "Messages récupérés" },
+          "status_codes": {
+            "200": "Messages récupérés"
+          },
           "errors": {
             "401": "JWT absent ou invalide",
             "403": "La fiche appartient à un autre propriétaire",
@@ -247,7 +280,9 @@
           "response": {
             "interactions": "array — [{ id, contact_id, type, direction, date, resume, statut, piece_jointe_file_id }] ; pour les courriels, 'date' = date d'envoi et 'resume' = sujet"
           },
-          "status_codes": { "200": "Interactions récupérées" },
+          "status_codes": {
+            "200": "Interactions récupérées"
+          },
           "errors": {
             "401": "JWT absent ou invalide",
             "403": "La fiche appartient à un autre propriétaire",
@@ -279,7 +314,9 @@
               "piece_jointe_file_id": "int|null"
             }
           },
-          "status_codes": { "201": "Interaction créée" },
+          "status_codes": {
+            "201": "Interaction créée"
+          },
           "errors": {
             "401": "JWT absent ou invalide",
             "403": "La fiche appartient à un autre propriétaire",
@@ -292,8 +329,12 @@
           "path": "/contacts/{id}/interactions/{interactionId}?app_id={app_id}",
           "description": "Soft-delete d'une interaction. Elle disparaît ensuite du GET. Owner-strict.",
           "auth_required": true,
-          "response": { "id": "int — id de l'interaction supprimée" },
-          "status_codes": { "200": "Interaction supprimée" },
+          "response": {
+            "id": "int — id de l'interaction supprimée"
+          },
+          "status_codes": {
+            "200": "Interaction supprimée"
+          },
           "errors": {
             "401": "JWT absent ou invalide",
             "403": "La fiche appartient à un autre propriétaire",
@@ -316,7 +357,9 @@
           "response": {
             "opportunites": "Opportunite[]"
           },
-          "status_codes": { "200": "Opportunités récupérées" },
+          "status_codes": {
+            "200": "Opportunités récupérées"
+          },
           "errors": {
             "401": "JWT absent ou invalide",
             "403": "La fiche appartient à un autre propriétaire",
@@ -335,10 +378,15 @@
             "montant": "number|null — optionnel, 2 décimales",
             "devise": "string — optionnel, code ISO 4217, défaut 'CAD'",
             "date_cloture_prevue": "date|null — optionnel, format 'Y-m-d'",
-            "notes": "string|null — optionnel, markdown toléré"
+            "notes": "string|null — optionnel, markdown toléré",
+            "notifications": "array|null (optional) — rappels de l'élément [{type: 'EMAIL'|'DISPLAY', minutes_before: 0..40320}] (contrat #236). Absent : création = défaut du type, mise à jour = inchangé ; null = défaut du type ; [] = aucun rappel ; liste = remplace le défaut. Max 10, pas de doublon type+délai. 422 : REMINDER_CHANNEL_UNKNOWN, REMINDER_LEAD_INVALID, REMINDER_DUPLICATE, REMINDER_TOO_MANY (errors = {code, field, message}). En lecture : null ou la liste normalisée."
           },
-          "response": { "opportunite": "Opportunite" },
-          "status_codes": { "201": "Opportunité créée" },
+          "response": {
+            "opportunite": "Opportunite"
+          },
+          "status_codes": {
+            "201": "Opportunité créée"
+          },
           "errors": {
             "401": "JWT absent ou invalide",
             "403": "La fiche appartient à un autre propriétaire",
@@ -361,7 +409,9 @@
             "opportunites": "Opportunite[]",
             "total": "int — nombre total avant pagination"
           },
-          "status_codes": { "200": "Opportunités récupérées" },
+          "status_codes": {
+            "200": "Opportunités récupérées"
+          },
           "errors": {
             "401": "JWT absent ou invalide",
             "422": "etape invalide"
@@ -379,10 +429,15 @@
             "montant": "number|null — optionnel",
             "devise": "string — optionnel, code ISO 4217",
             "date_cloture_prevue": "date|null — optionnel, format 'Y-m-d'",
-            "notes": "string|null — optionnel"
+            "notes": "string|null — optionnel",
+            "notifications": "array|null (optional) — rappels de l'élément [{type: 'EMAIL'|'DISPLAY', minutes_before: 0..40320}] (contrat #236). Absent : création = défaut du type, mise à jour = inchangé ; null = défaut du type ; [] = aucun rappel ; liste = remplace le défaut. Max 10, pas de doublon type+délai. 422 : REMINDER_CHANNEL_UNKNOWN, REMINDER_LEAD_INVALID, REMINDER_DUPLICATE, REMINDER_TOO_MANY (errors = {code, field, message}). En lecture : null ou la liste normalisée."
           },
-          "response": { "opportunite": "Opportunite" },
-          "status_codes": { "200": "Opportunité mise à jour" },
+          "response": {
+            "opportunite": "Opportunite"
+          },
+          "status_codes": {
+            "200": "Opportunité mise à jour"
+          },
           "errors": {
             "401": "JWT absent ou invalide",
             "403": "L'opportunité appartient à un autre propriétaire",
@@ -395,8 +450,12 @@
           "path": "/opportunites/{opId}?app_id={app_id}",
           "description": "Soft-delete d'une opportunité. Elle disparaît ensuite du board et de la fiche. Ses liens croisés (/links) sont purgés.",
           "auth_required": true,
-          "response": { "id": "int — id de l'opportunité supprimée" },
-          "status_codes": { "200": "Opportunité supprimée" },
+          "response": {
+            "id": "int — id de l'opportunité supprimée"
+          },
+          "status_codes": {
+            "200": "Opportunité supprimée"
+          },
           "errors": {
             "401": "JWT absent ou invalide",
             "403": "L'opportunité appartient à un autre propriétaire",
@@ -414,8 +473,28 @@
           "description": "Export vCard 4.0 de la fiche. Réponse brute (pas d'enveloppe JSON).",
           "auth_required": true,
           "response_content_type": "text/vcard; charset=utf-8",
-          "proprietes": ["BEGIN:VCARD", "VERSION:4.0", "N", "FN", "ORG", "TITLE", "EMAIL;TYPE=", "TEL;TYPE=", "ADR", "URL", "X-SOCIALPROFILE", "BDAY", "CATEGORIES", "NOTE", "REV", "UID", "END:VCARD"],
-          "status_codes": { "200": "vCard renvoyée" },
+          "proprietes": [
+            "BEGIN:VCARD",
+            "VERSION:4.0",
+            "N",
+            "FN",
+            "ORG",
+            "TITLE",
+            "EMAIL;TYPE=",
+            "TEL;TYPE=",
+            "ADR",
+            "URL",
+            "X-SOCIALPROFILE",
+            "BDAY",
+            "CATEGORIES",
+            "NOTE",
+            "REV",
+            "UID",
+            "END:VCARD"
+          ],
+          "status_codes": {
+            "200": "vCard renvoyée"
+          },
           "errors": {
             "401": "JWT absent ou invalide",
             "403": "La fiche appartient à un autre propriétaire",
@@ -435,7 +514,22 @@
           "multipart": {
             "file": "fichier .vcf/.vcard/.csv — alternative à 'content'"
           },
-          "csv_colonnes_reconnues": ["prenom", "nom", "organisation", "fonction", "courriel", "telephone", "categories", "adresse", "ville", "code_postal", "pays", "notes", "anniversaire", "site"],
+          "csv_colonnes_reconnues": [
+            "prenom",
+            "nom",
+            "organisation",
+            "fonction",
+            "courriel",
+            "telephone",
+            "categories",
+            "adresse",
+            "ville",
+            "code_postal",
+            "pays",
+            "notes",
+            "anniversaire",
+            "site"
+          ],
           "csv_notes": "En-tête obligatoire. Séparateur détecté parmi ',', ';' et tabulation. Colonnes inconnues ignorées. Alias acceptés (email, phone, company, first_name…).",
           "response": {
             "crees": "int — fiches créées",
@@ -443,7 +537,9 @@
             "ignores": "int — entrées non importées faute de quota",
             "erreurs": "array — [{ ligne|carte, raison }]"
           },
-          "status_codes": { "200": "Import terminé" },
+          "status_codes": {
+            "200": "Import terminé"
+          },
           "errors": {
             "401": "JWT absent ou invalide",
             "422": "content/fichier absent, ou format hors (vcard|csv)"
@@ -455,7 +551,12 @@
   "plan_caps": {
     "cle": "max_contacts",
     "expose_dans": "GET /auth/me → data.user.plan.features.max_contacts",
-    "valeurs": { "free": 50, "monthly": 2000, "yearly": 2000, "ami": 2000 },
+    "valeurs": {
+      "free": 50,
+      "monthly": 2000,
+      "yearly": 2000,
+      "ami": 2000
+    },
     "depassement": "403 avec payload { code: 'QUOTA_EXCEEDED', resource: 'max_contacts', limit, current }"
   },
   "modele_contact": {

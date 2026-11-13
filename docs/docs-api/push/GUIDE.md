@@ -47,6 +47,9 @@ d'opportunité n'est transmis (exigence de confidentialité de la directive §6)
 
 ## Préférences — portée compte
 
+> Dépréciées en v2.22.0 : `GET|PUT /push/preferences` restent compatibles une version
+> (projection des défauts `DISPLAY` de `/notifications/defaults`), puis seront retirées.
+
 `notification_prefs` est unique sur `(owner_id, app_id, kind)`. C'est la réponse au point
 laissé à trancher par la directive : **les préférences font autorité au niveau du compte**.
 
@@ -104,37 +107,32 @@ le texte générique par délai (« dans 1 jour(s) », etc.) — non concerné p
 
 ## Sélection des échéances
 
-Une échéance est due dès qu'elle tombe dans `]maintenant − grâce ; maintenant + lead_minutes]`.
+Depuis la v2.22.0 (contrat #236), la sélection est commune au courriel et au push :
+`AuthGroups\Services\ReminderScanner`, appelé par le cron unifié. Règles complètes :
+[guide ICS — Rappels unifiés](../ics/GUIDE.md#rappels-unifiés-v2220-contrat-236).
 
-La fenêtre n'est pas bornée par la période du cron : l'idempotence
-(`push_notification_log`) suffit à garantir l'envoi unique, ce qui rend le balayage
-insensible à un cron en retard, arrêté quelques heures, ou relancé à la main.
+- Rappels effectifs d'un élément = sa liste `notifications`, sinon le défaut de son type
+  (`/notifications/defaults`). Les préférences de ce module sont une projection de ces défauts.
+- Un rappel est dû quand `échéance − minutes_before ≤ maintenant`, tant que son retard ne
+  dépasse pas la tolérance : 60 minutes pour `event`, `recurring`, `task_due` ; 7 jours pour
+  `contact_followup`. Un rappel plus en retard (élément créé ou déplacé tard) ne part pas.
+- `DISPLAY` : un envoi par appareil dont `kinds` contient le type, hors plage silencieuse du
+  type et de l'appareil.
 
-Grâce (échéances déjà passées) : 60 minutes pour `event`, `recurring`, `task_due` ;
-7 jours pour `contact_followup` (un suivi en retard doit rester signalé).
-
-Fuseaux : les datetimes sont stockés dans le fuseau de l'entité
-(`calendar_events.timezone`, `calendar_todos.timezone`) ; les échéances sans heure
-(relances de contact, opportunités) sont fixées à 00:00 dans le fuseau de l'usager. Toutes les comparaisons se
-font en UTC, jamais avec `NOW()` côté SQL.
-
-Le fuseau de l'usager est retenu dans cet ordre : `users.timezone` (posé par le client via
-`PUT /users/me`), à défaut le fuseau de son premier calendrier, à défaut
-`America/Montreal`. La plage « ne pas déranger » est évaluée dans ce fuseau.
-
-Un identifiant absent de la base IANA du serveur est ignoré au profit du repli suivant —
-jamais passé à `DateTimeZone`.
+Fuseaux : datetimes dans le fuseau de l'entité ; échéances sans heure (tâche « toute la
+journée », tâche de projet, relance, opportunité) à 00:00 dans le fuseau de l'usager
+(`users.timezone`, sinon premier calendrier, sinon `America/Montreal`). Comparaisons en UTC.
 
 ## Idempotence et purge
 
-- Avant tout envoi, le cron réserve l'échéance dans `push_notification_log`
-  (`INSERT IGNORE` sur `(owner_id, kind, entity_id, occurrence_key)`). Réservation
-  refusée = déjà notifiée = rien n'est envoyé.
-- Une ligne de journal par échéance, quel que soit le nombre d'appareils : `devices` et
-  `delivered` gardent la trace du fan-out.
-- Toute subscription rejetée en `404`/`410` par le service de push est supprimée
-  immédiatement. C'est la maintenance principale du module : aucun ménage périodique
-  n'est requis en plus.
+- Avant tout envoi, le cron réserve le rappel dans `reminder_log` (`INSERT IGNORE` sur
+  élément, occurrence, canal, délai, appareil — `device_id = 0` pour le courriel).
+  Réservation refusée = déjà envoyé. Un appareil réabonné reçoit les rappels encore dans
+  la tolérance qu'il n'avait pas reçus.
+- Abonnement rejeté en `404`/`410` : supprimé immédiatement.
+- Abonnement sans envoi réussi depuis 90 jours (`last_seen_at`, sinon `created_at`) :
+  supprimé par le cron.
+- `push_notification_log` n'est plus écrit (conservé en lecture, retiré à la version suivante).
 
 ## Configuration `.env`
 
@@ -158,7 +156,9 @@ refusent un envoi signé par une autre clé que celle passée à `pushManager.su
 
 ## Cron
 
-Ligne crontab (production, toutes les 5 minutes) :
+Le script historique `src/push/send_push_notifications.php` lance le cron unifié
+`src/notifications/send_reminders.php` sur le canal `DISPLAY` ; la ligne crontab ne change
+pas :
 
 ```crontab
 */5 * * * * /usr/local/bin/php /home/lmdkhdg5/cmem2.journauxdebord.com/src/push/send_push_notifications.php >> /home/lmdkhdg5/logs/push-$(date +\%Y-\%m-\%d).log 2>&1
@@ -170,17 +170,19 @@ Options :
 
 | Option | Effet |
 | - | - |
-| `--dry-run` | Liste les échéances sans envoyer et sans écrire au journal |
-| `--verbose` | Ajoute une ligne `SCAN {...}` par usager (préférences actives, candidats, retenus) |
-| `--batch=N` | Nombre maximal d'usagers traités (défaut 200) |
+| `--dry-run` | Liste les rappels dus sans envoyer et sans écrire au journal |
+| `--verbose` | Ajoute une ligne `SCAN {...}` par usager (candidats et rappels dus par type) |
+| `--batch=N` | Nombre maximal d'usagers traités (défaut 500) |
 | `--user=ID` | Restreint le balayage à un usager |
-| `--now="Y-m-d H:i:s"` | Instant de référence — tests déterministes |
+| `--now=ISO8601` | Instant de référence — tests déterministes |
+| `--channel=EMAIL\|DISPLAY\|all` | Canal (fixé par les scripts historiques) |
 
-Sortie, une ligne par échéance :
+`.env` : `REMINDER_APP_ID` (défaut `cmemweb`) — app dont les défauts et les appareils sont lus.
+
+Sortie, une ligne par rappel (élément, canal, délai) :
 
 ```txt
-DUE user=297 kind=contact_followup entity=41 entity_type=opportunite occ=2026-07-27 devices=2 title="Rappel" body="Un suivi de contact est à faire dans 1 jour(s)."
-DUE user=297 kind=contact_followup entity=10 entity_type=contact occ=relance:2026-07-27 devices=2 title="Rappel" body="Un suivi de contact est à faire dans 1 jour(s)."
+DUE user=297 channel=DISPLAY kind=contact_followup entity=41 entity_type=opportunite occ=2026-07-27 lead=1440 devices=2 due=2026-07-27T04:00:00+00:00 title="Rappel" body="Un suivi de contact est à faire dans 1 jour(s)."
 ```
 
 ## Tests

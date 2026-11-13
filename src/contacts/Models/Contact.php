@@ -37,7 +37,8 @@ class Contact extends BaseModel
     public const SCALAR_FIELDS = ['prenom', 'nom', 'organisation', 'fonction', 'notes',
                                   'anniversaire', 'photo_file_id', 'favori', 'partage_scope',
                                   'date_relance', 'motif_relance', 'relance_faite_le',
-                                  'enc_alg', 'enc_iv', 'enc_payload'];
+                                  'enc_alg', 'enc_iv', 'enc_payload',
+                                  'notifications']; // JSON déjà sérialisé par le contrôleur (#487)
 
     /** Requis par BaseModel — création via createContact(). */
     public function create()

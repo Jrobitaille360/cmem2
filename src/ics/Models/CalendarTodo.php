@@ -34,6 +34,9 @@ class CalendarTodo extends BaseModel
     public $percentComplete;
     public $location;
     public $categories;
+    /** Rappels (#487) : NULL = défaut du type task_due ; notificationsSet = écrire même NULL à la maj. */
+    public $notifications;
+    public bool $notificationsSet = false;
     public $url;
     public $relatedTo;
     public $recurrenceRule;
@@ -78,8 +81,9 @@ class CalendarTodo extends BaseModel
             INSERT INTO calendar_todos
                 (calendar_id, user_id, uid, title, description, enc_alg, enc_iv, due, dtstart, completed,
                  status, priority, percent_complete, location, categories, url,
-                 related_to, recurrence_rule, organizer_email, organizer_name, attendees, sequence, timezone, is_all_day)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                 related_to, recurrence_rule, organizer_email, organizer_name, attendees, sequence, timezone, is_all_day,
+                 notifications)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ");
 
         $stmt->execute([
@@ -107,6 +111,7 @@ class CalendarTodo extends BaseModel
             $this->sequence ?? 0,
             $this->timezone ?? 'America/Montreal',
             isset($this->isAllDay) ? (int)(bool)$this->isAllDay : 0,
+            \AuthGroups\Services\ReminderList::toStorage(is_array($this->notifications) ? $this->notifications : null),
         ]);
 
         $id = (int)$this->getDb()->lastInsertId();
@@ -151,6 +156,11 @@ class CalendarTodo extends BaseModel
         if (isset($this->attendees)) {
             $fields[] = 'attendees = ?';
             $params[] = json_encode($this->attendees);
+        }
+
+        if ($this->notificationsSet) {
+            $fields[] = 'notifications = ?';
+            $params[] = \AuthGroups\Services\ReminderList::toStorage($this->notifications);
         }
 
         // Chiffrement E2E : remise à NULL explicite = retour au clair.
@@ -281,6 +291,9 @@ class CalendarTodo extends BaseModel
         }
         if (isset($row['is_all_day'])) {
             $row['is_all_day'] = (bool) $row['is_all_day'];
+        }
+        if (array_key_exists('notifications', $row)) {
+            $row['notifications'] = \AuthGroups\Services\ReminderList::normalize($row['notifications']);
         }
         if (isset($row['priority'])) {
             $row['priority'] = (int) $row['priority'];
