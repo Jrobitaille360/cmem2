@@ -9,6 +9,12 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+### Corrigé
+
+- SMTP par usager : délai de lecture des réponses SMTP borné à 10 s (`Timelimit` PHPMailer restait à 300 s) — une mauvaise configuration bloquait `POST /assistant/smtp/test` 5 minutes, et chaque rappel courriel du cron jusqu'à 300 s.
+- `POST /assistant/smtp/test` : port 465 avec `encryption` `tls` ou `none` → `422 SMTP_TLS_FAILED` immédiat, message « le port 465 attend ssl ».
+- Tests : S5.3b (465 + tls sans attente) ; S7 (envoi réel) via `private/tests/smtp_test_creds.json` et `receive_at`.
+
 ## [2.24.0] — 2026-11-14
 
 ### Ajouté

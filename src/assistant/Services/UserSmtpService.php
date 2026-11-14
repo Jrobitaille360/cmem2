@@ -64,7 +64,14 @@ class UserSmtpService
         $port    = (int) $cfg['port'];
         $options = ['ssl' => ['peer_name' => $cfg['host'], 'verify_peer' => true, 'verify_peer_name' => true]];
         $smtp    = new SMTP();
-        $smtp->Timeout = self::TIMEOUT;
+        $smtp->Timeout   = self::TIMEOUT;
+        $smtp->Timelimit = self::TIMEOUT; // lecture des réponses (bannière 220) — 300 s par défaut
+
+        // Port 465 = TLS implicite : en STARTTLS / clair, le serveur n'envoie jamais de bannière
+        if ($port === 465 && $cfg['encryption'] !== 'ssl') {
+            return $this->fail($cfg, $userId, 'SMTP_TLS_FAILED',
+                "Le port 465 attend un chiffrement « ssl » (TLS implicite) ; « tls » (STARTTLS) s'utilise sur le port 587.");
+        }
 
         try {
             $prefix = $cfg['encryption'] === 'ssl' ? 'ssl://' : '';
@@ -119,6 +126,7 @@ class UserSmtpService
             $mail->Host        = $resolved['ip'];
             $mail->Port        = (int) $cfg['port'];
             $mail->Timeout     = self::TIMEOUT;
+            $mail->getSMTPInstance()->Timelimit = self::TIMEOUT; // sinon 300 s par réponse
             $mail->SMTPOptions = ['ssl' => ['peer_name' => $cfg['host'], 'verify_peer' => true, 'verify_peer_name' => true]];
             $mail->SMTPAuth    = $cfg['username'] !== '';
             $mail->Username    = $cfg['username'];
