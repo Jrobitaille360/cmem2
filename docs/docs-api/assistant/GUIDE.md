@@ -1,7 +1,7 @@
 # Guide — Module Assistant
 
 Référence des routes : [API_ASSISTANT_ENDPOINTS.json](API_ASSISTANT_ENDPOINTS.json).
-Plan : [PLAN_module-assistant.md](../../v-2-23-0/PLAN_module-assistant.md).
+Plan : [PLAN_module-assistant.md](../../versions-old/v-2-23-0/PLAN_module-assistant.md).
 
 L'Assistant est un chat avec Claude qui peut lire et modifier les tâches de l'usager et leurs
 rappels. Toutes les routes sont sous `/assistant/*`, authentifiées par JWT.

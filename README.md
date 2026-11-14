@@ -1,6 +1,6 @@
 ﻿# cmem2 API
 
-![Version](https://img.shields.io/badge/version-2.23.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.24.0-blue.svg)
 ![PHP](https://img.shields.io/badge/PHP-8.0+-purple.svg)
 ![Status](https://img.shields.io/badge/status-production%20ready-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
@@ -458,7 +458,8 @@ Chaque module a son propre fichier `private/tests/test_<module>.php` (voir la li
 - [x] Suivi du temps par tâche — sessions start/stop, un seul minuteur actif par usager (v2.17.0)
 - [x] Accès sur approbation — fin de la commercialisation : invitations + approbation, modules cochés par personne, budget IA en $, caps à 3 niveaux, retrait Stripe/Play Store ([plan](docs/archives/PLAN_acces-sur-approbation.md) — suivi : task cmem #269) — Phase 1 (budget IA en $) livrée en v2.18.0 ; Phases 2 (approbation, invitations) et 3 (modules cochés) livrées en v2.19.0 ; Phase 3 bis (caps) en v2.20.0 ; Phases 4 et 6 (retrait Stripe / Play Store, plans legacy) en v2.21.0
 - [x] Rappels unifiés — courriel + push, défauts par type, liste par élément, filtre par appareil, cron unifié (contrat cmem_web #236 — directive #487) (v2.22.0)
-- [x] Module Assistant — chat avec Claude (JSON / SSE), consentement Loi 25, historique, outils sur les tâches et rappels, suppression sur confirmation, budget IA commun ([plan](docs/v-2-23-0/PLAN_module-assistant.md) — suivi : task cmem #515) (v2.23.0) — voix et SMTP par usager reportés
+- [x] Module Assistant — chat avec Claude (JSON / SSE), consentement Loi 25, historique, outils sur les tâches et rappels, suppression sur confirmation, budget IA commun ([plan](docs/versions-old/v-2-23-0/PLAN_module-assistant.md) — suivi : task cmem #515) (v2.23.0) — voix reportée
+- [x] SMTP par usager pour les rappels courriel — `/assistant/smtp`, mot de passe chiffré, repli SMTP système (tasks cmem #252-#254) (v2.24.0)
 - [ ] Rate limiting Redis
 
 ## Licence
@@ -467,4 +468,4 @@ MIT — voir [LICENSE](LICENSE). Dépendances tierces : [THIRD_PARTY_LICENSES.md
 
 ---
 
-**Version** : 2.23.0 · **Mis à jour** : 2026-11-14 · **Auteur** : [Jrobitaille360](https://github.com/Jrobitaille360)
+**Version** : 2.24.0 · **Mis à jour** : 2026-11-14 · **Auteur** : [Jrobitaille360](https://github.com/Jrobitaille360)
