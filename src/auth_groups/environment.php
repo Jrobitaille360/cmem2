@@ -318,7 +318,7 @@ define('AI_DEFAULT_BUDGET_USD', (float)($_ENV['AI_DEFAULT_BUDGET_USD'] ?? 10));
 define('AI_GLOBAL_BUDGET_USD_MONTHLY', (float)($_ENV['AI_GLOBAL_BUDGET_USD_MONTHLY'] ?? 30));
 
 // ============================================
-// MODULE ASSISTANT — POST /assistant/chat (plan docs/PLAN_module-assistant.md)
+// MODULE ASSISTANT — POST /assistant/chat (plan docs/v-2-23-0/PLAN_module-assistant.md)
 // ============================================
 // Modèle distinct du résumé ; réflexion adaptative + effort AI_ASSISTANT_EFFORT (défaut low)
 define('AI_ASSISTANT_MODEL', $_ENV['AI_ASSISTANT_MODEL'] ?? 'claude-haiku-5-5');

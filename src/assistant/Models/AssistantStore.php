@@ -7,7 +7,7 @@ use PDO;
 
 /**
  * Accès base du module Assistant — tables assistant_consents, assistant_conversations,
- * assistant_messages, assistant_actions (docs/20261114_module_assistant.sql).
+ * assistant_messages, assistant_actions (docs/v-2-23-0/20261114_module_assistant.sql).
  *
  * Toute lecture/écriture est filtrée par user_id : un usager ne voit jamais les
  * conversations ni les actions d'un autre (404 côté contrôleur).
