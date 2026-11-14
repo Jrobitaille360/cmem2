@@ -9,6 +9,8 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+## [2.24.1] — 2026-11-14
+
 ### Corrigé
 
 - SMTP par usager : délai de lecture des réponses SMTP borné à 10 s (`Timelimit` PHPMailer restait à 300 s) — une mauvaise configuration bloquait `POST /assistant/smtp/test` 5 minutes, et chaque rappel courriel du cron jusqu'à 300 s.

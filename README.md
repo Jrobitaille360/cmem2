@@ -1,6 +1,6 @@
 ﻿# cmem2 API
 
-![Version](https://img.shields.io/badge/version-2.24.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.24.1-blue.svg)
 ![PHP](https://img.shields.io/badge/PHP-8.0+-purple.svg)
 ![Status](https://img.shields.io/badge/status-production%20ready-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
@@ -468,4 +468,4 @@ MIT — voir [LICENSE](LICENSE). Dépendances tierces : [THIRD_PARTY_LICENSES.md
 
 ---
 
-**Version** : 2.24.0 · **Mis à jour** : 2026-11-14 · **Auteur** : [Jrobitaille360](https://github.com/Jrobitaille360)
+**Version** : 2.24.1 · **Mis à jour** : 2026-11-14 · **Auteur** : [Jrobitaille360](https://github.com/Jrobitaille360)
