@@ -9,10 +9,12 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+## [2.24.0] — 2026-11-14
+
 ### Ajouté
 
 - SMTP par usager du module Assistant (tâches cmem #252, #253, #254) : `GET|PUT|DELETE /assistant/smtp` et `POST /assistant/smtp/test` (doc `docs/docs-api/assistant/`).
-- Table `user_smtp_settings` (migration `docs/20261114_user_smtp_settings.sql`, appliquée sur dev) : mot de passe chiffré `sodium_crypto_secretbox` avec la clé serveur `SMTP_ENCRYPTION_KEY` (nouvelle variable `.env`), jamais stocké ni renvoyé en clair (`has_password`).
+- Table `user_smtp_settings` (migration `docs/v-2-24-0/20261114_user_smtp_settings.sql`, schéma de référence `docs/v-2-24-0/build_DB-v-2.24.0.sql`) : mot de passe chiffré `sodium_crypto_secretbox` avec la clé serveur `SMTP_ENCRYPTION_KEY` (nouvelle variable `.env`), jamais stocké ni renvoyé en clair (`has_password`).
 - `POST /assistant/smtp/test` : connexion + EHLO + STARTTLS + authentification sans envoi ; erreurs lisibles `SMTP_HOST_UNREACHABLE`, `SMTP_TLS_FAILED`, `SMTP_AUTH_FAILED` (422) ; 5 essais / 10 min par usager (429 `SMTP_TEST_RATE_LIMITED`) ; `send_to_self: true` envoie un vrai courriel de test (hors `EMAIL_SIMULATION`) ; succès sur les paramètres enregistrés → `verified_at`.
 - Hôtes privés, loopback ou réservés refusés (`SMTP_HOST_FORBIDDEN`) ; connexion sur l'IP vérifiée, certificat validé sur le nom d'hôte.
 - Cron `send_reminders.php` : rappels courriel envoyés par le SMTP de l'usager (HTML + texte) quand il est configuré et le module `assistant` disponible ; repli sur le SMTP système en cas d'échec ; ligne `MAIL user=… via=user|system|system-fallback ok=…` ; échecs journalisés sans mot de passe.
