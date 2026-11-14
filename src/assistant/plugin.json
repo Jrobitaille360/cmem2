@@ -1,0 +1,26 @@
+{
+    "name": "Assistant",
+    "version": "1.0.0",
+    "description": "Module Assistant — chat avec Claude (streaming), historique, outils tâches/rappels, consentement Loi 25",
+    "author": "CMEM Team",
+    "namespace": "Assistant",
+    "main_class": "Assistant\\AssistantPlugin",
+    "min_cmem_version": "2.22.0",
+    "status": "active",
+    "dependencies": {
+        "cmem2_core": ">=2.22.0"
+    },
+    "routes": {
+        "prefix": "/assistant",
+        "public_routes": [],
+        "auth_routes": [
+            "/assistant/consent",
+            "/assistant/chat",
+            "/assistant/conversations",
+            "/assistant/conversations/{id}",
+            "/assistant/actions/{id}/confirm",
+            "/assistant/actions/{id}/reject",
+            "/assistant/usage"
+        ]
+    }
+}

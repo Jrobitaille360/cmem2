@@ -961,7 +961,7 @@
           "description": "Plan équipe — active/désactive un module au niveau du groupe. Réservé aux admins du groupe. Détail complet : modules/API_MODULES_ENDPOINTS.json.",
           "params": {
             "id": "integer (required)",
-            "key": "string (required, in: projet|contacts|crm|ged|ia|caldav|booking|push_avance)"
+            "key": "string (required, in: projet|contacts|crm|ged|ia|caldav|booking|push_avance|assistant)"
           },
           "body": {
             "enabled": "bool (required)"

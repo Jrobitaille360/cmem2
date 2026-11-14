@@ -153,7 +153,7 @@
           "description": "Crée une invitation (liste blanche). Courriel normalisé en minuscules. Les modules sont validés contre le registre et stockés ; ils seront appliqués en Phase 3 (modules cochés par personne). Le budget IA est posé dans users.ai_budget_usd_monthly à l'acceptation.",
           "body": {
             "email": "string (required)",
-            "modules": "string[] (optional) — codes : projet, contacts, crm, ged, ia, caldav, booking, push_avance",
+            "modules": "string[] (optional) — codes : projet, contacts, crm, ged, ia, caldav, booking, push_avance, assistant",
             "ai_budget_usd": "number >= 0 (optional) — NULL = AI_DEFAULT_BUDGET_USD",
             "expires_in_days": "int 1–365 (optional, défaut 30)"
           },
@@ -271,7 +271,7 @@
           "path": "/users/{id}/modules",
           "auth_required": true,
           "role": "ADMINISTRATEUR+",
-          "description": "Remplace la liste des modules cochés (dédoublonnée, triée). Codes : projet, contacts, crm, ged, ia, caldav, booking, push_avance. Une liste vide retire tout.",
+          "description": "Remplace la liste des modules cochés (dédoublonnée, triée). Codes : projet, contacts, crm, ged, ia, caldav, booking, push_avance, assistant. Une liste vide retire tout.",
           "body": {
             "modules": "string[] (required)"
           },

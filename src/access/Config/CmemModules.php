@@ -19,7 +19,7 @@ namespace Access\Config;
 class CmemModules
 {
     /** Enum figée dès la v1 — doit rester alignée sur l'ENUM SQL de tenant_modules.module_key. */
-    public const KEYS = ['projet', 'contacts', 'crm', 'ged', 'ia', 'caldav', 'booking', 'push_avance'];
+    public const KEYS = ['projet', 'contacts', 'crm', 'ged', 'ia', 'caldav', 'booking', 'push_avance', 'assistant'];
 
     /** Modules déjà livrés : allumés par défaut, aucun compte ne perd l'accès. */
     private const ENABLED_BY_DEFAULT = ['projet', 'contacts', 'crm', 'ged'];

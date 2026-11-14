@@ -21,6 +21,7 @@ php private/tests/test_access_approval.php
 php private/tests/test_account_deletion.php
 php private/tests/test_ai_summarize.php
 php private/tests/test_ai_budget.php
+php private/tests/test_assistant.php
 php private/tests/test_auth_otp.php
 php private/tests/test_auth_device_id.php
 php private/tests/test_auth_test_code.php
@@ -133,6 +134,7 @@ src/<module>/
 | `src/pomo/` | `Pomo\` | Engagement waitlist and support forms |
 | `src/puzzle/` | `Puzzle\` | Collaborative puzzle with pick/drop mechanics |
 | `src/access/` | `Access\` | Approval-based access: account status, invitations, module grants, resource caps, AI budget, `/v2/access/status` |
+| `src/assistant/` | `Assistant\` | Claude chat assistant — `/assistant/*` (JSON/SSE chat, history, Loi 25 consent, task/reminder tools, PENDING delete confirmation), shared AI budget |
 | `src/traque/` | `Traque\` | Game plugin: combat, monsters, OSM biomes, achievements |
 | `src/webdevice/` | `WebDevice\` | Device registration (Android, web, Windows) — `/v2/devices/*`, device_token, pseudonym |
 | `src/push/` | `Push\` | Web Push (VAPID) — `/push/*`, subscriptions per device, prefs per account, send cron |

@@ -22,7 +22,7 @@ droit. Un `PATCH` émis sans droit est refusé, quel que soit ce que croit le cl
 ## Les 8 clés
 
 ```txt
-projet | contacts | crm | ged | ia | caldav | booking | push_avance
+projet | contacts | crm | ged | ia | caldav | booking | push_avance | assistant
 ```
 
 Énumération figée dès la v1, alignée sur l'`ENUM` SQL de `tenant_modules.module_key`. Ajouter une
@@ -64,6 +64,7 @@ lors de la migration `20261109_user_module_grants.sql` (aucun module retiré) :
 | `caldav` | non | non | disponible | `false` | — |
 | `booking` | non | disponible | disponible | `false` | — |
 | `push_avance` | non | non | disponible | `false` | — |
+| `assistant` | non | non | disponible | `false` | budget IA en dollars (commun) |
 
 `team` (plan équipe, groupe) a le même mapping que `monthly`/`yearly`.
 

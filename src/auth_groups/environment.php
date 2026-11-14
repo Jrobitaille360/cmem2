@@ -318,6 +318,19 @@ define('AI_DEFAULT_BUDGET_USD', (float)($_ENV['AI_DEFAULT_BUDGET_USD'] ?? 10));
 define('AI_GLOBAL_BUDGET_USD_MONTHLY', (float)($_ENV['AI_GLOBAL_BUDGET_USD_MONTHLY'] ?? 30));
 
 // ============================================
+// MODULE ASSISTANT — POST /assistant/chat (plan docs/PLAN_module-assistant.md)
+// ============================================
+// Modèle distinct du résumé ; réflexion adaptative + effort AI_ASSISTANT_EFFORT (défaut low)
+define('AI_ASSISTANT_MODEL', $_ENV['AI_ASSISTANT_MODEL'] ?? 'claude-haiku-5-5');
+define('AI_ASSISTANT_EFFORT', $_ENV['AI_ASSISTANT_EFFORT'] ?? 'low');
+// Plafond de sortie d'UN tour d'appel modèle (borne aussi la réservation de budget du tour)
+define('AI_ASSISTANT_MAX_TOKENS', (int)($_ENV['AI_ASSISTANT_MAX_TOKENS'] ?? 4096));
+// Nombre de messages d'historique renvoyés au modèle
+define('AI_ASSISTANT_HISTORY_LIMIT', (int)($_ENV['AI_ASSISTANT_HISTORY_LIMIT'] ?? 20));
+// Nombre maximal de tours d'outils par message usager
+define('AI_ASSISTANT_MAX_TOOL_ROUNDS', (int)($_ENV['AI_ASSISTANT_MAX_TOOL_ROUNDS'] ?? 5));
+
+// ============================================
 // DEVICE TOKENS - Appareils de confiance
 // ============================================
 define('DEVICE_TOKEN_EXPIRY_DAYS', (int)($_ENV['DEVICE_TOKEN_EXPIRY_DAYS'] ?? 365));

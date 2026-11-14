@@ -1,0 +1,183 @@
+{
+  "api": {
+    "name": "Assistant API",
+    "version": "1.0.0",
+    "description": "Module Assistant — chat avec Claude (streaming SSE ou JSON), historique par usager, outils sur les tâches (calendar_todos) et leurs rappels, suppression soumise à confirmation, consentement Loi 25, budget IA commun.",
+    "generated": "2026-11-14",
+    "base_url": "/assistant",
+    "authentication": {
+      "types": ["JWT"],
+      "description": "Toutes les routes requièrent Authorization: Bearer <jwt_token>. Compte approuvé (403 ACCOUNT_PENDING / ACCOUNT_SUSPENDED sinon)."
+    },
+    "notes": [
+      "Gating : module « assistant » coché (user_module_grants, hérité du propriétaire en contexte de groupe) ET activé (PATCH /modules/assistant {enabled: true}). Sinon 403 MODULE_NOT_AVAILABLE sur toutes les routes /assistant/*.",
+      "Consentement explicite requis avant le premier envoi de données à Claude : POST /assistant/consent. Sans lui, POST /assistant/chat → 403 ASSISTANT_CONSENT_REQUIRED et rien n'est envoyé au modèle.",
+      "Budget IA en dollars commun avec /ai/summarize : chaque tour d'appel modèle réserve son coût maximal puis l'ajuste au coût réel (ai_usage, feature = assistant). 429 AI_BUDGET_EXCEEDED (scope user | global) avant tout appel.",
+      "Modèle : AI_ASSISTANT_MODEL (défaut claude-haiku-5-5), réflexion adaptative, effort AI_ASSISTANT_EFFORT (défaut low).",
+      "Dates des outils : heure locale de l'usager (users.timezone), format YYYY-MM-DDTHH:MM ou YYYY-MM-DD.",
+      "Tâches chiffrées de bout en bout (enc_alg) : jamais lues ni réécrites en clair par l'assistant (titre masqué).",
+      "Aucune suppression directe : l'outil propose_delete crée une action PENDING, exécutée seulement par POST /assistant/actions/{id}/confirm."
+    ]
+  },
+  "endpoints": {
+    "consent": {
+      "description": "Consentement Loi 25 à l'envoi de données à Claude",
+      "base_path": "/assistant/consent",
+      "auth_required": true,
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/assistant/consent",
+          "description": "État du consentement de l'usager.",
+          "response_success": {
+            "http_status": 200,
+            "body": { "success": true, "data": { "consented": "bool", "consented_at": "datetime|null", "revoked_at": "datetime|null", "version": "string|null", "current_version": "string — version du texte à afficher" } }
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/assistant/consent",
+          "description": "Enregistre (ou renouvelle) le consentement, version courante du texte.",
+          "response_success": { "http_status": 201, "body": { "success": true, "data": { "consented": true, "consented_at": "datetime" } } }
+        },
+        {
+          "method": "DELETE",
+          "path": "/assistant/consent",
+          "description": "Retire le consentement (horodaté). Les conversations existantes sont conservées ; les supprimer par DELETE /assistant/conversations.",
+          "response_success": { "http_status": 200, "body": { "success": true, "data": { "consented": false, "revoked_at": "datetime" } } }
+        }
+      ]
+    },
+    "chat": {
+      "description": "Conversation avec l'assistant",
+      "base_path": "/assistant/chat",
+      "auth_required": true,
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/assistant/chat",
+          "description": "Envoie un message. Sans conversation_id : nouvelle conversation. Réponse JSON complète, ou flux SSE si l'en-tête Accept contient text/event-stream.",
+          "body": {
+            "message": "string (required) — 1 à 4000 caractères",
+            "conversation_id": "integer (optional) — conversation existante de l'usager (404 sinon)"
+          },
+          "response_success": {
+            "http_status": 200,
+            "body": {
+              "success": true,
+              "data": {
+                "conversation_id": "integer",
+                "reply": "string — réponse finale de l'assistant",
+                "actions": "array — actions de ce message : {id, tool, input, result, status DONE|FAILED|PENDING}",
+                "budget": { "spent_usd": "float", "limit_usd": "float", "reset_at": "datetime", "assistant_spent_usd": "float" },
+                "stop_reason": "string|null",
+                "error": "object|null — {code, message} si la réponse a été interrompue (budget atteint en cours de boucle, erreur modèle, trop de tours d'outils)"
+              }
+            }
+          },
+          "sse_events": {
+            "conversation": "{conversation_id} — premier événement",
+            "delta": "{text} — fragment de texte de la réponse",
+            "tool": "{action} — action effectuée ou proposée (même forme que actions[])",
+            "error": "{code, message[, scope]} — AI_BUDGET_EXCEEDED, AI_UPSTREAM_ERROR, ASSISTANT_TOOL_ROUNDS_EXCEEDED, INTERNAL_ERROR",
+            "done": "même objet que data en mode JSON — dernier événement"
+          },
+          "errors": {
+            "403": "ASSISTANT_CONSENT_REQUIRED | MODULE_NOT_AVAILABLE",
+            "404": "conversation_id inconnu ou d'un autre usager",
+            "422": "message vide ou trop long",
+            "429": "AI_BUDGET_EXCEEDED — {scope: user|global, budget}",
+            "502": "AI_UPSTREAM_ERROR — échec du modèle avant toute réponse (non facturé)",
+            "503": "AI_NOT_CONFIGURED — clé serveur absente"
+          }
+        }
+      ]
+    },
+    "conversations": {
+      "description": "Historique — consultable et supprimable par l'usager",
+      "base_path": "/assistant/conversations",
+      "auth_required": true,
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/assistant/conversations",
+          "description": "Conversations de l'usager, plus récentes d'abord.",
+          "query": { "limit": "integer (optional, 1-100, défaut 50)", "offset": "integer (optional)" },
+          "response_success": { "http_status": 200, "body": { "success": true, "data": { "conversations": "[{id, title, created_at, updated_at}]", "count": "integer" } } }
+        },
+        {
+          "method": "GET",
+          "path": "/assistant/conversations/{id}",
+          "description": "Détail d'une conversation avec ses messages (texte de l'usager et réponses finales).",
+          "response_success": { "http_status": 200, "body": { "success": true, "data": { "id": "integer", "title": "string", "messages": "[{id, role user|assistant, content, created_at}]" } } },
+          "errors": { "404": "conversation inconnue ou d'un autre usager" }
+        },
+        {
+          "method": "DELETE",
+          "path": "/assistant/conversations/{id}",
+          "description": "Supprime une conversation et ses messages. Les actions journalisées sont conservées (conversation_id mis à null).",
+          "response_success": { "http_status": 200, "body": { "success": true } },
+          "errors": { "404": "conversation inconnue ou d'un autre usager" }
+        },
+        {
+          "method": "DELETE",
+          "path": "/assistant/conversations",
+          "description": "Supprime tout l'historique de l'usager.",
+          "response_success": { "http_status": 200, "body": { "success": true, "data": { "deleted": "integer" } } }
+        }
+      ]
+    },
+    "actions": {
+      "description": "Journal des actions de l'assistant et confirmation des suppressions",
+      "base_path": "/assistant/actions",
+      "auth_required": true,
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/assistant/actions",
+          "description": "Actions de l'usager, plus récentes d'abord.",
+          "query": { "status": "string (optional) — DONE | PENDING | CONFIRMED | REJECTED | FAILED", "limit": "integer (optional, défaut 50, max 200)" },
+          "response_success": { "http_status": 200, "body": { "success": true, "data": { "actions": "[{id, conversation_id, tool, input, result, status, created_at, resolved_at}]", "count": "integer" } } }
+        },
+        {
+          "method": "POST",
+          "path": "/assistant/actions/{id}/confirm",
+          "description": "Exécute une action PENDING (suppression proposée par l'assistant) → CONFIRMED, ou FAILED si la tâche n'existe plus.",
+          "response_success": { "http_status": 200, "body": { "success": true, "data": { "action": "object" } } },
+          "errors": { "404": "action inconnue ou d'un autre usager", "409": "ACTION_NOT_PENDING — déjà traitée" }
+        },
+        {
+          "method": "POST",
+          "path": "/assistant/actions/{id}/reject",
+          "description": "Refuse une action PENDING → REJECTED, rien n'est modifié.",
+          "response_success": { "http_status": 200, "body": { "success": true, "data": { "action": "object" } } },
+          "errors": { "404": "action inconnue ou d'un autre usager", "409": "ACTION_NOT_PENDING — déjà traitée" }
+        }
+      ]
+    },
+    "usage": {
+      "description": "Budget IA",
+      "base_path": "/assistant/usage",
+      "auth_required": true,
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/assistant/usage",
+          "description": "Dépense IA du mois (même total que GET /ai/usage), budget personnel, remise à zéro, et part de l'assistant.",
+          "response_success": { "http_status": 200, "body": { "success": true, "data": { "budget": { "spent_usd": "float", "limit_usd": "float", "reset_at": "datetime", "assistant_spent_usd": "float" }, "model": "string" } } }
+        }
+      ]
+    }
+  },
+  "tools": {
+    "description": "Outils exposés au modèle (côté serveur, jamais appelables directement par le client).",
+    "list": {
+      "list_tasks": "Tâches de l'usager (50 max) — filtres statut, échéance, recherche dans le titre",
+      "create_task": "Crée une tâche dans le premier calendrier de l'usager — titre, échéance locale, description, priorité, notifications (contrat #487)",
+      "update_task": "Modifie titre / échéance / statut / priorité (null = inchangé ; titre refusé si tâche chiffrée)",
+      "set_reminder": "Remplace la liste notifications d'une tâche",
+      "list_events": "Événements d'agenda sur une période (50 max)",
+      "propose_delete": "Crée une action PENDING — aucune suppression sans confirmation"
+    }
+  }
+}

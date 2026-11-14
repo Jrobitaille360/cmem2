@@ -63,6 +63,17 @@ class AiBudgetService
             ->fetchColumn();
     }
 
+    /** Dépense du mois pour un usage donné (ai_usage.feature) — ventilation seulement, le budget reste commun. */
+    public function spentByFeature(int $userId, string $feature): float
+    {
+        $st = $this->pdo->prepare(
+            "SELECT COALESCE(SUM(cost_usd), 0) FROM ai_usage
+             WHERE user_id = ? AND feature = ? AND created_at >= DATE_FORMAT(NOW(), '%Y-%m-01')"
+        );
+        $st->execute([$userId, $feature]);
+        return (float) $st->fetchColumn();
+    }
+
     /** @return array{spent_usd: float, limit_usd: float, reset_at: string} */
     public function usage(int $userId): array
     {
@@ -78,7 +89,7 @@ class AiBudgetService
      *
      * @return array{ok: true, usage_id: int}|array{ok: false, scope: string, budget: array}
      */
-    public function reserve(int $userId, string $model, int $estimatedInputTokens, int $maxOutputTokens): array
+    public function reserve(int $userId, string $model, int $estimatedInputTokens, int $maxOutputTokens, string $feature = 'summarize'): array
     {
         $estimate = AiPricing::cost($model, $estimatedInputTokens, $maxOutputTokens);
 
@@ -99,9 +110,9 @@ class AiBudgetService
             }
 
             $this->pdo->prepare(
-                "INSERT INTO ai_usage (user_id, model, input_tokens, output_tokens, cost_usd)
-                 VALUES (?, ?, ?, ?, ?)"
-            )->execute([$userId, $model, $estimatedInputTokens, $maxOutputTokens, $estimate]);
+                "INSERT INTO ai_usage (user_id, model, feature, input_tokens, output_tokens, cost_usd)
+                 VALUES (?, ?, ?, ?, ?, ?)"
+            )->execute([$userId, $model, $feature, $estimatedInputTokens, $maxOutputTokens, $estimate]);
 
             return ['ok' => true, 'usage_id' => (int) $this->pdo->lastInsertId()];
         } finally {
