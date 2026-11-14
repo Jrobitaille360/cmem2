@@ -7,7 +7,7 @@ use Core\PluginManager;
 use Assistant\Routing\AssistantRouteHandler;
 
 /**
- * Module Assistant — tâche racine cmem #515, plan docs/PLAN_module-assistant.md.
+ * Module Assistant — tâche racine cmem #515, plan docs/v-2-23-0/PLAN_module-assistant.md.
  * Routes /assistant/* : consentement, chat (JSON ou SSE), historique, actions, usage.
  */
 class AssistantPlugin extends AbstractPlugin

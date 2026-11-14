@@ -9,16 +9,18 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+## [2.23.0] — 2026-11-14
+
 ### Ajouté
 
-- Module Assistant (tâche racine cmem #515, tâches #251, #257, #258, #260, #263, #264 ; plan `docs/PLAN_module-assistant.md`) : plugin `src/assistant/`, routes `/assistant/*` (12), doc `docs/docs-api/assistant/`.
+- Module Assistant (tâche racine cmem #515, tâches #251, #257, #258, #260, #263, #264 ; plan `docs/v-2-23-0/PLAN_module-assistant.md`) : plugin `src/assistant/`, routes `/assistant/*` (12), doc `docs/docs-api/assistant/`.
 - `POST /assistant/chat` : chat avec Claude, réponse JSON ou flux SSE (`Accept: text/event-stream` — événements `conversation`, `delta`, `tool`, `error`, `done`). Modèle `AI_ASSISTANT_MODEL` (défaut `claude-haiku-5-5`), réflexion adaptative, effort `AI_ASSISTANT_EFFORT` (défaut `low`) ; date, heure et fuseau de l'usager dans le prompt système.
 - Consentement Loi 25 : `GET|POST|DELETE /assistant/consent` ; sans consentement, `403 ASSISTANT_CONSENT_REQUIRED` et rien n'est envoyé au modèle.
 - Historique par usager : `GET|DELETE /assistant/conversations`, `GET|DELETE /assistant/conversations/{id}` (404 entre usagers).
 - Outils côté serveur sur les tâches ICS et leurs rappels (#487) : `list_tasks`, `create_task`, `update_task`, `set_reminder`, `list_events`, `propose_delete`. Identité tirée du JWT, tâches chiffrées jamais lues en clair, aucune suppression directe : `propose_delete` crée une action `PENDING` confirmée par `POST /assistant/actions/{id}/confirm` (ou `/reject`) ; journal `GET /assistant/actions`.
 - Module `assistant` dans le registre (`CmemModules::KEYS`, ENUM `tenant_modules` / `user_module_grants`) : 403 `MODULE_NOT_AVAILABLE` si non coché ou non activé.
 - Budget IA commun : chaque tour d'appel modèle de l'Assistant passe par `AiBudgetService::reserve()`/`settle()` (429 `AI_BUDGET_EXCEEDED`) ; colonne `ai_usage.feature` (`summarize` / `assistant`) ; `GET /assistant/usage` = total du mois + `assistant_spent_usd`.
-- Migration `docs/20261114_module_assistant.sql` (ENUM `module_key`, `ai_usage.feature`, tables `assistant_consents`, `assistant_conversations`, `assistant_messages`, `assistant_actions`) — appliquée sur dev.
+- Migration `docs/v-2-23-0/20261114_module_assistant.sql` (schéma de référence `docs/v-2-23-0/build_DB-v-2.23.0.sql`) (ENUM `module_key`, `ai_usage.feature`, tables `assistant_consents`, `assistant_conversations`, `assistant_messages`, `assistant_actions`) — appliquée sur dev.
 - Tests : `test_assistant.php` (critères 1 à 15) ; évaluation du modèle `private/tests/eval_assistant.php` (21 phrases types, 21/21 sur Haiku 5.5 effort `low`, ≈ 0,008 $).
 
 ### Modifié
