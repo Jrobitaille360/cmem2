@@ -317,6 +317,9 @@ define('AI_SUMMARIZE_MAX_TOKENS', (int)($_ENV['AI_SUMMARIZE_MAX_TOKENS'] ?? 512)
 define('AI_DEFAULT_BUDGET_USD', (float)($_ENV['AI_DEFAULT_BUDGET_USD'] ?? 10));
 define('AI_GLOBAL_BUDGET_USD_MONTHLY', (float)($_ENV['AI_GLOBAL_BUDGET_USD_MONTHLY'] ?? 30));
 
+// SMTP par usager (module Assistant, #252) : clé sodium_crypto_secretbox, 32 octets en base64
+define('SMTP_ENCRYPTION_KEY', trim($_ENV['SMTP_ENCRYPTION_KEY'] ?? ''));
+
 // ============================================
 // MODULE ASSISTANT — POST /assistant/chat (plan docs/v-2-23-0/PLAN_module-assistant.md)
 // ============================================

@@ -20,7 +20,9 @@
             "/assistant/conversations/{id}",
             "/assistant/actions/{id}/confirm",
             "/assistant/actions/{id}/reject",
-            "/assistant/usage"
+            "/assistant/usage",
+            "/assistant/smtp",
+            "/assistant/smtp/test"
         ]
     }
 }

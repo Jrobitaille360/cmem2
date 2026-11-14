@@ -167,6 +167,43 @@
           "response_success": { "http_status": 200, "body": { "success": true, "data": { "budget": { "spent_usd": "float", "limit_usd": "float", "reset_at": "datetime", "assistant_spent_usd": "float" }, "model": "string" } } }
         }
       ]
+    },
+    "smtp": {
+      "description": "Serveur SMTP personnel (tâches #252-#254) : les rappels par courriel de l'usager partent par son serveur, repli sur le SMTP système en cas d'échec. Mot de passe chiffré (sodium, clé serveur), jamais renvoyé. Hôtes privés, loopback ou réservés refusés.",
+      "base_path": "/assistant/smtp",
+      "auth_required": true,
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/assistant/smtp",
+          "description": "Paramètres SMTP de l'usager, sans mot de passe (has_password indique s'il est enregistré).",
+          "response_success": { "http_status": 200, "body": { "success": true, "data": { "smtp": { "host": "string", "port": "int", "encryption": "tls|ssl|none", "username": "string", "has_password": "bool", "from_email": "string", "from_name": "string", "verified_at": "datetime|null", "updated_at": "datetime" } } } },
+          "errors": { "404": "SMTP_NOT_CONFIGURED" }
+        },
+        {
+          "method": "PUT",
+          "path": "/assistant/smtp",
+          "description": "Crée ou remplace les paramètres. password omis = conservé ; requis à la création si username est non vide. Tout changement de host, port, encryption, username ou password remet verified_at à null.",
+          "request_body": { "host": "string (requis, nom d'hôte ou IPv4 publique)", "port": "int 1-65535 (requis)", "encryption": "tls (STARTTLS, défaut) | ssl (TLS implicite) | none", "username": "string?", "password": "string? (1024 max)", "from_email": "email (requis)", "from_name": "string?" },
+          "response_success": { "http_status": 200, "body": { "success": true, "data": { "smtp": "object (comme GET)" } } },
+          "errors": { "422": "champ invalide ; errors.code = SMTP_HOST_FORBIDDEN si hôte privé/local/réservé", "503": "SMTP_KEY_NOT_CONFIGURED — clé de chiffrement absente côté serveur" }
+        },
+        {
+          "method": "DELETE",
+          "path": "/assistant/smtp",
+          "description": "Supprime les paramètres ; les rappels repartent par le SMTP système.",
+          "response_success": { "http_status": 200, "body": { "success": true } },
+          "errors": { "404": "SMTP_NOT_CONFIGURED" }
+        },
+        {
+          "method": "POST",
+          "path": "/assistant/smtp/test",
+          "description": "Teste connexion + EHLO + STARTTLS + authentification, sans envoyer de courriel. Corps avec host = paramètres fournis (password omis = celui enregistré) ; sans host = paramètres enregistrés, et verified_at est mis à jour en cas de succès. send_to_self: true = envoie en plus un courriel de test réel à l'adresse du compte. Limite : 5 essais / 10 min par usager.",
+          "request_body": { "host": "string?", "port": "int?", "encryption": "string?", "username": "string?", "password": "string?", "from_email": "email?", "from_name": "string?", "send_to_self": "bool? (défaut false)" },
+          "response_success": { "http_status": 200, "body": { "success": true, "message": "Connexion SMTP réussie", "data": { "ok": true, "verified": "bool", "sent": "bool|null" } } },
+          "errors": { "404": "SMTP_NOT_CONFIGURED (sans host et rien d'enregistré)", "422": "SMTP_HOST_FORBIDDEN | SMTP_HOST_UNREACHABLE | SMTP_TLS_FAILED | SMTP_AUTH_FAILED | SMTP_SEND_FAILED — message lisible", "429": "SMTP_TEST_RATE_LIMITED" }
+        }
+      ]
     }
   },
   "tools": {

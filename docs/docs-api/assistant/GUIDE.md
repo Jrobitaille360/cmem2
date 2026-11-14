@@ -117,6 +117,49 @@ l'appel, puis est ramené au coût réel.
 
 `GET /assistant/usage` donne le total du mois (identique à `GET /ai/usage`) et la part de l'Assistant.
 
+## Serveur SMTP personnel
+
+Avec le module `assistant`, la personne peut faire partir **ses rappels par courriel** par son
+propre serveur SMTP. Si ce serveur échoue au moment d'un rappel, l'envoi repasse par le SMTP de
+Journaux de Bord : le rappel arrive quand même.
+
+Parcours conseillé côté client :
+
+1. `POST /assistant/smtp/test` avec les paramètres saisis : connexion, STARTTLS et
+   authentification sont vérifiés, **aucun courriel n'est envoyé**.
+2. `PUT /assistant/smtp` avec les mêmes paramètres pour les enregistrer.
+3. Optionnel : `POST /assistant/smtp/test {"send_to_self": true}` (sans `host`) teste les
+   paramètres enregistrés, renseigne `verified_at` et envoie un vrai courriel de test à
+   l'adresse du compte.
+
+```json
+PUT /assistant/smtp
+{
+  "host": "smtp.exemple.com",
+  "port": 587,
+  "encryption": "tls",
+  "username": "moi@exemple.com",
+  "password": "••••••••",
+  "from_email": "moi@exemple.com",
+  "from_name": "Moi"
+}
+```
+
+- `encryption` : `tls` = STARTTLS (port 587 en général), `ssl` = TLS implicite (port 465),
+  `none` = sans chiffrement.
+- Le mot de passe est chiffré côté serveur et **n'est jamais renvoyé** : `GET /assistant/smtp`
+  indique seulement `has_password`. Omettre `password` dans un `PUT` le conserve.
+- Les hôtes privés, locaux ou réservés (`127.0.0.1`, `10.x`, `192.168.x`…) sont refusés.
+- `POST /assistant/smtp/test` est limité à 5 essais par tranche de 10 minutes.
+
+| Code (`errors.code`) | Message à afficher |
+| - | - |
+| `SMTP_HOST_UNREACHABLE` | Serveur introuvable ou injoignable — vérifier l'hôte et le port |
+| `SMTP_TLS_FAILED` | Chiffrement refusé — essayer `tls` sur 587 ou `ssl` sur 465 |
+| `SMTP_AUTH_FAILED` | Identifiant ou mot de passe refusé |
+| `SMTP_HOST_FORBIDDEN` | Adresse non autorisée |
+| `SMTP_SEND_FAILED` | Connexion correcte mais envoi du courriel de test refusé |
+
 ## Codes d'erreur
 
 | HTTP | Code | Cause |
@@ -126,11 +169,15 @@ l'appel, puis est ramené au coût réel.
 | 403 | `MODULE_NOT_AVAILABLE` | Module `assistant` non coché ou non activé |
 | 403 | `ASSISTANT_CONSENT_REQUIRED` | Consentement absent ou retiré |
 | 404 | — | Conversation ou action inconnue, ou d'un autre usager |
+| 404 | `SMTP_NOT_CONFIGURED` | Aucun serveur SMTP personnel enregistré |
 | 409 | `ACTION_NOT_PENDING` | Action déjà confirmée ou refusée |
-| 422 | — | Message vide ou de plus de 4 000 caractères |
+| 422 | — | Message vide ou de plus de 4 000 caractères ; paramètres SMTP invalides |
+| 422 | `SMTP_*` | Test SMTP en échec (voir « Serveur SMTP personnel ») |
 | 429 | `AI_BUDGET_EXCEEDED` | Budget IA atteint |
+| 429 | `SMTP_TEST_RATE_LIMITED` | Plus de 5 tests SMTP en 10 minutes |
 | 502 | `AI_UPSTREAM_ERROR` | Échec du modèle (non facturé) |
 | 503 | `AI_NOT_CONFIGURED` | Clé Anthropic absente côté serveur |
+| 503 | `SMTP_KEY_NOT_CONFIGURED` | Chiffrement SMTP non configuré côté serveur |
 
 ## Données et confidentialité
 
@@ -138,3 +185,4 @@ l'appel, puis est ramené au coût réel.
   outils (titres, échéances, statuts, rappels des tâches ; titres et lieux des événements).
 - Jamais envoyé : le contenu des tâches chiffrées de bout en bout, les journaux, les contacts.
 - L'usager peut supprimer une conversation ou tout son historique, et retirer son consentement.
+- Paramètres SMTP : jamais transmis à Claude ; supprimés avec le compte.

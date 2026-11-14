@@ -21,7 +21,7 @@ Chaque module expose sa documentation d'API au format JSON. Ces fichiers décriv
 | [push/API_PUSH_ENDPOINTS.json](docs-api/push/API_PUSH_ENDPOINTS.json) | 5 | Notifications push web (VAPID) : clé publique, subscriptions par appareil. `/push/preferences` déprécié (v2.22.0) : projection des défauts `/notifications/defaults`. |
 | [modules/API_MODULES_ENDPOINTS.json](docs-api/modules/API_MODULES_ENDPOINTS.json) | 4 | Registre de modules activables : gating par plan (`available`), interrupteur usager (`enabled`), quota serveur. Plan équipe : `GET/PATCH /groups/{id}/modules[/{key}]`, fusionnés dans `GET /modules`. |
 | [ai/API_AI_ENDPOINTS.json](docs-api/ai/API_AI_ENDPOINTS.json) | 2 | Proxy IA — `POST /ai/summarize` (résumé d'agenda), `GET /ai/usage`. Budget mensuel en dollars réservé avant l'appel modèle, clé Anthropic serveur seule, consigne fixe (pas de prompt libre). |
-| [assistant/API_ASSISTANT_ENDPOINTS.json](docs-api/assistant/API_ASSISTANT_ENDPOINTS.json) | 12 | Module Assistant — `POST /assistant/chat` (JSON ou SSE), consentement Loi 25 (`/assistant/consent`), historique (`/assistant/conversations`), journal et confirmation des suppressions (`/assistant/actions`), `GET /assistant/usage`. Outils sur les tâches et leurs rappels ; budget IA commun avec `/ai/summarize`. |
+| [assistant/API_ASSISTANT_ENDPOINTS.json](docs-api/assistant/API_ASSISTANT_ENDPOINTS.json) | 16 | Module Assistant — `POST /assistant/chat` (JSON ou SSE), consentement Loi 25 (`/assistant/consent`), historique (`/assistant/conversations`), journal et confirmation des suppressions (`/assistant/actions`), `GET /assistant/usage`, SMTP personnel des rappels (`/assistant/smtp`, `POST /assistant/smtp/test`). Outils sur les tâches et leurs rappels ; budget IA commun avec `/ai/summarize`. |
 
 ## Guides narratifs par module
 
@@ -46,7 +46,7 @@ Chaque guide complète le JSON avec les flux d'intégration, exemples et codes d
 | [push/GUIDE.md](docs-api/push/GUIDE.md) | Flux d'abonnement Web Push, préférences (dépréciées), sélection commune courriel + push, idempotence par appareil (`reminder_log`), purge 410 et 90 jours, cron unifié. |
 | [modules/GUIDE.md](docs-api/modules/GUIDE.md) | Trois états (disponible / activé / quota), mapping plan→modules, rétro-fit des pans livrés, codes d'erreur du gating, plan équipe (fusion perso ∪ groupe). |
 | [ai/GUIDE.md](docs-api/ai/GUIDE.md) | Contrat de confidentialité (métadonnées seulement, jamais de corps de journal), quota avant appel, consigne fixe côté serveur. |
-| [assistant/GUIDE.md](docs-api/assistant/GUIDE.md) | Prérequis (module coché + activé, consentement), chat JSON et SSE, outils, confirmation des suppressions, budget IA, codes d'erreur, données envoyées. |
+| [assistant/GUIDE.md](docs-api/assistant/GUIDE.md) | Prérequis (module coché + activé, consentement), chat JSON et SSE, outils, confirmation des suppressions, budget IA, SMTP personnel, codes d'erreur, données envoyées. |
 
 ## Exploitation (cron)
 

@@ -3,6 +3,7 @@
 namespace Assistant\Routing;
 
 use Assistant\Controllers\AssistantController;
+use Assistant\Controllers\SmtpController;
 use AuthGroups\Routing\BaseRouteHandler;
 use AuthGroups\Utils\Response;
 
@@ -17,6 +18,8 @@ use AuthGroups\Utils\Response;
  *   GET             /assistant/actions[?status=PENDING]
  *   POST            /assistant/actions/{id}/confirm|reject
  *   GET             /assistant/usage
+ *   GET|PUT|DELETE  /assistant/smtp                       (SMTP personnel, #252)
+ *   POST            /assistant/smtp/test                  (sonde sans envoi, #253)
  */
 class AssistantRouteHandler extends BaseRouteHandler
 {
@@ -58,6 +61,11 @@ class AssistantRouteHandler extends BaseRouteHandler
             $action === 'actions' && $isId && $sub === 'reject' && $method === 'POST'   => $c->resolveAction($userId, (int) $id, false),
 
             $action === 'usage' && $id === '' && $method === 'GET' => $c->usage($userId),
+
+            $action === 'smtp' && $id === '' && $method === 'GET'           => (new SmtpController())->get($userId),
+            $action === 'smtp' && $id === '' && $method === 'PUT'           => (new SmtpController())->put($userId),
+            $action === 'smtp' && $id === '' && $method === 'DELETE'        => (new SmtpController())->delete($userId),
+            $action === 'smtp' && $id === 'test' && $sub === '' && $method === 'POST' => (new SmtpController())->test($userId),
 
             default => Response::error('Endpoint non trouvé', null, 404),
         };

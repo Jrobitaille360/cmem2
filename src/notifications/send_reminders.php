@@ -34,7 +34,9 @@ $rootDir = dirname(__DIR__, 2);
 require_once $rootDir . '/vendor/autoload.php';
 require_once $rootDir . '/src/auth_groups/loader.php';
 require_once $rootDir . '/src/push/autoloader.php';
+require_once $rootDir . '/src/assistant/autoloader.php';
 
+use Assistant\Services\UserSmtpService;
 use AuthGroups\Controllers\NotificationSettingsController;
 use AuthGroups\Services\EmailService;
 use AuthGroups\Services\LogService;
@@ -165,6 +167,7 @@ try {
     $db       = Database::getInstance()->getConnection();
     $scanner  = new ReminderScanner($db);
     $mailer   = $doEmail && !$dryRun ? new EmailService() : null;
+    $userSmtp = $doEmail && !$dryRun ? new UserSmtpService() : null;
     $owners   = array_slice(reminderOwners($db, $appId, $onlyUser), 0, $batch);
     $stats    = ['due' => 0, 'email_sent' => 0, 'email_failed' => 0, 'push_sent' => 0, 'push_failed' => 0, 'purged' => 0, 'skipped' => 0];
 
@@ -177,7 +180,8 @@ try {
             continue;
         }
 
-        $user = null;
+        $user    = null;
+        $userCfg = false; // false = pas encore lu ; null = SMTP système
         if ($doEmail) {
             $s = $db->prepare('SELECT email, email_notifications_enabled FROM users WHERE id = ?');
             $s->execute([$ownerId]);
@@ -215,12 +219,25 @@ try {
                 $subject = $r['title'] === ReminderScanner::genericTitle() ? $r['title'] : 'Rappel : ' . $r['title'];
                 $body    = $r['generic_body'] . "\n" . ($r['body'] !== $r['generic_body'] ? $r['body'] . "\n" : '')
                          . "\n— Journaux de Bord";
-                $ok = false;
-                try {
-                    $ok = (bool) $mailer->sendEmail($user['email'], $subject, $body, false);
-                } catch (Throwable $e) {
-                    LogService::warning('Rappels : échec courriel', ['owner' => $ownerId, 'error' => $e->getMessage()]);
+                $ok  = false;
+                $via = 'system';
+                // SMTP personnel de l'usager (module Assistant, #254) ; repli SMTP système en cas d'échec
+                if ($userCfg === false) {
+                    $userCfg = $userSmtp->configFor($ownerId);
                 }
+                if ($userCfg !== null) {
+                    $ok  = $userSmtp->send($userCfg, $ownerId, $user['email'], $subject,
+                        UserSmtpService::htmlFromText($subject, $body), $body);
+                    $via = $ok ? 'user' : 'system-fallback';
+                }
+                if (!$ok) {
+                    try {
+                        $ok = (bool) $mailer->sendEmail($user['email'], $subject, $body, false);
+                    } catch (Throwable $e) {
+                        LogService::warning('Rappels : échec courriel', ['owner' => $ownerId, 'error' => $e->getMessage()]);
+                    }
+                }
+                printf("MAIL user=%d via=%s ok=%d%s", $ownerId, $via, $ok ? 1 : 0, PHP_EOL);
                 reminderComplete($db, $logId, $ok ? 'sent' : 'failed', $ok ? null : 'échec envoi courriel');
                 $stats[$ok ? 'email_sent' : 'email_failed']++;
                 continue;
