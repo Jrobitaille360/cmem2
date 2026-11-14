@@ -75,7 +75,7 @@ if (isset($GLOBALS['pending_config_loads'])) {
 $allowedOrigins = $_ENV['ALLOWED_ORIGINS'] ?? 'https://cmem1.journauxdebord.com,http://localhost:3000,http://localhost:8080,http://127.0.0.1:3000';
 define('ALLOWED_ORIGINS', explode(',', $allowedOrigins));
 define('ALLOWED_METHODS', explode(',', $_ENV['ALLOWED_METHODS'] ?? 'GET,POST,PUT,PATCH,DELETE,OPTIONS'));
-define('ALLOWED_HEADERS', explode(',', $_ENV['ALLOWED_HEADERS'] ?? 'Content-Type,Authorization,X-Requested-With'));
+define('ALLOWED_HEADERS', explode(',', $_ENV['ALLOWED_HEADERS'] ?? 'Content-Type,Authorization,X-Requested-With,If-Unmodified-Since'));
 
 // Configuration du timezone
 date_default_timezone_set($_ENV['APP_TIMEZONE'] ?? 'America/Montreal');

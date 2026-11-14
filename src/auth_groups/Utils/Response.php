@@ -83,7 +83,7 @@ class Response {
         }
         
         header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS');
-        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-API-Key');
+        header('Access-Control-Allow-Headers: ' . implode(', ', ALLOWED_HEADERS));
         header('Access-Control-Allow-Credentials: true');
         header('Access-Control-Max-Age: 86400');
         
