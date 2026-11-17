@@ -114,10 +114,17 @@ class Calendar extends BaseModel
         return $stmt->execute($params);
     }
 
+    /**
+     * Calendriers comptés pour le quota max_calendars : ceux de l'usager, hors calendriers
+     * cachés provisionnés par un projet (Projets\Models\Project, actif ou soft-supprimé) —
+     * déjà exclus des listes, ils ne doivent pas consommer le quota non plus.
+     */
     public function countOwnedByUserId($userId): int
     {
         $stmt = $this->getDb()->prepare(
-            "SELECT COUNT(*) FROM calendars WHERE user_id = ? AND deleted_at IS NULL"
+            "SELECT COUNT(*) FROM calendars c
+             WHERE c.user_id = ? AND c.deleted_at IS NULL
+               AND NOT EXISTS (SELECT 1 FROM projects p WHERE p.calendar_id = c.id)"
         );
         $stmt->execute([$userId]);
         return (int) $stmt->fetchColumn();
