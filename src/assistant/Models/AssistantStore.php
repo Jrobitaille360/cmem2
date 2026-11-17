@@ -173,6 +173,14 @@ class AssistantStore
         return array_map([self::class, 'formatAction'], $st->fetchAll(PDO::FETCH_ASSOC));
     }
 
+    /** Actions journalisées d'une conversation, ordre chronologique (statut à jour). */
+    public function conversationActions(int $userId, int $conversationId): array
+    {
+        $st = $this->pdo->prepare("SELECT * FROM assistant_actions WHERE user_id = ? AND conversation_id = ? ORDER BY id");
+        $st->execute([$userId, $conversationId]);
+        return array_map([self::class, 'formatAction'], $st->fetchAll(PDO::FETCH_ASSOC));
+    }
+
     /** Passe une action PENDING à son statut final ; false si elle n'était plus PENDING (course). */
     public function resolveAction(int $actionId, string $status, ?array $result): bool
     {

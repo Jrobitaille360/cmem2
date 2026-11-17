@@ -9,6 +9,12 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+### Corrigé
+
+- Assistant (directive #521 de cmem_web) : l'historique renvoyé au modèle inclut le journal des actions de chaque tour (numéro, outil, statut actuel, tâche) — le modèle ne renie plus une action `DONE` au tour suivant.
+- Assistant SSE : `conversation` émis dès la réservation budget acceptée, avant le premier appel modèle (avant : à la fin du premier appel quand il commençait par un outil). Le `429` budget reste du JSON ; un échec modèle en SSE devient `error` + `done` (le `502` ne vaut plus que pour le mode JSON).
+- Tests : `test_assistant.php` 6.2, 16.x, 17.x.
+
 ## [2.24.1] — 2026-11-14
 
 ### Corrigé

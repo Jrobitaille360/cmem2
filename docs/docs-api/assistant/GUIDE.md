@@ -31,7 +31,9 @@ Content-Type: application/json
 
 - Sans `conversation_id` : une conversation est créée, son id revient dans la réponse.
 - Avec `conversation_id` : les 20 derniers messages (`AI_ASSISTANT_HISTORY_LIMIT`) sont
-  renvoyés au modèle comme contexte.
+  renvoyés au modèle comme contexte, avec le journal des actions de chaque tour (numéro,
+  outil, statut actuel, tâche) : le modèle sait ce qu'il a déjà fait, y compris une
+  suppression confirmée ou refusée depuis.
 
 ### Réponse JSON (défaut)
 
@@ -69,11 +71,15 @@ event: done
 data: {"conversation_id":42,"reply":"…","actions":[…],"budget":{…},"stop_reason":"end_turn","error":null}
 ```
 
+- `conversation` est envoyé dès l'ouverture du flux, avant le premier appel au modèle :
+  la conversation peut s'afficher dans l'historique sans attendre la réponse.
 - `delta` arrive au fil de la génération : afficher le texte au fur et à mesure.
 - `tool` arrive dès qu'une action est exécutée ou proposée : rafraîchir la liste des tâches.
 - `error` (rare) précède `done` quand la réponse a été interrompue en cours de route.
-- Les erreurs détectées **avant** le premier événement (budget, consentement, modèle
-  indisponible) arrivent en JSON ordinaire avec leur code HTTP, pas en SSE.
+- Les erreurs détectées **avant** le premier événement (consentement, budget) arrivent en
+  JSON ordinaire avec leur code HTTP, pas en SSE. En SSE, un échec du modèle survient après
+  `conversation` : il arrive comme `error` (`AI_UPSTREAM_ERROR`) suivi de `done` ; le
+  `502` ne concerne que le mode JSON.
 
 `EventSource` ne permet pas `POST` : utiliser `fetch()` et lire `response.body` par morceaux.
 
@@ -181,8 +187,8 @@ PUT /assistant/smtp
 
 ## Données et confidentialité
 
-- Envoyé à Claude : le message, l'historique récent de la conversation, et le résultat des
-  outils (titres, échéances, statuts, rappels des tâches ; titres et lieux des événements).
+- Envoyé à Claude : le message, l'historique récent de la conversation (avec le journal des
+  actions de ses tours), et le résultat des outils (titres, échéances, statuts, rappels des tâches ; titres et lieux des événements).
 - Jamais envoyé : le contenu des tâches chiffrées de bout en bout, les journaux, les contacts.
 - L'usager peut supprimer une conversation ou tout son historique, et retirer son consentement.
 - Paramètres SMTP : jamais transmis à Claude ; supprimés avec le compte.

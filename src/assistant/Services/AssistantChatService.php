@@ -45,6 +45,10 @@ Règles :
   confirmer dans l'application. Dis-le clairement.
 - Après une action, confirme en une phrase ce qui a été fait (titre, date, rappel).
 - Les tâches chiffrées sont illisibles pour toi : dis-le si l'usager en parle.
+- Les appels d'outils des tours précédents ne sont pas réaffichés comme appels d'outils : ils sont
+  résumés par le bloc « [Journal système …] » en tête de tes réponses précédentes, avec leur statut
+  actuel. Ce journal fait foi : les actions qu'il liste ont réellement été exécutées par toi. Ne dis
+  jamais que tu n'as appelé aucun outil quand le journal en liste, et ne recopie jamais ce bloc.
 - Tu n'as accès qu'aux tâches et à l'agenda de l'usager ; décline poliment les demandes hors de ce périmètre
   si elles demandent d'agir, mais réponds normalement aux questions générales courtes.
 TXT;
@@ -62,17 +66,18 @@ TXT;
      * @param callable(string, array): void $emit
      * @return array{conversation_id: int, reply: string, actions: array, budget: array, stop_reason: ?string}
      */
-    public function run(int $userId, ?int $conversationId, string $message, callable $emit): array
+    public function run(int $userId, ?int $conversationId, string $message, callable $emit, bool $eagerStart = false): array
     {
         $model     = AI_ASSISTANT_MODEL;
         $maxTokens = AI_ASSISTANT_MAX_TOKENS;
 
-        // Historique (texte seul) avant d'ajouter le nouveau message.
-        $history = $conversationId !== null ? $this->store->messages($conversationId, AI_ASSISTANT_HISTORY_LIMIT) : [];
-        while ($history && $history[0]['role'] !== 'user') {
-            array_shift($history); // l'API exige que la conversation commence par l'usager
-        }
-        $messages = array_map(fn($m) => ['role' => $m['role'], 'content' => $m['content']], $history);
+        // Historique avant d'ajouter le nouveau message : textes + journal des actions de chaque tour (#521).
+        $messages = $conversationId !== null
+            ? self::historyMessages(
+                $this->store->messages($conversationId, AI_ASSISTANT_HISTORY_LIMIT),
+                $this->store->conversationActions($userId, $conversationId)
+            )
+            : [];
         $messages[] = ['role' => 'user', 'content' => $message];
 
         $tools  = new AssistantTools($userId, $conversationId, $this->store);
@@ -108,6 +113,11 @@ TXT;
                 $error = ['code' => 'AI_BUDGET_EXCEEDED', 'scope' => $reservation['scope'],
                           'message' => 'Budget IA atteint pendant la réponse.'];
                 break;
+            }
+            if ($eagerStart) {
+                // SSE (#521) : `conversation` part dès la première réservation acceptée, avant l'appel
+                // modèle. Le 429 budget reste du JSON ; un échec modèle devient error + done.
+                $start();
             }
 
             $acc = MessageAccumulator::forMessages();
@@ -224,6 +234,83 @@ TXT;
         ];
         $emit('done', $result);
         return $result;
+    }
+
+    /**
+     * Historique envoyé au modèle (#521) : messages texte + journal des actions de chaque tour.
+     *
+     * Une action appartient au dernier message usager créé avant elle (created_at). Son résumé
+     * (id, outil, statut à jour, tâche) est placé en tête de la réponse assistant de ce tour, ou
+     * dans un message assistant synthétique si le tour n'a pas de réponse enregistrée. Les actions
+     * antérieures à la fenêtre d'historique sont ignorées ; l'historique commence par l'usager.
+     *
+     * @param array<int, array{role: string, content: string, created_at?: ?string}> $history ordre chronologique
+     * @param array<int, array> $actions format AssistantStore::formatAction(), ordre chronologique
+     * @return array<int, array{role: string, content: string}>
+     */
+    public static function historyMessages(array $history, array $actions): array
+    {
+        while ($history && $history[0]['role'] !== 'user') {
+            array_shift($history); // l'API exige que la conversation commence par l'usager
+        }
+        $history = array_values($history);
+
+        $byTurn = [];
+        foreach ($actions as $action) {
+            $turn = null;
+            foreach ($history as $i => $m) {
+                if ($m['role'] === 'user' && (string) ($m['created_at'] ?? '') <= (string) ($action['created_at'] ?? '')) {
+                    $turn = $i;
+                }
+            }
+            if ($turn !== null) {
+                $byTurn[$turn][] = self::describeAction($action);
+            }
+        }
+
+        $out = [];
+        foreach ($history as $i => $m) {
+            if ($m['role'] === 'assistant' && $out && end($out)['role'] === 'assistant') {
+                // réponse d'un tour dont le journal a déjà produit le message assistant
+                $out[count($out) - 1]['content'] .= $m['content'];
+                continue;
+            }
+            $out[] = ['role' => $m['role'], 'content' => $m['content']];
+            if ($m['role'] === 'user' && isset($byTurn[$i])) {
+                $out[] = ['role' => 'assistant', 'content' => self::JOURNAL_HEADER . "\n" . implode("\n", $byTurn[$i]) . "\n\n"];
+            }
+        }
+        // Tour sans réponse : retirer le séparateur final du journal synthétique.
+        foreach ($out as &$m) {
+            $m['content'] = $m['role'] === 'assistant' ? rtrim($m['content']) : $m['content'];
+        }
+        unset($m);
+        return $out;
+    }
+
+    private const JOURNAL_HEADER = '[Journal système — actions exécutées à ce tour, statut actuel]';
+
+    private static function describeAction(array $a): string
+    {
+        $in     = is_array($a['input'] ?? null) ? $a['input'] : [];
+        $res    = is_array($a['result'] ?? null) ? $a['result'] : [];
+        $task   = is_array($res['task'] ?? null) ? $res['task'] : [];
+        $taskId = $task['id'] ?? $in['task_id'] ?? $in['todo_id'] ?? null;
+        $title  = $task['title'] ?? $in['title'] ?? null;
+        $line   = sprintf('- action #%d %s %s', (int) ($a['id'] ?? 0), $a['tool'] ?? '?', $a['status'] ?? '?');
+        if ($taskId !== null) {
+            $line .= ' — tâche ' . (int) $taskId;
+        }
+        if (is_string($title) && $title !== '') {
+            $line .= ' « ' . $title . ' »';
+        }
+        if (!empty($task['due'])) {
+            $line .= ' (échéance ' . $task['due'] . ')';
+        }
+        if (isset($res['error']) && is_string($res['error'])) {
+            $line .= ' — erreur : ' . $res['error'];
+        }
+        return $line;
     }
 
     /** Prompt système complet ; $now injectable pour l'évaluation (private/tests/eval_assistant.php). */

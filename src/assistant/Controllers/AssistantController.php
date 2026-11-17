@@ -121,7 +121,7 @@ class AssistantController
 
         @set_time_limit(300);
         try {
-            $result = (new AssistantChatService($this->store))->run($userId, $conversationId, $message, $emit);
+            $result = (new AssistantChatService($this->store))->run($userId, $conversationId, $message, $emit, $sse);
         } catch (AssistantBudgetException $e) {
             LoggingMiddleware::logExit(429);
             Response::error(

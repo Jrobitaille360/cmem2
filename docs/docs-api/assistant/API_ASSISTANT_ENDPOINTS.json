@@ -56,7 +56,7 @@
         {
           "method": "POST",
           "path": "/assistant/chat",
-          "description": "Envoie un message. Sans conversation_id : nouvelle conversation. Réponse JSON complète, ou flux SSE si l'en-tête Accept contient text/event-stream.",
+          "description": "Envoie un message. Sans conversation_id : nouvelle conversation. Avec conversation_id : historique récent + journal des actions de chaque tour renvoyés au modèle. Réponse JSON complète, ou flux SSE si l'en-tête Accept contient text/event-stream.",
           "body": {
             "message": "string (required) — 1 à 4000 caractères",
             "conversation_id": "integer (optional) — conversation existante de l'usager (404 sinon)"
@@ -76,7 +76,7 @@
             }
           },
           "sse_events": {
-            "conversation": "{conversation_id} — premier événement",
+            "conversation": "{conversation_id} — premier événement, envoyé dès l'ouverture du flux avant l'appel modèle (un échec modèle arrive ensuite en error AI_UPSTREAM_ERROR + done, pas en 502)",
             "delta": "{text} — fragment de texte de la réponse",
             "tool": "{action} — action effectuée ou proposée (même forme que actions[])",
             "error": "{code, message[, scope]} — AI_BUDGET_EXCEEDED, AI_UPSTREAM_ERROR, ASSISTANT_TOOL_ROUNDS_EXCEEDED, INTERNAL_ERROR",
