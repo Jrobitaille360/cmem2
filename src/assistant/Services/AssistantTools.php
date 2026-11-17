@@ -507,10 +507,18 @@ class AssistantTools
         return $result + ['action_id' => $id];
     }
 
-    /** Premier calendrier possédé (non supprimé). */
-    private function defaultCalendarId(): ?int
+    /**
+     * Premier calendrier possédé (non supprimé), hors calendriers cachés de projet : une tâche
+     * créée par l'assistant y serait invisible dans l'agenda. Null si aucun calendrier normal.
+     */
+    public function defaultCalendarId(): ?int
     {
-        $st = $this->pdo->prepare('SELECT id FROM calendars WHERE user_id = ? AND deleted_at IS NULL ORDER BY id LIMIT 1');
+        $st = $this->pdo->prepare(
+            'SELECT c.id FROM calendars c
+             WHERE c.user_id = ? AND c.deleted_at IS NULL
+               AND NOT EXISTS (SELECT 1 FROM projects p WHERE p.calendar_id = c.id)
+             ORDER BY c.id LIMIT 1'
+        );
         $st->execute([$this->userId]);
         $id = $st->fetchColumn();
         return $id !== false ? (int) $id : null;
