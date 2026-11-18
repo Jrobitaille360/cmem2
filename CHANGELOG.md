@@ -9,6 +9,15 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+### Ajouté
+
+- Plugin `jesaisquand` (directives #524 et #526 de jesaisquand) — `src/jesaisquand/`, docs `docs/docs-api/jesaisquand/`.
+- Paquets : `GET /jesaisquand/paquets` (publics, sans cartes) et `GET /jesaisquand/paquets/{slug}` (cartes avec dates, format client jesaisquand ; paquet privé visible des admins seulement).
+- Multijoueur au tour par tour, joueurs invités (pseudo + jeton joueur opaque, SHA-256 seul stocké ; `user_id` renseigné si un JWT accompagne) : `POST /jesaisquand/parties`, `POST /parties/{code}/rejoindre` (2 à 6 joueurs), `POST /parties/{code}/demarrer` (créateur), `GET /parties/{code}?depuis=` (`304` si inchangé), `POST /parties/{code}/coups`. Le serveur fait autorité : les dates, `dateTexte`, `periode` et `description` des cartes en main ne sortent jamais avant la pose. Règle de pose identique à `src/lib/partie.ts` (précision commune, égalités acceptées, pénalité après les égalités) ; fin au tour de table complété, ex æquo possibles. Pas de délai par tour : partie inactive 24 h → `expiree` (`410`), purge à 7 jours.
+- Admin (`ADMINISTRATEUR` / `SUPERADMINISTRATEUR`) : `POST /jesaisquand/admin/paquets` (import upsert d'un `src/data/*.json`), `PATCH /jesaisquand/paquets/{slug}/cartes/{carte_id}` (illustration `image_url` https sur `upload.wikimedia.org` / `images-assets.nasa.gov` ou `image_file_id` cmem2 grand-public, crédit obligatoire, journal `jsq_cartes_journal`), `GET /jesaisquand/admin/cartes-sans-credit?paquet=`.
+- Migration `docs/20261118_jesaisquand.sql` : tables `jsq_paquets`, `jsq_cartes`, `jsq_cartes_journal`, `jsq_parties`, `jsq_joueurs`, `jsq_coups`.
+- Tests : `test_jesaisquand_regles.php` (règles hors ligne, 23) et `test_jesaisquand.php` (HTTP, 95).
+
 ## [2.24.2] — 2026-11-16
 
 ### Corrigé

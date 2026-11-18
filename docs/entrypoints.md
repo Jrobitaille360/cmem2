@@ -12,6 +12,7 @@ Chaque module expose sa documentation d'API au format JSON. Ces fichiers décriv
 | [booking/API_BOOKING_ENDPOINTS.json](docs-api/booking/API_BOOKING_ENDPOINTS.json) | 7 | Réservation publique : page hôte (`/booking/page`, JWT), créneaux libres et réservation atomique par slug (public, rate-limité), annulation par token. |
 | [items/API_ITEMS_ENDPOINTS.json](docs-api/items/API_ITEMS_ENDPOINTS.json) | 13 | Gestionnaire d'items génériques — privé / public / partagé, catégories, permissions par utilisateur. |
 | [quiz/API_QUIZ_ENDPOINTS_v1_0_0.json](docs-api/quiz/API_QUIZ_ENDPOINTS_v1_0_0.json) | 17 | Quiz temps réel : CRUD quiz/questions, sessions animateur (JWT) et participants (participant_token). |
+| [jesaisquand/API_JESAISQUAND_ENDPOINTS.json](docs-api/jesaisquand/API_JESAISQUAND_ENDPOINTS.json) | 10 | « Je sais quand » : paquets de cartes chronologiques (solo), parties multijoueur au tour par tour arbitrées par le serveur (invités, jeton joueur, dates des mains jamais exposées, `304` sur `?depuis=`), import admin des paquets, illustration et crédit des cartes journalisés. |
 | [puzzle/API_PUZZLE_ENDPOINTS.json](docs-api/puzzle/API_PUZZLE_ENDPOINTS.json) | 20 | Plugin puzzle : carrousel, thèmes, livraison d'images, backup en ligne, casse-têtes partagés (pick/drop). Auth device_token. |
 | [puzzle/API_PUZZLE_ADMIN_MANAGER.json](docs-api/puzzle/API_PUZZLE_ADMIN_MANAGER.json) | 16 | Administration puzzle pour le SPA React : CRUD images et thèmes, tri, associations, livraison images admin. JWT ADMINISTRATEUR. |
 | [webdevice/API_WEBDEVICE_ENDPOINTS.json](docs-api/webdevice/API_WEBDEVICE_ENDPOINTS.json) | 10 (+5 alias) | Devices Android (table `android_devices`), web et Windows (table `web_devices`) : register + pseudonyme. Routes `/v2/devices/windows/*` identiques en alias de web. |
@@ -37,6 +38,7 @@ Chaque guide complète le JSON avec les flux d'intégration, exemples et codes d
 | [booking/GUIDE.md](docs-api/booking/GUIDE.md) | Gating par plan, endpoints hôte et publics, génération des zones, cron, erreurs. |
 | [items/GUIDE.md](docs-api/items/GUIDE.md) | Items privés/publics/partagés, catégories, permissions par utilisateur. |
 | [quiz/GUIDE.md](docs-api/quiz/GUIDE.md) | Flux animateur (JWT) et participant (participant_token), sessions, leaderboard. |
+| [jesaisquand/GUIDE.md](docs-api/jesaisquand/GUIDE.md) | Flux salon → démarrage → interrogation `?depuis=` → coups, règles de pose, champs jamais exposés, import et édition admin des cartes. |
 | [puzzle/GUIDE.md](docs-api/puzzle/GUIDE.md) | Client mobile Flutter : carrousel, thèmes, backup/claim, casse-têtes partagés (pick/drop). |
 | [puzzle/guide_image_manager.md](docs-api/puzzle/guide_image_manager.md) | SPA React d'administration des images et thèmes. |
 | [webdevice/GUIDE.md](docs-api/webdevice/GUIDE.md) | Devices Android, web, Windows (alias `/v2/devices/windows/*`), pseudonyme multi-plateforme. |

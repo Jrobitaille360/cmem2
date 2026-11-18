@@ -1,0 +1,210 @@
+{
+  "api": {
+    "name": "Jesaisquand API",
+    "version": "1.0.0",
+    "description": "Plugin « Je sais quand » : paquets de cartes chronologiques (solo), parties multijoueur au tour par tour où le serveur fait autorité (les dates des cartes en main ne sortent jamais avant la pose), édition admin des illustrations et crédits.",
+    "generated": "2026-11-18",
+    "directives": ["#524 (paquets + multijoueur)", "#526 (édition admin des cartes)"],
+    "base_url": "/jesaisquand",
+    "authentication": {
+      "types": ["NONE", "PLAYER_TOKEN", "JWT_BEARER"],
+      "none": {
+        "description": "Lecture des paquets publics, création d'un salon et arrivée dans un salon (invités : pseudo seulement)."
+      },
+      "player_token": {
+        "header": "Authorization: Bearer {jeton}",
+        "description": "Jeton joueur opaque (64 caractères hexadécimaux) renvoyé par POST /parties et POST /parties/{code}/rejoindre. Le serveur n'en stocke que le SHA-256 : il n'est pas récupérable s'il est perdu. Valable pour une seule partie."
+      },
+      "jwt": {
+        "header": "Authorization: Bearer {jwt_token}",
+        "description": "Facultatif à la création et à l'arrivée (renseigne user_id du joueur). Obligatoire, avec le rôle ADMINISTRATEUR ou SUPERADMINISTRATEUR, pour les routes admin. Un JWT invalide envoyé à une route facultative renvoie 401."
+      }
+    },
+    "card_format": {
+      "revealed": "{ id: string, titre, date: { annee: int (<0 = av. J.-C.), mois?: 1-12, jour?: 1-31 }, dateTexte?, approx?: true, periode?, essentiel?: true, categorie?, description?, image?, credit?, imageSource?, imageFileId? }",
+      "hidden": "{ id: string, titre, categorie?, image?, credit?, imageSource?, imageFileId? } — JAMAIS date, dateTexte, periode, approx, essentiel ni description (la description peut citer l'année).",
+      "image": "image = image_url, ou {APP_URL}/files/{image_file_id} pour un fichier cmem2 grand-public."
+    },
+    "rules": {
+      "comparison": "Dates comparées à leur précision commune : année, puis mois, puis jour si les deux cartes les ont (1969 = 1969-07-20). Identique à jesaisquand/src/lib/partie.ts.",
+      "valid_move": "Pose à l'index i (0 = avant la première carte, n = après la dernière) valide si gauche <= carte <= droite. Égalités acceptées des deux côtés.",
+      "wrong_move": "La carte est insérée après les égalités existantes (index_final) et le joueur pioche une carte de pénalité si la pioche n'est pas vide.",
+      "end": "Le premier joueur à vider sa main gagne ; le tour de table est complété (jusqu'au joueur d'ordre le plus élevé) et tous ceux qui ont vidé leur main dans ce tour sont gagnants (ex æquo).",
+      "players": "2 à 6 joueurs. Main de taille_main cartes (1 à 8, défaut 4). Le paquet doit compter au moins 1 + joueurs × taille_main cartes.",
+      "expiry": "Aucun délai par tour. Une partie en attente ou en cours sans activité depuis 24 h passe au statut expiree (actions → 410). Les parties inactives depuis 7 jours sont purgées."
+    }
+  },
+  "endpoints": {
+    "paquets": {
+      "description": "Lecture des paquets — publique",
+      "auth_required": false,
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/jesaisquand/paquets",
+          "description": "Liste des paquets publics, sans leurs cartes.",
+          "responses": {
+            "200": "{ success: true, data: { paquets: [{ slug, titre, description, source, nb_cartes: int }] } }"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/jesaisquand/paquets/{slug}",
+          "description": "Paquet complet, cartes AVEC dates (mode solo). Un paquet non public n'est visible qu'avec un JWT ADMINISTRATEUR ou SUPERADMINISTRATEUR.",
+          "params": { "slug": "string (required)" },
+          "responses": {
+            "200": "{ success: true, data: { id, slug, titre, description, source, public: bool, cartes: [carte révélée] } }",
+            "401": "JWT fourni mais invalide",
+            "404": "Paquet introuvable (ou non public sans JWT admin)"
+          }
+        }
+      ]
+    },
+    "salon": {
+      "description": "Création et arrivée dans un salon — invités (JWT facultatif)",
+      "auth_required": false,
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/jesaisquand/parties",
+          "description": "Crée un salon sur un paquet public. Le créateur devient le joueur d'ordre 1 (seul autorisé à démarrer).",
+          "body": {
+            "paquet": "string (required) - slug d'un paquet public",
+            "pseudo": "string (required) - 1 à 40 caractères",
+            "taille_main": "integer (optional) - 1 à 8, défaut 4"
+          },
+          "responses": {
+            "201": "{ success: true, data: { code: string (6 caractères A-Z 2-9), jeton: string, joueur_id: int, ordre: 1 } }",
+            "401": "JWT fourni mais invalide",
+            "404": "Paquet introuvable ou non public",
+            "422": "Données invalides — détail dans errors"
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/jesaisquand/parties/{code}/rejoindre",
+          "description": "Rejoint un salon en attente. Le code est insensible à la casse.",
+          "body": { "pseudo": "string (required) - 1 à 40 caractères" },
+          "responses": {
+            "201": "{ success: true, data: { code, jeton, joueur_id, ordre } }",
+            "401": "JWT fourni mais invalide",
+            "404": "Partie introuvable",
+            "409": "Partie déjà démarrée ou terminée | salon complet (6 joueurs)",
+            "410": "Partie expirée",
+            "422": "Pseudo invalide"
+          }
+        }
+      ]
+    },
+    "partie": {
+      "description": "Déroulement d'une partie — jeton joueur",
+      "auth_required": true,
+      "auth_type": "PLAYER_TOKEN",
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/jesaisquand/parties/{code}/demarrer",
+          "description": "Démarre la partie : mélange, distribue taille_main cartes à chaque joueur, pose une carte sur la frise, donne le tour au joueur d'ordre 1.",
+          "responses": {
+            "200": "{ success: true, data: état de la partie (voir GET) }",
+            "401": "Jeton absent",
+            "403": "Jeton invalide pour cette partie | joueur non créateur",
+            "404": "Partie introuvable",
+            "409": "Partie déjà démarrée",
+            "410": "Partie expirée",
+            "422": "Moins de 2 joueurs | paquet trop petit"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/jesaisquand/parties/{code}",
+          "description": "État de la partie vu par le joueur du jeton. Avec ?depuis={version} égal à la version courante : 304 sans corps (interrogation périodique 1-2 s).",
+          "query": { "depuis": "integer (optional) - dernière version connue" },
+          "responses": {
+            "200": "{ success: true, data: { code, statut: 'attente'|'en_cours'|'terminee'|'expiree', version: int, paquet: { slug, titre }, taille_main, frise: [carte révélée], moi: { joueur_id, pseudo, ordre, createur: bool, main: [carte cachée] }, joueurs: [{ joueur_id, pseudo, ordre, taille_main, gagnant: bool }], tour_joueur_id: int|null, pioche_restante: int, dernier_coup: { joueur_id, carte: carte révélée, correct, index_final, penalite: bool } | null } }",
+            "304": "Version inchangée",
+            "401": "Jeton absent",
+            "403": "Jeton invalide pour cette partie",
+            "404": "Partie introuvable"
+          },
+          "notes": "La version augmente à chaque arrivée, démarrage, coup et expiration. Les mains adverses ne sont données que par leur taille."
+        },
+        {
+          "method": "POST",
+          "path": "/jesaisquand/parties/{code}/coups",
+          "description": "Pose une carte de sa main sur la frise.",
+          "body": {
+            "carte_id": "string (required) - id d'une carte de sa main",
+            "index": "integer (required) - 0 (avant la première carte) à n (après la dernière)"
+          },
+          "responses": {
+            "200": "{ success: true, data: { correct: bool, index_final: int, date: { annee, mois?, jour? }, carte: carte révélée, statut: 'en_cours'|'terminee', penalite_carte?: carte cachée } }",
+            "401": "Jeton absent",
+            "403": "Jeton invalide | ce n'est pas votre tour",
+            "404": "Partie introuvable",
+            "409": "Partie non démarrée ou terminée",
+            "410": "Partie expirée",
+            "422": "Carte absente de la main | index hors frise | données invalides"
+          }
+        }
+      ]
+    },
+    "admin": {
+      "description": "Administration des paquets et des cartes — JWT ADMINISTRATEUR ou SUPERADMINISTRATEUR",
+      "auth_required": true,
+      "auth_type": "JWT_BEARER",
+      "routes": [
+        {
+          "method": "POST",
+          "path": "/jesaisquand/admin/paquets",
+          "description": "Import (upsert) d'un paquet au format JSON de jesaisquand (src/data/*.json). Les cartes sont rapprochées par id ; les cartes absentes de l'import sont conservées.",
+          "body": {
+            "id": "string (required) - slug : minuscules, chiffres, tirets, 64 max (alias : slug)",
+            "titre": "string (required)",
+            "description": "string (optional)",
+            "source": "string (optional)",
+            "public": "bool (optional) - défaut true",
+            "cartes": "array (required, 1 à 2000) - [{ id (lettres, chiffres, . _ -, 100 max), titre, date: { annee, mois?, jour? }, dateTexte?, periode?, approx?, essentiel?, categorie?, description?, image?, credit?, imageSource? }]"
+          },
+          "responses": {
+            "201": "{ success: true, data: { slug, paquet_cree: true, cartes_crees, cartes_mises_a_jour } } — nouveau paquet",
+            "200": "Même forme — paquet existant mis à jour",
+            "401": "JWT absent ou invalide",
+            "403": "Rôle insuffisant",
+            "422": "Données invalides — détail par carte dans errors (cartes.{i})"
+          }
+        },
+        {
+          "method": "PATCH",
+          "path": "/jesaisquand/paquets/{slug}/cartes/{carte_id}",
+          "description": "Change l'illustration et le crédit d'une carte (#526). Chaque modification est journalisée (jsq_cartes_journal : qui, quand, ancienne et nouvelle valeur).",
+          "body": {
+            "image_url": "string - URL https sur upload.wikimedia.org ou images-assets.nasa.gov (hôte exact, sans port ni identifiants)",
+            "image_file_id": "integer - fichier cmem2 image, accessibility grand-public (alternative exclusive à image_url)",
+            "credit": "string (required) - non vide, 500 max",
+            "image_source": "string (optional) - URL https de la page d'origine"
+          },
+          "responses": {
+            "200": "{ success: true, data: { paquet: slug, carte: carte révélée } }",
+            "401": "JWT absent ou invalide",
+            "403": "Rôle insuffisant",
+            "404": "Paquet ou carte introuvable",
+            "422": "Crédit vide | hôte non autorisé ou URL non https | ni image_url ni image_file_id (ou les deux) | fichier introuvable ou non grand-public"
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/jesaisquand/admin/cartes-sans-credit",
+          "description": "Cartes illustrées (image_url ou image_file_id) sans crédit.",
+          "query": { "paquet": "string (optional) - slug ; sans filtre, tous les paquets" },
+          "responses": {
+            "200": "{ success: true, data: { cartes: [{ id, paquet, titre, image, imageSource }], total } }",
+            "401": "JWT absent ou invalide",
+            "403": "Rôle insuffisant",
+            "404": "Paquet introuvable"
+          }
+        }
+      ]
+    }
+  }
+}

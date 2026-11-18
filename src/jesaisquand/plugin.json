@@ -1,0 +1,29 @@
+{
+    "name": "Jesaisquand",
+    "version": "1.0.0",
+    "description": "Je sais quand — paquets de cartes chronologiques et parties multijoueur au tour par tour",
+    "author": "CMEM Team",
+    "namespace": "Jesaisquand",
+    "main_class": "Jesaisquand\\JesaisquandPlugin",
+    "min_cmem_version": "2.24.0",
+    "status": "active",
+    "dependencies": {
+        "cmem2_core": ">=1.3.0"
+    },
+    "routes": {
+        "prefix": "/jesaisquand"
+    },
+    "route_handlers": {
+        "jesaisquand": "Jesaisquand\\Routing\\JesaisquandRouteHandler"
+    },
+    "database": {
+        "tables": [
+            "jsq_paquets",
+            "jsq_cartes",
+            "jsq_cartes_journal",
+            "jsq_parties",
+            "jsq_joueurs",
+            "jsq_coups"
+        ]
+    }
+}
