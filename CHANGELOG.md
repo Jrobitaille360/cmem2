@@ -9,6 +9,8 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+## [2.25.0] — 2026-11-18
+
 ### Ajouté
 
 - Plugin `jesaisquand` (directives #524 et #526 de jesaisquand) — `src/jesaisquand/`, docs `docs/docs-api/jesaisquand/`.

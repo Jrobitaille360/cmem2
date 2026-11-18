@@ -1,11 +1,11 @@
 ﻿# cmem2 API
 
-![Version](https://img.shields.io/badge/version-2.24.2-blue.svg)
+![Version](https://img.shields.io/badge/version-2.25.0-blue.svg)
 ![PHP](https://img.shields.io/badge/PHP-8.0+-purple.svg)
 ![Status](https://img.shields.io/badge/status-production%20ready-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 
-API REST modulaire pour la plateforme **Memories v2**. Elle regroupe les modules : authentification/groupes (core), calendriers ICS/CalDAV, Pomodoro, Quiz interactif, gestionnaire générique Items, pilier Contacts (CRM), gestion de projet (Projets), puzzle collaboratif, jeu Traque, accès sur approbation (Access), notifications push web VAPID (Push) et enregistrement d'appareils Android/web/Windows (WebDevice).
+API REST modulaire pour la plateforme **Memories v2**. Elle regroupe les modules : authentification/groupes (core), calendriers ICS/CalDAV, Pomodoro, Quiz interactif, jeu de frise « Je sais quand » (jesaisquand), gestionnaire générique Items, pilier Contacts (CRM), gestion de projet (Projets), puzzle collaboratif, jeu Traque, accès sur approbation (Access), notifications push web VAPID (Push) et enregistrement d'appareils Android/web/Windows (WebDevice).
 
 Authentification **JWT** HS256 (Bearer, 15 jours). Deux méthodes de connexion : **email + mot de passe** ou **email + code OTP**.
 
@@ -32,6 +32,7 @@ cmem2 API fournit :
 - **ICS/CalDAV** : Calendriers iCalendar, tâches (VTODO), journaux (VJOURNAL), étiquettes par calendrier, export `.ics`, synchronisation CalDAV RFC 5545
 - **Pomo** : Plugin Pomodoro — engagement waitlist/sondage, support, sync cloud
 - **Quiz** : Quiz interactifs en temps réel (style Kahoot) — sessions, scoring dégressif, leaderboard
+- **Jesaisquand** : « Je sais quand » — paquets de cartes chronologiques, multijoueur au tour par tour arbitré par le serveur (invités), édition admin des illustrations et crédits
 - **Items** : Gestionnaire générique d'items (private/public/share), catégories JSON, partages utilisateurs
 - **Contacts** : Pilier Contacts (CRM) — fiches personnes/organisations owner-strict, vCard 4.0, cap `max_contacts`, envoi de courriel, historique d'interactions (appels/notes/rdv/sms)
 - **Projets** : Gestion de projet — tâches, hiérarchie, dépendances (FS/SS/FF/SF), round-trip JSON, export `.ics`
@@ -159,6 +160,7 @@ cmem2_API/
 │   │   ├── Models/
 │   │   ├── Validators/        # QuizValidator
 │   │   └── Routing/
+│   ├── jesaisquand/           # Plugin « Je sais quand » — paquets, multijoueur, admin cartes
 │   ├── items/                 # Gestionnaire générique d'items
 │   ├── projets/                # Gestion de projet — tâches, hiérarchie, dépendances
 │   │   ├── Controllers/
@@ -188,6 +190,7 @@ Namespaces PSR-4 :
 - `ICS\` → `src/ics/`
 - `Pomo\` → `src/pomo/`
 - `Quiz\` → `src/quiz/`
+- `Jesaisquand\` → `src/jesaisquand/`
 - `Items\` → `src/items/`
 - `Projets\` → `src/projets/`
 - `Puzzle\` → `src/puzzle/`
@@ -340,6 +343,23 @@ Voir [docs/docs-api/pomo/GUIDE.md](docs/docs-api/pomo/GUIDE.md) pour la référe
 
 Voir [docs/docs-api/quiz/GUIDE.md](docs/docs-api/quiz/GUIDE.md) pour la référence complète.
 
+### Jesaisquand
+
+| Méthode | Endpoint | Description | Auth |
+| --- | --- | --- | --- |
+| GET | `/jesaisquand/paquets` | Paquets publics | Non |
+| GET | `/jesaisquand/paquets/{slug}` | Paquet complet, cartes avec dates (solo) | Non |
+| POST | `/jesaisquand/parties` | Créer un salon → code + jeton joueur | Non (JWT facultatif) |
+| POST | `/jesaisquand/parties/{code}/rejoindre` | Rejoindre un salon | Non (JWT facultatif) |
+| POST | `/jesaisquand/parties/{code}/demarrer` | Démarrer (créateur) | Jeton joueur |
+| GET | `/jesaisquand/parties/{code}?depuis=` | État (main sans dates), 304 si inchangé | Jeton joueur |
+| POST | `/jesaisquand/parties/{code}/coups` | Poser une carte | Jeton joueur |
+| POST | `/jesaisquand/admin/paquets` | Importer un paquet (upsert) | JWT admin |
+| PATCH | `/jesaisquand/paquets/{slug}/cartes/{carte_id}` | Illustration et crédit (journalisés) | JWT admin |
+| GET | `/jesaisquand/admin/cartes-sans-credit` | Cartes illustrées sans crédit | JWT admin |
+
+Voir [docs/docs-api/jesaisquand/GUIDE.md](docs/docs-api/jesaisquand/GUIDE.md) pour la référence complète.
+
 ### Items
 
 | Méthode | Endpoint | Description | Auth |
@@ -468,4 +488,4 @@ MIT — voir [LICENSE](LICENSE). Dépendances tierces : [THIRD_PARTY_LICENSES.md
 
 ---
 
-**Version** : 2.24.2 · **Mis à jour** : 2026-11-16 · **Auteur** : [Jrobitaille360](https://github.com/Jrobitaille360)
+**Version** : 2.25.0 · **Mis à jour** : 2026-11-18 · **Auteur** : [Jrobitaille360](https://github.com/Jrobitaille360)
