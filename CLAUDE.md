@@ -52,6 +52,8 @@ php private/tests/test_ics_occurrences_expand.php
 php private/tests/test_ics_tags.php
 php private/tests/test_ics_todos_e2e.php
 php private/tests/test_items.php
+php private/tests/test_jesaisquand.php
+php private/tests/test_jesaisquand_regles.php
 php private/tests/test_kestyon_tags.php
 php private/tests/test_kestyon_upload.php
 php private/tests/test_link_device_e2e.php
@@ -100,7 +102,7 @@ Tests execute real HTTP requests via cURL against a running server. Each test fi
 ### Database initialization
 
 ```bash
-mysql -u root -p < docs/versions-old/v-2-24-0/build_DB-v-2.24.0.sql
+mysql -u root -p < docs/v-2-25-0/build_DB-v-2.25.0.sql
 ```
 
 ## Architecture
@@ -127,6 +129,7 @@ src/<module>/
 | - | - | - |
 | `src/auth_groups/` | `AuthGroups\` | Core: users, JWT auth, groups, files, tags, webhooks, cross-entity links (`/links`) |
 | `src/ics/` | `ICS\` | CalDAV/ICS calendar sync (RFC 5545) |
+| `src/jesaisquand/` | `Jesaisquand\` | « Je sais quand » — card decks, server-authoritative turn-based multiplayer (guest player tokens), admin card illustration/credit |
 | `src/quiz/` | `Quiz\` | Real-time quiz sessions with participant tokens |
 | `src/items/` | `Items\` | Generic item manager — private / public / shared |
 | `src/contacts/` | `Contacts\` | Contacts pillar — CRUD `/contacts`, vCard 4.0 import/export, `max_contacts` cap, CRM interactions and `/opportunites` pipeline |
