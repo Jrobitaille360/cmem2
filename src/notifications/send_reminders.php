@@ -38,6 +38,7 @@ require_once $rootDir . '/src/assistant/autoloader.php';
 
 use Assistant\Services\UserSmtpService;
 use AuthGroups\Controllers\NotificationSettingsController;
+use AuthGroups\Services\DbAvailability;
 use AuthGroups\Services\EmailService;
 use AuthGroups\Services\LogService;
 use AuthGroups\Services\ReminderScanner;
@@ -312,7 +313,12 @@ try {
     exit(0);
 
 } catch (Throwable $e) {
-    echo date('[Y-m-d H:i:s]') . ' ERREUR FATALE : ' . $e->getMessage() . PHP_EOL;
-    LogService::error('Cron rappels — erreur fatale', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+    // Panne MySQL (connexion refusée, gone away) : avertissement sans trace, le passage
+    // suivant rattrape les rappels encore dans la tolérance (task #532).
+    $failure = DbAvailability::cronFailure($e, 'Cron rappels');
+    echo $failure['line'] . PHP_EOL;
+    $failure['level'] === 'warning'
+        ? LogService::warning($failure['message'], $failure['context'])
+        : LogService::error($failure['message'], $failure['context']);
     exit(1);
 }

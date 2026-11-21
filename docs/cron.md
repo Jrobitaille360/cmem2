@@ -41,6 +41,13 @@ php src/notifications/send_email_notifications.php --dry-run   # liste les envoi
 php src/notifications/send_reminders.php --dry-run --verbose   # tous canaux
 ```
 
+Panne de la base (connexion refusée, « MySQL server has gone away », coupure de l'hébergeur) :
+le passage s'arrête avec la ligne « Base de données indisponible — reprise au prochain passage »
+et un `WARNING` « Cron rappels — base de données indisponible » dans `logs/app-*.log`, sans trace
+(task #532). Le passage suivant envoie les rappels restés dans la tolérance (60 minutes ; 7 jours
+pour `contact_followup`) : une panne plus courte ne fait perdre aucun rappel. Les autres erreurs
+restent des `ERROR` « Cron rappels — erreur fatale » avec trace.
+
 ## Roulement d'horizon booking (réservation publique)
 
 `src/cron/booking_regenerate.php` — pour chaque `booking_pages.active = 1`, régénère les zones

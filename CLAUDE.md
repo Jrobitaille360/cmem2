@@ -34,6 +34,7 @@ php private/tests/test_contacts_messages.php
 php private/tests/test_contacts_interactions.php
 php private/tests/test_contacts_opportunites.php
 php private/tests/test_cors_e2e_account.php
+php private/tests/test_cron_db_unavailable.php
 php private/tests/test_email_verification.php
 php private/tests/test_entrypoints.php
 php private/tests/test_files.php
