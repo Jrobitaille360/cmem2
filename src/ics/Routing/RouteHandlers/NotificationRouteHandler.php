@@ -9,10 +9,12 @@ use AuthGroups\Utils\Response;
 /**
  * Gère les routes sous /notifications
  *
- *   GET    /notifications/email                → listEmailNotifications
- *   POST   /notifications/email/test           → sendTestEmail
- *   DELETE /notifications/email/{id}           → cancelEmailNotification
  *   POST   /notifications/attendee-reply       → handleAttendeeReply  [Phase 3.3]
+ *   GET|PUT /notifications/defaults            → NotificationSettingsController (#487)
+ *   GET     /notifications/devices             → NotificationSettingsController (#487)
+ *   PUT|DELETE /notifications/devices/{id}     → NotificationSettingsController (#487)
+ *
+ * Retirées en #497 : /notifications/email[/{id}|/test], /notifications/send-email (→ 404).
  */
 class NotificationRouteHandler extends BaseRouteHandler
 {
@@ -36,33 +38,17 @@ class NotificationRouteHandler extends BaseRouteHandler
         $user     = $request['user'];
 
         // segments[0] = 'notifications'
-        // segments[1] = 'email' (toujours, pour l'instant)
-        // segments[2] = '{id}' ou 'test' (optionnel)
+        // segments[1] = 'attendee-reply' | 'defaults' | 'devices'
+        // segments[2] = '{id}' (devices, optionnel)
 
-        $sub   = $segments[1] ?? '';   // 'email'
-        $third = $segments[2] ?? '';   // id numérique ou 'test'
+        $sub   = $segments[1] ?? '';
+        $third = $segments[2] ?? '';
 
         match (true) {
-
-            // POST /notifications/send-email
-            ($sub === 'send-email' && $method === 'POST') =>
-                $this->controller->sendEmailForOccurrence($user['user_id']),
 
             // POST /notifications/attendee-reply  — Phase 3.3 iTIP REPLY
             ($sub === 'attendee-reply' && $method === 'POST') =>
                 $this->controller->handleAttendeeReply($user['user_id']),
-
-            // GET /notifications/email
-            ($sub === 'email' && $method === 'GET' && $third === '') =>
-                $this->controller->listEmailNotifications($user['user_id']),
-
-            // POST /notifications/email/test
-            ($sub === 'email' && $method === 'POST' && $third === 'test') =>
-                $this->controller->sendTestEmail($user['user_id']),
-
-            // DELETE /notifications/email/{id}
-            ($sub === 'email' && $method === 'DELETE' && ctype_digit($third) && $third !== '') =>
-                $this->controller->cancelEmailNotification((int)$third, $user['user_id']),
 
             // Rappels unifiés (#487, contrat #236 §4-§5) — contrôleur AuthGroups
             ($sub === 'defaults' && $third === '' && $method === 'GET') =>

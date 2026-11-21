@@ -158,12 +158,6 @@ class ReminderList
         return ['present' => true, 'value' => $check['value']];
     }
 
-    /** Premier délai d'une liste (compatibilité `rappelMinutesAvant`), NULL si vide ou NULL. */
-    public static function firstLead(?array $list): ?int
-    {
-        return isset($list[0]['minutes_before']) ? (int) $list[0]['minutes_before'] : null;
-    }
-
     /** Valeur à stocker en base : NULL ou JSON. */
     public static function toStorage(?array $list): ?string
     {

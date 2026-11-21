@@ -720,8 +720,8 @@
         {
           "method": "GET",
           "path": "/users/me/notification-preferences",
-          "description": "Récupérer les préférences de notifications email de l'utilisateur (fournies par le plugin ICS)",
-          "response": "Objet des préférences de notifications",
+          "description": "Récupérer la préférence courriel du compte (fournie par le plugin ICS). Les rappels partent toujours à l'adresse du compte (notification_email retiré en v2.26.0, #497).",
+          "response": "{ email_notifications_enabled: bool, account_email: string }",
           "errors": {
             "503": "Plugin de notifications non disponible"
           }
@@ -729,12 +729,13 @@
         {
           "method": "PUT",
           "path": "/users/me/notification-preferences",
-          "description": "Mettre à jour les préférences de notifications email de l'utilisateur (fournies par le plugin ICS)",
+          "description": "Activer ou suspendre les rappels par courriel du compte (fourni par le plugin ICS)",
           "body": {
-            "preferences": "object — champs de préférences à modifier"
+            "email_notifications_enabled": "bool (optional) — absent = inchangé"
           },
-          "response": "Objet des préférences mises à jour",
+          "response": "{ email_notifications_enabled: bool, account_email: string }",
           "errors": {
+            "422": "FIELD_REMOVED (field notification_email) — champ retiré en v2.26.0 (#497)",
             "503": "Plugin de notifications non disponible"
           }
         },

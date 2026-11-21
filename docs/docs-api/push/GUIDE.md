@@ -12,10 +12,10 @@ Directive d'origine : `cmem_web` 20260726_140426.
 | Élément | Valeur |
 | - | - |
 | Base path | `/push` |
-| Authentification | JWT Bearer (les 5 routes) |
+| Authentification | JWT Bearer (les 3 routes) |
 | Multi-tenant | `app_id` — `cmemweb` pour cmem_web, défaut serveur `puzzle` |
-| Portée des préférences | **Compte** (jamais par appareil) |
-| Tables | `push_subscriptions`, `notification_prefs`, `push_notification_log` |
+| Réglages | `/notifications/defaults` (compte) et `/notifications/devices` (appareil) — guide ICS |
+| Tables | `push_subscriptions`, `notification_defaults`, `reminder_log` |
 | Cron | `src/push/send_push_notifications.php`, toutes les 5 minutes |
 | Bibliothèque | `minishlink/web-push` ^9 (ext-openssl, ext-curl, ext-gmp/bcmath) |
 
@@ -27,7 +27,8 @@ Directive d'origine : `cmem_web` 20260726_140426.
    `app_id: 'cmemweb'`.
    - Premier envoi → `201`. Ré-abonnement du même appareil → `200`, même `id`, aucune
      ligne dupliquée.
-4. `GET /push/preferences` puis `PUT /push/preferences` pour régler les 4 `kind`.
+4. `GET /notifications/defaults` puis `PUT /notifications/defaults` pour régler les 4 `kind`
+   (`/push/preferences` est retiré depuis v2.26.0 → `404`).
 5. Désinstallation / retrait du consentement → `DELETE /push/subscribe` (corps :
    `endpoint`) → `204`.
 
@@ -45,13 +46,14 @@ Le service worker reçoit :
 le client a besoin pour router le clic. Aucun titre d'événement, de tâche ou
 d'opportunité n'est transmis (exigence de confidentialité de la directive §6).
 
-## Préférences — portée compte
+## Réglages — portée compte
 
-> Dépréciées en v2.22.0 : `GET|PUT /push/preferences` restent compatibles une version
-> (projection des défauts `DISPLAY` de `/notifications/defaults`), puis seront retirées.
+> `GET|PUT /push/preferences` et la table `notification_prefs`, dépréciés en v2.22.0, sont
+> retirés depuis v2.26.0. Les réglages passent par `/notifications/defaults` (défauts par
+> type, table `notification_defaults`) et `/notifications/devices` (filtre par appareil).
 
-`notification_prefs` est unique sur `(owner_id, app_id, kind)`. C'est la réponse au point
-laissé à trancher par la directive : **les préférences font autorité au niveau du compte**.
+`notification_defaults` est unique sur `(owner_id, app_id, kind)` : **les défauts font
+autorité au niveau du compte**, l'appareil ne fait que filtrer les types qu'il accepte.
 
 Raison : l'exigence « une échéance ne doit compter que pour un envoi logique » est
 incompatible avec des `lead_minutes` divergents d'un appareil à l'autre — deux appareils
@@ -71,12 +73,12 @@ le payload `data` porte `entity` (`contact` ou `opportunite`) en plus de `type` 
 évite une migration d'`ENUM` à chaque nouvelle source. Une relance n'est retenue que si
 `date_relance IS NOT NULL AND relance_faite_le IS NULL` sur une fiche non supprimée.
 
-L'`occurrence_key` des relances est préfixée `relance:` — `push_notification_log` est unique
-sur `(owner_id, kind, entity_id, occurrence_key)`, et sans ce préfixe un contact et une
-opportunité de même id échéant le même jour s'annuleraient mutuellement.
+`reminder_log` distingue le type d'entité (`entity_type`) : un contact et une opportunité
+de même id échéant le même jour ne s'annulent pas mutuellement.
 
-`lead_minutes` accepte `5`, `15`, `60`, `1440`. `quiet_from`/`quiet_to` vont par paire
-(fournir l'un sans l'autre → `422`) et gèrent le passage de minuit (`22:00` → `07:00`).
+Délais et plages silencieuses : voir `/notifications/defaults` dans le guide ICS.
+`quiet_from`/`quiet_to` vont par paire (fournir l'un sans l'autre → `422`) et gèrent le
+passage de minuit (`22:00` → `07:00`).
 
 Par défaut, un `kind` jamais réglé est renvoyé avec `enabled = false` : le push est
 **opt-in**.
@@ -140,7 +142,7 @@ journée », tâche de projet, relance, opportunité) à 00:00 dans le fuseau de
 - Abonnement rejeté en `404`/`410` : supprimé immédiatement.
 - Abonnement sans envoi réussi depuis 90 jours (`last_seen_at`, sinon `created_at`) :
   supprimé par le cron.
-- `push_notification_log` n'est plus écrit (conservé en lecture, retiré à la version suivante).
+- `push_notification_log` est supprimée depuis v2.26.0 (remplacée par `reminder_log`).
 
 ## Configuration `.env`
 

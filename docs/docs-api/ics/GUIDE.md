@@ -608,8 +608,11 @@ l'appellent, une par canal) :
 - échéances date seule (tâche « toute la journée », tâche de projet, relance, clôture) :
   00:00 dans le fuseau de l'usager.
 
-La file `email_notification_queue` (et `GET /notifications/email`) n'est plus traitée :
-dépréciée, retirée à la version suivante.
+Le courriel part toujours à l'adresse du compte (`users.email`) : `notification_email`
+est retiré depuis v2.26.0 (`PUT /users/me/notification-preferences` avec ce champ →
+`422 FIELD_REMOVED`). La file `email_notification_queue` et ses routes
+(`/notifications/email`, `/notifications/email/test`, `/notifications/email/{id}`,
+`/notifications/send-email`) sont retirées depuis v2.26.0 (`404`).
 
 ---
 
@@ -622,10 +625,6 @@ dépréciée, retirée à la version suivante.
 | GET | `/notifications/devices?app_id=` | Appareils (abonnements push) |
 | PUT | `/notifications/devices/{id}` | Types acceptés, plage silencieuse, libellé |
 | DELETE | `/notifications/devices/{id}?app_id=` | Supprime l'abonnement (204) |
-| GET | `/notifications/email` | Déprécié — ancienne file courriel |
-| POST | `/notifications/email/test` | Envoyer email de test |
-| DELETE | `/notifications/email/{id}` | Annuler une notification |
-| POST | `/notifications/send-email` | Envoyer rappel immédiat |
 | POST | `/notifications/attendee-reply` | Réponse RSVP (iTIP) |
 
 ### POST /notifications/attendee-reply

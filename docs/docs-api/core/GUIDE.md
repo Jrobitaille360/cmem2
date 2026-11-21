@@ -322,7 +322,7 @@ l'inscription, et de la corriger si elle change.
 Le champ sert au cron des notifications push, qui s'exécute hors requête HTTP et ne peut
 donc pas déduire l'heure locale de l'usager au moment de l'envoi : échéances sans heure
 fixées à 00:00 locales, et plage « ne pas déranger » (`quiet_from` / `quiet_to` de
-`/push/preferences`) évaluée dans ce fuseau. Ordre de priorité :
+`/notifications/defaults` et `/notifications/devices`) évaluée dans ce fuseau. Ordre de priorité :
 `users.timezone` → fuseau du premier calendrier → `America/Montreal`.
 
 ### Rôles utilisateur

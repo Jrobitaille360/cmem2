@@ -12,8 +12,8 @@ use Push\Controllers\PushController;
  *   GET    /push/vapid-public-key
  *   POST   /push/subscribe
  *   DELETE /push/subscribe
- *   GET    /push/preferences
- *   PUT    /push/preferences
+ *
+ * /push/preferences retiré en #497 (→ 404) — voir /notifications/defaults.
  *
  * Toutes les routes exigent un JWT valide.
  */
@@ -53,15 +53,6 @@ class PushRouteHandler extends BaseRouteHandler
                     'POST'   => $controller->subscribe($user),
                     'DELETE' => $controller->unsubscribe($user),
                     default  => Response::error('Méthode non autorisée', null, 405),
-                };
-                return;
-
-            case 'preferences':
-                match ($method) {
-                    'GET'   => $controller->getPreferences($user),
-                    'PUT'   => $controller->putPreferences($user),
-                    'PATCH' => $controller->putPreferences($user),
-                    default => Response::error('Méthode non autorisée', null, 405),
                 };
                 return;
 

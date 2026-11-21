@@ -30,17 +30,16 @@ class MaintenanceService implements MaintenanceTaskInterface
         ];
 
         // Ordre FK-safe :
-        // 1. email_notification_queue (pas de FK explicite)
-        // 2. caldav_locks expirés (FK CASCADE depuis calendars/events — préventif)
-        // 3. caldav_sync_log anciens (FK CASCADE depuis calendars/events)
-        // 4. calendar_events soft-deleted → cascade event_occurrences, caldav_locks
-        // 5. calendar_todos soft-deleted (pas de FK sur calendar_id)
-        // 6. calendar_journals soft-deleted (pas de FK sur calendar_id)
-        // 7. calendar_shares soft-deleted → cascade via FK
-        // 8. calendars soft-deleted → cascade tout ce qui reste
-        // 9. Régénération incrémentale des occurrences récurrentes
+        // 1. caldav_locks expirés (FK CASCADE depuis calendars/events — préventif)
+        // 2. caldav_sync_log anciens (FK CASCADE depuis calendars/events)
+        // 3. calendar_events soft-deleted → cascade event_occurrences, caldav_locks
+        // 4. calendar_todos soft-deleted (pas de FK sur calendar_id)
+        // 5. calendar_journals soft-deleted (pas de FK sur calendar_id)
+        // 6. calendar_shares soft-deleted → cascade via FK
+        // 7. calendars soft-deleted → cascade tout ce qui reste
+        // 8. Régénération incrémentale des occurrences récurrentes
+        // (email_notification_queue retirée en #497.)
 
-        $this->purgeNotificationQueue($db, $result);
         $this->purgeExpiredLocks($db, $result);
         $this->purgeOldSyncLog($db, $result);
         $this->purgeDeletedEvents($db, $result);
@@ -54,46 +53,6 @@ class MaintenanceService implements MaintenanceTaskInterface
     }
 
     // -------------------------------------------------------------------------
-
-    private function purgeNotificationQueue(\PDO $db, array &$result): void
-    {
-        try {
-            // Entrées failed/cancelled gardées 7 jours pour audit
-            $sqlAudit = "
-                DELETE FROM email_notification_queue
-                WHERE status IN ('failed','cancelled')
-                  AND updated_at < NOW() - INTERVAL 7 DAY
-            ";
-            // Entrées pending jamais envoyées depuis plus de 24h (orphelines)
-            $sqlStale = "
-                DELETE FROM email_notification_queue
-                WHERE status = 'pending'
-                  AND fire_at < NOW() - INTERVAL 24 HOUR
-            ";
-
-            if ($this->dryRun) {
-                $stmt = $db->prepare("SELECT COUNT(*) FROM email_notification_queue WHERE status IN ('failed','cancelled') AND updated_at < NOW() - INTERVAL 7 DAY");
-                $stmt->execute();
-                $result['rows_deleted']['email_notification_queue (failed/cancelled >7d)'] = (int) $stmt->fetchColumn();
-
-                $stmt = $db->prepare("SELECT COUNT(*) FROM email_notification_queue WHERE status = 'pending' AND fire_at < NOW() - INTERVAL 24 HOUR");
-                $stmt->execute();
-                $result['rows_deleted']['email_notification_queue (stale pending >24h)'] = (int) $stmt->fetchColumn();
-                return;
-            }
-
-            $stmt = $db->prepare($sqlAudit);
-            $stmt->execute();
-            $result['rows_deleted']['email_notification_queue (failed/cancelled >7d)'] = $stmt->rowCount();
-
-            $stmt = $db->prepare($sqlStale);
-            $stmt->execute();
-            $result['rows_deleted']['email_notification_queue (stale pending >24h)'] = $stmt->rowCount();
-        } catch (\Throwable $e) {
-            $result['errors'][] = 'purgeNotificationQueue: ' . $e->getMessage();
-            LogService::error('Maintenance[ics] purgeNotificationQueue', ['exception' => $e->getMessage()]);
-        }
-    }
 
     private function purgeExpiredLocks(\PDO $db, array &$result): void
     {

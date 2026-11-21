@@ -37,7 +37,6 @@ $tables = [
     'event_occurrences',
     'caldav_sync_log',
     'caldav_locks',
-    'email_notification_queue',
 ];
 
 try {
@@ -46,8 +45,6 @@ try {
     $cleaned += cleanupTable($pdo, "DELETE FROM `event_occurrences` WHERE start_datetime < NOW() - INTERVAL 90 DAY");
     $cleaned += cleanupTable($pdo, "DELETE FROM `caldav_sync_log` WHERE changed_at < NOW() - INTERVAL 30 DAY");
     $cleaned += cleanupTable($pdo, "DELETE FROM `caldav_locks` WHERE expires_at < NOW()");
-    $cleaned += cleanupTable($pdo, "DELETE FROM `email_notification_queue` WHERE status IN ('sent','failed') AND created_at < NOW() - INTERVAL 7 DAY");
-
     // --- 2. Export SQL ---
     $fh = fopen($outFile, 'w');
     if ($fh === false) {

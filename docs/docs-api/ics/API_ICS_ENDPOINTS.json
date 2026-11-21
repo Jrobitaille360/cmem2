@@ -1009,36 +1009,6 @@
           }
         },
         {
-          "method": "GET",
-          "path": "/notifications/email",
-          "description": "DÉPRÉCIÉ (v2.22.0) — liste l'ancienne file email_notification_queue, qui n'est plus traitée : les rappels courriel sont envoyés par le cron unifié (reminder_log)."
-        },
-        {
-          "method": "POST",
-          "path": "/notifications/email/test",
-          "description": "Envoyer un email de test SMTP",
-          "body": {
-            "email": "string (optional) — destinataire (défaut: email du compte)"
-          }
-        },
-        {
-          "method": "DELETE",
-          "path": "/notifications/email/{id}",
-          "description": "Annuler une notification email planifiée",
-          "params": {
-            "id": "integer (required)"
-          }
-        },
-        {
-          "method": "POST",
-          "path": "/notifications/send-email",
-          "description": "Envoyer immédiatement un rappel email pour une occurrence",
-          "body": {
-            "event_id": "integer (required)",
-            "occurrence_date": "string YYYY-MM-DD (required)"
-          }
-        },
-        {
           "method": "POST",
           "path": "/notifications/attendee-reply",
           "description": "Enregistrer la réponse RSVP d'un participant — iTIP METHOD:REPLY (Phase 3)",

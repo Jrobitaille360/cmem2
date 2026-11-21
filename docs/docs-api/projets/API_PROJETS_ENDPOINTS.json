@@ -155,7 +155,7 @@
             "assignee": "string — optionnel",
             "url": "string — optionnel",
             "categories": "array de strings — optionnel",
-            "rappelMinutesAvant": "integer|null — DÉPRÉCIÉ (v2.22.0, retiré à la version suivante) : n → notifications [EMAIL n, DISPLAY n], null → défaut du type ; ignoré si notifications est fourni. Relu = premier délai de notifications.",
+            "rappelMinutesAvant": "RETIRÉ (v2.26.0, #497) — 422 FIELD_REMOVED (field rappelMinutesAvant) en POST/PATCH ; ignoré à l'import JSON (anciens exports). Absent en lecture : utiliser notifications.",
             "notifications": "array|null (optional) — rappels de l'élément [{type: 'EMAIL'|'DISPLAY', minutes_before: 0..40320}] (contrat #236). Absent : création = défaut du type, mise à jour = inchangé ; null = défaut du type ; [] = aucun rappel ; liste = remplace le défaut. Max 10, pas de doublon type+délai. 422 : REMINDER_CHANNEL_UNKNOWN, REMINDER_LEAD_INVALID, REMINDER_DUPLICATE, REMINDER_TOO_MANY (errors = {code, field, message}). En lecture : null ou la liste normalisée."
           },
           "response": {

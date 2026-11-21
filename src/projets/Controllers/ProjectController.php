@@ -35,11 +35,13 @@ class ProjectController
     }
 
     /**
-     * Import JSON (#487) : résout notifications / rappelMinutesAvant d'une ligne ; un rappel
-     * invalide fait échouer l'import entier (rollback → 422 « Import rejeté »).
+     * Import JSON (#487) : valide `notifications` d'une ligne ; un rappel invalide fait échouer
+     * l'import entier (rollback → 422 « Import rejeté »). `rappelMinutesAvant` (retiré en #497)
+     * est ignoré : les exports antérieurs le contiennent encore et doivent rester importables.
      */
     private static function importReminders(array $data): array
     {
+        unset($data['rappelMinutesAvant']);
         $prep = Task::prepareReminders($data);
         if ($prep['error']) {
             throw new \RuntimeException("{$prep['error']['code']} ({$prep['error']['field']})");
@@ -268,7 +270,7 @@ class ProjectController
                     'assignee'           => $row['assignee'] ?? null,
                     'url'                => $row['url'] ?? null,
                     'categories'         => $row['categories'] ?? null,
-                ] + array_intersect_key($row, ['notifications' => true, 'rappelMinutesAvant' => true])));
+                ] + array_intersect_key($row, ['notifications' => true])));
                 // Clé normalisée : id temporaire texte OU numérique absent du projet (directive #235)
                 $cle = JsonRoundTrip::cle($tmpId);
                 if ($cle !== null) { $tmpToReal[$cle] = $newId; }

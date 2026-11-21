@@ -1237,16 +1237,6 @@ class CalendarController
 
             $result = $event->create();
 
-            // Planifier les notifications email (§1.1 spec)
-            try {
-                EmailNotificationService::scheduleEmailsForEvent($result, $userId);
-            } catch (\Exception $notifEx) {
-                LogService::warning("Échec planification notifications email (création)", [
-                    'event_id' => $result['id'] ?? null,
-                    'error'    => $notifEx->getMessage(),
-                ]);
-            }
-
             // Phase 3.4 — Invitations email aux attendees (iTIP METHOD:REQUEST)
             if (!empty($result['attendees'])) {
                 try {
@@ -1531,17 +1521,6 @@ class CalendarController
             // Récupérer les données mises à jour (décodées : categories/attachments/… + updatedAt)
             $updatedEvent = $event->getEventById($eventId);
 
-            // Replanifier les notifications email si le champ `notifications` était fourni (§1.2 spec)
-            if (in_array('notifications', $updatedFields, true) && $updatedEvent) {
-                try {
-                    EmailNotificationService::rescheduleEmailsForEvent($eventId, $updatedEvent, $userId);
-                } catch (\Exception $notifEx) {
-                    LogService::warning("Échec replanification notifications email (mise à jour)", [
-                        'event_id' => $eventId,
-                        'error'    => $notifEx->getMessage(),
-                    ]);
-                }
-            }
 
 
             LogService::info("Événement mis à jour", [
@@ -1604,15 +1583,6 @@ class CalendarController
             // Annuler toutes les occurrences de l'événement
             $cancelledCount = \ICS\Models\EventOccurrence::cancelAllForEvent($eventId);
 
-            // Annuler les notifications email en attente (§1.3 spec)
-            try {
-                EmailNotificationService::cancelEmailsForEvent($eventId);
-            } catch (\Exception $notifEx) {
-                LogService::warning("Échec annulation notifications email (suppression)", [
-                    'event_id' => $eventId,
-                    'error'    => $notifEx->getMessage(),
-                ]);
-            }
 
 
             LogService::info("Événement supprimé (soft delete)", [

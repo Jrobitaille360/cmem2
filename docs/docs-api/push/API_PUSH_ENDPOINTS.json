@@ -2,19 +2,18 @@
   "module": {
     "name": "Push",
     "version": "1.0.0",
-    "description": "Notifications push web (Web Push RFC 8030 + VAPID RFC 8292) — subscriptions par appareil, préférences par compte, cron d'envoi. Directive cmem_web 20260726_140426.",
+    "description": "Notifications push web (Web Push RFC 8030 + VAPID RFC 8292) — subscriptions par appareil, cron d'envoi. Directive cmem_web 20260726_140426. Les réglages (défauts par type, filtre par appareil) sont sous /notifications/defaults et /notifications/devices (ICS, #487) ; /push/preferences est retiré depuis v2.26.0 (#497, 404).",
     "generated": "2026-07-26",
     "base_path": "/push",
     "authentication": {
       "type": "JWT_BEARER",
       "header": "Authorization: Bearer {jwt_token}"
     },
-    "notes": "Les 5 routes exigent un JWT. Portée owner-strict : un usager ne voit et ne supprime que ses propres subscriptions ; un endpoint appartenant à un tiers renvoie 404 (aucune fuite d'existence). Multi-tenant via app_id (défaut serveur 'puzzle', 'cmemweb' pour cmem_web). Les préférences sont rattachées au COMPTE, jamais à un appareil."
+    "notes": "Les 3 routes exigent un JWT. Portée owner-strict : un usager ne voit et ne supprime que ses propres subscriptions ; un endpoint appartenant à un tiers renvoie 404 (aucune fuite d'existence). Multi-tenant via app_id (défaut serveur 'puzzle', 'cmemweb' pour cmem_web)."
   },
   "decisions": {
-    "portee_preferences": "PAR COMPTE. notification_prefs est unique sur (owner_id, app_id, kind). Un compte = un jeu de 4 préférences ; tous ses appareils reçoivent le même envoi. Seule portée compatible avec l'exigence « une échéance = un envoi logique » de la directive.",
+    "portee_preferences": "PAR COMPTE : défauts par type dans notification_defaults (owner_id, app_id, kind) via /notifications/defaults ; filtre par appareil via /notifications/devices. (notification_prefs et /push/preferences retirés en v2.26.0, #497.)",
     "kinds": "event | task_due | recurring | contact_followup — l'énumération est complète dès la première migration.",
-    "lead_minutes": "Valeurs acceptées : 5, 15, 60, 1440. Toute autre valeur → 422.",
     "confidentialite": "Par défaut, le title de la notification est générique (PUSH_GENERIC_TITLE) : aucun titre d'événement, de tâche ou d'opportunité n'y figure ; seuls data.type et data.id permettent d'ouvrir la bonne fiche. Opt-in par kind (show_entity_detail=true, défaut false) : le title devient le titre réel de l'entité (titre événement/tâche, nom contact, titre opportunité). Le body est indépendant de ce réglage — voir payload_push.regle.",
     "fuseau_usager": "La table users n'a pas de colonne timezone : le fuseau retenu est celui du premier calendrier de l'usager, sinon America/Montreal."
   },
@@ -93,51 +92,6 @@
             "401": "JWT absent ou invalide",
             "404": "Aucune subscription de cet usager pour cet endpoint",
             "422": "endpoint manquant"
-          }
-        }
-      ]
-    },
-    "preferences": {
-      "description": "Préférences de notification du compte (4 kinds)",
-      "routes": [
-        {
-          "method": "GET",
-          "path": "/push/preferences?app_id={app_id}",
-          "description": "DÉPRÉCIÉ (v2.22.0, retiré à la version suivante) — compatibilité : projection des défauts par type (/notifications/defaults). Lecture : enabled = le défaut du kind a un rappel DISPLAY, lead_minutes = son délai. Écriture : remplace le rappel DISPLAY du défaut (les rappels EMAIL sont conservés). Retourne les 4 kinds. Les kinds jamais réglés sont renvoyés avec leurs défauts (lead_minutes=15, enabled=false — opt-in).",
-          "auth_required": true,
-          "query": {
-            "app_id": "string — optionnel, défaut 'puzzle'"
-          },
-          "response": {
-            "scope": "string — toujours 'account'",
-            "preferences": "[{ kind, lead_minutes, quiet_from, quiet_to, enabled, show_entity_detail }]"
-          },
-          "status_codes": {
-            "200": "Préférences retournées"
-          },
-          "errors": {
-            "401": "JWT absent ou invalide"
-          }
-        },
-        {
-          "method": "PUT",
-          "path": "/push/preferences",
-          "description": "DÉPRÉCIÉ (v2.22.0, retiré à la version suivante) — compatibilité : projection des défauts par type (/notifications/defaults). Lecture : enabled = le défaut du kind a un rappel DISPLAY, lead_minutes = son délai. Écriture : remplace le rappel DISPLAY du défaut (les rappels EMAIL sont conservés). Met à jour les préférences fournies (upsert par kind). PATCH est accepté comme alias. Les kinds absents du corps restent inchangés.",
-          "auth_required": true,
-          "body": {
-            "app_id": "string — optionnel, défaut 'puzzle'",
-            "preferences": "[{ kind: 'event'|'task_due'|'recurring'|'contact_followup', lead_minutes: 5|15|60|1440, enabled: bool, quiet_from?: 'HH:MM', quiet_to?: 'HH:MM', show_entity_detail?: bool }]"
-          },
-          "response": {
-            "scope": "string — toujours 'account'",
-            "preferences": "[{ kind, lead_minutes, quiet_from, quiet_to, enabled, show_entity_detail }] — les 4 kinds après mise à jour"
-          },
-          "status_codes": {
-            "200": "Préférences persistées"
-          },
-          "errors": {
-            "401": "JWT absent ou invalide",
-            "422": "kind inconnu, lead_minutes hors {5,15,60,1440}, format horaire ≠ HH:MM, ou quiet_from/quiet_to fourni seul"
           }
         }
       ]
