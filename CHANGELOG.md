@@ -9,6 +9,8 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+## [2.26.0] — 2026-11-20
+
 ### Retiré (BREAKING — task #497, suite de #487 / v2.22.0)
 
 - `GET|PUT /push/preferences` → `404` : réglages via `/notifications/defaults` et `/notifications/devices`. Modèle `NotificationPref` retiré.
@@ -16,7 +18,7 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 - Tâches de projet : `rappelMinutesAvant` absent en lecture (GET, liste, `export.json`) ; en `POST` / `PATCH` → `422 FIELD_REMOVED` (`field: rappelMinutesAvant`) ; ignoré à l'import JSON (les anciens exports restent importables). Plus de repli `remind_minutes_before` dans l'export `.ics`.
 - `GET /users/me/notification-preferences` : `notification_email` absent ; `PUT` avec ce champ → `422 FIELD_REMOVED`. Les rappels partent toujours à l'adresse du compte.
 - Modèle `PushNotificationLog` et script one-shot `src/notifications/migrate_20261112_reminders.php` (reprise #493 déjà appliquée).
-- Migration `docs/20261120_remove_deprecated_reminders.sql` : `DROP TABLE notification_prefs`, `push_notification_log`, `email_notification_queue` ; `DROP COLUMN calendar_todos.remind_minutes_before`, `users.notification_email`. À appliquer **après** le déploiement du code, avec export préalable.
+- Migration `docs/v-2-26-0/20261120_remove_deprecated_reminders.sql` (schéma de référence `docs/v-2-26-0/build_DB-v-2.26.0.sql`) : `DROP TABLE notification_prefs`, `push_notification_log`, `email_notification_queue` ; `DROP COLUMN calendar_todos.remind_minutes_before`, `users.notification_email`. À appliquer **après** le déploiement du code, avec export préalable.
 - Tests : `test_reminders_deprecations_removed.php` (nouveau) ; `test_push.php`, `test_notification_settings.php`, `test_user_timezone.php`, `test_reminders.php`, `test_reminders_cron.php`, `test_ics_email_notifications.php`, `test_maintenance.php` adaptés.
 
 ## [2.25.0] — 2026-11-18
