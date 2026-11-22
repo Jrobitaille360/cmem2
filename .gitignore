@@ -4,6 +4,8 @@ error_log
 
 # Fichiers de configuration sensibles
 .env
+# Toute variante (.env.prod, .env.bak-YYYYMMDD…) — exemples et .env.ics ré-autorisés plus bas
+.env.*
 
 # répertoire de données privées
 private/
@@ -18,6 +20,7 @@ src/puzzle/google-service-account.json
 
 # Garder les fichiers d'exemple
 !.env*.example
+!src/ics/config/.env.ics
 
 # Dossiers de logs
 logs/
@@ -39,6 +42,8 @@ test*/
 
 # Fichiers de sauvegarde
 *.bak
+*.bak-*
+*.bak_*
 *.backup
 
 # Fichiers IDE
