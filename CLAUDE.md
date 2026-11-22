@@ -24,6 +24,7 @@ php private/tests/test_ai_budget.php
 php private/tests/test_assistant.php
 php private/tests/test_assistant_smtp.php
 php private/tests/test_auth_otp.php
+php private/tests/test_auth_otp_send_failure.php
 php private/tests/test_auth_device_id.php
 php private/tests/test_auth_test_code.php
 php private/tests/test_booking.php

@@ -284,6 +284,9 @@ define('OTP_TEST_ACCOUNT_CODE', trim($_ENV['OTP_TEST_ACCOUNT_CODE'] ?? ''));
 define('AUTH_TEST_CODE', APP_ENV === 'development' ? trim($_ENV['AUTH_TEST_CODE'] ?? '') : '');
 // Trace la présence de la variable hors développement (configuration à corriger)
 define('AUTH_TEST_CODE_IGNORED', APP_ENV !== 'development' && trim($_ENV['AUTH_TEST_CODE'] ?? '') !== '');
+// Domaine de courriel en échec simulé (dev seulement) — ignoré si APP_ENV !== 'development'.
+// Toute adresse @<domaine> fait échouer EmailService::sendEmail et échappe à AUTH_TEST_CODE.
+define('EMAIL_TEST_FAIL_DOMAIN', APP_ENV === 'development' ? strtolower(trim($_ENV['EMAIL_TEST_FAIL_DOMAIN'] ?? '')) : '');
 
 // ============================================
 // RESET DE MOT DE PASSE (code par courriel)

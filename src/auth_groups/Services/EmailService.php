@@ -114,7 +114,15 @@ class EmailService {
                 ]);
                 return false;
             }
-            
+
+            if (self::isTestFailAddress($to)) {
+                LogService::warning("EmailService: Échec d'envoi simulé (EMAIL_TEST_FAIL_DOMAIN)", [
+                    'to' => $to,
+                    'subject' => $subject
+                ]);
+                return false;
+            }
+
             LogService::info("EmailService: Début d'envoi d'email", [
                 'to' => $to,
                 'subject' => $subject,
@@ -898,6 +906,15 @@ class EmailService {
      */
     public function isValidEmail($email) {
         return filter_var($email, FILTER_VALIDATE_EMAIL) !== false;
+    }
+
+    /**
+     * Adresse du domaine d'échec simulé (dev seulement, EMAIL_TEST_FAIL_DOMAIN).
+     */
+    public static function isTestFailAddress(string $email): bool
+    {
+        $domain = defined('EMAIL_TEST_FAIL_DOMAIN') ? EMAIL_TEST_FAIL_DOMAIN : '';
+        return $domain !== '' && str_ends_with(strtolower(trim($email)), '@' . $domain);
     }
     
     /**

@@ -146,8 +146,9 @@ class AuthController
             && in_array($email, OTP_TEST_ACCOUNT_EMAILS, true);
 
         // Le compte de test E2E garde son propre code ; sinon AUTH_TEST_CODE prend le relais.
+        // Le domaine d'échec simulé (dev) doit passer par l'envoi réel pour être testable.
         $fixedCode    = $isTestAccount ? OTP_TEST_ACCOUNT_CODE : $globalTestCode;
-        $useFixedCode = $fixedCode !== '';
+        $useFixedCode = $fixedCode !== '' && !EmailService::isTestFailAddress($email);
 
         if (!$useFixedCode && !RateLimitService::check($email, 'send-code')) {
             LogService::warning('Rate limit send-code dépassé', ['email' => $email]);
@@ -245,7 +246,13 @@ class AuthController
             $forceCode    = (defined('APP_ENV') && APP_ENV === 'development' && defined('TMP_CODE') && TMP_CODE !== '') ? TMP_CODE : null;
             $code         = OtpService::generateAndStore($email, $forceCode);
             $emailService = new EmailService();
-            $emailService->sendOtpCode($email, $userData['name'], $code);
+            if (!$emailService->sendOtpCode($email, $userData['name'], $code)) {
+                // Échec SMTP / mail() : ne pas annoncer un code qui n'arrivera jamais (#534)
+                LogService::error('Échec envoi courriel code OTP', ['email' => $email]);
+                LoggingMiddleware::logExit(500);
+                Response::error('Erreur lors de l\'envoi du code', null, 500);
+                return;
+            }
         } catch (Exception $e) {
             LogService::error('Erreur envoi code OTP', ['email' => $email, 'error' => $e->getMessage()]);
             LoggingMiddleware::logExit(500);
@@ -360,7 +367,12 @@ class AuthController
                 ? TMP_CODE
                 : null;
             $code = OtpService::generateAndStore($email, $forceCode);
-            (new EmailService())->sendOtpCode($email, $pending['name'] ?? '', $code);
+            if (!(new EmailService())->sendOtpCode($email, $pending['name'] ?? '', $code)) {
+                LogService::error('Échec envoi courriel code de restauration', ['email' => $email]);
+                LoggingMiddleware::logExit(500);
+                Response::error('Erreur lors de l\'envoi du code', null, 500);
+                return;
+            }
         } catch (Exception $e) {
             LogService::error('Erreur envoi code de restauration', [
                 'email' => $email,

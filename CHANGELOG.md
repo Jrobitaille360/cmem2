@@ -13,6 +13,9 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 - Cron rappels (task #532) : une panne de la base (connexion refusée, `2002`/`2003`, « MySQL server has gone away » `2006`, `2013`) n'est plus journalisée en `ERROR` « Cron rappels — erreur fatale » avec trace à chaque minute de panne, mais en `WARNING` « Cron rappels — base de données indisponible » sans trace ; ligne console « reprise au prochain passage ». Les autres erreurs restent des `ERROR`. Nouveau `AuthGroups\Services\DbAvailability`. Constat prod : pannes MySQL de l'hébergeur les 14, 15, 16 et 18 nov. (18 nov. 12:32–12:59, l'API aussi), aucun rappel perdu (rattrapage au passage suivant, `reminder_log`).
 - Tests : `test_cron_db_unavailable.php` (hors ligne, 23).
+- Auth OTP (task #534, directive jesaisquand) : `POST /auth/send-code` (et `POST /auth/restore-account`) répond désormais `500` « Erreur lors de l'envoi du code » quand le courriel OTP n'a pas pu partir (`EmailService::sendOtpCode()` → `false`), au lieu d'un `200` « Code envoyé » trompeur. Constat prod 2026-11-22 : `535 Incorrect authentication data` sur `mail.journauxdebord.com` (mot de passe de la boîte `admin@` changé le 2026-11-20 sans report dans `.env`), aucun code reçu par les clients depuis.
+- Dev : nouvelle variable `EMAIL_TEST_FAIL_DOMAIN` (ignorée hors `APP_ENV=development`) — toute adresse de ce domaine fait échouer l'envoi de courriel et échappe à `AUTH_TEST_CODE`, pour tester le chemin d'échec.
+- Tests : `test_auth_otp_send_failure.php` (7).
 
 ## [2.26.0] — 2026-11-20
 

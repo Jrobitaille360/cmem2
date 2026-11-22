@@ -87,7 +87,8 @@
             "400": "Email manquant ou format invalide",
             "403": "Email existant mais non vérifié",
             "409": "Compte en attente de suppression définitive — errors.error_code = ACCOUNT_PENDING_DELETION, errors.purge_scheduled_at = date ISO 8601 UTC de l'effacement physique",
-            "429": "Trop de tentatives — réessayez dans 10 minutes (5 max / 10 min par email+IP)"
+            "429": "Trop de tentatives — réessayez dans 10 minutes (5 max / 10 min par email+IP)",
+            "500": "Erreur lors de l'envoi du code — le courriel OTP n'a pas pu être envoyé (SMTP / mail() en échec) ; aucun code n'arrivera, réessayer plus tard"
           }
         },
         {

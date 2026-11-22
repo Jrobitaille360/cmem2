@@ -193,6 +193,8 @@ Réponse générique `200` (même si email inconnu) :
 
 `403` retourné uniquement si le compte **existe** mais que l'email n'est pas vérifié.
 
+`500` « Erreur lors de l'envoi du code » si le courriel OTP n'a pas pu partir (SMTP ou `mail()` en échec) : aucun code n'arrivera, le client doit afficher l'erreur plutôt qu'attendre un code (avant 2026-11-22, cet échec répondait `200`). Idem pour `POST /auth/restore-account`.
+
 `409` retourné si le compte est **en attente de purge** (supprimé, délai de grâce en cours) — aucun code n'est envoyé :
 
 ```json
