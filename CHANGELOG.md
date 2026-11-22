@@ -9,6 +9,8 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+## [2.26.1] — 2026-11-22
+
 ### Corrigé
 
 - Cron rappels (task #532) : une panne de la base (connexion refusée, `2002`/`2003`, « MySQL server has gone away » `2006`, `2013`) n'est plus journalisée en `ERROR` « Cron rappels — erreur fatale » avec trace à chaque minute de panne, mais en `WARNING` « Cron rappels — base de données indisponible » sans trace ; ligne console « reprise au prochain passage ». Les autres erreurs restent des `ERROR`. Nouveau `AuthGroups\Services\DbAvailability`. Constat prod : pannes MySQL de l'hébergeur les 14, 15, 16 et 18 nov. (18 nov. 12:32–12:59, l'API aussi), aucun rappel perdu (rattrapage au passage suivant, `reminder_log`).
