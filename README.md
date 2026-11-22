@@ -1,7 +1,7 @@
 ﻿# cmem2 API
 
 ![Version](https://img.shields.io/badge/version-2.26.1-blue.svg)
-![PHP](https://img.shields.io/badge/PHP-8.0+-purple.svg)
+![PHP](https://img.shields.io/badge/PHP-8.3+-purple.svg)
 ![Status](https://img.shields.io/badge/status-production%20ready-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 
@@ -47,7 +47,7 @@ cmem2 API fournit :
 
 ## Technologies
 
-- **PHP 8.0+** — langage principal
+- **PHP 8.3+** — langage principal
 - **MySQL / MariaDB** — base de données
 - **PHPMailer** — envoi d'emails (inscription, OTP, support)
 - **sabre/vobject** — génération et parsage iCalendar
@@ -57,7 +57,7 @@ cmem2 API fournit :
 
 ## Installation
 
-**Prérequis** : PHP >= 8.0, MySQL >= 5.7 ou MariaDB >= 10.3, Composer, extensions PDO / mbstring / openssl / fileinfo.
+**Prérequis** : PHP >= 8.3, MySQL >= 5.7 ou MariaDB >= 10.3, Composer, extensions PDO / mbstring / openssl / fileinfo.
 
 ```bash
 git clone https://github.com/Jrobitaille360/cmem2.git

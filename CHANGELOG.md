@@ -9,6 +9,14 @@ Versioning : [Semantic Versioning](https://semver.org/lang/fr/)
 
 ## [Unreleased]
 
+### Sécurité
+
+- Dépendances : `paragonie/sodium_compat` 2.5.0 → 2.6.0 (validation incorrecte des clés publiques Ed25519, PKSA-32g2-byr9-drtw) et `symfony/http-client` 7.4.14 → 7.4.23 (CVE-2026-121971 `ScopingHttpClient` qui envoie les identifiants vers d'autres origines ; CVE-2026-123119 DNS rebinding `NoPrivateNetworkHttpClient`), avec `symfony/*-contracts` 3.8.1 et polyfills 1.43.0. `composer audit` : aucune vulnérabilité.
+
+### Modifié
+
+- PHP minimum : `>=8.3` dans `composer.json` (avant `>=8.0`, alors que le code utilise déjà `readonly` 8.1+ et que le serveur tourne en 8.3). Corrige les fausses erreurs de syntaxe du language server sur les propriétés `readonly` promues (`AssistantBudgetException`, `AssistantTools`). README et CLAUDE.md alignés.
+
 ## [2.26.1] — 2026-11-22
 
 ### Corrigé

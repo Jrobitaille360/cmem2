@@ -110,7 +110,7 @@ mysql -u root -p < docs/v-2-26-1/build_DB-v-2.26.1.sql
 
 ## Architecture
 
-This is a **modular REST API** built in PHP 8.0+ on a custom micro-framework (no Laravel/Symfony). All requests enter via `index.php`, which bootstraps the app and delegates to a `Router` instance.
+This is a **modular REST API** built in PHP 8.3+ on a custom micro-framework (no Laravel/Symfony). All requests enter via `index.php`, which bootstraps the app and delegates to a `Router` instance.
 
 ### Boot sequence
 
